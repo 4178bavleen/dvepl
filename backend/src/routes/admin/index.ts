@@ -1,22 +1,32 @@
-import adminAuthRouteGroup from "./auth/index";
-import adminReportRouteGroup from "./reports/index";
+// import adminAuthRouteGroup from "./auth/index";
+// import adminReportRouteGroup from "./reports/index";
+// import { FastifyInstance, FastifyPluginOptions } from "fastify";
+
+// async function adminRoutes(fastify: FastifyInstance, options: FastifyPluginOptions) {
+//     // Public routes
+//     fastify.register(adminAuthRouteGroup, { prefix: "/auth" });
+
+//     fastify.register(async function rolesGroup(instance, opts) {
+
+//         instance.addHook("preHandler", async (req, reply) => {
+//             await instance.verifyToken(req, reply);  // 1️⃣ Verify token
+//             await instance.authorizeRoles(["SYSTEM_ADMIN", "INTERNAL_ADMIN"])(req, reply);  // 2️⃣ Verify role
+//         });
+
+//         instance.register(adminReportRouteGroup, { prefix: "/report" });
+//     });
+
+// }
+
+
+// export default adminRoutes;
+
+
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
+import authRoutes from "../../modules/auth/auth.routes";
 
-async function adminRoutes(fastify: FastifyInstance, options: FastifyPluginOptions) {
-    // Public routes
-    fastify.register(adminAuthRouteGroup, { prefix: "/auth" });
-
-    fastify.register(async function rolesGroup(instance, opts) {
-
-        instance.addHook("preHandler", async (req, reply) => {
-            await instance.verifyToken(req, reply);  // 1️⃣ Verify token
-            await instance.authorizeRoles(["SYSTEM_ADMIN", "INTERNAL_ADMIN"])(req, reply);  // 2️⃣ Verify role
-        });
-
-        instance.register(adminReportRouteGroup, { prefix: "/report" });
-    });
-
+export default async function routes(fastify: FastifyInstance) {
+  fastify.register(authRoutes, {
+    prefix: "/auth",
+  });
 }
-
-
-export default adminRoutes;

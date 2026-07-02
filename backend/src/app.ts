@@ -57,8 +57,8 @@ async function buildApp() {
 
   fastify.get("/", async (req, reply) => {
     return reply.view("index", {
-      title: "Whatsapp Saas",
-      message: "Internal tool for creating whatsapp",
+      title: "DVEPL SERVER",
+      message: "An ERP portal for DVEPL",
     });
   });
 

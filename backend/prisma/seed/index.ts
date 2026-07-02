@@ -1,19 +1,25 @@
-import "dotenv/config";
 import { prisma } from "../../src/lib/prisma";
-import hashUtil from "../../src/utils/hashPassword";
-import { seedCompany, seedRole, seedAdmin } from "./admin/index";
+
+import { seedOrganization } from "./Organization";
+import { seedAuth } from "./auth";
+import { seedHRMS } from "./hrms";
 
 async function main() {
-  const companyId = await seedCompany(prisma);
-  const roleId = await seedRole(prisma, companyId);
-  await seedAdmin(prisma, companyId, roleId, hashUtil);
+  console.log("Starting Database Seed");
+
+  const organization = await seedOrganization();
+
+  await seedAuth(prisma,{
+    companyId: organization.company.id,
+  });
+
+  await seedHRMS();
+
+  console.log("✅ Database Seed Completed");
 }
 
 main()
-  .catch((e) => {
-    console.error("❌ Seed failed:", e);
-    process.exit(1);
-  })
+  .catch(console.error)
   .finally(async () => {
     await prisma.$disconnect();
   });

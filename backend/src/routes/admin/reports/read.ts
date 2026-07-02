@@ -1,8 +1,7 @@
-import { PrismaClient } from "../../../generated/prisma/client";
 import loginSchema from "../../../schemas/admin/auth/auth.schema";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 
-const prisma = new PrismaClient();
+
 
 async function adminReportReadRouteGroup(fastify: FastifyInstance, options: FastifyPluginOptions) {
 
