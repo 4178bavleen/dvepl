@@ -58,4 +58,3 @@ export const userLogs = createCustomLogger("user", 20);
 export const customerLogs = createCustomLogger("customer", 20);
 export const commonLogs = createCustomLogger("common", 10);
 export const kafkaLogs = createCustomLogger("kafka", 10);
-

@@ -1,15 +1,16 @@
-import bcrypt from "bcrypt";
+
+import {hashPassword , comparePassword} from "../../../src/utils/hashPassword";
 
 export async function seedAdmin(prisma: any, companyId: string) {
-    const passwordHash = await bcrypt.hash("Admin@123", 10);
+    const passwordHash = await hashPassword("Admin@123");
 
-    return prisma.user.upsert({
+    const adminUser = await prisma.user.upsert({
         where: {
             email: "admin@vibrantick.com",
         },
         update: {
             isActive: true,
-            isEmailVerified: true
+            isEmailVerified: true,
         },
         create: {
             companyId,
@@ -18,4 +19,30 @@ export async function seedAdmin(prisma: any, companyId: string) {
             isEmailVerified: true,
         },
     });
+
+    const adminRole = await prisma.role.findFirst({
+        where: {
+            name: "Admin",
+        },
+    });
+
+    if (!adminRole) {
+        throw new Error("Admin role not found");
+    }
+
+    await prisma.userRole.upsert({
+        where: {
+            userId_roleId: {
+                userId: adminUser.id,
+                roleId: adminRole.id,
+            },
+        },
+        update: {},
+        create: {
+            userId: adminUser.id,
+            roleId: adminRole.id,
+        },
+    });
+
+    return adminUser;
 }

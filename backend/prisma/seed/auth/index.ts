@@ -2,6 +2,7 @@ import { seedPermissionGroups } from "./permission-group.seed";
 import { seedPermissions } from "./permission.seed";
 import { seedRole } from "./role.seed";
 import { seedAdmin } from "./admin.seed";
+import { seedRolePermissions } from "./role-permission.seed";
 
 
 interface SeedAuthParams {
@@ -11,11 +12,18 @@ interface SeedAuthParams {
 export async function seedAuth(prisma: any, { companyId }: SeedAuthParams) {
   console.log("🌱 Seeding Authentication...");
 
-  const roles = await seedRole(prisma, companyId);
-  const admin = await seedAdmin(prisma,companyId);
+await seedPermissionGroups(prisma);    // permission groups 
+ 
+await seedPermissions(prisma);           
 
-  return {
-    roles,
-    admin,
-  };
+const role = await seedRole(prisma, companyId);
+
+await seedRolePermissions(prisma, companyId);
+
+const admin = await seedAdmin(prisma, companyId);
+
+return {
+  role,
+  admin,
+};
 }

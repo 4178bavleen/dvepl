@@ -28,6 +28,8 @@ async function authPlugin(fastify: FastifyInstance) {
 
         const decoded: any = await request.jwtVerify();
 
+
+        console.log("Decoded JWT:", decoded);
         // Eventually these roles & permissions should come from the database.
         request.user = {
           id: decoded.userId,

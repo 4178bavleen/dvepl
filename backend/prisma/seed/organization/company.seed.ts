@@ -1,5 +1,5 @@
 
-export async function seedCompany() {
+export async function seedCompany(prisma: any, companyId: string) {
   return prisma.company.upsert({
     where: {
       gst: "07ABCDE1234F1Z5",

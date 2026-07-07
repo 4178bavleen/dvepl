@@ -1,5 +1,5 @@
 
-export async function seedDepartment(branchId: string) {
+export async function seedDepartment(prisma:any,branchId: string) {
   const departments = [
     { name: "Sales", code: "SALES" },
     { name: "Human Resources", code: "HR" },

@@ -1,10 +1,17 @@
-import hashUtil from "../../../utils/hashPassword";
-import loginSchema from "../../../schemas/admin/auth/auth.schema";
-import { FastifyInstance, FastifyPluginOptions } from "fastify";
+import { FastifyInstance, FastifyPluginOptions, FastifyReply, FastifyRequest } from "fastify";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+
+import { adminLogs } from "../../../services/logger/contextLogger";
+import { loginSchema } from "../../../schemas/admin/auth/auth.schema";
+import { getExpiryTime } from "../../../utils/getExpirytime";
+
+const jwtSecret = process.env.JWT_SECRET || "SecretKey";
+const jwtExpiration = process.env.JWT_EXPIRATION || "1h";
 
 async function adminLoginRoutes(
   fastify: FastifyInstance,
-  options: FastifyPluginOptions,
+  options: FastifyPluginOptions
 ) {
   fastify.post(
     "/",
@@ -13,89 +20,126 @@ async function adminLoginRoutes(
         tags: ["Auth"],
         summary: "Admin Login",
         description: "Login using email and password",
-
-        body: {
-          type: "object",
-          required: ["email", "password"],
-          properties: {
-            email: { type: "string" },
-            password: { type: "string" },
-          },
-        },
       },
     },
-    async (request: any, reply: any) => {
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         const validationResult = loginSchema.safeParse(request.body);
+
         if (!validationResult.success) {
-          fastify.adminLogger.error("Invalid data", {
+          adminLogs.error("Invalid data for login", {
             error: validationResult.error,
           });
 
           return reply.status(400).send({
             success: false,
             message: "Invalid data for auth.",
+            error:
+              process.env.NODE_ENV === "development"
+                ? validationResult.error.issues
+                : "Invalid credentials",
           });
         }
 
         const { email, password } = validationResult.data;
 
-        fastify.adminLogger.error(`Login Attmpted ${email}`);
-
-        const existingAdmin = await fastify.prisma.admin.findUnique({
-          where: { email },
+        const existingUser = await fastify.prisma.user.findFirst({
+          where: {
+            email,
+            isActive: true,
+          },
           include: {
-            role: true,
+            userRoles: {
+              include: {
+                role: {
+                  include: {
+                    rolePermissions: {
+                      include: {
+                        permission: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
         });
 
-        if (!existingAdmin) {
-          return reply.status(401).send({
+        if (!existingUser) {
+          return reply.status(404).send({
             success: false,
-            message: "Invalid Email Address.",
+            message: "Invalid email address for authentication",
           });
         }
 
-        const isMatch = await hashUtil.comparePassword(
+        const isPasswordValid = await bcrypt.compare(
           password,
-          existingAdmin.password,
+          existingUser.passwordHash
         );
 
-        if (!isMatch) {
-          return reply.status(401).send({
+        if (!isPasswordValid) {
+          return reply.status(403).send({
             success: false,
-            message: "Invalid Password",
+            message: "Invalid password",
           });
         }
-
-        const token = fastify.jwt.sign(
-          {
-            id: existingAdmin.id,
-            roleType: existingAdmin.role?.roleType ?? null,
-            tokenVersion: existingAdmin.tokenVersion,
-          },
-          {
-            expiresIn: process.env.JWT_EXPIRATION || "1h",
-          },
+        const roles = existingUser.userRoles.map(
+          (ur) => ur.role.name
         );
 
-        fastify.adminLogger.info(`Admin logged in: ${email}`);
+        const permissions = [
+          ...new Set(
+            existingUser.userRoles.flatMap((ur) =>
+              ur.role.rolePermissions.map(
+                (rp) => rp.permission.code
+              )
+            ),
+          ),
+        ];
+        
 
-        reply.send({
-          success: true,
-          message: "Login successful",
-          token,
+        const token = jwt.sign(
+          {
+            userId: existingUser.id,
+            companyId: existingUser.companyId,
+            roles,
+            permissions,
+            tokenVersion: existingUser.tokenVersion,
+          },
+          jwtSecret,
+          {
+            expiresIn: jwtExpiration,
+          }
+        );
+        const expiresAt = getExpiryTime(jwtExpiration);
+
+        adminLogs.info("Admin login attempt", {
+          adminId: existingUser.id,
+          email: existingUser.email,
         });
-      } catch (error: string | any) {
-        fastify.adminLogger.error(`Login failed ${error}`);
+
+        return reply.status(200).send({
+          success: true,
+          message: "Login successfully",
+          token,
+          name: existingUser.name,
+          expiresAt,
+        });
+      } catch (error: any) {
+        adminLogs.error("Admin login failed", {
+          error,
+        });
+
         return reply.status(500).send({
           success: false,
           message: "Server error during login. Please try again later.",
           details:
-            process.env.NODE_ENV === "development" ? error.message : error.message,
+            process.env.NODE_ENV === "development"
+              ? error.message
+              : undefined,
         });
       }
-    },
+    }
   );
 }
 

@@ -1,5 +1,5 @@
 
-export async function seedBranch(companyId: string) {
+export async function seedBranch(prisma:any,companyId: string) {
   return prisma.branch.upsert({
     where: {
       companyId_code: {

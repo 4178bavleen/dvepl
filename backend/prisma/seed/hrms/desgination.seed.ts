@@ -1,5 +1,4 @@
-
-export async function seedDesignation() {
+export async function seedDesignation(prisma: any) {
   console.log(" Seeding Designations...");
 
   const designations = [

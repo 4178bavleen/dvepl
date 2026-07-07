@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const loginSchema = z
+export const loginSchema = z
     .object({
         email: z.email({ message: "Invalid email address" }),
         password: z
@@ -13,5 +13,3 @@ const loginSchema = z
             ), // Updated syntax
     })
     .strict();
-
-export default loginSchema;

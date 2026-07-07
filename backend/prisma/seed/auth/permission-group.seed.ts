@@ -1,7 +1,7 @@
-import prisma from "../../client";
+
 import { PERMISSION_GROUPS } from "./constants";
 
-export async function seedPermissionGroups() {
+export async function seedPermissionGroups(prisma: any) {
   console.log(" Seeding Permission Groups...");
 
   const groups = Object.values(PERMISSION_GROUPS);
