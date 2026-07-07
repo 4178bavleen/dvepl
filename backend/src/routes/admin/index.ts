@@ -1,5 +1,10 @@
 import adminAuthRouteGroup from "./auth/index";
-import adminReportRouteGroup from "./reports/index";
+import adminBranchRouteGroup from "./branch/index";
+import adminCompanyRouteGroup from "./company/index";
+import adminUserRouteGroup from "./user/index";
+import adminRoleRouteGroup from "./role";
+import adminPermissionRouteGroup from "./permission/index";
+
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 
 async function adminRoutes(fastify: FastifyInstance, options: FastifyPluginOptions) {
@@ -8,15 +13,28 @@ async function adminRoutes(fastify: FastifyInstance, options: FastifyPluginOptio
 
     fastify.register(async function rolesGroup(instance, opts) {
 
+
+        //runs automatically before every req
         instance.addHook("preHandler", async (req, reply) => {
             await instance.verifyToken(req, reply);  // 1️⃣ Verify token
-            await instance.authorizeRoles(["SYSTEM_ADMIN", "INTERNAL_ADMIN"])(req, reply);  // 2️⃣ Verify role
+            await instance.authorizePermissions(["company.create"])(req, reply);  // 2️⃣ Verify role
         });
 
-        instance.register(adminReportRouteGroup, { prefix: "/report" });
+        instance.register(adminBranchRouteGroup, { prefix: "/branch" });
+        instance.register(adminCompanyRouteGroup, { prefix: "/company" });
+        instance.register(adminUserRouteGroup, { prefix: "/user" });
+        instance.register(adminRoleRouteGroup, {
+            prefix: "/role",
+        });
+        instance.register(adminPermissionRouteGroup, {
+            prefix: "/permission",
+        });
+
     });
 
 }
 
 
 export default adminRoutes;
+
+

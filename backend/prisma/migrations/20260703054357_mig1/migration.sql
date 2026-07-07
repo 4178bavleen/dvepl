@@ -1,13 +1,3 @@
-/*
-  Warnings:
-
-  - You are about to drop the `Admin` table. If the table is not empty, all the data it contains will be lost.
-  - You are about to drop the `AdminPermission` table. If the table is not empty, all the data it contains will be lost.
-  - You are about to drop the `Permission` table. If the table is not empty, all the data it contains will be lost.
-  - You are about to drop the `Role` table. If the table is not empty, all the data it contains will be lost.
-  - You are about to drop the `RolePermission` table. If the table is not empty, all the data it contains will be lost.
-
-*/
 -- CreateEnum
 CREATE TYPE "OtpPurpose" AS ENUM ('LOGIN', 'PHONE_VERIFICATION', 'PASSWORD_RESET');
 
@@ -34,51 +24,6 @@ CREATE TYPE "LeadSource" AS ENUM ('WEBSITE', 'REFERRAL', 'EMAIL', 'WHATSAPP', 'M
 
 -- CreateEnum
 CREATE TYPE "LeadStatus" AS ENUM ('NEW', 'ASSIGNED', 'CONTACTED', 'QUALIFIED', 'TENDER', 'QUOTATION', 'WON', 'LOST');
-
--- DropForeignKey
-ALTER TABLE "Admin" DROP CONSTRAINT "Admin_roleId_fkey";
-
--- DropForeignKey
-ALTER TABLE "AdminPermission" DROP CONSTRAINT "AdminPermission_adminId_fkey";
-
--- DropForeignKey
-ALTER TABLE "AdminPermission" DROP CONSTRAINT "AdminPermission_permissionId_fkey";
-
--- DropForeignKey
-ALTER TABLE "RolePermission" DROP CONSTRAINT "RolePermission_permissionId_fkey";
-
--- DropForeignKey
-ALTER TABLE "RolePermission" DROP CONSTRAINT "RolePermission_roleId_fkey";
-
--- DropTable
-DROP TABLE "Admin";
-
--- DropTable
-DROP TABLE "AdminPermission";
-
--- DropTable
-DROP TABLE "Permission";
-
--- DropTable
-DROP TABLE "Role";
-
--- DropTable
-DROP TABLE "RolePermission";
-
--- DropEnum
-DROP TYPE "Action";
-
--- DropEnum
-DROP TYPE "PermissionEffect";
-
--- DropEnum
-DROP TYPE "PermissionScope";
-
--- DropEnum
-DROP TYPE "Resource";
-
--- DropEnum
-DROP TYPE "RoleType";
 
 -- CreateTable
 CREATE TABLE "companies" (
@@ -192,8 +137,8 @@ CREATE TABLE "refresh_tokens" (
     "userId" TEXT NOT NULL,
     "token" TEXT NOT NULL,
     "expiresAt" TIMESTAMP(3) NOT NULL,
-    "revoked" BOOLEAN NOT NULL DEFAULT false,
-    "ipAddress" TEXT,
+    "revokedAt" TIMESTAMP(3),
+    "ipAddress" TEXT NOT NULL,
     "userAgent" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -208,7 +153,7 @@ CREATE TABLE "user_sessions" (
     "deviceName" TEXT,
     "ipAddress" TEXT,
     "userAgent" TEXT,
-    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "loggedOutAt" TIMESTAMP(3),
     "lastSeenAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -222,7 +167,7 @@ CREATE TABLE "otp_requests" (
     "otpHash" TEXT NOT NULL,
     "purpose" "OtpPurpose" NOT NULL,
     "expiresAt" TIMESTAMP(3) NOT NULL,
-    "verifiedAt" TIMESTAMP(3),
+    "consumedAt" TIMESTAMP(3),
     "attempts" INTEGER NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -236,6 +181,8 @@ CREATE TABLE "password_resets" (
     "tokenHash" TEXT NOT NULL,
     "expiresAt" TIMESTAMP(3) NOT NULL,
     "usedAt" TIMESTAMP(3),
+    "requestedIp" TEXT,
+    "requestedUserAgent" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "password_resets_pkey" PRIMARY KEY ("id")
@@ -637,6 +584,12 @@ CREATE UNIQUE INDEX "employees_employeeCode_key" ON "employees"("employeeCode");
 
 -- CreateIndex
 CREATE INDEX "employees_companyId_idx" ON "employees"("companyId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "shifts_name_key" ON "shifts"("name");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "holidays_name_key" ON "holidays"("name");
 
 -- CreateIndex
 CREATE INDEX "attendance_employeeId_idx" ON "attendance"("employeeId");

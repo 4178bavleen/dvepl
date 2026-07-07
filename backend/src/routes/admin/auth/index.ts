@@ -1,11 +1,11 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
-import loginRoute from "./login";
+import adminLoginRoutes from "./login";
 
 async function adminAuthRouteGroup(
     fastify: FastifyInstance,
     options: FastifyPluginOptions
 ) {
-    fastify.register(loginRoute, { prefix: "/login" });
+    fastify.register(adminLoginRoutes, { prefix: "/login" });
 }
 
 export default adminAuthRouteGroup;
