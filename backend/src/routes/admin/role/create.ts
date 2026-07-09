@@ -41,7 +41,7 @@ async function createRoleRoute(
                 const { name, description, permissionIds } =
                     validationResult.data;
 
-                const companyId = request.user?.companyId;
+                const companyId = (request.user as any)?.companyId;
 
                 if (!companyId) {
                     return reply.status(401).send({

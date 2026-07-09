@@ -22,4 +22,9 @@ interface FastifyInstance {
         reply: FastifyReply
     ) => Promise<void>;
 }
+interface FastifySchema {
+  tags?: string[];
+  summary?: string;
+  description?: string;
+}
 }

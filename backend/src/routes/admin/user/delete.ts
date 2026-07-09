@@ -25,12 +25,12 @@ async function deleteUserRoute(
       ],
     },
     async (
-      request: FastifyRequest<{ Params: { id: string } }>,
+      request: FastifyRequest,
       reply: FastifyReply
     ) => {
       try {
-        const companyId = request.user?.companyId;
-        const loggedInUserId = request.user?.id;
+        const companyId = (request.user as any)?.companyId;
+        const loggedInUserId = (request.user as any)?.id?.toString();
 
         if (!companyId) {
           return reply.status(401).send({
@@ -39,7 +39,7 @@ async function deleteUserRoute(
           });
         }
 
-        const { id } = request.params;
+        const { id } = request.params as { id: string };
 
         // Prevent self deletion
         if (id === loggedInUserId) {

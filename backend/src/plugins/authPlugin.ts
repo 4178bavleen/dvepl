@@ -31,7 +31,7 @@ async function authPlugin(fastify: FastifyInstance) {
 
         console.log("Decoded JWT:", decoded);
         // Eventually these roles & permissions should come from the database.
-        request.user = {
+        (request as any).user = {
           id: decoded.userId,
           companyId: decoded.companyId,
           roles: decoded.roles || [],
@@ -61,7 +61,7 @@ async function authPlugin(fastify: FastifyInstance) {
           return;
         }
 
-        const userPermissions = request.user?.permissions || [];
+        const userPermissions = (request.user as any)?.permissions || [];
 
         const hasPermission = userPermissions.some((permission: string) =>
           allowedPermissions.includes(permission)

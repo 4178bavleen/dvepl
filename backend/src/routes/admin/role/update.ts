@@ -26,7 +26,7 @@ async function updateRoleRoute(
       ],
     },
     async (
-      request: FastifyRequest<{ Params: { id: string } }>,
+      request: FastifyRequest,
       reply: FastifyReply
     ) => {
       try {
@@ -47,11 +47,11 @@ async function updateRoleRoute(
           });
         }
 
-        const { id } = request.params;
+        const { id } = request.params as { id: string };
 
         const { name, description, permissionIds } = validation.data;
 
-        const companyId = request.user?.companyId;
+        const companyId = (request.user as any)?.companyId;
 
         //--------------------------------
         // Check Role

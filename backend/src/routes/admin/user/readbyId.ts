@@ -24,10 +24,10 @@ async function readUserByIdRoute(
                 fastify.authorizePermissions(["user.view"]),
             ],
         },
-        async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+        async (request: FastifyRequest, reply: FastifyReply) => {
             try {
 
-                const companyId = request.user?.companyId;
+                const companyId = (request.user as any)?.companyId;
 
                 if (!companyId) {
                     return reply.status(401).send({
@@ -36,7 +36,7 @@ async function readUserByIdRoute(
                     });
                 }
 
-                const { id } = request.params;
+                const { id } = request.params as { id: string };
 
                 const user = await fastify.prisma.user.findFirst({
                     where: {

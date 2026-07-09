@@ -1,5 +1,5 @@
-import loginSchema from "../../../schemas/admin/auth/auth.schema";
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
+import { adminLogs } from "../../../services/logger/contextLogger";
 
 
 
@@ -18,7 +18,7 @@ async function adminReportReadRouteGroup(fastify: FastifyInstance, options: Fast
             });
 
         } catch (error: string | any) {
-            options.adminLogger.error(`Report Api failed ${error}`);
+            adminLogs.error(`Report Api failed ${error}`);
             return reply.status(500).send({
                 success: false,
                 message: "Server error during login. Please try again later.",

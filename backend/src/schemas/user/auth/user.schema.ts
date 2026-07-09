@@ -2,9 +2,8 @@ import { z } from "zod";
 
 export const createUserSchema = z.object({
   email: z
-    .string({
-      required_error: "Email is required",
-    })
+    .string()
+    .min(1, "Email is required")
     .email("Invalid email address")
     .trim()
     .toLowerCase(),
@@ -15,9 +14,8 @@ export const createUserSchema = z.object({
     .optional(),
 
   password: z
-    .string({
-      required_error: "Password is required",
-    })
+    .string()
+    .min(1, "Password is required")
     .min(8, "Password must be at least 8 characters")
     .max(32, "Password cannot exceed 32 characters")
     .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
