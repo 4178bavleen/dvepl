@@ -5,8 +5,7 @@ import fastifyEnv from "@fastify/env";
 import fastifyJwt from "@fastify/jwt";
 import formbody from "@fastify/formbody";
 import path from "path";
-import swagger from "@fastify/swagger";
-import swaggerUI from "@fastify/swagger-ui";
+
 
 //Logger
 import { adminLogs as AdminLogger } from "./services/logger/contextLogger";
@@ -68,42 +67,6 @@ async function buildApp() {
     }
   });
 
-  // Swagger
-  fastify.register(swagger, {
-    mode: "dynamic",
-    openapi: {
-      openapi: "3.0.0",
-      info: {
-        title: "Whatsapp Saas API Documentation",
-        version: "1.0.0",
-      },
-      components: {
-        securitySchemes: {
-          bearerAuth: {
-            type: "http",
-            scheme: "bearer",
-            bearerFormat: "JWT",
-          },
-        },
-      },
-      security: [{ bearerAuth: [] }],
-    },
-  });
-
-  fastify.addHook("onRequest", async (req, reply) => {
-    if (req.url.startsWith("/docs")) {
-      AdminLogger.info(`Swagger docs viewed from: ${req.ip}`);
-    }
-  });
-
-  fastify.register(swaggerUI, {
-    routePrefix: "/docs",
-    uiConfig: {
-      docExpansion: "none",
-      deepLinking: true,
-      persistAuthorization: true,
-    },
-  });
 
   fastify.register(formbody);
 

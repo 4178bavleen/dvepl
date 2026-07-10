@@ -26,7 +26,7 @@ async function updateUserRoute(
       ],
     },
     async (
-      request: FastifyRequest<{ Params: { id: string } }>,
+      request: FastifyRequest,
       reply: FastifyReply
     ) => {
       try {
@@ -47,7 +47,7 @@ async function updateUserRoute(
           });
         }
 
-        const companyId = request.user?.companyId;
+        const companyId = (request.user as any)?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({
@@ -56,7 +56,7 @@ async function updateUserRoute(
           });
         }
 
-        const { id } = request.params;
+        const { id } = request.params as { id: string };
 
         const { email, phone, isActive, roleIds } =
           validationResult.data;

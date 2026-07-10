@@ -104,7 +104,7 @@ async function adminLoginRoutes(
             companyId: existingUser.companyId,
             roles,
             permissions,
-            tokenVersion: existingUser.tokenVersion,
+            tokenVersion: (existingUser as any).tokenVersion,
           },
           jwtSecret,
           {
@@ -122,7 +122,7 @@ async function adminLoginRoutes(
           success: true,
           message: "Login successfully",
           token,
-          name: existingUser.name,
+          name: (existingUser as any).name,
           expiresAt,
         });
       } catch (error: any) {

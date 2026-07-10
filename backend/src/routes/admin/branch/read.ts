@@ -1,4 +1,5 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
+import { adminLogs } from "../../../services/logger/contextLogger";
 
 async function adminBranchReadRoutes(
   fastify: FastifyInstance,
@@ -34,7 +35,7 @@ async function adminBranchReadRoutes(
           data,
         });
       } catch (error: string | any) {
-        fastify.adminLogger.error(`Failed to retrieve branch information ${error}`);
+        adminLogs.error(`Failed to retrieve branch information ${error}`);
         return reply.status(500).send({
           success: false,
           message: "Server error during branch information retrieval. Please try again later.",

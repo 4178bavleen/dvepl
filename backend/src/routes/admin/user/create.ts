@@ -54,7 +54,7 @@ async function createUserRoute(
         // ======================================================
         // Get Company ID From JWT
         // ======================================================
-        const companyId = request.user?.companyId;
+        const companyId = (request.user as any)?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({

@@ -25,13 +25,13 @@ async function deleteRoleRoute(
       ],
     },
     async (
-      request: FastifyRequest<{ Params: { id: string } }>,
+      request: FastifyRequest,
       reply: FastifyReply
     ) => {
       try {
-        const { id } = request.params;
+        const { id } = request.params as { id: string };
 
-        const companyId = request.user?.companyId;
+        const companyId = (request.user as any)?.companyId;
 
         //--------------------------------
         // Check Role
