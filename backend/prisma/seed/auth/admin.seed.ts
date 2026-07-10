@@ -14,6 +14,7 @@ export async function seedAdmin(prisma: any, companyId: string) {
         },
         create: {
             companyId,
+            name:"Admin",
             email: "admin@vibrantick.com",
             passwordHash,
             isEmailVerified: true,

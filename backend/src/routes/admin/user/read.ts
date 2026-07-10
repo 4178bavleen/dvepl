@@ -46,7 +46,7 @@ async function readUsersRoute(
         const users = await fastify.prisma.user.findMany({
           where: {
             companyId,
-            deletedAt: null,
+            // deletedAt: null,
           },
           include: {
             userRoles: {
@@ -59,6 +59,7 @@ async function readUsersRoute(
             createdAt: "desc",
           },
         });
+        console.log("users coming from read API " ,users)
 
         //---------------------------------------
         // Response

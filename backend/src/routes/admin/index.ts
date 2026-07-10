@@ -4,6 +4,7 @@ import adminCompanyRouteGroup from "./company/index";
 import adminUserRouteGroup from "./user/index";
 import adminRoleRouteGroup from "./role";
 import adminPermissionRouteGroup from "./permission/index";
+import accessRoutes from "./access";
 
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 
@@ -29,6 +30,9 @@ async function adminRoutes(fastify: FastifyInstance, options: FastifyPluginOptio
         instance.register(adminPermissionRouteGroup, {
             prefix: "/permission",
         });
+        fastify.register(accessRoutes,{
+    prefix:"/user/access"
+});
 
     });
 

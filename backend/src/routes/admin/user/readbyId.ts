@@ -60,20 +60,27 @@ async function readUserByIdRoute(
                     });
                 }
 
-                return reply.send({
+                  return reply.send({
                     success: true,
                     data: {
-                        id: user.id,
-                        email: user.email,
-                        phone: user.phone,
-                        isActive: user.isActive,
-                        isEmailVerified: user.isEmailVerified,
-                        isPhoneVerified: user.isPhoneVerified,
-                        roleIds: user.userRoles.map((r) => r.role.id),
-                        roles: user.userRoles.map((r) => ({
-                            id: r.role.id,
-                            name: r.role.name,
+                        user: {
+                            id: user.id,
+                            name: user.name,
+                            email: user.email,
+                            phone: user.phone,
+                            isActive: user.isActive,
+                        },
+
+                        roles: user.userRoles.map((userRole) => ({
+                            id: userRole.role.id,
+                            name: userRole.role.name,
                         })),
+
+                        permissions: [
+                            "user.create",
+                            "user.view",
+                            "lead.assign",
+                        ],
                     },
                 });
 
@@ -83,14 +90,7 @@ async function readUserByIdRoute(
                     error,
                 });
 
-                return reply.status(500).send({
-                    success: false,
-                    message: "Server error.",
-                    details:
-                        process.env.NODE_ENV === "development"
-                            ? error.message
-                            : undefined,
-                });
+           
 
             }
         }

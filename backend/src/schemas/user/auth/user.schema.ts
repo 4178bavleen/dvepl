@@ -8,6 +8,9 @@ export const createUserSchema = z.object({
     .email("Invalid email address")
     .trim()
     .toLowerCase(),
+    name: z 
+    .string()
+    .optional(),
 
   phone: z
     .string()
