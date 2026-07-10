@@ -142,6 +142,7 @@ model CostCenter {
 
 model User {
   id        String  @id @default(uuid())
+  name       String?
   companyId String
   company   Company @relation(fields: [companyId], references: [id])
 
@@ -159,7 +160,8 @@ model User {
   otpRequests         OtpRequest[]
   passwordResets      PasswordReset[]
   userRoles           UserRole[]
-  permissionOverrides UserPermissionOverride[]
+ 
+  userPermissions UserPermission[]
   leadsAssigned       Lead[]                   @relation("LeadAssignedTo")
   communicationLogs   CommunicationHistory[]
   auditLogs           AuditLog[]
@@ -289,9 +291,9 @@ model Permission {
 
   code        String  @unique // e.g. "tender.create", "tender.approve"
   description String?
-
+  userPermissions UserPermission[]
   rolePermissions RolePermission[]
-  userOverrides   UserPermissionOverride[]
+  
 
   @@map("permissions")
 }
@@ -323,21 +325,23 @@ model UserRole {
 }
 
 // Explicit allow/deny overrides for a specific user, on top of role permissions
-model UserPermissionOverride {
-  id           String     @id @default(uuid())
-  userId       String
-  user         User       @relation(fields: [userId], references: [id])
-  permissionId String
-  permission   Permission @relation(fields: [permissionId], references: [id])
 
-  effect OverrideEffect // ALLOW or DENY
+model UserPermission {
+  id            String @id @default(uuid())
 
-  createdAt DateTime @default(now())
+  userId        String
+  permissionId  String
 
-  @@unique([userId, permissionId])
-  @@map("user_permission_overrides")
+  allowed       Boolean @default(true)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user          User @relation(fields:[userId],references:[id])
+  permission    Permission @relation(fields:[permissionId],references:[id])
+
+  @@unique([userId,permissionId])
 }
-
 enum OverrideEffect {
   ALLOW
   DENY

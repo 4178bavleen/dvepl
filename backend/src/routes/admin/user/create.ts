@@ -48,7 +48,7 @@ async function createUserRoute(
           });
         }
 
-        const { email, phone, password, roleIds } =
+        const { email, phone, password, roleIds ,name} =
           validationResult.data;
 
         // ======================================================
@@ -134,6 +134,7 @@ async function createUserRoute(
             const user = await tx.user.create({
               data: {
                 companyId,
+                name,
                 email,
                 phone,
                 passwordHash,

@@ -75,7 +75,7 @@ async function buildApp() {
     type: "object",
     required: ["PORT"],
     properties: {
-      PORT: { type: "number", default: 3000 },
+      PORT: { type: "number", default: 8000 },
       NODE_ENV: { type: "string", default: "development" },
       APP_NAME: { type: "string", default: "FastifyApp" },
     },
