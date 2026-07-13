@@ -54,6 +54,7 @@ async function adminLoginRoutes(
             isActive: true,
           },
           include: {
+            company: true,
             userRoles: {
               include: {
                 role: {
@@ -122,8 +123,16 @@ async function adminLoginRoutes(
           success: true,
           message: "Login successfully",
           token,
-          name: (existingUser as any).name,
           expiresAt,
+
+          user: {
+            id: existingUser.id,
+            name: existingUser.name,
+            email: existingUser.email,
+            company: existingUser.company?.name ?? null,
+            roles,
+            permissions,
+          },
         });
       } catch (error: any) {
         adminLogs.error("Admin login failed", {
