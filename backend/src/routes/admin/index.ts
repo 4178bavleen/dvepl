@@ -5,22 +5,26 @@ import adminUserRouteGroup from "./user/index";
 import adminRoleRouteGroup from "./role";
 import adminPermissionRouteGroup from "./permission/index";
 import accessRoutes from "./access";
-import permissionGroupRoutes from "./permission-group";
+import permissionGroupRoutes from "./permissionGroup";
 
 
 import adminEmployeeRouteGroup from './employee'
-import adminEmployeeContactRouteGroup from './employee-contact'
-import adminEmployeeEmergencyContactRouteGroup from './employee-emergency-contact'
-import adminEmployeeEducationRouteGroup from './employee-education'
-import adminEmployeeExperienceRouteGroup from './employee-experience'
-import adminEmployeeDocumentRouteGroup from './employee-document'
-import adminShiftRouteGroup from './employee-shift'
-import adminEmployeeShiftRouteGroup from './employee-shift'
+import adminEmployeeContactRouteGroup from './employeeContact'
+import adminEmployeeEmergencyContactRouteGroup from './employeeEmergencyContact'
+import adminEmployeeEducationRouteGroup from './employeeEducation'
+import adminEmployeeExperienceRouteGroup from './employeeExperience'
+import adminEmployeeDocumentRouteGroup from './employeeDocument'
+import adminShiftRouteGroup from './shift'
+import adminEmployeeShiftRouteGroup from './employeeShift'
 import adminHolidayRouteGroup from './holiday'
 import adminAttendanceRouteGroup from './attendance'
 import adminLeaveRouteGroup from './leave'
 import adminSalaryRouteGroup from './salary'
-
+import adminCustomerRouteGroup from "./customer/index"
+import adminContactRouteGroup from "./contact/index"
+import adminCommunicationRouteGroup from "./communication/index"
+import adminLeadRouteGroup from "./lead/index"
+import adminLeadActivityRouteGroup from "./leadActivity/index"
 
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 
@@ -86,6 +90,11 @@ async function adminRoutes(
     instance.register(adminSalaryRouteGroup, {
       prefix: "/salary",
     });
+    instance.register(adminCustomerRouteGroup, { prefix: "/customer" });
+    instance.register(adminContactRouteGroup, { prefix: "/contact" });
+    instance.register(adminCommunicationRouteGroup, { prefix: "/communication" });
+    instance.register(adminLeadRouteGroup, { prefix: "/lead" });
+    instance.register(adminLeadActivityRouteGroup, { prefix: "/leadActivity" });
     fastify.register(accessRoutes, {
       prefix: "/user/access",
     });
