@@ -10,9 +10,9 @@ async function adminEmployeeEducationRouteGroup(
   options: FastifyPluginOptions
 ) {
   fastify.register(createEmployeeEducationRoute, { prefix: "/create" });
-  fastify.register(readEmployeeEducationRoutes, { prefix: "/" });
-  fastify.register(updateEmployeeEducationRoutes, { prefix: "/" });
-  fastify.register(deleteEmployeeEducationRoute, { prefix: "/" });
+  fastify.register(readEmployeeEducationRoutes, { prefix: "/read" });
+  fastify.register(updateEmployeeEducationRoutes, { prefix: "/update" });
+  fastify.register(deleteEmployeeEducationRoute, { prefix: "/delete" });
 }
 
 export default adminEmployeeEducationRouteGroup;

@@ -10,9 +10,9 @@ async function adminAttendanceRouteGroup(
   options: FastifyPluginOptions
 ) {
   fastify.register(createAttendanceRoute, { prefix: "/create" });
-  fastify.register(readAttendanceRoutes, { prefix: "/" });
-  fastify.register(updateAttendanceRoutes, { prefix: "/" });
-  fastify.register(deleteAttendanceRoute, { prefix: "/" });
+  fastify.register(readAttendanceRoutes, { prefix: "/read" });
+  fastify.register(updateAttendanceRoutes, { prefix: "/update" });
+  fastify.register(deleteAttendanceRoute, { prefix: "/delete" });
 }
 
 export default adminAttendanceRouteGroup;

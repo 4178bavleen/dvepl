@@ -10,9 +10,9 @@ async function adminEmployeeContactRouteGroup(
   options: FastifyPluginOptions
 ) {
   fastify.register(createEmployeeContactRoute, { prefix: "/create" });
-  fastify.register(readEmployeeContactRoutes, { prefix: "/" });
-  fastify.register(updateEmployeeContactRoutes, { prefix: "/" });
-  fastify.register(deleteEmployeeContactRoute, { prefix: "/" });
+  fastify.register(readEmployeeContactRoutes, { prefix: "/read" });
+  fastify.register(updateEmployeeContactRoutes, { prefix: "/update" });
+  fastify.register(deleteEmployeeContactRoute, { prefix: "/delete" });
 }
 
 export default adminEmployeeContactRouteGroup;

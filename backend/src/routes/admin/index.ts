@@ -17,6 +17,11 @@ import adminAttendanceRouteGroup from "./attendance/index";
 import adminLeaveRouteGroup from "./leave/index";
 import adminSalaryRouteGroup from "./salary/index";
 import accessRoutes from "./access";
+import adminCustomerRouteGroup from "./customer/index";
+import adminContactRouteGroup from "./contact/index";
+import adminCommunicationRouteGroup from "./communication/index";
+import adminLeadRouteGroup from "./lead/index";
+import adminLeadActivityRouteGroup from "./leadActivity/index";
 
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 
@@ -78,9 +83,14 @@ async function adminRoutes(fastify: FastifyInstance, options: FastifyPluginOptio
         instance.register(adminSalaryRouteGroup, {
             prefix: "/salary",
         });
+        instance.register(adminCustomerRouteGroup, { prefix: "/customer" });
+        instance.register(adminContactRouteGroup, { prefix: "/contact" });
+        instance.register(adminCommunicationRouteGroup, { prefix: "/communication" });
+        instance.register(adminLeadRouteGroup, { prefix: "/lead" });
+        instance.register(adminLeadActivityRouteGroup, { prefix: "/leadActivity" });
         fastify.register(accessRoutes,{
-    prefix:"/user/access"
-});
+            prefix:"/user/access"
+        });
 
     });
 

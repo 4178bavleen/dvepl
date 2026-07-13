@@ -10,9 +10,9 @@ async function adminEmployeeEmergencyContactRouteGroup(
   options: FastifyPluginOptions
 ) {
   fastify.register(createEmployeeEmergencyContactRoute, { prefix: "/create" });
-  fastify.register(readEmployeeEmergencyContactRoutes, { prefix: "/" });
-  fastify.register(updateEmployeeEmergencyContactRoutes, { prefix: "/" });
-  fastify.register(deleteEmployeeEmergencyContactRoute, { prefix: "/" });
+  fastify.register(readEmployeeEmergencyContactRoutes, { prefix: "/read" });
+  fastify.register(updateEmployeeEmergencyContactRoutes, { prefix: "/update" });
+  fastify.register(deleteEmployeeEmergencyContactRoute, { prefix: "/delete" });
 }
 
 export default adminEmployeeEmergencyContactRouteGroup;

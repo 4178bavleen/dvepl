@@ -10,9 +10,9 @@ async function adminShiftRouteGroup(
   options: FastifyPluginOptions
 ) {
   fastify.register(createShiftRoute, { prefix: "/create" });
-  fastify.register(readShiftRoutes, { prefix: "/" });
-  fastify.register(updateShiftRoutes, { prefix: "/" });
-  fastify.register(deleteShiftRoute, { prefix: "/" });
+  fastify.register(readShiftRoutes, { prefix: "/read" });
+  fastify.register(updateShiftRoutes, { prefix: "/update" });
+  fastify.register(deleteShiftRoute, { prefix: "/delete" });
 }
 
 export default adminShiftRouteGroup;
