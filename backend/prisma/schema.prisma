@@ -1,8 +1,6 @@
-// =========================================================
 // Manufacturing ERP - Phase 1 Database Schema
 // Modules: Authentication, Organization, PRBAC,
 //          Employee Management (HRMS), CRM, Lead Management
-// =========================================================
 
 generator client {
   provider = "prisma-client-js"
@@ -13,10 +11,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// =========================================================
 // 1. ORGANIZATION MANAGEMENT
-// =========================================================
-
 model Company {
   id        String    @id @default(uuid())
   name      String
@@ -30,13 +25,18 @@ model Company {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  branches    Branch[]
-  users       User[]
-  costCenters CostCenter[]
-  customers   Customer[]
-  leads       Lead[]
-  roles       Role[]
-  employees   Employee[]
+  branches              Branch[]
+  users                 User[]
+  costCenters           CostCenter[]
+  customers             Customer[]
+  leads                 Lead[]
+  roles                 Role[]
+  employees             Employee[]
+  tenders               Tender[]
+  governmentDepartments GovernmentDepartment[]
+  sections              Section[]
+  divisions             Division[]
+  subDivisions          SubDivision[]
 
   @@map("companies")
 }
@@ -81,6 +81,8 @@ model Department {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
+  tenders   Tender[]
+  sections  Section[]
 
   @@unique([branchId, code])
   @@map("departments")
@@ -136,13 +138,10 @@ model CostCenter {
   @@map("cost_centers")
 }
 
-// =========================================================
 // 2. AUTHENTICATION
-// =========================================================
-
 model User {
   id        String  @id @default(uuid())
-  name       String?
+  name      String?
   companyId String
   company   Company @relation(fields: [companyId], references: [id])
 
@@ -155,20 +154,23 @@ model User {
 
   employee Employee?
 
-  refreshTokens       RefreshToken[]
-  sessions            UserSession[]
-  otpRequests         OtpRequest[]
-  passwordResets      PasswordReset[]
-  userRoles           UserRole[]
- 
-  userPermissions UserPermission[]
-  leadsAssigned       Lead[]                   @relation("LeadAssignedTo")
-  communicationLogs   CommunicationHistory[]
-  auditLogs           AuditLog[]
+  refreshTokens  RefreshToken[]
+  sessions       UserSession[]
+  otpRequests    OtpRequest[]
+  passwordResets PasswordReset[]
+  userRoles      UserRole[]
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  userPermissions   UserPermission[]
+  leadsAssigned     Lead[]                 @relation("LeadAssignedTo")
+  communicationLogs CommunicationHistory[]
+  auditLogs         AuditLog[]
+
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  deletedAt     DateTime?
+  tenders       Tender[]
+  tenders       Tender[]
+  tenderRemarks TenderRemark[]
 
   @@index([companyId])
   @@map("users")
@@ -250,10 +252,7 @@ model PasswordReset {
   @@map("password_resets")
 }
 
-// =========================================================
 // 3. PRBAC (Policy & Permission Based Access Control)
-// =========================================================
-
 model Role {
   id        String  @id @default(uuid())
   companyId String
@@ -289,11 +288,10 @@ model Permission {
   groupId String?
   group   PermissionGroup? @relation(fields: [groupId], references: [id])
 
-  code        String  @unique // e.g. "tender.create", "tender.approve"
-  description String?
+  code            String           @unique // e.g. "tender.create", "tender.approve"
+  description     String?
   userPermissions UserPermission[]
   rolePermissions RolePermission[]
-  
 
   @@map("permissions")
 }
@@ -325,32 +323,29 @@ model UserRole {
 }
 
 // Explicit allow/deny overrides for a specific user, on top of role permissions
-
 model UserPermission {
-  id            String @id @default(uuid())
+  id String @id @default(uuid())
 
-  userId        String
-  permissionId  String
+  userId       String
+  permissionId String
 
-  allowed       Boolean @default(true)
+  allowed Boolean @default(true)
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user          User @relation(fields:[userId],references:[id])
-  permission    Permission @relation(fields:[permissionId],references:[id])
+  user       User       @relation(fields: [userId], references: [id])
+  permission Permission @relation(fields: [permissionId], references: [id])
 
-  @@unique([userId,permissionId])
+  @@unique([userId, permissionId])
 }
+
 enum OverrideEffect {
   ALLOW
   DENY
 }
 
-// =========================================================
 // 4. EMPLOYEE MANAGEMENT (HRMS)
-// =========================================================
-
 model Employee {
   id     String  @id @default(uuid())
   userId String? @unique
@@ -487,11 +482,9 @@ model EmployeeDocument {
 model Shift {
   id String @id @default(uuid())
 
-  name String @unique
-
-  startTime String
-  endTime   String
-
+  name        String          @unique
+  startTime   String
+  endTime     String
   assignments EmployeeShift[]
 
   createdAt DateTime  @default(now())
@@ -593,10 +586,7 @@ model Salary {
   @@map("salaries")
 }
 
-// =========================================================
 // 5. CRM (Customer Relationship Management)
-// =========================================================
-
 model Customer {
   id        String  @id @default(uuid())
   companyId String
@@ -608,6 +598,7 @@ model Customer {
   billingAddress  String?
   shippingAddress String?
   paymentTerms    String?
+  firmName        String?
   isGovernment    Boolean @default(false) // links conceptually to Govt Org Master (Phase 2+)
   isActive        Boolean @default(true)
 
@@ -618,6 +609,7 @@ model Customer {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
+  tenders   Tender[]
 
   @@index([companyId])
   @@map("customers")
@@ -666,10 +658,7 @@ enum CommunicationType {
   NOTE
 }
 
-// =========================================================
 // 6. LEAD MANAGEMENT
-// =========================================================
-
 model Lead {
   id        String  @id @default(uuid())
   companyId String
@@ -695,6 +684,7 @@ model Lead {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
+  tenders   Tender[]
 
   @@index([companyId])
   @@index([assignedToId])
@@ -735,11 +725,8 @@ model LeadActivity {
   @@map("lead_activities")
 }
 
-// =========================================================
 // CROSS-CUTTING: AUDIT LOG
 // (Included in Phase 1 since every module above needs it from day one)
-// =========================================================
-
 model AuditLog {
   id     String  @id @default(uuid())
   userId String?
@@ -757,4 +744,222 @@ model AuditLog {
 
   @@index([module, recordId])
   @@map("audit_logs")
+}
+
+model Tender {
+  id String @id @default(uuid())
+
+  companyId  String
+  leadId     String?
+  customerId String?
+
+  departmentId  String?
+  sectionId     String?
+  divisionId    String?
+  subDivisionId String?
+
+  tenderNo   String?
+  tenderCode String? @unique
+
+  title       String
+  description String?
+
+  projectLocation String?
+  estimatedCost   Decimal? @db.Decimal(15, 2)
+
+  publishedAt DateTime?
+  dueDate     DateTime?
+
+  status TenderStatus @default(DRAFT)
+
+  createdById  String
+  assignedToId String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  lead Lead? @relation(fields: [leadId], references: [id])
+
+  customer Customer? @relation(fields: [customerId], references: [id])
+
+  department Department? @relation(fields: [departmentId], references: [id])
+
+  section Section? @relation(fields: [sectionId], references: [id])
+
+  division Division? @relation(fields: [divisionId], references: [id])
+
+  subDivision SubDivision? @relation(fields: [subDivisionId], references: [id])
+
+  createdBy User @relation("TenderCreatedBy", fields: [createdById], references: [id])
+
+  assignedTo User? @relation("TenderAssignedTo", fields: [assignedToId], references: [id])
+
+  files                  TenderFile[]
+  remarks                TenderRemark[]
+  activities             TenderActivity[]
+  governmentDepartment   GovernmentDepartment? @relation(fields: [governmentDepartmentId], references: [id])
+  governmentDepartmentId String?
+
+  @@index([companyId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("tenders")
+}
+
+model TenderFile {
+  id String @id @default(uuid())
+
+  tenderId String
+
+  fileName String
+  fileUrl  String
+  fileType String?
+
+  uploadedBy String?
+
+  createdAt DateTime @default(now())
+
+  tender Tender @relation(fields: [tenderId], references: [id])
+
+  @@map("tender_files")
+}
+
+model TenderRemark {
+  id String @id @default(uuid())
+
+  tenderId String
+  userId   String?
+
+  remark String
+
+  createdAt DateTime @default(now())
+
+  tender Tender @relation(fields: [tenderId], references: [id])
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("tender_remarks")
+}
+
+model TenderActivity {
+  id String @id @default(uuid())
+
+  tenderId String
+
+  action   String
+  oldValue Json?
+  newValue Json?
+
+  performedBy String?
+
+  createdAt DateTime @default(now())
+
+  tender Tender @relation(fields: [tenderId], references: [id])
+
+  @@map("tender_activities")
+}
+
+enum TenderStatus {
+  DRAFT
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  SUBMITTED
+  COMPLETED
+  CANCELLED
+}
+
+model GovernmentDepartment {
+  id        String @id @default(uuid())
+  companyId String
+
+  name      String
+  code      String?
+  shortName String? // MES, CPWD, PWD
+
+  isActive Boolean @default(true)
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  sections Section[]
+  tenders  Tender[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, name])
+  @@map("government_departments")
+}
+
+model Section {
+  id           String @id @default(uuid())
+  companyId    String
+  departmentId String
+
+  name     String
+  code     String?
+  isActive Boolean @default(true)
+
+  company    Company    @relation(fields: [companyId], references: [id])
+  department Department @relation(fields: [departmentId], references: [id])
+
+  divisions Division[]
+
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+  deletedAt              DateTime?
+  tenders                Tender[]
+  governmentDepartment   GovernmentDepartment? @relation(fields: [governmentDepartmentId], references: [id])
+  governmentDepartmentId String?
+
+  @@unique([departmentId, name])
+  @@map("sections")
+}
+
+model Division {
+  id        String @id @default(uuid())
+  companyId String
+  sectionId String
+
+  name     String
+  code     String?
+  isActive Boolean @default(true)
+
+  company Company @relation(fields: [companyId], references: [id])
+  section Section @relation(fields: [sectionId], references: [id])
+
+  subDivisions SubDivision[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  tenders   Tender[]
+
+  @@unique([sectionId, name])
+  @@map("divisions")
+}
+
+model SubDivision {
+  id         String @id @default(uuid())
+  companyId  String
+  divisionId String
+
+  name     String
+  code     String?
+  isActive Boolean @default(true)
+
+  company  Company  @relation(fields: [companyId], references: [id])
+  division Division @relation(fields: [divisionId], references: [id])
+
+  tenders Tender[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([divisionId, name])
+  @@map("sub_divisions")
 }
