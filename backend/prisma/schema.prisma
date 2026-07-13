@@ -169,7 +169,6 @@ model User {
   updatedAt     DateTime       @updatedAt
   deletedAt     DateTime?
   tenders       Tender[]
-  tenders       Tender[]
   tenderRemarks TenderRemark[]
 
   @@index([companyId])
