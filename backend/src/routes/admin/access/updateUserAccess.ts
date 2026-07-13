@@ -22,10 +22,7 @@ async function updateUserAccessRoute(
             ],
         },
         async (
-            request: FastifyRequest<{
-                Params: { id: string };
-                Body: Body;
-            }>,
+            request: FastifyRequest,
             reply: FastifyReply
         ) => {
             try {
@@ -38,8 +35,8 @@ async function updateUserAccessRoute(
                     });
                 }
 
-                const { id } = request.params;
-                const { permissionIds } = request.body;
+                const { id } = request.params as { id: string };
+                const { permissionIds } = request.body as Body;
 
                 const user = await fastify.prisma.user.findFirst({
                     where: {

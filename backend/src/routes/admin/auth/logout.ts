@@ -21,7 +21,7 @@ async function adminLogoutRoutes(
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const userId = request.user?.userId;
+        const userId = request.user?.id;
 
         if (!userId) {
           return reply.status(401).send({
@@ -29,18 +29,6 @@ async function adminLogoutRoutes(
             message: "Unauthorized",
           });
         }
-
-        // Invalidate all existing tokens
-        await fastify.prisma.user.update({
-          where: {
-            id: userId,
-          },
-          data: {
-            tokenVersion: {
-              increment: 1,
-            },
-          },
-        });
 
         return reply.send({
           success: true,

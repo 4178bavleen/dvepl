@@ -4,7 +4,6 @@ import adminCompanyRouteGroup from "./company/index";
 import adminUserRouteGroup from "./user/index";
 import adminRoleRouteGroup from "./role";
 import adminPermissionRouteGroup from "./permission/index";
-<<<<<<< HEAD
 import adminEmployeeRouteGroup from "./employee/index";
 import adminEmployeeContactRouteGroup from "./employee-contact/index";
 import adminEmployeeEmergencyContactRouteGroup from "./employee-emergency-contact/index";
@@ -17,9 +16,7 @@ import adminHolidayRouteGroup from "./holiday/index";
 import adminAttendanceRouteGroup from "./attendance/index";
 import adminLeaveRouteGroup from "./leave/index";
 import adminSalaryRouteGroup from "./salary/index";
-=======
 import accessRoutes from "./access";
->>>>>>> bavleen
 
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 
