@@ -167,9 +167,10 @@ model User {
 
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
-  deletedAt     DateTime?
-  tenders       Tender[]
-  tenderRemarks TenderRemark[]
+  deletedAt       DateTime?
+  tendersCreated  Tender[]       @relation("TenderCreatedBy")
+  tendersAssigned Tender[]       @relation("TenderAssignedTo")
+  tenderRemarks   TenderRemark[]
 
   @@index([companyId])
   @@map("users")
@@ -745,6 +746,8 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+
+// 7. TENDER MANAGEMENT
 model Tender {
   id String @id @default(uuid())
 

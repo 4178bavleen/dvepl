@@ -25,6 +25,14 @@ import adminContactRouteGroup from "./contact/index"
 import adminCommunicationRouteGroup from "./communication/index"
 import adminLeadRouteGroup from "./lead/index"
 import adminLeadActivityRouteGroup from "./leadActivity/index"
+import adminTenderRouteGroup from "./tender/index"
+import adminTenderFileRouteGroup from "./tenderFile/index"
+import adminTenderRemarkRouteGroup from "./tenderRemark/index"
+import adminTenderActivityRouteGroup from "./tenderActivity/index"
+import adminGovernmentDepartmentRouteGroup from "./governmentDepartment/index"
+import adminSectionRouteGroup from "./section/index"
+import adminDivisionRouteGroup from "./division/index"
+import adminSubDivisionRouteGroup from "./subDivision/index"
 
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 
@@ -95,6 +103,14 @@ async function adminRoutes(
     instance.register(adminCommunicationRouteGroup, { prefix: "/communication" });
     instance.register(adminLeadRouteGroup, { prefix: "/lead" });
     instance.register(adminLeadActivityRouteGroup, { prefix: "/leadActivity" });
+    instance.register(adminTenderRouteGroup, { prefix: "/tender" });
+    instance.register(adminTenderFileRouteGroup, { prefix: "/tender-file" });
+    instance.register(adminTenderRemarkRouteGroup, { prefix: "/tender-remark" });
+    instance.register(adminTenderActivityRouteGroup, { prefix: "/tenderActivity" });
+    instance.register(adminGovernmentDepartmentRouteGroup, { prefix: "/government-department" });
+    instance.register(adminSectionRouteGroup, { prefix: "/section" });
+    instance.register(adminDivisionRouteGroup, { prefix: "/division" });
+    instance.register(adminSubDivisionRouteGroup, { prefix: "/sub-division" });
     fastify.register(accessRoutes, {
       prefix: "/user/access",
     });
