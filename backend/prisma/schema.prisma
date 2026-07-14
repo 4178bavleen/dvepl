@@ -658,94 +658,7 @@ enum CommunicationType {
   NOTE
 }
 
-// 6. LEAD MANAGEMENT
-model Lead {
-  id        String  @id @default(uuid())
-  companyId String
-  company   Company @relation(fields: [companyId], references: [id])
-
-  customerId String?
-  customer   Customer? @relation(fields: [customerId], references: [id])
-
-  assignedToId String?
-  assignedTo   User?   @relation("LeadAssignedTo", fields: [assignedToId], references: [id])
-
-  createdById String?
-  createdBy   Employee? @relation("LeadCreatedBy", fields: [createdById], references: [id])
-
-  source         LeadSource
-  status         LeadStatus @default(NEW)
-  title          String
-  description    String?
-  estimatedValue Decimal?   @db.Decimal(15, 2)
-
-  activities LeadActivity[]
-
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-  tenders   Tender[]
-
-  @@index([companyId])
-  @@index([assignedToId])
-  @@map("leads")
-}
-
-enum LeadSource {
-  WEBSITE
-  REFERRAL
-  EMAIL
-  WHATSAPP
-  MANUAL
-}
-
-enum LeadStatus {
-  NEW
-  ASSIGNED
-  CONTACTED
-  QUALIFIED
-  TENDER
-  QUOTATION
-  WON
-  LOST
-}
-
-model LeadActivity {
-  id     String @id @default(uuid())
-  leadId String
-  lead   Lead   @relation(fields: [leadId], references: [id])
-
-  activityType String // STATUS_CHANGE, NOTE, CALL, FOLLOW_UP
-  remarks      String?
-  performedBy  String? // userId, kept loose to avoid tight coupling
-
-  createdAt DateTime @default(now())
-
-  @@index([leadId])
-  @@map("lead_activities")
-}
-
-// CROSS-CUTTING: AUDIT LOG
-// (Included in Phase 1 since every module above needs it from day one)
-model AuditLog {
-  id     String  @id @default(uuid())
-  userId String?
-  user   User?   @relation(fields: [userId], references: [id])
-
-  module    String // e.g. "Lead", "Tender"
-  recordId  String
-  action    String // CREATE, UPDATE, DELETE, APPROVE, etc
-  oldValue  Json?
-  newValue  Json?
-  ipAddress String?
-  userAgent String?
-
-  createdAt DateTime @default(now())
-
-  @@index([module, recordId])
-  @@map("audit_logs")
-}
-
+//6. TENDER MANAGEMENT
 model Tender {
   id String @id @default(uuid())
 
@@ -844,6 +757,65 @@ model TenderRemark {
   @@map("tender_remarks")
 }
 
+enum TenderStatus {
+  DRAFT
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  SUBMITTED
+  COMPLETED
+  CANCELLED
+}
+
+model TenderRequest {
+  id        String  @id @default(uuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+
+  assignedToId String?
+  assignedTo   User?   @relation("TenderRequestAssignedTo", fields: [assignedToId], references: [id])
+
+  createdById String?
+  createdBy   Employee? @relation("TenderRequestCreatedBy", fields: [createdById], references: [id])
+
+  source         TenderRequestSource @default(WEBSITE)
+  status         TenderRequestStatus @default(NEW)
+  title          String
+  description    String?
+  estimatedValue Decimal?            @db.Decimal(15, 2)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  tenders   Tender[]
+
+  @@index([companyId])
+  @@index([assignedToId])
+  @@map("tender_requests")
+}
+
+enum TenderRequestSource {
+  WEBSITE
+  REFERRAL
+  EMAIL
+  WHATSAPP
+  MANUAL
+}
+
+enum TenderRequestStatus {
+  NEW
+  ASSIGNED
+  CONTACTED
+  QUALIFIED
+  TENDER
+  QUOTATION
+  WON
+  LOST
+}
+
 model TenderActivity {
   id String @id @default(uuid())
 
@@ -860,16 +832,6 @@ model TenderActivity {
   tender Tender @relation(fields: [tenderId], references: [id])
 
   @@map("tender_activities")
-}
-
-enum TenderStatus {
-  DRAFT
-  OPEN
-  ASSIGNED
-  IN_PROGRESS
-  SUBMITTED
-  COMPLETED
-  CANCELLED
 }
 
 model GovernmentDepartment {
@@ -962,4 +924,25 @@ model SubDivision {
 
   @@unique([divisionId, name])
   @@map("sub_divisions")
+}
+
+// CROSS-CUTTING: AUDIT LOG
+// (Included in Phase 1 since every module above needs it from day one)
+model AuditLog {
+  id     String  @id @default(uuid())
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  module    String // e.g. "Lead", "Tender"
+  recordId  String
+  action    String // CREATE, UPDATE, DELETE, APPROVE, etc
+  oldValue  Json?
+  newValue  Json?
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@index([module, recordId])
+  @@map("audit_logs")
 }
