@@ -21,7 +21,7 @@ async function adminLogoutRoutes(
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const userId = request.user?.id;
+        const userId = request.admin?.id;
 
         if (!userId) {
           return reply.status(401).send({

@@ -32,7 +32,7 @@ async function readTeamRoutes(
 
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const companyId = request.user?.companyId;
+        const companyId = request.admin?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({

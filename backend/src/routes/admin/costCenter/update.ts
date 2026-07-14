@@ -31,7 +31,7 @@ async function updateCostCenterRoutes(
     ) => {
       try {
         const { id } = request.params;
-        const companyId = request.user?.companyId;
+        const companyId = request.admin?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({
@@ -125,7 +125,7 @@ async function updateCostCenterRoutes(
 
         adminLogs.info("Cost Center updated successfully", {
           costCenterId: updatedCostCenter.id,
-          updatedBy: request.user?.id,
+          updatedBy: request.admin?.id,
         });
 
         return reply.status(200).send({

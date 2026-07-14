@@ -27,8 +27,8 @@ async function deleteTenderFileRoute(
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         const { id } = request.params as { id: string };
-        const companyId = request.user?.companyId;
-        const userId = request.user?.id || "System";
+        const companyId = request.admin?.companyId;
+        const userId = request.admin?.id || "System";
 
         if (!companyId) {
           return reply.status(401).send({

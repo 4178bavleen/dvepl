@@ -8,7 +8,7 @@ export async function seedTeam(prisma: any, departments: any[]) {
     PROD: ["Manufacturing Assembly", "Quality Control"],
   };
 
-  const createdTeams = [];
+  const createdTeams: any[] = [];
 
   for (const dept of departments) {
     const teamsToCreate = departmentTeams[dept.code] || [];

@@ -33,7 +33,7 @@ async function readRoleByIdRoute(
         // Company From JWT
         //------------------------------------
 
-        const companyId = (request.user as any)?.companyId;
+        const companyId = (request.admin as any)?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({

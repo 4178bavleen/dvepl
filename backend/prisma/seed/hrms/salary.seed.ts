@@ -24,7 +24,7 @@ export async function seedSalary(
     },
   });
 
-  const salariesData = [];
+  const salariesData: any[] = [];
 
   for (const emp of employees) {
     const codeNum = parseInt(emp.employeeCode.replace("EMP", ""));

@@ -29,8 +29,8 @@ async function deleteUserRoute(
       reply: FastifyReply
     ) => {
       try {
-        const companyId = (request.user as any)?.companyId;
-        const loggedInUserId = (request.user as any)?.id?.toString();
+        const companyId = (request.admin as any)?.companyId;
+        const loggedInUserId = (request.admin as any)?.id?.toString();
 
         if (!companyId) {
           return reply.status(401).send({

@@ -30,7 +30,7 @@ async function readLeadRoutes(
         //--------------------------------
         // Company From JWT
         //--------------------------------
-        const companyId = request.user?.companyId;
+        const companyId = request.admin?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({
@@ -42,7 +42,7 @@ async function readLeadRoutes(
         //--------------------------------
         // Fetch Leads
         //--------------------------------
-        const leads = await fastify.prisma.lead.findMany({
+        const leads = await fastify.prisma.tenderRequest.findMany({
           where: {
             companyId,
             deletedAt: null,
@@ -98,7 +98,7 @@ async function readLeadRoutes(
         //--------------------------------
         // Company From JWT
         //--------------------------------
-        const companyId = request.user?.companyId;
+        const companyId = request.admin?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({
@@ -112,7 +112,7 @@ async function readLeadRoutes(
         //--------------------------------
         // Fetch Lead
         //--------------------------------
-        const lead = await fastify.prisma.lead.findFirst({
+        const lead = await fastify.prisma.tenderRequest.findFirst({
           where: {
             id,
             companyId,
@@ -132,9 +132,6 @@ async function readLeadRoutes(
             createdBy: {
               select: { id: true, firstName: true, lastName: true },
             },
-            activities: {
-              orderBy: { createdAt: "desc" },
-            },
           },
         });
 
@@ -145,10 +142,25 @@ async function readLeadRoutes(
           });
         }
 
+        const activities = await fastify.prisma.auditLog.findMany({
+          where: {
+            module: "TenderRequest",
+            recordId: id,
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+        });
+
+        const leadWithActivities = {
+          ...lead,
+          activities,
+        };
+
         return reply.status(200).send({
           success: true,
           message: "Lead details fetched successfully.",
-          data: lead,
+          data: leadWithActivities,
         });
       } catch (error: any) {
         adminLogs.error("Read Lead By Id failed", { error });

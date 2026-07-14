@@ -77,7 +77,7 @@ async function updateHolidayRoutes(
         });
 
         adminLogs.info("Holiday updated successfully", {
-          updatedBy: (request.user as any)?.id,
+          updatedBy: (request.admin as any)?.id,
           holidayId: id,
         });
 

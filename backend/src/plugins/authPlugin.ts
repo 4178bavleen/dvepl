@@ -30,13 +30,14 @@ async function authPlugin(fastify: FastifyInstance) {
 
 
         console.log("Decoded JWT:", decoded);
-        // Eventually these roles & permissions should come from the database.
-        (request as any).user = {
+        const tokenUser = {
           id: decoded.userId,
           companyId: decoded.companyId,
           roles: decoded.roles || [],
           permissions: decoded.permissions || [],
         };
+        (request as any).user = tokenUser;
+        (request as any).admin = tokenUser;
       } catch (error: any) {
         AdminLogger.error(`JWT Verification Failed: ${error}`);
 
@@ -61,7 +62,7 @@ async function authPlugin(fastify: FastifyInstance) {
           return;
         }
 
-        const userPermissions = (request.user as any)?.permissions || [];
+        const userPermissions = (request.admin as any)?.permissions || [];
 
         const hasPermission = userPermissions.some((permission: string) =>
           allowedPermissions.includes(permission)
@@ -71,7 +72,7 @@ async function authPlugin(fastify: FastifyInstance) {
           AdminLogger.warn("Unauthorized Permission", {
             endpoint: request.url,
             method: request.method,
-            userId: request.user?.id,
+            userId: request.admin?.id,
             permissions: userPermissions,
           });
 

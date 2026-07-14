@@ -41,7 +41,7 @@ async function createRoleRoute(
                 const { name, description, permissionIds } =
                     validationResult.data;
 
-                const companyId = (request.user as any)?.companyId;
+                const companyId = (request.admin as any)?.companyId;
 
                 if (!companyId) {
                     return reply.status(401).send({
@@ -113,7 +113,7 @@ async function createRoleRoute(
                     );
 
                 adminLogs.info("Role created", {
-                    createdBy: request.user?.id,
+                    createdBy: request.admin?.id,
                     roleId: createdRole.id,
                 });
 

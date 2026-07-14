@@ -51,7 +51,7 @@ async function updateRoleRoute(
 
         const { name, description, permissionIds } = validation.data;
 
-        const companyId = (request.user as any)?.companyId;
+        const companyId = (request.admin as any)?.companyId;
 
         //--------------------------------
         // Check Role

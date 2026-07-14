@@ -31,7 +31,7 @@ async function deleteRoleRoute(
       try {
         const { id } = request.params as { id: string };
 
-        const companyId = (request.user as any)?.companyId;
+        const companyId = (request.admin as any)?.companyId;
 
         //--------------------------------
         // Check Role

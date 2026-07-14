@@ -62,7 +62,7 @@ async function createShiftRoutes(
         });
 
         adminLogs.info("Shift created successfully", {
-          createdBy: (request.user as any)?.id,
+          createdBy: (request.admin as any)?.id,
           shiftId: shift.id,
           name,
         });

@@ -28,7 +28,7 @@ export async function seedEmployeeShift(
   const dayShift = shifts.find((s) => s.name === "Day Shift");
   const nightShift = shifts.find((s) => s.name === "Night Shift");
 
-  const shiftsData = [];
+  const shiftsData: any[] = [];
 
   for (const emp of employees) {
     const codeNum = parseInt(emp.employeeCode.replace("EMP", ""));

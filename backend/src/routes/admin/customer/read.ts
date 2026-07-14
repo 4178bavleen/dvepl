@@ -30,7 +30,7 @@ async function readCustomerRoutes(
         //--------------------------------
         // Company From JWT
         //--------------------------------
-        const companyId = request.user?.companyId;
+        const companyId = request.admin?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({
@@ -90,7 +90,7 @@ async function readCustomerRoutes(
         //--------------------------------
         // Company From JWT
         //--------------------------------
-        const companyId = request.user?.companyId;
+        const companyId = request.admin?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({

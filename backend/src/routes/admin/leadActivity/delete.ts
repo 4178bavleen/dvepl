@@ -27,7 +27,7 @@ async function deleteLeadActivityRoute(
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         const { id } = request.params as { id: string };
-        const companyId = request.user?.companyId;
+        const companyId = request.admin?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({
@@ -39,13 +39,10 @@ async function deleteLeadActivityRoute(
         //--------------------------------
         // Check Activity & Tenant
         //--------------------------------
-        const activity = await fastify.prisma.leadActivity.findFirst({
+        const activity = await fastify.prisma.auditLog.findFirst({
           where: {
             id,
-            lead: {
-              companyId,
-              deletedAt: null,
-            },
+            module: "TenderRequest",
           },
         });
 
@@ -56,10 +53,25 @@ async function deleteLeadActivityRoute(
           });
         }
 
+        const lead = await fastify.prisma.tenderRequest.findFirst({
+          where: {
+            id: activity.recordId,
+            companyId,
+            deletedAt: null,
+          },
+        });
+
+        if (!lead) {
+          return reply.status(404).send({
+            success: false,
+            message: "Lead activity not found.",
+          });
+        }
+
         //--------------------------------
-        // Hard Delete (LeadActivity has no deletedAt field in schema)
+        // Hard Delete
         //--------------------------------
-        await fastify.prisma.leadActivity.delete({
+        await fastify.prisma.auditLog.delete({
           where: { id },
         });
 

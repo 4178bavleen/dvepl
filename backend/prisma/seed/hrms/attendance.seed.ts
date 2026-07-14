@@ -20,7 +20,7 @@ export async function seedAttendance(
     new Date("2026-07-13"),
   ];
 
-  const seeded = [];
+  const seeded: any[] = [];
 
   for (const emp of employees) {
     for (const date of attendanceDays) {

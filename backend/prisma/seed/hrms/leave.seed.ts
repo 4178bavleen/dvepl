@@ -24,7 +24,7 @@ export async function seedLeave(
     },
   });
 
-  const leavesData = [];
+  const leavesData: any[] = [];
 
   for (const emp of employees) {
     const codeNum = parseInt(emp.employeeCode.replace("EMP", ""));

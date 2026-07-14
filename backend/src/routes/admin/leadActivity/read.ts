@@ -28,7 +28,7 @@ async function readLeadActivityRoutes(
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const companyId = request.user?.companyId;
+        const companyId = request.admin?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({
@@ -57,7 +57,7 @@ async function readLeadActivityRoutes(
         //--------------------------------
         // Tenant Verification
         //--------------------------------
-        const lead = await fastify.prisma.lead.findFirst({
+        const lead = await fastify.prisma.tenderRequest.findFirst({
           where: { id: leadId, companyId, deletedAt: null },
         });
 
@@ -68,15 +68,27 @@ async function readLeadActivityRoutes(
           });
         }
 
-        const activities = await fastify.prisma.leadActivity.findMany({
-          where: { leadId },
+        const activities = await fastify.prisma.auditLog.findMany({
+          where: {
+            module: "TenderRequest",
+            recordId: leadId,
+          },
           orderBy: { createdAt: "desc" },
         });
+
+        const formattedActivities = activities.map((activity) => ({
+          id: activity.id,
+          leadId: activity.recordId,
+          activityType: activity.action,
+          remarks: (activity.newValue as any)?.remarks || "",
+          performedBy: activity.userId || "System",
+          createdAt: activity.createdAt,
+        }));
 
         return reply.status(200).send({
           success: true,
           message: "Lead activities fetched successfully.",
-          data: activities,
+          data: formattedActivities,
         });
       } catch (error: any) {
         adminLogs.error("List Lead Activities failed", { error });
@@ -108,7 +120,7 @@ async function readLeadActivityRoutes(
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const companyId = request.user?.companyId;
+        const companyId = request.admin?.companyId;
         const { id } = request.params as { id: string };
 
         if (!companyId) {
@@ -121,21 +133,10 @@ async function readLeadActivityRoutes(
         //--------------------------------
         // Fetch Activity with tenant check
         //--------------------------------
-        const activity = await fastify.prisma.leadActivity.findFirst({
+        const activity = await fastify.prisma.auditLog.findFirst({
           where: {
             id,
-            lead: {
-              companyId,
-              deletedAt: null,
-            },
-          },
-          include: {
-            lead: {
-              select: {
-                id: true,
-                title: true,
-              },
-            },
+            module: "TenderRequest",
           },
         });
 
@@ -146,10 +147,39 @@ async function readLeadActivityRoutes(
           });
         }
 
+        const lead = await fastify.prisma.tenderRequest.findFirst({
+          where: {
+            id: activity.recordId,
+            companyId,
+            deletedAt: null,
+          },
+          select: {
+            id: true,
+            title: true,
+          },
+        });
+
+        if (!lead) {
+          return reply.status(404).send({
+            success: false,
+            message: "Lead activity not found.",
+          });
+        }
+
+        const formattedActivity = {
+          id: activity.id,
+          leadId: activity.recordId,
+          activityType: activity.action,
+          remarks: (activity.newValue as any)?.remarks || "",
+          performedBy: activity.userId || "System",
+          createdAt: activity.createdAt,
+          lead,
+        };
+
         return reply.status(200).send({
           success: true,
           message: "Lead activity details fetched successfully.",
-          data: activity,
+          data: formattedActivity,
         });
       } catch (error: any) {
         adminLogs.error("Read lead activity details failed", { error });

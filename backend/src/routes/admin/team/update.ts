@@ -35,7 +35,7 @@ async function updateTeamRoutes(
     ) => {
       try {
         const { id } = request.params as Params;
-        const companyId = request.user?.companyId;
+        const companyId = request.admin?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({
@@ -137,7 +137,7 @@ async function updateTeamRoutes(
 
         adminLogs.info("Team updated successfully", {
           teamId: updatedTeam.id,
-          updatedBy: request.user?.id,
+          updatedBy: request.admin?.id,
         });
 
         return reply.status(200).send({

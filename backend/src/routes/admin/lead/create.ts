@@ -44,8 +44,8 @@ async function createLeadRoute(
         }
 
         const data = validation.data;
-        const companyId = request.user?.companyId;
-        const userId = request.user?.id;
+        const companyId = request.admin?.companyId;
+        const userId = request.admin?.id;
 
         if (!companyId) {
           return reply.status(401).send({
@@ -116,19 +116,22 @@ async function createLeadRoute(
         // Create Lead & Log Activity
         //--------------------------------
         const lead = await fastify.prisma.$transaction(async (tx) => {
-          const newLead = await tx.lead.create({
+          const newLead = await tx.tenderRequest.create({
             data: {
               ...data,
               estimatedValue: data.estimatedValue ?? null,
             },
           });
 
-          await tx.leadActivity.create({
+          await tx.auditLog.create({
             data: {
-              leadId: newLead.id,
-              activityType: "STATUS_CHANGE",
-              remarks: `Lead created with status: ${newLead.status}`,
-              performedBy: userId || "System",
+              userId: userId || null,
+              module: "TenderRequest",
+              recordId: newLead.id,
+              action: "CREATE",
+              newValue: JSON.parse(JSON.stringify(newLead)),
+              ipAddress: request.ip,
+              userAgent: request.headers["user-agent"],
             },
           });
 

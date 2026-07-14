@@ -54,7 +54,7 @@ async function createUserRoute(
         // ======================================================
         // Get Company ID From JWT
         // ======================================================
-        const companyId = (request.user as any)?.companyId;
+        const companyId = (request.admin as any)?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({
@@ -134,7 +134,7 @@ async function createUserRoute(
             const user = await tx.user.create({
               data: {
                 companyId,
-                name,
+                name: name || "",
                 email,
                 phone,
                 passwordHash,
@@ -159,7 +159,7 @@ async function createUserRoute(
         // Log
         // ======================================================
         adminLogs.info("User created successfully", {
-          createdBy: request.user?.id,
+          createdBy: request.admin?.id,
           userId: createdUser.id,
           companyId,
         });

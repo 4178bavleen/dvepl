@@ -37,7 +37,7 @@ async function updateLeaveRoutes(
           });
         }
 
-        const companyId = (request.user as any)?.companyId;
+        const companyId = (request.admin as any)?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({
@@ -98,7 +98,7 @@ async function updateLeaveRoutes(
         });
 
         adminLogs.info("Leave request updated successfully", {
-          updatedBy: (request.user as any)?.id,
+          updatedBy: (request.admin as any)?.id,
           leaveId: id,
         });
 

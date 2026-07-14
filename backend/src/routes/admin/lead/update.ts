@@ -43,8 +43,8 @@ async function updateLeadRoute(
         }
 
         const { id } = request.params as { id: string };
-        const companyId = request.user?.companyId;
-        const performerId = request.user?.id || "System";
+        const companyId = request.admin?.companyId;
+        const performerId = request.admin?.id || "System";
 
         if (!companyId) {
           return reply.status(401).send({
@@ -58,7 +58,7 @@ async function updateLeadRoute(
         //--------------------------------
         // Check Lead & Tenant
         //--------------------------------
-        const existingLead = await fastify.prisma.lead.findFirst({
+        const existingLead = await fastify.prisma.tenderRequest.findFirst({
           where: { id, companyId, deletedAt: null },
         });
 
@@ -103,7 +103,7 @@ async function updateLeadRoute(
         // Update Lead & Write Activities
         //--------------------------------
         await fastify.prisma.$transaction(async (tx) => {
-          await tx.lead.update({
+          await tx.tenderRequest.update({
             where: { id },
             data: {
               ...data,
@@ -113,24 +113,30 @@ async function updateLeadRoute(
 
           // Log status change
           if (data.status && data.status !== existingLead.status) {
-            await tx.leadActivity.create({
+            await tx.auditLog.create({
               data: {
-                leadId: id,
-                activityType: "STATUS_CHANGE",
-                remarks: `Lead status changed from ${existingLead.status} to ${data.status}`,
-                performedBy: performerId,
+                userId: performerId === "System" ? null : performerId,
+                module: "TenderRequest",
+                recordId: id,
+                action: "STATUS_CHANGE",
+                newValue: { remarks: `Lead status changed from ${existingLead.status} to ${data.status}` },
+                ipAddress: request.ip,
+                userAgent: request.headers["user-agent"],
               },
             });
           }
 
           // Log assignee change
           if (data.assignedToId && data.assignedToId !== existingLead.assignedToId) {
-            await tx.leadActivity.create({
+            await tx.auditLog.create({
               data: {
-                leadId: id,
-                activityType: "FOLLOW_UP",
-                remarks: `Lead reassigned to user ID: ${data.assignedToId}`,
-                performedBy: performerId,
+                userId: performerId === "System" ? null : performerId,
+                module: "TenderRequest",
+                recordId: id,
+                action: "FOLLOW_UP",
+                newValue: { remarks: `Lead reassigned to user ID: ${data.assignedToId}` },
+                ipAddress: request.ip,
+                userAgent: request.headers["user-agent"],
               },
             });
           }

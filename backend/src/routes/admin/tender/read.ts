@@ -27,7 +27,7 @@ async function readTenderRoutes(
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const companyId = request.user?.companyId;
+        const companyId = request.admin?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({
@@ -42,7 +42,7 @@ async function readTenderRoutes(
             deletedAt: null,
           },
           include: {
-            lead: {
+            tenderRequest: {
               select: { id: true, title: true },
             },
             customer: {
@@ -101,7 +101,7 @@ async function readTenderRoutes(
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const companyId = request.user?.companyId;
+        const companyId = request.admin?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({
@@ -119,7 +119,7 @@ async function readTenderRoutes(
             deletedAt: null,
           },
           include: {
-            lead: true,
+            tenderRequest: true,
             customer: true,
             department: true,
             section: true,

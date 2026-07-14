@@ -27,7 +27,7 @@ async function getAllRolesRoute(
         ) => {
             try {
                 const companyId =
-                    (request.user as any)?.companyId;
+                    (request.admin as any)?.companyId;
 
                 const roles =
                     await fastify.prisma.role.findMany({

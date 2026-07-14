@@ -44,8 +44,8 @@ async function createLeadActivityRoute(
         }
 
         const data = validation.data;
-        const companyId = request.user?.companyId;
-        const userId = request.user?.id;
+        const companyId = request.admin?.companyId;
+        const userId = request.admin?.id;
 
         if (!companyId) {
           return reply.status(401).send({
@@ -57,7 +57,7 @@ async function createLeadActivityRoute(
         //--------------------------------
         // Check Lead & Tenant
         //--------------------------------
-        const lead = await fastify.prisma.lead.findFirst({
+        const lead = await fastify.prisma.tenderRequest.findFirst({
           where: { id: data.leadId, companyId, deletedAt: null },
         });
 
@@ -69,24 +69,38 @@ async function createLeadActivityRoute(
         }
 
         //--------------------------------
-        // Create LeadActivity
+        // Create LeadActivity inside AuditLog
         //--------------------------------
-        const activity = await fastify.prisma.leadActivity.create({
+        const activity = await fastify.prisma.auditLog.create({
           data: {
-            ...data,
-            performedBy: userId || "System",
+            userId: userId || null,
+            module: "TenderRequest",
+            recordId: data.leadId,
+            action: data.activityType,
+            newValue: { remarks: data.remarks },
+            ipAddress: request.ip,
+            userAgent: request.headers["user-agent"],
           },
         });
 
+        const formattedActivity = {
+          id: activity.id,
+          leadId: activity.recordId,
+          activityType: activity.action,
+          remarks: (activity.newValue as any)?.remarks || "",
+          performedBy: activity.userId || "System",
+          createdAt: activity.createdAt,
+        };
+
         adminLogs.info("Lead activity logged successfully", {
-          activityId: activity.id,
-          leadId: activity.leadId,
+          activityId: formattedActivity.id,
+          leadId: formattedActivity.leadId,
         });
 
         return reply.status(201).send({
           success: true,
           message: "Lead activity logged successfully.",
-          data: activity,
+          data: formattedActivity,
         });
       } catch (error: any) {
         adminLogs.error("Lead activity logging failed", { error });

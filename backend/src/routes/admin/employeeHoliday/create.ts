@@ -61,7 +61,7 @@ async function createHolidayRoutes(
         });
 
         adminLogs.info("Holiday created successfully", {
-          createdBy: (request.user as any)?.id,
+          createdBy: (request.admin as any)?.id,
           holidayId: holiday.id,
           name,
         });

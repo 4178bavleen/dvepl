@@ -24,7 +24,7 @@ export async function seedContactPerson(
     },
   });
 
-  const contactsData = [];
+  const contactsData: any[] = [];
 
   for (const customer of customers) {
     if (customer.isGovernment) {

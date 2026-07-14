@@ -41,8 +41,8 @@ async function createTenderActivityRoute(
         }
 
         const data = validation.data;
-        const companyId = request.user?.companyId;
-        const userId = request.user?.id;
+        const companyId = request.admin?.companyId;
+        const userId = request.admin?.id;
 
         if (!companyId) {
           return reply.status(401).send({

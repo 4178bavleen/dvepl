@@ -37,7 +37,7 @@ async function createAttendanceRoutes(
           });
         }
 
-        const companyId = (request.user as any)?.companyId;
+        const companyId = (request.admin as any)?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({
@@ -97,7 +97,7 @@ async function createAttendanceRoutes(
         });
 
         adminLogs.info("Attendance record created successfully", {
-          createdBy: (request.user as any)?.id,
+          createdBy: (request.admin as any)?.id,
           attendanceId: attendance.id,
           employeeId,
           date: normalizedDate,

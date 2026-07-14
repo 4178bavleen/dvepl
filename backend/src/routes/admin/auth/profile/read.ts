@@ -23,7 +23,7 @@ async function readProfileRoute(
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const userId = (request.user as any).id;
+        const userId = (request.admin as any).id;
 
         console.log("profile api ", userId); //undefined
 

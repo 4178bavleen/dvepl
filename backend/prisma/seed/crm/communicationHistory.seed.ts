@@ -29,7 +29,7 @@ export async function seedCommunicationHistory(
     where: { email: "admin@vibrantick.com" },
   });
 
-  const commData = [];
+  const commData: any[] = [];
 
   for (const customer of customers) {
     commData.push(

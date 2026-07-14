@@ -18,5 +18,11 @@ declare module "fastify" {
             roles: string[];
             permissions: string[];
         };
+        admin?: {
+            id: string;
+            companyId: string;
+            roles: string[];
+            permissions: string[];
+        };
     }
 }

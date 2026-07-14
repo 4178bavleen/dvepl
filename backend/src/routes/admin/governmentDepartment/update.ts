@@ -41,7 +41,7 @@ async function updateGovernmentDepartmentRoute(
         }
 
         const { id } = request.params as { id: string };
-        const companyId = request.user?.companyId;
+        const companyId = request.admin?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({

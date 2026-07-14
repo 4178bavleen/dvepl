@@ -36,7 +36,7 @@ async function createEmployeeShiftRoutes(
           });
         }
 
-        const companyId = (request.user as any)?.companyId;
+        const companyId = (request.admin as any)?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({
@@ -88,7 +88,7 @@ async function createEmployeeShiftRoutes(
         });
 
         adminLogs.info("Employee shift assigned successfully", {
-          createdBy: (request.user as any)?.id,
+          createdBy: (request.admin as any)?.id,
           assignmentId: assignment.id,
           employeeId,
           shiftId,

@@ -36,7 +36,7 @@ async function updateEmployeeEmergencyContactRoutes(
           });
         }
 
-        const companyId = (request.user as any)?.companyId;
+        const companyId = (request.admin as any)?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({
@@ -92,7 +92,7 @@ async function updateEmployeeEmergencyContactRoutes(
         });
 
         adminLogs.info("Employee emergency contact updated successfully", {
-          updatedBy: (request.user as any)?.id,
+          updatedBy: (request.admin as any)?.id,
           contactId: id,
         });
 

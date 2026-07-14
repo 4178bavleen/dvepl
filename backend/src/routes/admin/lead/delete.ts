@@ -27,7 +27,7 @@ async function deleteLeadRoute(
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         const { id } = request.params as { id: string };
-        const companyId = request.user?.companyId;
+        const companyId = request.admin?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({
@@ -39,7 +39,7 @@ async function deleteLeadRoute(
         //--------------------------------
         // Check Lead & Tenant
         //--------------------------------
-        const lead = await fastify.prisma.lead.findFirst({
+        const lead = await fastify.prisma.tenderRequest.findFirst({
           where: { id, companyId, deletedAt: null },
         });
 
@@ -53,7 +53,7 @@ async function deleteLeadRoute(
         //--------------------------------
         // Soft Delete
         //--------------------------------
-        await fastify.prisma.lead.update({
+        await fastify.prisma.tenderRequest.update({
           where: { id },
           data: { deletedAt: new Date() },
         });

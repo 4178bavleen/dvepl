@@ -25,7 +25,7 @@ async function deleteEmployeeEducationRoute(
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const companyId = (request.user as any)?.companyId;
+        const companyId = (request.admin as any)?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({
@@ -60,7 +60,7 @@ async function deleteEmployeeEducationRoute(
         });
 
         adminLogs.info("Employee education record deleted successfully", {
-          deletedBy: (request.user as any)?.id,
+          deletedBy: (request.admin as any)?.id,
           educationId: id,
         });
 

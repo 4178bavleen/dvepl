@@ -79,7 +79,7 @@ async function updateShiftRoutes(
         });
 
         adminLogs.info("Shift updated successfully", {
-          updatedBy: (request.user as any)?.id,
+          updatedBy: (request.admin as any)?.id,
           shiftId: id,
         });
 

@@ -27,7 +27,7 @@ async function adminCreateTeamRoute(
 
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const companyId = request.user?.companyId;
+        const companyId = request.admin?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({
@@ -96,7 +96,7 @@ async function adminCreateTeamRoute(
 
         adminLogs.info("Team created successfully", {
           teamId: team.id,
-          createdBy: request.user?.id,
+          createdBy: request.admin?.id,
         });
 
         return reply.status(201).send({

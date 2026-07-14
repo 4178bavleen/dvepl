@@ -37,7 +37,7 @@ async function updateAttendanceRoutes(
           });
         }
 
-        const companyId = (request.user as any)?.companyId;
+        const companyId = (request.admin as any)?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({
@@ -130,7 +130,7 @@ async function updateAttendanceRoutes(
         });
 
         adminLogs.info("Attendance record updated successfully", {
-          updatedBy: (request.user as any)?.id,
+          updatedBy: (request.admin as any)?.id,
           attendanceId: id,
         });
 

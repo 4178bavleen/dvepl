@@ -36,7 +36,7 @@ async function updateEmployeeShiftRoutes(
           });
         }
 
-        const companyId = (request.user as any)?.companyId;
+        const companyId = (request.admin as any)?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({
@@ -109,7 +109,7 @@ async function updateEmployeeShiftRoutes(
         });
 
         adminLogs.info("Employee shift assignment updated successfully", {
-          updatedBy: (request.user as any)?.id,
+          updatedBy: (request.admin as any)?.id,
           assignmentId: id,
         });
 

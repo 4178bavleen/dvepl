@@ -36,7 +36,7 @@ async function updateEmployeeExperienceRoutes(
           });
         }
 
-        const companyId = (request.user as any)?.companyId;
+        const companyId = (request.admin as any)?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({
@@ -92,7 +92,7 @@ async function updateEmployeeExperienceRoutes(
         });
 
         adminLogs.info("Employee experience updated successfully", {
-          updatedBy: (request.user as any)?.id,
+          updatedBy: (request.admin as any)?.id,
           experienceId: id,
         });
 

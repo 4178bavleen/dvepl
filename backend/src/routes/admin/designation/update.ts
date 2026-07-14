@@ -91,7 +91,7 @@ async function updateDesignationRoutes(
 
         adminLogs.info("Designation updated successfully", {
           designationId: updatedDesignation.id,
-          updatedBy: request.user?.id,
+          updatedBy: request.admin?.id,
         });
 
         return reply.status(200).send({

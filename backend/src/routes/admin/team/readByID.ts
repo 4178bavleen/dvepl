@@ -34,7 +34,7 @@ async function getTeamByIdRoutes(
     ) => {
       try {
         const { id } = request.params as Params;
-        const companyId = request.user?.companyId;
+        const companyId = request.admin?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({

@@ -38,7 +38,7 @@ async function revokePermissionRoute(
         const role = await fastify.prisma.role.findFirst({
           where: {
             id: roleId,
-            companyId: request.user.companyId,
+            companyId: request.admin!.companyId,
             deletedAt: null,
           },
         });

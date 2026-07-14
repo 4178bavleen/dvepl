@@ -47,7 +47,7 @@ async function deleteHolidayRoute(
         });
 
         adminLogs.info("Holiday deleted successfully", {
-          deletedBy: (request.user as any)?.id,
+          deletedBy: (request.admin as any)?.id,
           holidayId: id,
         });
 

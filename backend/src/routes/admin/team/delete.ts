@@ -34,7 +34,7 @@ async function deleteTeamRoutes(
     ) => {
       try {
         const { id } = request.params as Params;
-        const companyId = request.user?.companyId;
+        const companyId = request.admin?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({
@@ -88,7 +88,7 @@ async function deleteTeamRoutes(
 
         adminLogs.info("Team soft-deleted successfully", {
           teamId: id,
-          deletedBy: request.user?.id,
+          deletedBy: request.admin?.id,
         });
 
         return reply.status(200).send({

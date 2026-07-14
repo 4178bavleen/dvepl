@@ -36,7 +36,7 @@ async function updateEmployeeDocumentRoutes(
           });
         }
 
-        const companyId = (request.user as any)?.companyId;
+        const companyId = (request.admin as any)?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({
@@ -92,7 +92,7 @@ async function updateEmployeeDocumentRoutes(
         });
 
         adminLogs.info("Employee document updated successfully", {
-          updatedBy: (request.user as any)?.id,
+          updatedBy: (request.admin as any)?.id,
           documentId: id,
         });
 

@@ -40,8 +40,8 @@ async function updateTenderRoute(
         }
 
         const { id } = request.params as { id: string };
-        const companyId = request.user?.companyId;
-        const performerId = request.user?.id || "System";
+        const companyId = request.admin?.companyId;
+        const performerId = request.admin?.id || "System";
 
         if (!companyId) {
           return reply.status(401).send({
@@ -66,7 +66,7 @@ async function updateTenderRoute(
 
         // Validate Lead
         if (data.leadId) {
-          const lead = await fastify.prisma.lead.findFirst({
+          const lead = await fastify.prisma.tenderRequest.findFirst({
             where: { id: data.leadId, companyId, deletedAt: null },
           });
           if (!lead) {
@@ -195,11 +195,13 @@ async function updateTenderRoute(
         }
 
         // Update Tender & Write Activities
+        const { leadId, ...tenderData } = data;
         const updatedTender = await fastify.prisma.$transaction(async (tx) => {
           const tender = await tx.tender.update({
             where: { id },
             data: {
-              ...data,
+              ...tenderData,
+              tenderRequestId: leadId !== undefined ? leadId : undefined,
               estimatedCost: data.estimatedCost !== undefined ? (data.estimatedCost ?? null) : undefined,
             },
           });

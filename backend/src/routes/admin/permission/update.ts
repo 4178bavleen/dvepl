@@ -58,7 +58,7 @@ async function updateRolePermissionsRoute(
         const role = await fastify.prisma.role.findFirst({
           where: {
             id: roleId,
-            companyId: request.user.companyId,
+            companyId: request.admin!.companyId,
             deletedAt: null,
           },
         });
@@ -108,7 +108,7 @@ async function updateRolePermissionsRoute(
 
         await fastify.prisma.auditLog.create({
           data: {
-            userId: request.user.id,
+            userId: request.admin!.id,
             module: "Role",
             recordId: roleId,
             action: "UPDATE_PERMISSIONS",
