@@ -32,8 +32,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger, 
-  
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
 export default function PermissionManagement() {
@@ -70,12 +69,12 @@ export default function PermissionManagement() {
 
   const fetchPermissions = async () => {
     try {
-      const response = await getPermissions();
+     const response = await getPermissions();
 
-      const permissionGroups = response.data.data;
+const permissionGroups = response.data.data;
 
-      setGroups(permissionGroups);
-      setPermissions(flattenPermissionGroups(permissionGroups));
+setGroups(permissionGroups);
+setPermissions(flattenPermissionGroups(permissionGroups));
     } catch (error) {
       console.error(error);
 
