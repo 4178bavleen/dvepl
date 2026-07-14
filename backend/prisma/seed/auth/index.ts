@@ -12,18 +12,18 @@ interface SeedAuthParams {
 export async function seedAuth(prisma: any, { companyId }: SeedAuthParams) {
   console.log("🌱 Seeding Authentication...");
 
-await seedPermissionGroups(prisma);    // permission groups 
+  await seedPermissionGroups(prisma);    // permission groups 
  
-await seedPermissions(prisma);           
+  await seedPermissions(prisma);           
 
-const role = await seedRole(prisma, companyId);
+  const role = await seedRole(prisma, companyId);
 
-await seedRolePermissions(prisma, companyId);
+  await seedRolePermissions(prisma, companyId);
 
-const admin = await seedAdmin(prisma, companyId);
+  const admin = await seedAdmin(prisma, companyId);
 
-return {
-  role,
-  admin,
-};
+  return {
+    role,
+    admin,
+  };
 }

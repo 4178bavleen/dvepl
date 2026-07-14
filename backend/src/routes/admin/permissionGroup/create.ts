@@ -7,7 +7,7 @@ import {
 
 import { adminLogs } from "../../../services/logger/contextLogger";
 
-import { createPermissionGroupSchema } from "../../../schemas/admin/permission-group/permission-group";
+import { createPermissionGroupSchema } from "../../../schemas/admin/permissionGroup/permissionGroup";
 
 async function createPermissionGroupRoutes(
   fastify: FastifyInstance,

@@ -5,7 +5,7 @@ import {
   FastifyRequest,
 } from "fastify";
 import { adminLogs } from "../../../services/logger/contextLogger";
-import { createEmployeeShiftSchema } from "../../../schemas/admin/employee-shift/employee-shift.schema";
+import { createEmployeeShiftSchema } from "../../../schemas/admin/employeeShift/employeeShift.schema";
 
 async function createEmployeeShiftRoutes(
   fastify: FastifyInstance,

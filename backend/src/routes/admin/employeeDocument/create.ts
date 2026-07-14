@@ -5,7 +5,7 @@ import {
   FastifyRequest,
 } from "fastify";
 import { adminLogs } from "../../../services/logger/contextLogger";
-import { createEmployeeDocumentSchema } from "../../../schemas/admin/employee-document/employee-document.schema";
+import { createEmployeeDocumentSchema } from "../../../schemas/admin/employeeDocument/employeeDocument.schema";
 
 async function createEmployeeDocumentRoutes(
   fastify: FastifyInstance,

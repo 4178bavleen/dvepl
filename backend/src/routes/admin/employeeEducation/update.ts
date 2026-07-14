@@ -5,7 +5,7 @@ import {
   FastifyRequest,
 } from "fastify";
 import { adminLogs } from "../../../services/logger/contextLogger";
-import { updateEmployeeEducationSchema } from "../../../schemas/admin/employee-education/employee-education.schema";
+import { updateEmployeeEducationSchema } from "../../../schemas/admin/employeeEducation/employeeEducation.schema";
 
 async function updateEmployeeEducationRoutes(
   fastify: FastifyInstance,
