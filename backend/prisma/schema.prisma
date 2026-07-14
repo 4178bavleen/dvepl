@@ -29,7 +29,7 @@ model Company {
   users                 User[]
   costCenters           CostCenter[]
   customers             Customer[]
-  leads                 Lead[]
+  tenderRequests        TenderRequest[]
   roles                 Role[]
   employees             Employee[]
   tenders               Tender[]
@@ -141,7 +141,7 @@ model CostCenter {
 // 2. AUTHENTICATION
 model User {
   id        String  @id @default(uuid())
-  name      String?
+  name      String 
   companyId String
   company   Company @relation(fields: [companyId], references: [id])
 
@@ -160,13 +160,13 @@ model User {
   passwordResets PasswordReset[]
   userRoles      UserRole[]
 
-  userPermissions   UserPermission[]
-  leadsAssigned     Lead[]                 @relation("LeadAssignedTo")
-  communicationLogs CommunicationHistory[]
-  auditLogs         AuditLog[]
+  userPermissions        UserPermission[]
+  tenderRequestsAssigned TenderRequest[]        @relation("TenderRequestAssignedTo")
+  communicationLogs      CommunicationHistory[]
+  auditLogs              AuditLog[]
 
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
   deletedAt       DateTime?
   tendersCreated  Tender[]       @relation("TenderCreatedBy")
   tendersAssigned Tender[]       @relation("TenderAssignedTo")
@@ -374,16 +374,16 @@ model Employee {
   dateOfExit    DateTime?
   status        EmployeeStatus @default(ACTIVE)
 
-  contacts          EmployeeContact[]
-  emergencyContacts EmployeeEmergencyContact[]
-  education         EmployeeEducation[]
-  experience        EmployeeExperience[]
-  documents         EmployeeDocument[]
-  attendances       Attendance[]
-  leaves            Leave[]
-  shiftAssignments  EmployeeShift[]
-  salaries          Salary[]
-  leadsCreated      Lead[]                     @relation("LeadCreatedBy")
+  contacts              EmployeeContact[]
+  emergencyContacts     EmployeeEmergencyContact[]
+  education             EmployeeEducation[]
+  experience            EmployeeExperience[]
+  documents             EmployeeDocument[]
+  attendances           Attendance[]
+  leaves                Leave[]
+  shiftAssignments      EmployeeShift[]
+  salaries              Salary[]
+  tenderRequestsCreated TenderRequest[]            @relation("TenderRequestCreatedBy")
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -604,7 +604,7 @@ model Customer {
 
   contacts          ContactPerson[]
   communicationLogs CommunicationHistory[]
-  leads             Lead[]
+  tenderRequests    TenderRequest[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -662,9 +662,9 @@ enum CommunicationType {
 model Tender {
   id String @id @default(uuid())
 
-  companyId  String
-  leadId     String?
-  customerId String?
+  companyId       String
+  tenderRequestId String?
+  customerId      String?
 
   departmentId  String?
   sectionId     String?
@@ -694,7 +694,7 @@ model Tender {
 
   company Company @relation(fields: [companyId], references: [id])
 
-  lead Lead? @relation(fields: [leadId], references: [id])
+  tenderRequest TenderRequest? @relation(fields: [tenderRequestId], references: [id])
 
   customer Customer? @relation(fields: [customerId], references: [id])
 

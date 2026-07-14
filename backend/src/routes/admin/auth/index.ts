@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import adminLoginRoutes from "./login";
 import adminLogoutRoute from "./logout"
-import profileRoutes from "./profile"
+import adminProfileRoutes from "./profile"
 
 async function adminAuthRouteGroup(
   fastify: FastifyInstance,
@@ -11,7 +11,7 @@ async function adminAuthRouteGroup(
   fastify.register(adminLogoutRoute, {
     prefix: "/logout",
   });
-  fastify.register(profileRoutes, {
+  fastify.register(adminProfileRoutes, {
     prefix: "/profile",
   });
 }
