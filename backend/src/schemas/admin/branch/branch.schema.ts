@@ -15,3 +15,4 @@ export const createBranchSchema = z.object({
 
   isActive: z.boolean().optional(),
 });
+export const updateBranchSchema = createBranchSchema.partial();

@@ -5,7 +5,7 @@ import {
   FastifyRequest,
 } from "fastify";
 import { adminLogs } from "../../../services/logger/contextLogger";
-import { updateHolidaySchema } from "../../../schemas/admin/holiday/holiday.schema";
+import { updateHolidaySchema } from "../../../schemas/admin/employeeHoliday/holiday.schema";
 
 async function updateHolidayRoutes(
   fastify: FastifyInstance,

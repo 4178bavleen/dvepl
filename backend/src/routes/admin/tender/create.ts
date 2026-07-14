@@ -10,7 +10,7 @@ import { createTenderSchema } from "../../../schemas/admin/tender/tender.schema"
 
 async function createTenderRoute(
   fastify: FastifyInstance,
-  options: FastifyPluginOptions
+  options: FastifyPluginOptions,
 ) {
   fastify.post(
     "/",
@@ -227,12 +227,10 @@ async function createTenderRoute(
           success: false,
           message: "Server Error.",
           details:
-            process.env.NODE_ENV === "development"
-              ? error.message
-              : undefined,
+            process.env.NODE_ENV === "development" ? error.message : undefined,
         });
       }
-    }
+    },
   );
 }
 

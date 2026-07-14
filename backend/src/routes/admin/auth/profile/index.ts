@@ -3,7 +3,7 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import readProfileRoute from "./read";
 import updateProfileRoute from "./update";
 
-async function profileRoutes(
+async function adminProfileRoutes(
   fastify: FastifyInstance,
   options: FastifyPluginOptions,
 ) {
@@ -11,4 +11,4 @@ async function profileRoutes(
   fastify.register(updateProfileRoute);
 }
 
-export default profileRoutes;
+export default adminProfileRoutes;

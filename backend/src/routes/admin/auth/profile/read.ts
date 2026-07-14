@@ -23,9 +23,9 @@ async function readProfileRoute(
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const userId = (request.user as any).userId;
-        
-        console.log("profile api ",userId);  //undefined 
+        const userId = (request.user as any).id;
+
+        console.log("profile api ", userId); //undefined
 
         const user = await fastify.prisma.user.findUnique({
           where: {
@@ -33,9 +33,17 @@ async function readProfileRoute(
           },
           include: {
             company: true,
-            branch: true,
-            designation: true,
-            department: true,
+
+            employee: {
+              include: {
+                branch: true,
+                department: true,
+                team: true,
+                designation: true,
+                reportsTo: true,
+              },
+            },
+
             userRoles: {
               include: {
                 role: true,
@@ -63,10 +71,10 @@ async function readProfileRoute(
             name: user.name,
             email: user.email,
             phone: user.phone,
-            employeeCode: user.employeeCode,
+            // employeeCode: user.employeeCode,
             company: user.company,
             branch: user.branch,
-            designation: user.designation,
+            // designation: user.designation,
             department: user.department,
             roles: user.userRoles.map((r) => r.role.name),
           },
@@ -80,9 +88,7 @@ async function readProfileRoute(
           success: false,
           message: "Server error while fetching profile.",
           details:
-            process.env.NODE_ENV === "development"
-              ? error.message
-              : undefined,
+            process.env.NODE_ENV === "development" ? error.message : undefined,
         });
       }
     },

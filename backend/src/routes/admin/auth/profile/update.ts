@@ -34,7 +34,7 @@ async function updateProfileRoute(
           });
         }
 
-        const userId = (request.user as any).userId;
+        const userId = (request.user as any).id;
 
         const { name, phone } = validationResult.data;
 

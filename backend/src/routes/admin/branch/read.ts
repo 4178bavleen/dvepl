@@ -11,36 +11,44 @@ async function adminBranchReadRoutes(
       schema: {
         tags: ["Branch"],
         summary: "Read Branch Information",
-        description: "Retrieve information about a specific branch based on provided criteria.",
-
-        
+        description:
+          "Retrieve information about a specific branch based on provided criteria.",
       },
     },
     async (request: any, reply: any) => {
       try {
-        
+        const branches = await fastify.prisma.branch.findMany({
+          where: {
+            deletedAt: null,
+          },
+          include: {
+            company: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+        });
 
-
-        const data = {
-            "branchName": "Main Branch",
-            "branchLocation": "123 Main St, Cityville",
-            "branchManager": "John Doe",
-            "contactNumber": "+1 (555) 123-4567",
-        }
-        
-
-        reply.send({
+        return reply.send({
           success: true,
-          message: "Branch information retrieved successfully",
-          data,
+          message: "Branches fetched successfully.",
+          data: branches,
         });
       } catch (error: string | any) {
         adminLogs.error(`Failed to retrieve branch information ${error}`);
         return reply.status(500).send({
           success: false,
-          message: "Server error during branch information retrieval. Please try again later.",
+          message:
+            "Server error during branch information retrieval. Please try again later.",
           details:
-            process.env.NODE_ENV === "development" ? error.message : error.message,
+            process.env.NODE_ENV === "development"
+              ? error.message
+              : error.message,
         });
       }
     },
