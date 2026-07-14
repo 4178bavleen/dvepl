@@ -1,0 +1,92 @@
+import {
+  FastifyInstance,
+  FastifyPluginOptions,
+  FastifyReply,
+  FastifyRequest,
+} from "fastify";
+
+import { adminLogs } from "../../../../services/logger/contextLogger";
+
+async function readProfileRoute(
+  fastify: FastifyInstance,
+  options: FastifyPluginOptions,
+) {
+  fastify.get(
+    "/",
+    {
+      preHandler: [fastify.verifyToken],
+      schema: {
+        tags: ["Auth"],
+        summary: "Get Logged-in User Profile",
+        description: "Returns the profile of the currently logged-in user.",
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const userId = (request.user as any).userId;
+        
+        console.log("profile api ",userId);  //undefined 
+
+        const user = await fastify.prisma.user.findUnique({
+          where: {
+            id: userId,
+          },
+          include: {
+            company: true,
+            branch: true,
+            designation: true,
+            department: true,
+            userRoles: {
+              include: {
+                role: true,
+              },
+            },
+          },
+        });
+
+        if (!user || user.deletedAt) {
+          return reply.status(404).send({
+            success: false,
+            message: "User not found.",
+          });
+        }
+
+        adminLogs.info("Profile fetched", {
+          userId,
+        });
+
+        return reply.status(200).send({
+          success: true,
+          message: "Profile fetched successfully.",
+          data: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            phone: user.phone,
+            employeeCode: user.employeeCode,
+            company: user.company,
+            branch: user.branch,
+            designation: user.designation,
+            department: user.department,
+            roles: user.userRoles.map((r) => r.role.name),
+          },
+        });
+      } catch (error: any) {
+        adminLogs.error("Failed to fetch profile", {
+          error,
+        });
+
+        return reply.status(500).send({
+          success: false,
+          message: "Server error while fetching profile.",
+          details:
+            process.env.NODE_ENV === "development"
+              ? error.message
+              : undefined,
+        });
+      }
+    },
+  );
+}
+
+export default readProfileRoute;
