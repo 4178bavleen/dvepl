@@ -4,6 +4,7 @@ import { seedOrganization } from "./Organization";
 import { seedAuth } from "./auth";
 import { seedPermissions } from "./auth/permission.seed";
 import { seedHrms } from "./hrms";
+import { seedCrm } from "./crm";
 
 async function main() {
   console.log("Starting Database Seed");
@@ -14,7 +15,13 @@ async function main() {
     companyId: organization.company.id,
   });
 
-  await seedHrms(prisma);
+  await seedHrms(prisma, {
+    companyId: organization.company.id,
+  });
+
+  await seedCrm(prisma, {
+    companyId: organization.company.id,
+  });
 
   console.log("✅ Database Seed Completed");
 }

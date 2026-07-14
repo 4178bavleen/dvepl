@@ -1,34 +1,24 @@
+import { PrismaClient, Holiday } from "@prisma/client";
 
-export async function seedHoliday() {
-  console.log("Seeding Holidays...");
+const DEFAULT_HOLIDAYS = [
+  { name: "New Year's Day", date: new Date("2026-01-01"), type: "NATIONAL" },
+  { name: "Republic Day", date: new Date("2026-01-26"), type: "NATIONAL" },
+  { name: "Independence Day", date: new Date("2026-08-15"), type: "NATIONAL" },
+  { name: "Gandhi Jayanti", date: new Date("2026-10-02"), type: "NATIONAL" },
+  { name: "Christmas Day", date: new Date("2026-12-25"), type: "NATIONAL" },
+];
 
-  const currentYear = new Date().getFullYear();
-
-  const holidays = [
-    {
-      name: "Republic Day",
-      date: new Date(`${currentYear}-01-26`),
-      type: "NATIONAL",
-    },
-    {
-      name: "Independence Day",
-      date: new Date(`${currentYear}-08-15`),
-      type: "NATIONAL",
-    },
-    {
-      name: "Gandhi Jayanti",
-      date: new Date(`${currentYear}-10-02`),
-      type: "NATIONAL",
-    },
-    {
-      name: "Christmas",
-      date: new Date(`${currentYear}-12-25`),
-      type: "NATIONAL",
-    },
-  ];
+/**
+ * Seeds standard national holidays.
+ * 
+ * @param prisma The Prisma Client instance
+ * @returns Array of seeded holidays
+ */
+export async function seedHoliday(prisma: PrismaClient): Promise<Holiday[]> {
+  console.log("🌱 Seeding Holidays...");
 
   return Promise.all(
-    holidays.map((holiday) =>
+    DEFAULT_HOLIDAYS.map((holiday) =>
       prisma.holiday.upsert({
         where: {
           name: holiday.name,
@@ -37,7 +27,11 @@ export async function seedHoliday() {
           date: holiday.date,
           type: holiday.type,
         },
-        create: holiday,
+        create: {
+          name: holiday.name,
+          date: holiday.date,
+          type: holiday.type,
+        },
       })
     )
   );
