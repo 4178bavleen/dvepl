@@ -37,6 +37,7 @@ model Company {
   sections              Section[]
   divisions             Division[]
   subDivisions          SubDivision[]
+  referenceCodeCounters ReferenceCodeCounter[]
 
   @@map("companies")
 }
@@ -713,6 +714,7 @@ model Tender {
   files                  TenderFile[]
   remarks                TenderRemark[]
   activities             TenderActivity[]
+  referenceCodes         ReferenceCode[]
   governmentDepartment   GovernmentDepartment? @relation(fields: [governmentDepartmentId], references: [id])
   governmentDepartmentId String?
 
@@ -945,4 +947,40 @@ model AuditLog {
 
   @@index([module, recordId])
   @@map("audit_logs")
+}
+
+// Reference Code Tracking & Logging (Tender Management)
+model ReferenceCode {
+  id                 String              @id @default(uuid())
+  tenderId           String
+  tender             Tender              @relation(fields: [tenderId], references: [id])
+  oldReferenceCode   String?
+  newReferenceCode   String?
+  actionType         ReferenceCodeAction
+  actionReason       String?
+  actionBy           String?
+  createdAt          DateTime            @default(now())
+
+  @@map("reference_codes")
+}
+
+enum ReferenceCodeAction {
+  GENERATED
+  UPDATED
+  DELETED
+  REGENERATED
+  MISSING
+}
+
+model ReferenceCodeCounter {
+  id           String   @id @default(uuid())
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id])
+  prefix       String   @default("REF")
+  lastSequence Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([companyId, prefix])
+  @@map("reference_code_counters")
 }
