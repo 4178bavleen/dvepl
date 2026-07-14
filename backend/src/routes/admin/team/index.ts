@@ -1,18 +1,20 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 
 import adminCreateTeamRoute from "./create";
-// import adminReadTeamRoute from "./read";
-// import adminUpdateTeamRoute from "./update";
-// import adminDeleteTeamRoute from "./delete";
+import readTeamRoutes from "./read";
+import getTeamByIdRoutes from "./readByID";
+import updateTeamRoutes from "./update";
+import deleteTeamRoutes from "./delete";
 
-async function adminEmployeeRouteGroup(
+async function adminTeamRouteGroup(
   fastify: FastifyInstance,
   options: FastifyPluginOptions
 ) {
   fastify.register(adminCreateTeamRoute, { prefix: "/create" });
-//   fastify.register(readEmployeeRoutes, { prefix: "/read" });
-//   fastify.register(updateEmployeeRoutes, { prefix: "/update" });
-//   fastify.register(deleteEmployeeRoute, { prefix: "/delete" });
+  fastify.register(readTeamRoutes, { prefix: "/read" });
+  fastify.register(getTeamByIdRoutes, { prefix: "/read" });
+  fastify.register(updateTeamRoutes, { prefix: "/update" });
+  fastify.register(deleteTeamRoutes, { prefix: "/delete" });
 }
 
-export default adminEmployeeRouteGroup;
+export default adminTeamRouteGroup;

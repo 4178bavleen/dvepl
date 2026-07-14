@@ -11,17 +11,17 @@ interface Params {
   id: string;
 }
 
-async function deleteDesignationRoutes(
+async function getDesignationByIdRoutes(
   fastify: FastifyInstance,
   options: FastifyPluginOptions
 ) {
-  fastify.delete(
+  fastify.get(
     "/:id",
     {
       schema: {
         tags: ["Designation"],
-        summary: "Delete Designation",
-        description: "Soft delete designation",
+        summary: "Get Designation By ID",
+        description: "Fetch designation details by ID",
       },
     },
     async (
@@ -31,59 +31,55 @@ async function deleteDesignationRoutes(
       try {
         const { id } = request.params;
 
-        const designation = await fastify.prisma.designation.findUnique({
+        const designation = await fastify.prisma.designation.findFirst({
           where: {
             id,
+            deletedAt: null,
           },
           include: {
             employees: {
               where: {
                 deletedAt: null,
               },
+              select: {
+                id: true,
+                employeeCode: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+            _count: {
+              select: {
+                employees: true,
+              },
             },
           },
         });
 
-        if (!designation || designation.deletedAt) {
+        if (!designation) {
           return reply.status(404).send({
             success: false,
             message: "Designation not found.",
           });
         }
 
-        // Prevent deletion if employees are currently linked to this designation
-        if (designation.employees.length > 0) {
-          return reply.status(409).send({
-            success: false,
-            message: "Designation cannot be deleted because it is linked with active employees.",
-          });
-        }
-
-        await fastify.prisma.designation.update({
-          where: {
-            id,
-          },
-          data: {
-            deletedAt: new Date(),
-          },
-        });
-
-        adminLogs.info("Designation deleted successfully", {
-          designationId: id,
+        adminLogs.info("Designation fetched successfully", {
+          designationId: designation.id,
         });
 
         return reply.status(200).send({
           success: true,
-          message: "Designation deleted successfully.",
+          message: "Designation fetched successfully.",
+          data: designation,
         });
       } catch (error: any) {
-        adminLogs.error("Designation deletion failed", {
+        adminLogs.error("Failed to fetch designation", {
           error,
         });
 
         return reply.status(500).send({
           success: false,
-          message: "Server error while deleting designation.",
+          message: "Server error while fetching designation.",
           details:
             process.env.NODE_ENV === "development"
               ? error.message
@@ -94,4 +90,4 @@ async function deleteDesignationRoutes(
   );
 }
 
-export default deleteDesignationRoutes;
+export default getDesignationByIdRoutes;

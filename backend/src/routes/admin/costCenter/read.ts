@@ -4,9 +4,10 @@ import {
   FastifyReply,
   FastifyRequest,
 } from "fastify";
+
 import { adminLogs } from "../../../services/logger/contextLogger";
 
-async function readTeamRoutes(
+async function readCostCenterRoutes(
   fastify: FastifyInstance,
   options: FastifyPluginOptions
 ) {
@@ -14,22 +15,11 @@ async function readTeamRoutes(
     "/",
     {
       schema: {
-        tags: ["Team"],
-        summary: "Get Teams",
-        description: "Fetch all teams for the company.",
-        querystring: {
-          type: "object",
-          properties: {
-            departmentId: { type: "string" },
-          },
-        },
+        tags: ["Cost Center"],
+        summary: "Get Cost Centers",
+        description: "Fetch all active cost centers for the company",
       },
-      preHandler: [
-        fastify.verifyToken,
-        fastify.authorizePermissions(["employee.view"]),
-      ],
     },
-
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         const companyId = request.user?.companyId;
@@ -41,17 +31,10 @@ async function readTeamRoutes(
           });
         }
 
-        const { departmentId } = request.query as { departmentId?: string };
-
-        const teams = await fastify.prisma.team.findMany({
+        const costCenters = await fastify.prisma.costCenter.findMany({
           where: {
+            companyId,
             deletedAt: null,
-            department: {
-              branch: {
-                companyId,
-              },
-              ...(departmentId ? { id: departmentId } : {}),
-            },
           },
           include: {
             department: {
@@ -68,34 +51,30 @@ async function readTeamRoutes(
                 },
               },
             },
-            _count: {
-              select: {
-                employees: true,
-              },
-            },
           },
           orderBy: {
             createdAt: "desc",
           },
         });
 
-        adminLogs.info("Teams fetched successfully", {
-          count: teams.length,
+        adminLogs.info("Cost Centers fetched successfully", {
+          companyId,
+          count: costCenters.length,
         });
 
         return reply.status(200).send({
           success: true,
-          message: "Teams fetched successfully.",
-          data: teams,
+          message: "Cost centers fetched successfully.",
+          data: costCenters,
         });
       } catch (error: any) {
-        adminLogs.error("Failed to fetch teams", {
+        adminLogs.error("Failed to fetch cost centers", {
           error,
         });
 
         return reply.status(500).send({
           success: false,
-          message: "Server error while fetching teams.",
+          message: "Server error while fetching cost centers.",
           details:
             process.env.NODE_ENV === "development"
               ? error.message
@@ -106,4 +85,4 @@ async function readTeamRoutes(
   );
 }
 
-export default readTeamRoutes;
+export default readCostCenterRoutes;

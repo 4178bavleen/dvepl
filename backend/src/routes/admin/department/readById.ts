@@ -72,7 +72,11 @@ async function getDepartmentByIdRoutes(
                 employeeCode: true,
                 firstName: true,
                 lastName: true,
-                email: true,
+                user: {
+                  select: {
+                    email: true,
+                  },
+                },
               },
             },
             costCenters: {

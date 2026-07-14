@@ -4,13 +4,14 @@ import {
   FastifyReply,
   FastifyRequest,
 } from "fastify";
+
 import { adminLogs } from "../../../services/logger/contextLogger";
 
 interface Params {
   id: string;
 }
 
-async function getTeamByIdRoutes(
+async function getCostCenterByIdRoutes(
   fastify: FastifyInstance,
   options: FastifyPluginOptions
 ) {
@@ -18,22 +19,17 @@ async function getTeamByIdRoutes(
     "/:id",
     {
       schema: {
-        tags: ["Team"],
-        summary: "Get Team By ID",
-        description: "Fetch team details by ID.",
+        tags: ["Cost Center"],
+        summary: "Get Cost Center By ID",
+        description: "Fetch cost center details by ID",
       },
-      preHandler: [
-        fastify.verifyToken,
-        fastify.authorizePermissions(["employee.view"]),
-      ],
     },
-
     async (
-      request: FastifyRequest,
+      request: FastifyRequest<{ Params: Params }>,
       reply: FastifyReply
     ) => {
       try {
-        const { id } = request.params as Params;
+        const { id } = request.params;
         const companyId = request.user?.companyId;
 
         if (!companyId) {
@@ -43,15 +39,11 @@ async function getTeamByIdRoutes(
           });
         }
 
-        const team = await fastify.prisma.team.findFirst({
+        const costCenter = await fastify.prisma.costCenter.findFirst({
           where: {
             id,
+            companyId,
             deletedAt: null,
-            department: {
-              branch: {
-                companyId,
-              },
-            },
           },
           include: {
             department: {
@@ -68,54 +60,34 @@ async function getTeamByIdRoutes(
                 },
               },
             },
-            employees: {
-              where: {
-                deletedAt: null,
-              },
-              select: {
-                id: true,
-                employeeCode: true,
-                firstName: true,
-                lastName: true,
-                user: {
-                  select: {
-                    email: true,
-                  },
-                },
-              },
-            },
-            _count: {
-              select: {
-                employees: true,
-              },
-            },
           },
         });
 
-        if (!team) {
+        if (!costCenter) {
           return reply.status(404).send({
             success: false,
-            message: "Team not found.",
+            message: "Cost center not found.",
           });
         }
 
-        adminLogs.info("Team fetched successfully", {
-          teamId: team.id,
+        adminLogs.info("Cost Center fetched successfully", {
+          costCenterId: costCenter.id,
+          companyId,
         });
 
         return reply.status(200).send({
           success: true,
-          message: "Team fetched successfully.",
-          data: team,
+          message: "Cost center fetched successfully.",
+          data: costCenter,
         });
       } catch (error: any) {
-        adminLogs.error("Failed to fetch team", {
+        adminLogs.error("Failed to fetch cost center", {
           error,
         });
 
         return reply.status(500).send({
           success: false,
-          message: "Server error while fetching team.",
+          message: "Server error while fetching cost center.",
           details:
             process.env.NODE_ENV === "development"
               ? error.message
@@ -126,4 +98,4 @@ async function getTeamByIdRoutes(
   );
 }
 
-export default getTeamByIdRoutes;
+export default getCostCenterByIdRoutes;

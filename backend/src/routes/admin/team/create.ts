@@ -4,68 +4,122 @@ import {
   FastifyReply,
   FastifyRequest,
 } from "fastify";
-
 import { adminLogs } from "../../../services/logger/contextLogger";
-
 import { createTeamSchema } from "../../../schemas/admin/team/team.schema";
 
 async function adminCreateTeamRoute(
   fastify: FastifyInstance,
-  options: FastifyPluginOptions,
+  options: FastifyPluginOptions
 ) {
-  fastify.post("/create", async (request, reply) => {
-    try {
-      const body = createTeamSchema.parse(request.body);
+  fastify.post(
+    "/",
+    {
+      schema: {
+        tags: ["Team"],
+        summary: "Create Team",
+        description: "Create a new team under a department.",
+      },
+      preHandler: [
+        fastify.verifyToken,
+        fastify.authorizePermissions(["employee.update"]),
+      ],
+    },
 
-      const department = await fastify.prisma.department.findUnique({
-        where: {
-          id: body.departmentId,
-        },
-      });
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const companyId = request.user?.companyId;
 
-      if (!department) {
-        return reply.code(404).send({
+        if (!companyId) {
+          return reply.status(401).send({
+            success: false,
+            message: "Company information missing from token.",
+          });
+        }
+
+        const validationResult = createTeamSchema.safeParse(request.body);
+
+        if (!validationResult.success) {
+          adminLogs.error("Invalid team data", {
+            error: validationResult.error,
+          });
+
+          return reply.status(400).send({
+            success: false,
+            message: "Invalid team data.",
+            error: validationResult.error.issues,
+          });
+        }
+
+        const { departmentId, name, isActive } = validationResult.data;
+
+        // Verify department exists and belongs to this company
+        const department = await fastify.prisma.department.findFirst({
+          where: {
+            id: departmentId,
+            branch: {
+              companyId,
+            },
+            deletedAt: null,
+          },
+        });
+
+        if (!department) {
+          return reply.status(404).send({
+            success: false,
+            message: "Department not found.",
+          });
+        }
+
+        // Verify team name is unique in this department
+        const existingTeam = await fastify.prisma.team.findFirst({
+          where: {
+            departmentId,
+            name,
+            deletedAt: null,
+          },
+        });
+
+        if (existingTeam) {
+          return reply.status(409).send({
+            success: false,
+            message: "Team already exists in this department.",
+          });
+        }
+
+        const team = await fastify.prisma.team.create({
+          data: {
+            departmentId,
+            name,
+            isActive: isActive ?? true,
+          },
+        });
+
+        adminLogs.info("Team created successfully", {
+          teamId: team.id,
+          createdBy: request.user?.id,
+        });
+
+        return reply.status(201).send({
+          success: true,
+          message: "Team created successfully.",
+          data: team,
+        });
+      } catch (error: any) {
+        adminLogs.error("Failed to create team", {
+          error,
+        });
+
+        return reply.status(500).send({
           success: false,
-          message: "Department not found.",
+          message: "Server error while creating team.",
+          details:
+            process.env.NODE_ENV === "development"
+              ? error.message
+              : undefined,
         });
       }
-
-      const existing = await fastify.prisma.team.findFirst({
-        where: {
-          departmentId: body.departmentId,
-          name: body.name,
-          deletedAt: null,
-        },
-      });
-
-      if (existing) {
-        return reply.code(409).send({
-          success: false,
-          message: "Team already exists in this department.",
-        });
-      }
-
-      const team = await fastify.prisma.team.create({
-        data: {
-          departmentId: body.departmentId,
-          name: body.name,
-          isActive: body.isActive ?? true,
-        },
-      });
-
-      return reply.code(201).send({
-        success: true,
-        message: "Team created successfully.",
-        data: team,
-      });
-    } catch (error: any) {
-      return reply.code(500).send({
-        success: false,
-        message: "Failed to create team.",
-        details: error.message,
-      });
     }
-  });
+  );
 }
 
 export default adminCreateTeamRoute;

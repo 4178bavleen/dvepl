@@ -4,14 +4,15 @@ import {
   FastifyReply,
   FastifyRequest,
 } from "fastify";
+
 import { adminLogs } from "../../../services/logger/contextLogger";
-import { updateTeamSchema } from "../../../schemas/admin/team/team.schema";
+import { updateCostCenterSchema } from "../../../schemas/admin/costCenter/costCenter.schema";
 
 interface Params {
   id: string;
 }
 
-async function updateTeamRoutes(
+async function updateCostCenterRoutes(
   fastify: FastifyInstance,
   options: FastifyPluginOptions
 ) {
@@ -19,22 +20,17 @@ async function updateTeamRoutes(
     "/:id",
     {
       schema: {
-        tags: ["Team"],
-        summary: "Update Team",
-        description: "Update details of an existing team.",
+        tags: ["Cost Center"],
+        summary: "Update Cost Center",
+        description: "Update details of an existing cost center.",
       },
-      preHandler: [
-        fastify.verifyToken,
-        fastify.authorizePermissions(["employee.update"]),
-      ],
     },
-
     async (
-      request: FastifyRequest,
+      request: FastifyRequest<{ Params: Params }>,
       reply: FastifyReply
     ) => {
       try {
-        const { id } = request.params as Params;
+        const { id } = request.params;
         const companyId = request.user?.companyId;
 
         if (!companyId) {
@@ -44,115 +40,107 @@ async function updateTeamRoutes(
           });
         }
 
-        const validationResult = updateTeamSchema.safeParse(request.body);
+        const validationResult = updateCostCenterSchema.safeParse(request.body);
 
         if (!validationResult.success) {
-          adminLogs.error("Invalid team update data", {
+          adminLogs.error("Invalid cost center update data", {
             error: validationResult.error,
           });
 
           return reply.status(400).send({
             success: false,
-            message: "Invalid team data.",
+            message: "Invalid cost center data.",
             error: validationResult.error.issues,
           });
         }
 
-        const { departmentId, name, isActive } = validationResult.data;
+        const { departmentId, code, name, budget } = validationResult.data;
 
-        // Verify team exists and belongs to this company
-        const existingTeam = await fastify.prisma.team.findFirst({
+        // Verify cost center exists and is active
+        const existingCostCenter = await fastify.prisma.costCenter.findFirst({
           where: {
             id,
+            companyId,
             deletedAt: null,
-            department: {
-              branch: {
-                companyId,
-              },
-            },
           },
         });
 
-        if (!existingTeam) {
+        if (!existingCostCenter) {
           return reply.status(404).send({
             success: false,
-            message: "Team not found.",
+            message: "Cost center not found.",
           });
         }
 
-        // Verify department if departmentId is changing
-        if (departmentId && departmentId !== existingTeam.departmentId) {
+        // Verify department belongs to same company
+        if (departmentId && departmentId !== existingCostCenter.departmentId) {
           const department = await fastify.prisma.department.findFirst({
             where: {
               id: departmentId,
+              deletedAt: null,
               branch: {
                 companyId,
               },
-              deletedAt: null,
             },
           });
 
           if (!department) {
             return reply.status(404).send({
               success: false,
-              message: "Department not found.",
+              message: "Department not found or does not belong to your company.",
             });
           }
         }
 
-        // Verify team name uniqueness in the target department
-        if (name || departmentId) {
-          const targetDeptId = departmentId || existingTeam.departmentId;
-          const targetName = name || existingTeam.name;
-
-          const duplicateTeam = await fastify.prisma.team.findFirst({
+        // Verify code uniqueness in the company if it is changing
+        if (code && code !== existingCostCenter.code) {
+          const duplicateCostCenter = await fastify.prisma.costCenter.findUnique({
             where: {
-              departmentId: targetDeptId,
-              name: targetName,
-              deletedAt: null,
-              NOT: {
-                id,
+              companyId_code: {
+                companyId,
+                code,
               },
             },
           });
 
-          if (duplicateTeam) {
+          if (duplicateCostCenter) {
             return reply.status(409).send({
               success: false,
-              message: "Team name already exists for this department.",
+              message: "Cost center code already exists for this company.",
             });
           }
         }
 
-        const updatedTeam = await fastify.prisma.team.update({
+        const updatedCostCenter = await fastify.prisma.costCenter.update({
           where: {
             id,
           },
           data: {
             departmentId,
+            code,
             name,
-            isActive,
+            budget,
           },
         });
 
-        adminLogs.info("Team updated successfully", {
-          teamId: updatedTeam.id,
+        adminLogs.info("Cost Center updated successfully", {
+          costCenterId: updatedCostCenter.id,
           updatedBy: request.user?.id,
         });
 
         return reply.status(200).send({
           success: true,
-          message: "Team updated successfully.",
-          data: updatedTeam,
+          message: "Cost center updated successfully.",
+          data: updatedCostCenter,
         });
       } catch (error: any) {
-        adminLogs.error("Team update failed", {
+        adminLogs.error("Cost center update failed", {
           error,
         });
 
         return reply.status(500).send({
           success: false,
-          message: "Server error while updating team.",
+          message: "Server error while updating cost center.",
           details:
             process.env.NODE_ENV === "development"
               ? error.message
@@ -163,4 +151,4 @@ async function updateTeamRoutes(
   );
 }
 
-export default updateTeamRoutes;
+export default updateCostCenterRoutes;

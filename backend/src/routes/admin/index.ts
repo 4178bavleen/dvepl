@@ -4,6 +4,8 @@ import adminCompanyRouteGroup from "./company/index";
 import adminUserRouteGroup from "./user/index";
 import adminRoleRouteGroup from "./role";
 import adminPermissionRouteGroup from "./permission/index";
+import adminDesignationRouteGroup from "./designation/index";
+import adminCostCenterRouteGroup from "./costCenter/index";
 import accessRoutes from "./access";
 import permissionGroupRoutes from "./permissionGroup";
 
@@ -34,6 +36,7 @@ import adminSectionRouteGroup from "./section/index"
 import adminDivisionRouteGroup from "./division/index"
 import adminSubDivisionRouteGroup from "./subDivision/index"
 import adminDeptRouteGroup from "./department/index"
+import adminTeamRouteGroup from "./team/index"
 
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 
@@ -54,12 +57,19 @@ async function adminRoutes(
     instance.register(adminBranchRouteGroup, { prefix: "/branch" });
     instance.register(adminCompanyRouteGroup, { prefix: "/company" });
     instance.register(adminDeptRouteGroup, { prefix: "/department" });
+    instance.register(adminTeamRouteGroup, { prefix: "/team" });
     instance.register(adminUserRouteGroup, { prefix: "/user" });
      instance.register(permissionGroupRoutes, {
       prefix: "/permission-group",
     });
     instance.register(adminRoleRouteGroup, {
       prefix: "/role",
+    });
+    instance.register(adminDesignationRouteGroup, {
+      prefix: "/designation",
+    });
+    instance.register(adminCostCenterRouteGroup, {
+      prefix: "/cost-center",
     });
     instance.register(adminPermissionRouteGroup, {
       prefix: "/permission",
