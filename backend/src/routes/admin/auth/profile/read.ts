@@ -33,9 +33,13 @@ async function readProfileRoute(
           },
           include: {
             company: true,
-            branch: true,
-            designation: true,
-            department: true,
+            employee: {
+              include: {
+                branch: true,
+                designation: true,
+                department: true,
+              },
+            },
             userRoles: {
               include: {
                 role: true,
@@ -63,11 +67,11 @@ async function readProfileRoute(
             name: user.name,
             email: user.email,
             phone: user.phone,
-            employeeCode: user.employeeCode,
+            employeeCode: user.employee?.employeeCode || null,
             company: user.company,
-            branch: user.branch,
-            designation: user.designation,
-            department: user.department,
+            branch: user.employee?.branch || null,
+            designation: user.employee?.designation || null,
+            department: user.employee?.department || null,
             roles: user.userRoles.map((r) => r.role.name),
           },
         });

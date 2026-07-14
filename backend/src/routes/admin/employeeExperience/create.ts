@@ -5,7 +5,7 @@ import {
   FastifyRequest,
 } from "fastify";
 import { adminLogs } from "../../../services/logger/contextLogger";
-import { createEmployeeExperienceSchema } from "../../../schemas/admin/employee-experience/employee-experience.schema";
+import { createEmployeeExperienceSchema } from "../../../schemas/admin/employeeExperience/employeeExperience.schema";
 
 async function createEmployeeExperienceRoutes(
   fastify: FastifyInstance,
