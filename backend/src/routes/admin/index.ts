@@ -9,16 +9,16 @@ import permissionGroupRoutes from "./permission-group";
 
 
 import adminEmployeeRouteGroup from './employee'
-import adminEmployeeContactRouteGroup from './employee-contact'
+import adminEmployeeContactRouteGroup from './employeeContact'
 import adminEmployeeEmergencyContactRouteGroup from './employee-emergency-contact'
 import adminEmployeeEducationRouteGroup from './employee-education'
-import adminEmployeeExperienceRouteGroup from './employee-experience'
-import adminEmployeeDocumentRouteGroup from './employee-document'
-import adminShiftRouteGroup from './employee-shift'
-import adminEmployeeShiftRouteGroup from './employee-shift'
-import adminHolidayRouteGroup from './holiday'
-import adminAttendanceRouteGroup from './attendance'
-import adminLeaveRouteGroup from './leave'
+import adminEmployeeExperienceRouteGroup from './employeeExperience'
+import adminEmployeeDocumentRouteGroup from './employeeDocument'
+import adminShiftRouteGroup from './employeeShift'
+import adminEmployeeShiftRouteGroup from './employeeShift'
+import adminHolidayRouteGroup from './employeeHoliday'
+import adminAttendanceRouteGroup from './employeeAttendance'
+import adminLeaveRouteGroup from './employeeLeave'
 import adminSalaryRouteGroup from './salary'
 
 
