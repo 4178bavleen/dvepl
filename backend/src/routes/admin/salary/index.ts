@@ -10,9 +10,9 @@ async function adminSalaryRouteGroup(
   options: FastifyPluginOptions
 ) {
   fastify.register(createSalaryRoute, { prefix: "/create" });
-  fastify.register(readSalaryRoutes, { prefix: "/" });
-  fastify.register(updateSalaryRoutes, { prefix: "/" });
-  fastify.register(deleteSalaryRoute, { prefix: "/" });
+  fastify.register(readSalaryRoutes, { prefix: "/read" });
+  fastify.register(updateSalaryRoutes, { prefix: "/update" });
+  fastify.register(deleteSalaryRoute, { prefix: "/delete" });
 }
 
 export default adminSalaryRouteGroup;

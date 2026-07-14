@@ -5,13 +5,13 @@ import adminUserRouteGroup from "./user/index";
 import adminRoleRouteGroup from "./role";
 import adminPermissionRouteGroup from "./permission/index";
 import accessRoutes from "./access";
-import permissionGroupRoutes from "./permission-group";
+import permissionGroupRoutes from "./permissionGroup";
 
 
 import adminEmployeeRouteGroup from './employee'
 import adminEmployeeContactRouteGroup from './employeeContact'
-import adminEmployeeEmergencyContactRouteGroup from './employee-emergency-contact'
-import adminEmployeeEducationRouteGroup from './employee-education'
+import adminEmployeeEmergencyContactRouteGroup from './employeeEmergencyContact'
+import adminEmployeeEducationRouteGroup from './employeeEducation'
 import adminEmployeeExperienceRouteGroup from './employeeExperience'
 import adminEmployeeDocumentRouteGroup from './employeeDocument'
 import adminShiftRouteGroup from './employeeShift'
@@ -20,7 +20,19 @@ import adminHolidayRouteGroup from './employeeHoliday'
 import adminAttendanceRouteGroup from './employeeAttendance'
 import adminLeaveRouteGroup from './employeeLeave'
 import adminSalaryRouteGroup from './salary'
-
+import adminCustomerRouteGroup from "./customer/index"
+import adminContactRouteGroup from "./contact/index"
+import adminCommunicationRouteGroup from "./communication/index"
+import adminLeadRouteGroup from "./lead/index"
+import adminLeadActivityRouteGroup from "./leadActivity/index"
+import adminTenderRouteGroup from "./tender/index"
+import adminTenderFileRouteGroup from "./tenderFile/index"
+import adminTenderRemarkRouteGroup from "./tenderRemark/index"
+import adminTenderActivityRouteGroup from "./tenderActivity/index"
+import adminGovernmentDepartmentRouteGroup from "./governmentDepartment/index"
+import adminSectionRouteGroup from "./section/index"
+import adminDivisionRouteGroup from "./division/index"
+import adminSubDivisionRouteGroup from "./subDivision/index"
 
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 
@@ -86,6 +98,19 @@ async function adminRoutes(
     instance.register(adminSalaryRouteGroup, {
       prefix: "/salary",
     });
+    instance.register(adminCustomerRouteGroup, { prefix: "/customer" });
+    instance.register(adminContactRouteGroup, { prefix: "/contact" });
+    instance.register(adminCommunicationRouteGroup, { prefix: "/communication" });
+    instance.register(adminLeadRouteGroup, { prefix: "/lead" });
+    instance.register(adminLeadActivityRouteGroup, { prefix: "/leadActivity" });
+    instance.register(adminTenderRouteGroup, { prefix: "/tender" });
+    instance.register(adminTenderFileRouteGroup, { prefix: "/tender-file" });
+    instance.register(adminTenderRemarkRouteGroup, { prefix: "/tender-remark" });
+    instance.register(adminTenderActivityRouteGroup, { prefix: "/tenderActivity" });
+    instance.register(adminGovernmentDepartmentRouteGroup, { prefix: "/government-department" });
+    instance.register(adminSectionRouteGroup, { prefix: "/section" });
+    instance.register(adminDivisionRouteGroup, { prefix: "/division" });
+    instance.register(adminSubDivisionRouteGroup, { prefix: "/sub-division" });
     fastify.register(accessRoutes, {
       prefix: "/user/access",
     });

@@ -10,9 +10,9 @@ async function adminHolidayRouteGroup(
   options: FastifyPluginOptions
 ) {
   fastify.register(createHolidayRoute, { prefix: "/create" });
-  fastify.register(readHolidayRoutes, { prefix: "/" });
-  fastify.register(updateHolidayRoutes, { prefix: "/" });
-  fastify.register(deleteHolidayRoute, { prefix: "/" });
+  fastify.register(readHolidayRoutes, { prefix: "/read" });
+  fastify.register(updateHolidayRoutes, { prefix: "/update" });
+  fastify.register(deleteHolidayRoute, { prefix: "/delete" });
 }
 
 export default adminHolidayRouteGroup;

@@ -13,8 +13,10 @@ declare module "fastify" {
 
     interface FastifyRequest {
         user?: {
-            id: number;
-            roleType: string | null;
+            id: string;
+            companyId: string;
+            roles: string[];
+            permissions: string[];
         };
     }
 }

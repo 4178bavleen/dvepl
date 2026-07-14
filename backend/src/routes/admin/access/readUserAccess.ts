@@ -18,11 +18,7 @@ async function readUserAccessRoute(
       ],
     },
     async (
-      request: FastifyRequest<{
-        Params: {
-          id: string;
-        };
-      }>,
+      request: FastifyRequest,
       reply: FastifyReply,
     ) => {
       try {
@@ -35,7 +31,7 @@ async function readUserAccessRoute(
           });
         }
 
-        const { id } = request.params;
+        const { id } = request.params as { id: string };
 
         const user = await fastify.prisma.user.findFirst({
           where: {
@@ -165,24 +161,6 @@ async function readUserAccessRoute(
                 id: ur.role.id,
                 name: ur.role.name,
               })),
-            },
-
-            permissionGroups,
-          },
-        });
-        //-------------------------------------------------------
-        // Response
-        //-------------------------------------------------------
-
-        return reply.send({
-          success: true,
-          data: {
-            user: {
-              id: user.id,
-              name: user.name,
-              email: user.email,
-              phone: user.phone,
-              isActive: user.isActive,
             },
 
             permissionGroups,

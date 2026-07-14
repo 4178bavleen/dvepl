@@ -10,9 +10,9 @@ async function adminLeaveRouteGroup(
   options: FastifyPluginOptions
 ) {
   fastify.register(createLeaveRoute, { prefix: "/create" });
-  fastify.register(readLeaveRoutes, { prefix: "/" });
-  fastify.register(updateLeaveRoutes, { prefix: "/" });
-  fastify.register(deleteLeaveRoute, { prefix: "/" });
+  fastify.register(readLeaveRoutes, { prefix: "/read" });
+  fastify.register(updateLeaveRoutes, { prefix: "/update" });
+  fastify.register(deleteLeaveRoute, { prefix: "/delete" });
 }
 
 export default adminLeaveRouteGroup;

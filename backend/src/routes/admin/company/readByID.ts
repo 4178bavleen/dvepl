@@ -25,15 +25,11 @@ async function readCompanyByIdRoute(
       ],
     },
     async (
-      request: FastifyRequest<{
-        Params: {
-          id: string;
-        };
-      }>,
+      request: FastifyRequest,
       reply: FastifyReply
     ) => {
       try {
-        const { id } = request.params;
+        const { id } = request.params as { id: string };
 
         const company = await fastify.prisma.company.findFirst({
           where: {
