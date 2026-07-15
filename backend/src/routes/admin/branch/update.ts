@@ -17,7 +17,7 @@ async function updateBranchRoutes(
   options: FastifyPluginOptions
 ) {
   fastify.patch(
-    "/:id",
+    "/",
     {
       schema: {
         tags: ["Branch"],

@@ -55,6 +55,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { icon: LayoutDashboard, label: "Overview", to: "/admin" },
+    { icon: Users, label: "Organization", to: "/admin/company" },
     { icon: Users, label: "Users", to: "/admin/users" },
      { icon: Users, label: "Role Management", to: "/admin/roles" },
     { icon: CreditCard, label: "Plans & Pricing", to: "/admin/plans" },
