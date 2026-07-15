@@ -67,7 +67,6 @@ async function buildApp() {
     }
   });
 
-
   fastify.register(formbody);
 
   // ✅ Register environment variables

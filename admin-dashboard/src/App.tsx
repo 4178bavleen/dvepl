@@ -46,6 +46,9 @@ import SystemSettings from "./pages/admin/SystemSettings";
 
 import AdminRoute from "./routes/AdminRoute"
 import PermissionManagement from "./pages/admin/PermissionManagement";
+import OrganizationManagement from "./pages/admin/CompanyManagement";
+import OrganizationDetail from "./pages/admin/OrganizationDetail";
+import CompanyManagement from "./pages/admin/CompanyManagement";
 
 const queryClient = new QueryClient();
 
@@ -92,6 +95,8 @@ const App = () => (
               <Route path="/admin" element={<AdminDashboard />} />
               
               <Route path="/admin/users" element={<UserManagement />} />
+              <Route path="/admin/company" element={<CompanyManagement />} />
+              <Route path="/admin/campany/:id" element={<OrganizationDetail />} />
               <Route path="/admin/roles" element={<RoleManagement />} />
               <Route path="/admin/permissions" element={<PermissionManagement />} />
               <Route path="/admin/plans" element={<PlansManagement />} />

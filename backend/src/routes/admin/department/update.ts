@@ -16,7 +16,7 @@ async function updateDepartmentRoutes(
   fastify: FastifyInstance,
   options: FastifyPluginOptions
 ) {
-  fastify.put(
+  fastify.patch(
     "/:id",
     {
       schema: {
