@@ -6,24 +6,24 @@ import {
 } from "fastify";
 
 import { adminLogs } from "../../../services/logger/contextLogger";
-import { leadActivityListQuerySchema } from "../../../schemas/admin/leadActivity/leadActivity.schema";
+import { tenderRequestActivityListQuerySchema } from "../../../schemas/admin/tenderRequestActivity/tenderRequestActivity.schema";
 
-async function readLeadActivityRoutes(
+async function readTenderRequestActivityRoutes(
   fastify: FastifyInstance,
   options: FastifyPluginOptions
 ) {
-  // Read all activities for a lead
+  // Read all activities for a tender request
   fastify.get(
     "/",
     {
       schema: {
-        tags: ["Lead Activity"],
-        summary: "List Lead Activities",
-        description: "Returns activity logs for a specific lead.",
+        tags: ["Tender Request Activity"],
+        summary: "List Tender Request Activities",
+        description: "Returns activity logs for a specific tender request.",
       },
       preHandler: [
         fastify.verifyToken,
-        fastify.authorizePermissions(["lead.view"]),
+        fastify.authorizePermissions(["tenderRequest.view"]),
       ],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
@@ -37,10 +37,7 @@ async function readLeadActivityRoutes(
           });
         }
 
-        //--------------------------------
-        // Query Validation
-        //--------------------------------
-        const validation = leadActivityListQuerySchema.safeParse(request.query);
+        const validation = tenderRequestActivityListQuerySchema.safeParse(request.query);
         if (!validation.success) {
           return reply.status(400).send({
             success: false,
@@ -52,33 +49,31 @@ async function readLeadActivityRoutes(
           });
         }
 
-        const { leadId } = validation.data;
+        const { tenderRequestId } = validation.data;
 
-        //--------------------------------
         // Tenant Verification
-        //--------------------------------
-        const lead = await fastify.prisma.tenderRequest.findFirst({
-          where: { id: leadId, companyId, deletedAt: null },
+        const tenderRequest = await fastify.prisma.tenderRequest.findFirst({
+          where: { id: tenderRequestId, companyId, deletedAt: null },
         });
 
-        if (!lead) {
+        if (!tenderRequest) {
           return reply.status(404).send({
             success: false,
-            message: "Lead not found.",
+            message: "Tender request not found.",
           });
         }
 
         const activities = await fastify.prisma.auditLog.findMany({
           where: {
             module: "TenderRequest",
-            recordId: leadId,
+            recordId: tenderRequestId,
           },
           orderBy: { createdAt: "desc" },
         });
 
         const formattedActivities = activities.map((activity) => ({
           id: activity.id,
-          leadId: activity.recordId,
+          tenderRequestId: activity.recordId,
           activityType: activity.action,
           remarks: (activity.newValue as any)?.remarks || "",
           performedBy: activity.userId || "System",
@@ -87,11 +82,11 @@ async function readLeadActivityRoutes(
 
         return reply.status(200).send({
           success: true,
-          message: "Lead activities fetched successfully.",
+          message: "Tender request activities fetched successfully.",
           data: formattedActivities,
         });
       } catch (error: any) {
-        adminLogs.error("List Lead Activities failed", { error });
+        adminLogs.error("List Tender Request Activities failed", { error });
         return reply.status(500).send({
           success: false,
           message: "Server Error.",
@@ -104,18 +99,18 @@ async function readLeadActivityRoutes(
     }
   );
 
-  // Read lead activity by ID
+  // Read tender request activity by ID
   fastify.get(
     "/:id",
     {
       schema: {
-        tags: ["Lead Activity"],
-        summary: "Read Lead Activity Details",
-        description: "Returns detailed information of a lead activity log entry.",
+        tags: ["Tender Request Activity"],
+        summary: "Read Tender Request Activity Details",
+        description: "Returns detailed information of a tender request activity log entry.",
       },
       preHandler: [
         fastify.verifyToken,
-        fastify.authorizePermissions(["lead.view"]),
+        fastify.authorizePermissions(["tenderRequest.view"]),
       ],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
@@ -130,9 +125,7 @@ async function readLeadActivityRoutes(
           });
         }
 
-        //--------------------------------
         // Fetch Activity with tenant check
-        //--------------------------------
         const activity = await fastify.prisma.auditLog.findFirst({
           where: {
             id,
@@ -143,11 +136,11 @@ async function readLeadActivityRoutes(
         if (!activity) {
           return reply.status(404).send({
             success: false,
-            message: "Lead activity not found.",
+            message: "Tender request activity not found.",
           });
         }
 
-        const lead = await fastify.prisma.tenderRequest.findFirst({
+        const tenderRequest = await fastify.prisma.tenderRequest.findFirst({
           where: {
             id: activity.recordId,
             companyId,
@@ -159,30 +152,30 @@ async function readLeadActivityRoutes(
           },
         });
 
-        if (!lead) {
+        if (!tenderRequest) {
           return reply.status(404).send({
             success: false,
-            message: "Lead activity not found.",
+            message: "Tender request activity not found.",
           });
         }
 
         const formattedActivity = {
           id: activity.id,
-          leadId: activity.recordId,
+          tenderRequestId: activity.recordId,
           activityType: activity.action,
           remarks: (activity.newValue as any)?.remarks || "",
           performedBy: activity.userId || "System",
           createdAt: activity.createdAt,
-          lead,
+          tenderRequest,
         };
 
         return reply.status(200).send({
           success: true,
-          message: "Lead activity details fetched successfully.",
+          message: "Tender request activity details fetched successfully.",
           data: formattedActivity,
         });
       } catch (error: any) {
-        adminLogs.error("Read lead activity details failed", { error });
+        adminLogs.error("Read tender request activity details failed", { error });
         return reply.status(500).send({
           success: false,
           message: "Server Error.",
@@ -196,4 +189,4 @@ async function readLeadActivityRoutes(
   );
 }
 
-export default readLeadActivityRoutes;
+export default readTenderRequestActivityRoutes;

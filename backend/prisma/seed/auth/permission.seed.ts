@@ -150,31 +150,31 @@ const permissions = [
     description: "Delete Customer",
   },
 
-  // Lead
+  // Tender Request
   {
-    code: PERMISSIONS.LEAD_CREATE,
+    code: PERMISSIONS.TENDER_REQUEST_CREATE,
     group: PERMISSION_GROUPS.LEAD,
-    description: "Create Lead",
+    description: "Create Tender Request",
   },
   {
-    code: PERMISSIONS.LEAD_VIEW,
+    code: PERMISSIONS.TENDER_REQUEST_VIEW,
     group: PERMISSION_GROUPS.LEAD,
-    description: "View Leads",
+    description: "View Tender Requests",
   },
   {
-    code: PERMISSIONS.LEAD_UPDATE,
+    code: PERMISSIONS.TENDER_REQUEST_UPDATE,
     group: PERMISSION_GROUPS.LEAD,
-    description: "Update Lead",
+    description: "Update Tender Request",
   },
   {
-    code: PERMISSIONS.LEAD_DELETE,
+    code: PERMISSIONS.TENDER_REQUEST_DELETE,
     group: PERMISSION_GROUPS.LEAD,
-    description: "Delete Lead",
+    description: "Delete Tender Request",
   },
   {
-    code: PERMISSIONS.LEAD_ASSIGN,
+    code: PERMISSIONS.TENDER_REQUEST_ASSIGN,
     group: PERMISSION_GROUPS.LEAD,
-    description: "Assign Lead",
+    description: "Assign Tender Request",
   },
 ];
 

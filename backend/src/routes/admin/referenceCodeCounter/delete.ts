@@ -7,7 +7,7 @@ import {
 
 import { adminLogs } from "../../../services/logger/contextLogger";
 
-async function deleteLeadRoute(
+async function deleteCounterRoute(
   fastify: FastifyInstance,
   options: FastifyPluginOptions
 ) {
@@ -15,13 +15,13 @@ async function deleteLeadRoute(
     "/:id",
     {
       schema: {
-        tags: ["Lead"],
-        summary: "Soft Delete Lead",
-        description: "Soft deletes a sales opportunity lead.",
+        tags: ["Reference Code Counter"],
+        summary: "Delete Reference Code Counter",
+        description: "Hard deletes a sequence counter.",
       },
       preHandler: [
         fastify.verifyToken,
-        fastify.authorizePermissions(["lead.delete"]),
+        fastify.authorizePermissions(["tender.delete"]),
       ],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
@@ -36,47 +36,41 @@ async function deleteLeadRoute(
           });
         }
 
-        //--------------------------------
-        // Check Lead & Tenant
-        //--------------------------------
-        const lead = await fastify.prisma.tenderRequest.findFirst({
-          where: { id, companyId, deletedAt: null },
+        const counter = await fastify.prisma.referenceCodeCounter.findFirst({
+          where: { id, companyId },
         });
 
-        if (!lead) {
+        if (!counter) {
           return reply.status(404).send({
             success: false,
-            message: "Lead not found.",
+            message: "Reference code counter not found.",
           });
         }
 
-        //--------------------------------
-        // Soft Delete
-        //--------------------------------
-        await fastify.prisma.tenderRequest.update({
+        await fastify.prisma.referenceCodeCounter.delete({
           where: { id },
-          data: { deletedAt: new Date() },
         });
 
-        adminLogs.info("Lead soft deleted successfully", { leadId: id });
+        adminLogs.info("Reference code counter deleted successfully", {
+          counterId: id,
+          companyId,
+        });
 
         return reply.status(200).send({
           success: true,
-          message: "Lead deleted successfully.",
+          message: "Reference code counter deleted successfully.",
         });
       } catch (error: any) {
-        adminLogs.error("Lead soft delete failed", { error });
+        adminLogs.error("Delete reference code counter failed", { error });
         return reply.status(500).send({
           success: false,
           message: "Server Error.",
           details:
-            process.env.NODE_ENV === "development"
-              ? error.message
-              : undefined,
+            process.env.NODE_ENV === "development" ? error.message : undefined,
         });
       }
     }
   );
 }
 
-export default deleteLeadRoute;
+export default deleteCounterRoute;

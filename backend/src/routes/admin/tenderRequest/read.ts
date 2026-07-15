@@ -7,29 +7,26 @@ import {
 
 import { adminLogs } from "../../../services/logger/contextLogger";
 
-async function readLeadRoutes(
+async function readTenderRequestRoutes(
   fastify: FastifyInstance,
   options: FastifyPluginOptions
 ) {
-  // Read all leads
+  // Read all tender requests
   fastify.get(
     "/",
     {
       schema: {
-        tags: ["Lead"],
-        summary: "Read Leads",
-        description: "Returns all active leads for the authenticated company.",
+        tags: ["Tender Request"],
+        summary: "Read Tender Requests",
+        description: "Returns all active tender requests for the authenticated company.",
       },
       preHandler: [
         fastify.verifyToken,
-        fastify.authorizePermissions(["lead.view"]),
+        fastify.authorizePermissions(["tenderRequest.view"]),
       ],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        //--------------------------------
-        // Company From JWT
-        //--------------------------------
         const companyId = request.admin?.companyId;
 
         if (!companyId) {
@@ -39,10 +36,7 @@ async function readLeadRoutes(
           });
         }
 
-        //--------------------------------
-        // Fetch Leads
-        //--------------------------------
-        const leads = await fastify.prisma.tenderRequest.findMany({
+        const tenderRequests = await fastify.prisma.tenderRequest.findMany({
           where: {
             companyId,
             deletedAt: null,
@@ -62,11 +56,11 @@ async function readLeadRoutes(
 
         return reply.status(200).send({
           success: true,
-          message: "Leads fetched successfully.",
-          data: leads,
+          message: "Tender requests fetched successfully.",
+          data: tenderRequests,
         });
       } catch (error: any) {
-        adminLogs.error("Read Leads failed", { error });
+        adminLogs.error("Read Tender Requests failed", { error });
         return reply.status(500).send({
           success: false,
           message: "Server Error.",
@@ -79,25 +73,22 @@ async function readLeadRoutes(
     }
   );
 
-  // Read lead by ID
+  // Read tender request by ID
   fastify.get(
     "/:id",
     {
       schema: {
-        tags: ["Lead"],
-        summary: "Read Lead By Id",
-        description: "Returns detailed information of a lead, including customer, assignee, and activity history.",
+        tags: ["Tender Request"],
+        summary: "Read Tender Request By Id",
+        description: "Returns detailed information of a tender request.",
       },
       preHandler: [
         fastify.verifyToken,
-        fastify.authorizePermissions(["lead.view"]),
+        fastify.authorizePermissions(["tenderRequest.view"]),
       ],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        //--------------------------------
-        // Company From JWT
-        //--------------------------------
         const companyId = request.admin?.companyId;
 
         if (!companyId) {
@@ -109,10 +100,7 @@ async function readLeadRoutes(
 
         const { id } = request.params as { id: string };
 
-        //--------------------------------
-        // Fetch Lead
-        //--------------------------------
-        const lead = await fastify.prisma.tenderRequest.findFirst({
+        const tenderRequest = await fastify.prisma.tenderRequest.findFirst({
           where: {
             id,
             companyId,
@@ -135,10 +123,10 @@ async function readLeadRoutes(
           },
         });
 
-        if (!lead) {
+        if (!tenderRequest) {
           return reply.status(404).send({
             success: false,
-            message: "Lead not found.",
+            message: "Tender request not found.",
           });
         }
 
@@ -152,18 +140,18 @@ async function readLeadRoutes(
           },
         });
 
-        const leadWithActivities = {
-          ...lead,
+        const tenderRequestWithActivities = {
+          ...tenderRequest,
           activities,
         };
 
         return reply.status(200).send({
           success: true,
-          message: "Lead details fetched successfully.",
-          data: leadWithActivities,
+          message: "Tender request details fetched successfully.",
+          data: tenderRequestWithActivities,
         });
       } catch (error: any) {
-        adminLogs.error("Read Lead By Id failed", { error });
+        adminLogs.error("Read Tender Request By Id failed", { error });
         return reply.status(500).send({
           success: false,
           message: "Server Error.",
@@ -177,4 +165,4 @@ async function readLeadRoutes(
   );
 }
 
-export default readLeadRoutes;
+export default readTenderRequestRoutes;

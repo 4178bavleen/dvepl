@@ -5,7 +5,7 @@ export const PERMISSION_GROUPS = {
   EMPLOYEE: "Employee Management",
   ORGANIZATION: "Organization",
   CRM: "CRM",
-  LEAD: "Lead Management",
+  LEAD: "Tender Request Management",
 } as const;
 
 export const PERMISSIONS = {
@@ -48,10 +48,10 @@ export const PERMISSIONS = {
   CUSTOMER_UPDATE: "customer.update",
   CUSTOMER_DELETE: "customer.delete",
 
-  // Lead
-  LEAD_CREATE: "lead.create",
-  LEAD_VIEW: "lead.view",
-  LEAD_UPDATE: "lead.update",
-  LEAD_DELETE: "lead.delete",
-  LEAD_ASSIGN: "lead.assign",
+  // Tender Request
+  TENDER_REQUEST_CREATE: "tenderRequest.create",
+  TENDER_REQUEST_VIEW: "tenderRequest.view",
+  TENDER_REQUEST_UPDATE: "tenderRequest.update",
+  TENDER_REQUEST_DELETE: "tenderRequest.delete",
+  TENDER_REQUEST_ASSIGN: "tenderRequest.assign",
 } as const;

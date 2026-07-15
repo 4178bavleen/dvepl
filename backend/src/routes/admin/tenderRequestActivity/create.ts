@@ -6,9 +6,9 @@ import {
 } from "fastify";
 
 import { adminLogs } from "../../../services/logger/contextLogger";
-import { createLeadActivitySchema } from "../../../schemas/admin/leadActivity/leadActivity.schema";
+import { createTenderRequestActivitySchema } from "../../../schemas/admin/tenderRequestActivity/tenderRequestActivity.schema";
 
-async function createLeadActivityRoute(
+async function createTenderRequestActivityRoute(
   fastify: FastifyInstance,
   options: FastifyPluginOptions
 ) {
@@ -16,21 +16,18 @@ async function createLeadActivityRoute(
     "/",
     {
       schema: {
-        tags: ["Lead Activity"],
-        summary: "Log Lead Activity",
-        description: "Logs a note, call log, or follow-up activity for a lead.",
+        tags: ["Tender Request Activity"],
+        summary: "Log Tender Request Activity",
+        description: "Logs a note, call log, or follow-up activity for a tender request.",
       },
       preHandler: [
         fastify.verifyToken,
-        fastify.authorizePermissions(["lead.update"]),
+        fastify.authorizePermissions(["tenderRequest.update"]),
       ],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        //--------------------------------
-        // Validation
-        //--------------------------------
-        const validation = createLeadActivitySchema.safeParse(request.body);
+        const validation = createTenderRequestActivitySchema.safeParse(request.body);
 
         if (!validation.success) {
           return reply.status(400).send({
@@ -54,28 +51,24 @@ async function createLeadActivityRoute(
           });
         }
 
-        //--------------------------------
-        // Check Lead & Tenant
-        //--------------------------------
-        const lead = await fastify.prisma.tenderRequest.findFirst({
-          where: { id: data.leadId, companyId, deletedAt: null },
+        // Check Tender Request & Tenant
+        const tenderRequest = await fastify.prisma.tenderRequest.findFirst({
+          where: { id: data.tenderRequestId, companyId, deletedAt: null },
         });
 
-        if (!lead) {
+        if (!tenderRequest) {
           return reply.status(404).send({
             success: false,
-            message: "Lead not found.",
+            message: "Tender request not found.",
           });
         }
 
-        //--------------------------------
-        // Create LeadActivity inside AuditLog
-        //--------------------------------
+        // Create Activity inside AuditLog
         const activity = await fastify.prisma.auditLog.create({
           data: {
             userId: userId || null,
             module: "TenderRequest",
-            recordId: data.leadId,
+            recordId: data.tenderRequestId,
             action: data.activityType,
             newValue: { remarks: data.remarks },
             ipAddress: request.ip,
@@ -85,25 +78,25 @@ async function createLeadActivityRoute(
 
         const formattedActivity = {
           id: activity.id,
-          leadId: activity.recordId,
+          tenderRequestId: activity.recordId,
           activityType: activity.action,
           remarks: (activity.newValue as any)?.remarks || "",
           performedBy: activity.userId || "System",
           createdAt: activity.createdAt,
         };
 
-        adminLogs.info("Lead activity logged successfully", {
+        adminLogs.info("Tender request activity logged successfully", {
           activityId: formattedActivity.id,
-          leadId: formattedActivity.leadId,
+          tenderRequestId: formattedActivity.tenderRequestId,
         });
 
         return reply.status(201).send({
           success: true,
-          message: "Lead activity logged successfully.",
+          message: "Tender request activity logged successfully.",
           data: formattedActivity,
         });
       } catch (error: any) {
-        adminLogs.error("Lead activity logging failed", { error });
+        adminLogs.error("Tender request activity logging failed", { error });
         return reply.status(500).send({
           success: false,
           message: "Server Error.",
@@ -117,4 +110,4 @@ async function createLeadActivityRoute(
   );
 }
 
-export default createLeadActivityRoute;
+export default createTenderRequestActivityRoute;

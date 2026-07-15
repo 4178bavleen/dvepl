@@ -3,7 +3,7 @@ import { TenderStatus } from "@prisma/client";
 
 export const createTenderSchema = z.object({
   companyId: z.string().uuid("Invalid company ID"),
-  leadId: z.string().uuid("Invalid lead ID").optional().nullable(),
+  tenderRequestId: z.string().uuid("Invalid tender request ID").optional().nullable(),
   customerId: z.string().uuid("Invalid customer ID").optional().nullable(),
   departmentId: z.string().uuid("Invalid department ID").optional().nullable(),
   sectionId: z.string().uuid("Invalid section ID").optional().nullable(),

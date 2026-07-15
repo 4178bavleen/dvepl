@@ -7,6 +7,7 @@ import {
 
 import { adminLogs } from "../../../services/logger/contextLogger";
 import { updateTenderSchema } from "../../../schemas/admin/tender/tender.schema";
+import { ReferenceCodeService } from "../../../services/referenceCodeService";
 
 async function updateTenderRoute(
   fastify: FastifyInstance,
@@ -64,15 +65,15 @@ async function updateTenderRoute(
           });
         }
 
-        // Validate Lead
-        if (data.leadId) {
-          const lead = await fastify.prisma.tenderRequest.findFirst({
-            where: { id: data.leadId, companyId, deletedAt: null },
+        // Validate Tender Request
+        if (data.tenderRequestId) {
+          const tenderRequest = await fastify.prisma.tenderRequest.findFirst({
+            where: { id: data.tenderRequestId, companyId, deletedAt: null },
           });
-          if (!lead) {
+          if (!tenderRequest) {
             return reply.status(404).send({
               success: false,
-              message: "Lead not found.",
+              message: "Tender request not found.",
             });
           }
         }
@@ -195,16 +196,28 @@ async function updateTenderRoute(
         }
 
         // Update Tender & Write Activities
-        const { leadId, ...tenderData } = data;
+        const { tenderRequestId, ...tenderData } = data;
         const updatedTender = await fastify.prisma.$transaction(async (tx) => {
           const tender = await tx.tender.update({
             where: { id },
             data: {
               ...tenderData,
-              tenderRequestId: leadId !== undefined ? leadId : undefined,
+              tenderRequestId: tenderRequestId !== undefined ? tenderRequestId : undefined,
               estimatedCost: data.estimatedCost !== undefined ? (data.estimatedCost ?? null) : undefined,
             },
           });
+
+          // Log Reference Code Action if updated
+          if (data.tenderCode && data.tenderCode !== existingTender.tenderCode) {
+            await ReferenceCodeService.logAction(tx, {
+              tenderId: id,
+              oldReferenceCode: existingTender.tenderCode,
+              newReferenceCode: data.tenderCode,
+              actionType: "UPDATED",
+              actionReason: "Manually updated during tender details edit",
+              actionBy: performerId,
+            });
+          }
 
           // Log status change or general update
           const action = data.status && data.status !== existingTender.status ? "STATUS_CHANGE" : "UPDATE";

@@ -6,9 +6,9 @@ import {
 } from "fastify";
 
 import { adminLogs } from "../../../services/logger/contextLogger";
-import { createLeadSchema } from "../../../schemas/admin/lead/lead.schema";
+import { createTenderRequestSchema } from "../../../schemas/admin/tenderRequest/tenderRequest.schema";
 
-async function createLeadRoute(
+async function createTenderRequestRoute(
   fastify: FastifyInstance,
   options: FastifyPluginOptions
 ) {
@@ -16,21 +16,18 @@ async function createLeadRoute(
     "/",
     {
       schema: {
-        tags: ["Lead"],
-        summary: "Create Lead",
-        description: "Creates a new sales opportunity lead.",
+        tags: ["Tender Request"],
+        summary: "Create Tender Request",
+        description: "Creates a new tender request.",
       },
       preHandler: [
         fastify.verifyToken,
-        fastify.authorizePermissions(["lead.create"]),
+        fastify.authorizePermissions(["tenderRequest.create"]),
       ],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        //--------------------------------
-        // Validation
-        //--------------------------------
-        const validation = createLeadSchema.safeParse(request.body);
+        const validation = createTenderRequestSchema.safeParse(request.body);
 
         if (!validation.success) {
           return reply.status(400).send({
@@ -54,9 +51,7 @@ async function createLeadRoute(
           });
         }
 
-        //--------------------------------
         // Validate Company
-        //--------------------------------
         const company = await fastify.prisma.company.findUnique({
           where: { id: data.companyId },
         });
@@ -67,9 +62,7 @@ async function createLeadRoute(
           });
         }
 
-        //--------------------------------
         // Validate Customer (if provided)
-        //--------------------------------
         if (data.customerId) {
           const customer = await fastify.prisma.customer.findFirst({
             where: { id: data.customerId, companyId, deletedAt: null },
@@ -82,9 +75,7 @@ async function createLeadRoute(
           }
         }
 
-        //--------------------------------
         // Validate Assigned User (if provided)
-        //--------------------------------
         if (data.assignedToId) {
           const user = await fastify.prisma.user.findFirst({
             where: { id: data.assignedToId, deletedAt: null },
@@ -97,9 +88,7 @@ async function createLeadRoute(
           }
         }
 
-        //--------------------------------
         // Validate Creator Employee (if provided)
-        //--------------------------------
         if (data.createdById) {
           const employee = await fastify.prisma.employee.findFirst({
             where: { id: data.createdById, deletedAt: null },
@@ -112,11 +101,9 @@ async function createLeadRoute(
           }
         }
 
-        //--------------------------------
-        // Create Lead & Log Activity
-        //--------------------------------
-        const lead = await fastify.prisma.$transaction(async (tx) => {
-          const newLead = await tx.tenderRequest.create({
+        // Create Tender Request & Log Activity
+        const tenderRequest = await fastify.prisma.$transaction(async (tx) => {
+          const newTenderRequest = await tx.tenderRequest.create({
             data: {
               ...data,
               estimatedValue: data.estimatedValue ?? null,
@@ -127,29 +114,29 @@ async function createLeadRoute(
             data: {
               userId: userId || null,
               module: "TenderRequest",
-              recordId: newLead.id,
+              recordId: newTenderRequest.id,
               action: "CREATE",
-              newValue: JSON.parse(JSON.stringify(newLead)),
+              newValue: JSON.parse(JSON.stringify(newTenderRequest)),
               ipAddress: request.ip,
               userAgent: request.headers["user-agent"],
             },
           });
 
-          return newLead;
+          return newTenderRequest;
         });
 
-        adminLogs.info("Lead created successfully", {
-          leadId: lead.id,
-          title: lead.title,
+        adminLogs.info("Tender request created successfully", {
+          tenderRequestId: tenderRequest.id,
+          title: tenderRequest.title,
         });
 
         return reply.status(201).send({
           success: true,
-          message: "Lead created successfully.",
-          data: lead,
+          message: "Tender request created successfully.",
+          data: tenderRequest,
         });
       } catch (error: any) {
-        adminLogs.error("Lead creation failed", { error });
+        adminLogs.error("Tender request creation failed", { error });
         return reply.status(500).send({
           success: false,
           message: "Server Error.",
@@ -163,4 +150,4 @@ async function createLeadRoute(
   );
 }
 
-export default createLeadRoute;
+export default createTenderRequestRoute;

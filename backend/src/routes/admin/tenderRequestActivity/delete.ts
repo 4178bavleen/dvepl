@@ -7,7 +7,7 @@ import {
 
 import { adminLogs } from "../../../services/logger/contextLogger";
 
-async function deleteLeadActivityRoute(
+async function deleteTenderRequestActivityRoute(
   fastify: FastifyInstance,
   options: FastifyPluginOptions
 ) {
@@ -15,13 +15,13 @@ async function deleteLeadActivityRoute(
     "/:id",
     {
       schema: {
-        tags: ["Lead Activity"],
-        summary: "Delete Lead Activity",
-        description: "Deletes a lead activity log entry.",
+        tags: ["Tender Request Activity"],
+        summary: "Delete Tender Request Activity",
+        description: "Deletes a tender request activity log entry.",
       },
       preHandler: [
         fastify.verifyToken,
-        fastify.authorizePermissions(["lead.update"]),
+        fastify.authorizePermissions(["tenderRequest.update"]),
       ],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
@@ -36,9 +36,7 @@ async function deleteLeadActivityRoute(
           });
         }
 
-        //--------------------------------
         // Check Activity & Tenant
-        //--------------------------------
         const activity = await fastify.prisma.auditLog.findFirst({
           where: {
             id,
@@ -49,11 +47,11 @@ async function deleteLeadActivityRoute(
         if (!activity) {
           return reply.status(404).send({
             success: false,
-            message: "Lead activity not found.",
+            message: "Tender request activity not found.",
           });
         }
 
-        const lead = await fastify.prisma.tenderRequest.findFirst({
+        const tenderRequest = await fastify.prisma.tenderRequest.findFirst({
           where: {
             id: activity.recordId,
             companyId,
@@ -61,28 +59,26 @@ async function deleteLeadActivityRoute(
           },
         });
 
-        if (!lead) {
+        if (!tenderRequest) {
           return reply.status(404).send({
             success: false,
-            message: "Lead activity not found.",
+            message: "Tender request activity not found.",
           });
         }
 
-        //--------------------------------
         // Hard Delete
-        //--------------------------------
         await fastify.prisma.auditLog.delete({
           where: { id },
         });
 
-        adminLogs.info("Lead activity deleted successfully", { activityId: id });
+        adminLogs.info("Tender request activity deleted successfully", { activityId: id });
 
         return reply.status(200).send({
           success: true,
-          message: "Lead activity deleted successfully.",
+          message: "Tender request activity deleted successfully.",
         });
       } catch (error: any) {
-        adminLogs.error("Lead activity delete failed", { error });
+        adminLogs.error("Tender request activity delete failed", { error });
         return reply.status(500).send({
           success: false,
           message: "Server Error.",
@@ -96,4 +92,4 @@ async function deleteLeadActivityRoute(
   );
 }
 
-export default deleteLeadActivityRoute;
+export default deleteTenderRequestActivityRoute;

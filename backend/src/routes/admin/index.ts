@@ -17,7 +17,7 @@ import adminEmployeeEmergencyContactRouteGroup from './employeeEmergencyContact'
 import adminEmployeeEducationRouteGroup from './employeeEducation'
 import adminEmployeeExperienceRouteGroup from './employeeExperience'
 import adminEmployeeDocumentRouteGroup from './employeeDocument'
-import adminShiftRouteGroup from './employeeShift'
+import adminShiftRouteGroup from './shift'
 import adminEmployeeShiftRouteGroup from './employeeShift'
 import adminHolidayRouteGroup from './employeeHoliday'
 import adminAttendanceRouteGroup from './employeeAttendance'
@@ -26,9 +26,11 @@ import adminSalaryRouteGroup from './salary'
 import adminCustomerRouteGroup from "./customer/index"
 import adminContactRouteGroup from "./contact/index"
 import adminCommunicationRouteGroup from "./communication/index"
-import adminLeadRouteGroup from "./lead/index"
-import adminLeadActivityRouteGroup from "./leadActivity/index"
+import adminTenderRequestRouteGroup from "./tenderRequest/index"
+import adminTenderRequestActivityRouteGroup from "./tenderRequestActivity/index"
 import adminTenderRouteGroup from "./tender/index"
+import adminReferenceCodeRouteGroup from "./referenceCode/index"
+import adminReferenceCodeCounterRouteGroup from "./referenceCodeCounter/index"
 import adminTenderFileRouteGroup from "./tenderFile/index"
 import adminTenderRemarkRouteGroup from "./tenderRemark/index"
 import adminTenderActivityRouteGroup from "./tenderActivity/index"
@@ -117,9 +119,11 @@ async function adminRoutes(
     instance.register(adminCustomerRouteGroup, { prefix: "/customer" });
     instance.register(adminContactRouteGroup, { prefix: "/contact" });
     instance.register(adminCommunicationRouteGroup, { prefix: "/communication" });
-    instance.register(adminLeadRouteGroup, { prefix: "/lead" });
-    instance.register(adminLeadActivityRouteGroup, { prefix: "/leadActivity" });
+    instance.register(adminTenderRequestRouteGroup, { prefix: "/tender-request" });
+    instance.register(adminTenderRequestActivityRouteGroup, { prefix: "/tender-request-activity" });
     instance.register(adminTenderRouteGroup, { prefix: "/tender" });
+    instance.register(adminReferenceCodeRouteGroup, { prefix: "/reference-code" });
+    instance.register(adminReferenceCodeCounterRouteGroup, { prefix: "/reference-code-counter" });
     instance.register(adminTenderFileRouteGroup, { prefix: "/tender-file" });
     instance.register(adminTenderRemarkRouteGroup, { prefix: "/tender-remark" });
     instance.register(adminTenderActivityRouteGroup, { prefix: "/tenderActivity" });
