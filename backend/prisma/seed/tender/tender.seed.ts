@@ -1,192 +1,34 @@
-import { PrismaClient, TenderStatus, TenderRequestSource, TenderRequestStatus, ReferenceCodeAction } from "@prisma/client";
+import { PrismaClient, Tender, TenderStatus, ReferenceCodeAction } from "@prisma/client";
 
-export async function seedTenderModule(prisma: PrismaClient, companyId: string) {
-  console.log("🌱 Seeding Tender Module...");
+const TENDERS_INFO = [
+  { title: "Supply and Commissioning of LT Panels - Delhi Cantt", no: "MES-DEL-2026-T01", code: "REF-20260715-00001", cost: 4500000.00, loc: "Delhi Cantonment, New Delhi", status: TenderStatus.IN_PROGRESS },
+  { title: "Manufacturing and Erection of APFC Panels - Lucknow Junction", no: "RLY-LKO-2026-T02", code: "REF-20260715-00002", cost: 7200000.00, loc: "Lucknow Junction, Uttar Pradesh", status: TenderStatus.DRAFT },
+  { title: "Noida Sector 62 PCC Panels and Room Erection Works", no: "PWD-NOI-2026-T03", code: "REF-20260715-00003", cost: 45000000.00, loc: "Noida Sector 62, Uttar Pradesh", status: TenderStatus.IN_PROGRESS },
+  { title: "PLC Panels and SCADA Automation System - DMRC Phase IV", no: "DMRC-TEL-2026-T04", code: "REF-20260715-00004", cost: 12000000.00, loc: "New Delhi Metro Lines", status: TenderStatus.COMPLETED },
+  { title: "VFD Control Panels for Alwar Farms Micro Irrigation", no: "AGR-ALW-2026-T05", code: "REF-20260715-00005", cost: 2500000.00, loc: "Alwar Region, Rajasthan", status: TenderStatus.SUBMITTED },
+  { title: "NTPC Plant MCC Panels and Switchgear Installation", no: "NTPC-SEC-2026-T06", code: "REF-20260715-00006", cost: 8500000.00, loc: "NTPC Dadri, Uttar Pradesh", status: TenderStatus.IN_PROGRESS },
+  { title: "BHEL Corporate Office HVAC Control Panel Retrofitting", no: "BHEL-HVAC-2026-T07", code: "REF-20260715-00007", cost: 14000000.00, loc: "BHEL Noida, Uttar Pradesh", status: TenderStatus.DRAFT },
+  { title: "ONGC Refinery Custom Distribution Panels and Cabling", no: "ONGC-FIRE-2026-T08", code: "REF-20260715-00008", cost: 19500000.00, loc: "ONGC Ankleshwar, Gujarat", status: TenderStatus.SUBMITTED },
+  { title: "Industrial Automation and Control Desks - NHAI Works", no: "NHAI-RD-2026-T09", code: "REF-20260715-00009", cost: 38000000.00, loc: "Gurgaon-Jaipur Highway NH-8", status: TenderStatus.COMPLETED },
+  { title: "Jaipur Solar Grid Substation PCC Panels Erection", no: "RE-JAI-2026-T10", code: "REF-20260715-00010", cost: 5500000.00, loc: "Jaipur Grid, Rajasthan", status: TenderStatus.IN_PROGRESS }
+];
 
-  // 1. Resolve dependencies from previously seeded data
-  const company = await prisma.company.findUnique({
-    where: { id: companyId },
-  });
+export async function seedTenders(
+  prisma: PrismaClient,
+  companyId: string,
+  customerId: string,
+  userId: string,
+  tenderRequestIds: string[],
+  deptId: string,
+  sectionIds: string[],
+  divisionIds: string[],
+  subDivisionIds: string[],
+  govDeptIds: string[]
+): Promise<Tender[]> {
+  console.log("🌱 Seeding 10 Tenders and linked audit files/remarks...");
 
-  if (!company) {
-    throw new Error(`Company not found during tender seeding: ${companyId}`);
-  }
-
-  const customers = await prisma.customer.findMany({ where: { companyId } });
-  const users = await prisma.user.findMany({ where: { companyId } });
-  const departments = await prisma.department.findMany({
-    where: { branch: { companyId } },
-  });
-  const employees = await prisma.employee.findMany({ where: { companyId } });
-
-  if (customers.length === 0 || users.length === 0 || departments.length === 0) {
-    console.log("⚠️ CRM, Auth, or Organization seeds are missing. Skipping Tender Seeding.");
-    return;
-  }
-
-  const targetCustomer = customers[0];
-  const targetUser = users[0];
-  const targetDept = departments[0];
-  const targetEmployee = employees[0] || null;
-
-  // 2. Seed Government Departments
-  const govDeptsData = [
-    { name: "Military Engineer Services", code: "GOV-MES", shortName: "MES" },
-    { name: "Central Public Works Department", code: "GOV-CPWD", shortName: "CPWD" },
-    { name: "Public Works Department", code: "GOV-PWD", shortName: "PWD" },
-  ];
-
-  const govDepts = await Promise.all(
-    govDeptsData.map(async (data) => {
-      let dept = await prisma.governmentDepartment.findFirst({
-        where: { name: data.name, companyId },
-      });
-
-      if (!dept) {
-        dept = await prisma.governmentDepartment.create({
-          data: {
-            companyId,
-            name: data.name,
-            code: data.code,
-            shortName: data.shortName,
-            isActive: true,
-          },
-        });
-      }
-      return dept;
-    })
-  );
-
-  // 3. Seed Section, Division, SubDivision
-  let section = await prisma.section.findFirst({
-    where: { departmentId: targetDept.id, name: "Electrical & Mechanical (E&M)" },
-  });
-
-  if (!section) {
-    section = await prisma.section.create({
-      data: {
-        companyId,
-        departmentId: targetDept.id,
-        name: "Electrical & Mechanical (E&M)",
-        code: "SEC-EM",
-        isActive: true,
-        governmentDepartmentId: govDepts[0].id,
-      },
-    });
-  }
-
-  let division = await prisma.division.findFirst({
-    where: { sectionId: section.id, name: "Power Transmission" },
-  });
-
-  if (!division) {
-    division = await prisma.division.create({
-      data: {
-        companyId,
-        sectionId: section.id,
-        name: "Power Transmission",
-        code: "DIV-PT",
-        isActive: true,
-      },
-    });
-  }
-
-  let subDivision = await prisma.subDivision.findFirst({
-    where: { divisionId: division.id, name: "Substation Grid Design" },
-  });
-
-  if (!subDivision) {
-    subDivision = await prisma.subDivision.create({
-      data: {
-        companyId,
-        divisionId: division.id,
-        name: "Substation Grid Design",
-        code: "SUB-SGD",
-        isActive: true,
-      },
-    });
-  }
-
-  // 4. Seed Tender Requests (Leads)
-  const tenderRequestsData = [
-    {
-      title: "11KV Substation Equipment Installation Delhi Cantt",
-      description: "Supply and erection of transformer and panel boards.",
-      estimatedValue: 4500000.00,
-      source: TenderRequestSource.WEBSITE,
-      status: TenderRequestStatus.QUALIFIED,
-    },
-    {
-      title: "LED High Mast Lighting System in Lucknow Junction",
-      description: "Installation of modern high mast systems for platform lights.",
-      estimatedValue: 7200000.00,
-      source: TenderRequestSource.EMAIL,
-      status: TenderRequestStatus.NEW,
-    },
-  ];
-
-  const tenderRequests = await Promise.all(
-    tenderRequestsData.map(async (data) => {
-      let tr = await prisma.tenderRequest.findFirst({
-        where: { companyId, title: data.title },
-      });
-
-      if (!tr) {
-        tr = await prisma.tenderRequest.create({
-          data: {
-            companyId,
-            customerId: targetCustomer.id,
-            assignedToId: targetUser.id,
-            createdById: targetEmployee ? targetEmployee.id : null,
-            source: data.source,
-            status: data.status,
-            title: data.title,
-            description: data.description,
-            estimatedValue: data.estimatedValue,
-          },
-        });
-
-        // Seed some activities (AuditLog) for TenderRequest
-        await prisma.auditLog.create({
-          data: {
-            userId: targetUser.id,
-            module: "TenderRequest",
-            recordId: tr.id,
-            action: "CREATE",
-            newValue: JSON.parse(JSON.stringify(tr)),
-            ipAddress: "127.0.0.1",
-            userAgent: "Prisma Seeder",
-          },
-        });
-      }
-      return tr;
-    })
-  );
-
-  // 5. Seed Tenders
-  const tendersData = [
-    {
-      title: "Delhi Cantt 11KV Substation Erection Contract",
-      description: "Turnkey substation engineering, procurement, and construction.",
-      projectLocation: "Delhi Cantonment, New Delhi",
-      estimatedCost: 4500000.00,
-      tenderNo: "MES-DEL-2026-T01",
-      tenderCode: "TENDER-20260715-00001",
-      status: TenderStatus.IN_PROGRESS,
-    },
-    {
-      title: "Lucknow Junction Platform LED lighting System",
-      description: "Design and install high mast lights on platform 1, 2, and 3.",
-      projectLocation: "Lucknow Junction, Uttar Pradesh",
-      estimatedCost: 7200000.00,
-      tenderNo: "RLY-LKO-2026-T15",
-      tenderCode: "TENDER-20260715-00002",
-      status: TenderStatus.DRAFT,
-    },
-  ];
-
-  await Promise.all(
-    tendersData.map(async (data, idx) => {
+  const tenders = await Promise.all(
+    TENDERS_INFO.map(async (data, idx) => {
       let tender = await prisma.tender.findFirst({
         where: { companyId, title: data.title },
       });
@@ -195,52 +37,52 @@ export async function seedTenderModule(prisma: PrismaClient, companyId: string) 
         tender = await prisma.tender.create({
           data: {
             companyId,
-            tenderRequestId: tenderRequests[idx].id,
-            customerId: targetCustomer.id,
-            departmentId: targetDept.id,
-            sectionId: section.id,
-            divisionId: division.id,
-            subDivisionId: subDivision.id,
-            governmentDepartmentId: govDepts[idx % govDepts.length].id,
-            tenderNo: data.tenderNo,
-            tenderCode: data.tenderCode,
+            tenderRequestId: tenderRequestIds[idx],
+            customerId,
+            departmentId: deptId,
+            sectionId: sectionIds[idx],
+            divisionId: divisionIds[idx],
+            subDivisionId: subDivisionIds[idx],
+            governmentDepartmentId: govDeptIds[idx % govDeptIds.length],
+            tenderNo: data.no,
+            tenderCode: data.code,
             title: data.title,
-            description: data.description,
-            projectLocation: data.projectLocation,
-            estimatedCost: data.estimatedCost,
+            description: `Official execution contract for customized electrical panels: LT Panels, PCC Panels, MCC Panels, APFC Panels, PLC Panels, VFD Panels, Railway Electrical Panels, or Industrial Automation Panels.`,
+            projectLocation: data.loc,
+            estimatedCost: data.cost,
             status: data.status,
-            createdById: targetUser.id,
-            assignedToId: targetUser.id,
+            createdById: userId,
+            assignedToId: userId,
           },
         });
 
-        // Seed Tender Files
+        // Seed Tender File
         await prisma.tenderFile.create({
           data: {
             tenderId: tender.id,
-            fileName: "Technical_Specifications.pdf",
-            fileUrl: "https://minio.dvepl.internal/tenders/Technical_Specifications.pdf",
+            fileName: `Technical_Specifications_${idx + 1}.pdf`,
+            fileUrl: `https://minio.dvepl.internal/tenders/Technical_Specifications_${idx + 1}.pdf`,
             fileType: "application/pdf",
-            uploadedBy: targetUser.name,
+            uploadedBy: "System Seeder",
           },
         });
 
-        // Seed Tender Remarks
+        // Seed Tender Remark
         await prisma.tenderRemark.create({
           data: {
             tenderId: tender.id,
-            userId: targetUser.id,
-            remark: "Initial bid documents reviewed. Sequence looks fine.",
+            userId,
+            remark: `Bid parameters for panel works of ${data.no} verified against drawings. Setup complete.`,
           },
         });
 
-        // Seed Tender Activity log
+        // Seed Tender Activity
         await prisma.tenderActivity.create({
           data: {
             tenderId: tender.id,
             action: "CREATE",
             newValue: JSON.parse(JSON.stringify(tender)),
-            performedBy: targetUser.id,
+            performedBy: userId,
           },
         });
 
@@ -248,30 +90,36 @@ export async function seedTenderModule(prisma: PrismaClient, companyId: string) 
         await prisma.referenceCode.create({
           data: {
             tenderId: tender.id,
-            newReferenceCode: data.tenderCode,
+            newReferenceCode: data.code,
             actionType: ReferenceCodeAction.GENERATED,
             actionReason: "Initial seeder setup",
-            actionBy: "Prisma Seeder",
+            actionBy: "System Seeder",
           },
         });
       }
+      return tender;
     })
   );
 
-  // 6. Seed Reference Code Counter
+  // Seed Reference Code Counter value
   let counter = await prisma.referenceCodeCounter.findFirst({
-    where: { companyId, prefix: "TENDER" },
+    where: { companyId, prefix: "REF" },
   });
 
   if (!counter) {
     await prisma.referenceCodeCounter.create({
       data: {
         companyId,
-        prefix: "TENDER",
-        lastSequence: 2,
+        prefix: "REF",
+        lastSequence: 10,
       },
+    });
+  } else {
+    await prisma.referenceCodeCounter.update({
+      where: { id: counter.id },
+      data: { lastSequence: 10 },
     });
   }
 
-  console.log("✅ Tender Module Seeded Successfully.");
+  return tenders;
 }
