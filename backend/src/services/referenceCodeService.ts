@@ -16,7 +16,7 @@ export class ReferenceCodeService {
   static async generateNextCode(
     tx: any, // Accepts Prisma transaction client
     companyId: string,
-    prefix: string = "TENDER"
+    prefix: string = "REF"
   ): Promise<{ formattedCode: string; sequence: number }> {
     // 1. Get or Create the ReferenceCodeCounter record
     let counter = await tx.referenceCodeCounter.findUnique({

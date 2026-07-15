@@ -5,6 +5,7 @@ import { seedAuth } from "./auth";
 import { seedPermissions } from "./auth/permission.seed";
 import { seedHrms } from "./hrms";
 import { seedCrm } from "./crm";
+import { seedTender } from "./tender";
 
 async function main() {
   console.log("Starting Database Seed");
@@ -20,6 +21,10 @@ async function main() {
   });
 
   await seedCrm(prisma, {
+    companyId: organization.company.id,
+  });
+
+  await seedTender(prisma, {
     companyId: organization.company.id,
   });
 

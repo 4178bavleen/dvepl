@@ -20,6 +20,8 @@ async function readTeamRoutes(
         querystring: {
           type: "object",
           properties: {
+            companyId: { type: "string" },
+            branchId: { type: "string" },
             departmentId: { type: "string" },
           },
         },
@@ -32,16 +34,16 @@ async function readTeamRoutes(
 
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const companyId = request.admin?.companyId;
+        const companyId = (request.query as any)?.companyId || request.admin?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({
             success: false,
-            message: "Company information missing from token.",
+            message: "Company information missing from token or query.",
           });
         }
 
-        const { departmentId } = request.query as { departmentId?: string };
+        const { departmentId, branchId } = request.query as { departmentId?: string; branchId?: string };
 
         const teams = await fastify.prisma.team.findMany({
           where: {
@@ -49,6 +51,7 @@ async function readTeamRoutes(
             department: {
               branch: {
                 companyId,
+                ...(branchId ? { id: branchId } : {}),
               },
               ...(departmentId ? { id: departmentId } : {}),
             },

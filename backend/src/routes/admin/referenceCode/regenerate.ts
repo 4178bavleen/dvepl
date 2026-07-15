@@ -67,7 +67,7 @@ async function regenerateReferenceCodeRoute(
 
         // Transaction block to regenerate code
         const newCodeRecord = await fastify.prisma.$transaction(async (tx) => {
-          const prefixToUse = prefix || "TENDER";
+          const prefixToUse = "REF";
           
           // Get the latest reference code logged for this tender
           const latestCodeRecord = await tx.referenceCode.findFirst({

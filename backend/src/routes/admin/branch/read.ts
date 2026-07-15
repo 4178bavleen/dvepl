@@ -13,13 +13,22 @@ async function adminBranchReadRoutes(
         summary: "Read Branch Information",
         description:
           "Retrieve information about a specific branch based on provided criteria.",
+        querystring: {
+          type: "object",
+          properties: {
+            companyId: { type: "string" },
+          },
+        },
       },
     },
     async (request: any, reply: any) => {
       try {
+        const companyId = request.query?.companyId || request.admin?.companyId;
+
         const branches = await fastify.prisma.branch.findMany({
           where: {
             deletedAt: null,
+            ...(companyId ? { companyId } : {}),
           },
           include: {
             company: {

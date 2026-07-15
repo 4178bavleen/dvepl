@@ -18,14 +18,23 @@ async function readDepartmentRoutes(
         tags: ["Department"],
         summary: "Get Departments",
         description: "Fetch all departments",
+        querystring: {
+          type: "object",
+          properties: {
+            companyId: { type: "string" },
+          },
+        },
       },
     },
 
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
+        const companyId = (request.query as any)?.companyId || (request.admin as any)?.companyId;
+
         const departments = await fastify.prisma.department.findMany({
           where: {
             deletedAt: null,
+            ...(companyId ? { branch: { companyId } } : {}),
           },
           include: {
             branch: {
