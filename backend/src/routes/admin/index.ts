@@ -4,6 +4,7 @@ import adminCompanyRouteGroup from "./company/index";
 import adminUserRouteGroup from "./user/index";
 import adminRoleRouteGroup from "./role";
 import adminPermissionRouteGroup from "./permission/index";
+import adminRolePermissionRouteGroup from "./rolePermission/index";
 import adminDesignationRouteGroup from "./designation/index";
 import adminCostCenterRouteGroup from "./costCenter/index";
 import accessRoutes from "./access";
@@ -73,6 +74,9 @@ async function adminRoutes(
     });
     instance.register(adminPermissionRouteGroup, {
       prefix: "/permission",
+    });
+    instance.register(adminRolePermissionRouteGroup, {
+      prefix: "/role-permission",
     });
     instance.register(adminEmployeeRouteGroup, {
       prefix: "/employee",
