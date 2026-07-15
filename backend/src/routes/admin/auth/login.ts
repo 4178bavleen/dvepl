@@ -68,6 +68,11 @@ async function adminLoginRoutes(
                 },
               },
             },
+            userPermissions: {
+              include: {
+                permission: true,
+              },
+            },
           },
         });
 
@@ -91,13 +96,23 @@ async function adminLoginRoutes(
         }
         const roles = existingUser.userRoles.map((ur) => ur.role.name);
 
-        const permissions = [
-          ...new Set(
-            existingUser.userRoles.flatMap((ur) =>
-              ur.role.rolePermissions.map((rp) => rp.permission.code),
-            ),
-          ),
-        ];
+        const rolePermissionsSet = new Set(
+          existingUser.userRoles.flatMap((ur) =>
+            ur.role.rolePermissions.map((rp) => rp.permission.code)
+          )
+        );
+
+        if (existingUser.userPermissions) {
+          for (const up of existingUser.userPermissions) {
+            if (up.allowed) {
+              rolePermissionsSet.add(up.permission.code);
+            } else {
+              rolePermissionsSet.delete(up.permission.code);
+            }
+          }
+        }
+
+        const permissions = Array.from(rolePermissionsSet);
 
         const token = jwt.sign(
           {

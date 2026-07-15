@@ -79,14 +79,30 @@ async function readUserAccessRoute(
         }
 
         //-------------------------------------------------------
-        // Group Permissions
+        // Group Permissions & Apply Overrides
         //-------------------------------------------------------
 
-        const groupedPermissions: Record<string, any[]> = {};
+        const allPermissions = await fastify.prisma.permission.findMany({
+          include: {
+            group: true,
+          },
+          orderBy: {
+            code: "asc",
+          },
+        });
 
-        // ======================================================
-        // Build Permission Groups
-        // ======================================================
+        // Set up lookup structures for role permissions and overrides
+        const rolePermissionIds = new Set<string>();
+        for (const userRole of user.userRoles) {
+          for (const rp of userRole.role.rolePermissions) {
+            rolePermissionIds.add(rp.permissionId);
+          }
+        }
+
+        const overrideAllowedMap = new Map<string, boolean>();
+        for (const up of user.userPermissions) {
+          overrideAllowedMap.set(up.permissionId, up.allowed);
+        }
 
         const permissionGroupsMap = new Map<
           string,
@@ -97,43 +113,47 @@ async function readUserAccessRoute(
           }
         >();
 
-        for (const userRole of user.userRoles) {
-          for (const rp of userRole.role.rolePermissions) {
-            const permission = rp.permission;
+        for (const permission of allPermissions) {
+          const groupId = permission.group?.id ?? "ungrouped";
+          const groupName = permission.group?.name ?? "Other";
 
-            const groupId = permission.group?.id ?? "ungrouped";
-            const groupName = permission.group?.name ?? "Other";
-
-            if (!permissionGroupsMap.has(groupId)) {
-              permissionGroupsMap.set(groupId, {
-                groupId,
-                groupName,
-                permissions: [],
-              });
-            }
-
-            const group = permissionGroupsMap.get(groupId)!;
-
-            // Avoid duplicate permissions from multiple roles
-            if (group.permissions.some((p) => p.id === permission.id)) {
-              continue;
-            }
-
-            group.permissions.push({
-              id: permission.id,
-              code: permission.code,
-              description: permission.description,
-              enabled: true,
-              editable: true,
-              source: "role",
+          if (!permissionGroupsMap.has(groupId)) {
+            permissionGroupsMap.set(groupId, {
+              groupId,
+              groupName,
+              permissions: [],
             });
           }
+
+          const group = permissionGroupsMap.get(groupId)!;
+
+          const isAssignedByRole = rolePermissionIds.has(permission.id);
+          const override = overrideAllowedMap.get(permission.id);
+
+          // If override is defined, it dictates the status. Otherwise, fall back to role default.
+          const enabled = override !== undefined ? override : isAssignedByRole;
+
+          // Determine source label for UI
+          let source = "none";
+          if (override !== undefined) {
+            source = "override";
+          } else if (isAssignedByRole) {
+            source = "role";
+          }
+
+          group.permissions.push({
+            id: permission.id,
+            code: permission.code,
+            description: permission.description,
+            enabled,
+            editable: true,
+            source,
+          });
         }
 
         // ======================================================
-        // Sort Permissions
+        // Sort Groups and Permissions
         // ======================================================
-
         const permissionGroups = Array.from(permissionGroupsMap.values())
           .map((group) => ({
             ...group,
@@ -141,7 +161,11 @@ async function readUserAccessRoute(
               a.code.localeCompare(b.code),
             ),
           }))
-          .sort((a, b) => a.groupName.localeCompare(b.groupName));
+          .sort((a, b) => {
+            if (a.groupId === "ungrouped") return 1;
+            if (b.groupId === "ungrouped") return -1;
+            return a.groupName.localeCompare(b.groupName);
+          });
 
         // ======================================================
         // Response

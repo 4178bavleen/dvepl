@@ -4,6 +4,7 @@ import createRoleRoute from "./create";
 import getAllRolesRoute from "./read";
 import readRoleByIdRoute from "./readbyId";
 import updateRoleRoute from "./update";
+import deleteRoleRoute from "./delete";
 
 async function adminRoleRouteGroup(
   fastify: FastifyInstance,
@@ -14,13 +15,16 @@ async function adminRoleRouteGroup(
   });
 
   fastify.register(getAllRolesRoute, {
-    prefix: "/",
+    prefix: "/read",
   });
   fastify.register(readRoleByIdRoute, {
-    prefix: "/",
+    prefix: "/read",
   });
   fastify.register(updateRoleRoute, {
-    prefix: "/",
+    prefix: "/update",
+  });
+  fastify.register(deleteRoleRoute, {
+    prefix: "/delete",
   });
 }
 

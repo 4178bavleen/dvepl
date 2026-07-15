@@ -55,38 +55,82 @@ async function updateUserAccessRoute(
                 console.log("permissionIds:", permissionIds);
 
           await fastify.prisma.$transaction(async (tx) => {
+            // 1. Fetch user roles to find which permissions are granted by roles
+            const userRoles = await tx.userRole.findMany({
+              where: { userId: id },
+              include: {
+                role: {
+                  include: {
+                    rolePermissions: true,
+                  },
+                },
+              },
+            });
 
-    console.log("Deleting old permissions...");
+            const rolePermissionIds = new Set(
+              userRoles.flatMap((ur) =>
+                ur.role.rolePermissions.map((rp) => rp.permissionId)
+              )
+            );
 
-    await tx.userPermission.deleteMany({
-        where: {
-            userId: id,
-        },
-    });
+            // 2. Fetch all permissions to validate inputs
+            const allPermissions = await tx.permission.findMany({
+              select: { id: true },
+            });
+            const validPermissionIds = new Set(allPermissions.map((p) => p.id));
 
-    console.log("Creating:", permissionIds);
+            const desiredIds = new Set(permissionIds || []);
 
-    if (permissionIds && permissionIds.length > 0) {
-
-        await tx.userPermission.createMany({
-            data: permissionIds.map(permissionId => ({
+            // 3. Clear existing custom overrides
+            await tx.userPermission.deleteMany({
+              where: {
                 userId: id,
-                permissionId,
-            })),
-            skipDuplicates: true,
-        });
+              },
+            });
 
-    }
+            // 4. Calculate delta overrides (ALLOW / DENY)
+            const overridesToCreate: {
+              userId: string;
+              permissionId: string;
+              allowed: boolean;
+            }[] = [];
 
-    const saved = await tx.userPermission.findMany({
-        where: {
-            userId: id,
-        },
-    });
+            // We look at the union of desired permission IDs and role permission IDs
+            const unionOfPermissions = new Set([...desiredIds, ...rolePermissionIds]);
 
-    console.log("Saved Permissions:", saved);
+            for (const permissionId of unionOfPermissions) {
+              // Ignore any permission ID that does not exist in the database
+              if (!validPermissionIds.has(permissionId)) {
+                continue;
+              }
 
-});
+              const isDesired = desiredIds.has(permissionId);
+              const hasRole = rolePermissionIds.has(permissionId);
+
+              if (isDesired && !hasRole) {
+                // Not in role, but desired -> ALLOW override
+                overridesToCreate.push({
+                  userId: id,
+                  permissionId,
+                  allowed: true,
+                });
+              } else if (!isDesired && hasRole) {
+                // In role, but not desired -> DENY override
+                overridesToCreate.push({
+                  userId: id,
+                  permissionId,
+                  allowed: false,
+                });
+              }
+            }
+
+            if (overridesToCreate.length > 0) {
+              await tx.userPermission.createMany({
+                data: overridesToCreate,
+                skipDuplicates: true,
+              });
+            }
+          });
 
                 return reply.send({
                     success: true,
