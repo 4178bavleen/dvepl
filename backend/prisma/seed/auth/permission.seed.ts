@@ -176,6 +176,28 @@ const permissions = [
     group: PERMISSION_GROUPS.LEAD,
     description: "Assign Tender Request",
   },
+
+  // Tender Management
+  {
+    code: PERMISSIONS.TENDER_CREATE,
+    group: PERMISSION_GROUPS.TENDER,
+    description: "Create Tender Management Records",
+  },
+  {
+    code: PERMISSIONS.TENDER_VIEW,
+    group: PERMISSION_GROUPS.TENDER,
+    description: "View Tender Management Records",
+  },
+  {
+    code: PERMISSIONS.TENDER_UPDATE,
+    group: PERMISSION_GROUPS.TENDER,
+    description: "Update Tender Management Records",
+  },
+  {
+    code: PERMISSIONS.TENDER_DELETE,
+    group: PERMISSION_GROUPS.TENDER,
+    description: "Delete Tender Management Records",
+  },
 ];
 
   return Promise.all(
