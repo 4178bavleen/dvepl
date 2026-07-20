@@ -12,5 +12,5 @@ export const createContactPersonSchema = z.object({
 export const updateContactPersonSchema = createContactPersonSchema.partial().omit({ customerId: true });
 
 export const contactPersonListQuerySchema = z.object({
-  customerId: z.string().uuid("Invalid customer ID"),
+  customerId: z.string().uuid("Invalid customer ID").optional(),
 });

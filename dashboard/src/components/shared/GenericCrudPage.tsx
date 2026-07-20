@@ -55,6 +55,50 @@ interface GenericCrudPageProps<TRecord extends { id: string } = { id: string }> 
 
 const asInputValue = (value: unknown) => value == null ? '' : String(value);
 
+const renderDetailsValue = (value: unknown): string => {
+  if (value == null) return '';
+  
+  if (Array.isArray(value)) {
+    return value.map((item) => {
+      if (item && typeof item === 'object') {
+        return item.name || item.title || item.code || item.label || item.email || String(item);
+      }
+      return String(item);
+    }).join(', ');
+  }
+  
+  if (typeof value === 'object') {
+    if (value instanceof Date) {
+      return value.toLocaleString();
+    }
+    const obj = value as Record<string, unknown>;
+    if (obj.name || obj.title || obj.code || obj.label || obj.email) {
+      return String(obj.name ?? obj.title ?? obj.code ?? obj.label ?? obj.email);
+    }
+    // Handle plain objects (like count or config mappings)
+    return Object.entries(obj)
+      .map(([k, v]) => `${k.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase())}: ${renderDetailsValue(v)}`)
+      .join(', ');
+  }
+  
+  if (typeof value === 'boolean') {
+    return value ? 'Yes' : 'No';
+  }
+  
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+    try {
+      const date = new Date(value);
+      if (!isNaN(date.getTime())) {
+        return date.toLocaleString();
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
+  return String(value);
+};
+
 export function GenericCrudPage<TRecord extends { id: string }>({
   tableName,
   moduleName,
@@ -71,6 +115,7 @@ export function GenericCrudPage<TRecord extends { id: string }>({
   readOnly = false,
 }: GenericCrudPageProps<TRecord>) {
   const localRecords = useERPStore((state) => (state as unknown as Record<string, unknown>)[tableName] as TRecord[] ?? []);
+  const currentCompanyId = useERPStore((state) => state.currentCompanyId);
   const addRecord = useERPStore((state) => state.addRecord);
   const updateRecord = useERPStore((state) => state.updateRecord);
   const deleteRecord = useERPStore((state) => state.deleteRecord);
@@ -91,7 +136,7 @@ export function GenericCrudPage<TRecord extends { id: string }>({
     try { setRemoteRecords(await api.list()); }
     catch (error: any) { toast.error(error.response?.data?.message ?? `Unable to load ${pluralName.toLowerCase()}.`); }
     finally { setIsLoading(false); }
-  }, [api, pluralName]);
+  }, [api, pluralName, currentCompanyId]);
 
   useEffect(() => { void loadRecords(); }, [loadRecords]);
 
@@ -99,17 +144,39 @@ export function GenericCrudPage<TRecord extends { id: string }>({
     if (!selectOptions) return;
     void Promise.all(Object.entries(selectOptions).map(async ([field, load]) => {
       const items = await load();
-      setOptionValues((current) => ({ ...current, [field]: items.map((item) => ({ value: item.id, label: item.name ?? item.title ?? item.code ?? item.id })) }));
+      const filteredItems = items.filter((item: any) => !item.companyId || item.companyId === currentCompanyId);
+      setOptionValues((current) => ({
+        ...current,
+        [field]: filteredItems.map((item: any) => {
+          let label = item.name ?? item.title ?? item.code;
+          if (!label && item.firstName) {
+            label = `${item.firstName} ${item.lastName || ''}`.trim();
+            if (item.employeeCode) {
+              label += ` (${item.employeeCode})`;
+            }
+          }
+          return {
+            value: item.id,
+            label: label || item.id,
+          };
+        }),
+      }));
     })).catch(() => toast.error('Unable to load form options.'));
-  }, [selectOptions]);
+  }, [selectOptions, currentCompanyId]);
 
   const filteredRecords = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return records;
-    return records.filter((record) => Object.values(record).some((value) =>
+    let resultRecords = records;
+
+    if (currentCompanyId) {
+      resultRecords = records.filter((r: any) => !r.companyId || r.companyId === currentCompanyId);
+    }
+
+    if (!query) return resultRecords;
+    return resultRecords.filter((record) => Object.values(record).some((value) =>
       String(value ?? '').toLowerCase().includes(query),
     ));
-  }, [records, search]);
+  }, [records, search, currentCompanyId]);
 
   const openCreate = () => {
     setEditingRecord(null);
@@ -140,8 +207,16 @@ export function GenericCrudPage<TRecord extends { id: string }>({
 
     try {
       if (api) {
-        if (editingRecord && api.update) await api.update(editingRecord.id, result.data as Record<string, unknown>);
-        else await api.create(result.data as Record<string, unknown>);
+        const companyId = useERPStore.getState().currentCompanyId;
+        const userId = useERPStore.getState().currentUserId;
+        const payload = {
+          ...result.data as Record<string, unknown>,
+          ...(companyId && !(result.data as any).companyId ? { companyId } : {}),
+          ...(userId && !(result.data as any).createdById ? { createdById: userId } : {}),
+        };
+
+        if (editingRecord && api.update) await api.update(editingRecord.id, payload);
+        else await api.create(payload);
         await loadRecords();
       } else if (editingRecord) updateRecord(tableName, editingRecord.id, result.data);
       else addRecord(tableName, result.data);
@@ -158,6 +233,23 @@ export function GenericCrudPage<TRecord extends { id: string }>({
   };
 
   const cards = statsCards?.(records) ?? [];
+
+  const enrichedColumns = useMemo(() => {
+    return columns.map((col) => {
+      const key = (col as any).accessorKey;
+      if (key && optionValues[key]) {
+        return {
+          ...col,
+          cell: (info: any) => {
+            const val = info.getValue();
+            const matched = optionValues[key]?.find((opt) => opt.value === val);
+            return matched ? matched.label : (val || '—');
+          }
+        };
+      }
+      return col;
+    });
+  }, [columns, optionValues]);
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
@@ -200,7 +292,7 @@ export function GenericCrudPage<TRecord extends { id: string }>({
       </div>
 
       <GenericTable
-        columns={columns}
+        columns={enrichedColumns}
         data={filteredRecords}
         onView={setViewingRecord}
         onEdit={!readOnly && (!api || api.update) ? openEdit : undefined}
@@ -216,31 +308,54 @@ export function GenericCrudPage<TRecord extends { id: string }>({
       />
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto p-6">
+        <DialogContent className={editingRecord ? "fixed inset-y-0 right-0 z-50 h-full w-full max-w-lg border-l border-border bg-background p-6 shadow-lg overflow-y-auto animate-in slide-in-from-right duration-300 flex flex-col gap-4" : "max-h-[90vh] max-w-2xl overflow-y-auto p-6"}>
           <DialogHeader>
             <DialogTitle>{editingRecord ? `Edit ${moduleName}` : `Add ${moduleName}`}</DialogTitle>
             <DialogDescription>Complete the details below and save your changes.</DialogDescription>
           </DialogHeader>
-          <form onSubmit={submitForm} className="grid gap-4 py-2 sm:grid-cols-2">
-            {fields.map((field) => (
-              <div key={field.name} className={field.type === 'textarea' ? 'space-y-2 sm:col-span-2' : 'space-y-2'}>
-                <Label htmlFor={field.name}>{field.label}{field.required && <span className="text-destructive"> *</span>}</Label>
-                {field.type === 'textarea' ? (
-                  <Textarea id={field.name} value={asInputValue(formValues[field.name])} placeholder={field.placeholder} onChange={(event) => setField(field.name, event.target.value)} />
-                ) : field.type === 'select' ? (
-                  <Select value={asInputValue(formValues[field.name])} onValueChange={(value) => setField(field.name, value)}>
-                    <SelectTrigger id={field.name} className="w-full"><SelectValue placeholder={`Select ${field.label}`} /></SelectTrigger>
-                    <SelectContent>{(optionValues[field.name] ?? field.options)?.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
-                  </Select>
-                ) : field.type === 'checkbox' ? (
-                  <div className="flex h-8 items-center gap-2"><Checkbox id={field.name} checked={Boolean(formValues[field.name])} onCheckedChange={(checked) => setField(field.name, Boolean(checked))} /><Label htmlFor={field.name}>Yes</Label></div>
-                ) : (
-                  <Input id={field.name} type={field.type} value={asInputValue(formValues[field.name])} placeholder={field.placeholder} onChange={(event) => setField(field.name, event.target.value)} />
-                )}
-                {errors[field.name] && <p className="text-xs text-destructive">{errors[field.name]}</p>}
+          <form onSubmit={submitForm} className={editingRecord ? "space-y-4 py-2 flex-1 flex flex-col justify-between" : "grid gap-4 py-2 sm:grid-cols-2"}>
+            {editingRecord ? (
+              <div className="space-y-4 flex-1">
+                {fields.map((field) => (
+                  <div key={field.name} className="space-y-2">
+                    <Label htmlFor={field.name}>{field.label}{field.required && <span className="text-destructive"> *</span>}</Label>
+                    {field.type === 'textarea' ? (
+                      <Textarea id={field.name} value={asInputValue(formValues[field.name])} placeholder={field.placeholder} onChange={(event) => setField(field.name, event.target.value)} />
+                    ) : field.type === 'select' ? (
+                      <Select value={asInputValue(formValues[field.name])} onValueChange={(value) => setField(field.name, value)}>
+                        <SelectTrigger id={field.name} className="w-full"><SelectValue placeholder={`Select ${field.label}`} /></SelectTrigger>
+                        <SelectContent>{(optionValues[field.name] ?? field.options)?.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
+                      </Select>
+                    ) : field.type === 'checkbox' ? (
+                      <div className="flex h-8 items-center gap-2"><Checkbox id={field.name} checked={Boolean(formValues[field.name])} onCheckedChange={(checked) => setField(field.name, Boolean(checked))} /><Label htmlFor={field.name}>Yes</Label></div>
+                    ) : (
+                      <Input id={field.name} type={field.type} value={asInputValue(formValues[field.name])} placeholder={field.placeholder} onChange={(event) => setField(field.name, event.target.value)} />
+                    )}
+                    {errors[field.name] && <p className="text-xs text-destructive">{errors[field.name]}</p>}
+                  </div>
+                ))}
               </div>
-            ))}
-            <DialogFooter className="sm:col-span-2">
+            ) : (
+              fields.map((field) => (
+                <div key={field.name} className={field.type === 'textarea' ? 'space-y-2 sm:col-span-2' : 'space-y-2'}>
+                  <Label htmlFor={field.name}>{field.label}{field.required && <span className="text-destructive"> *</span>}</Label>
+                  {field.type === 'textarea' ? (
+                    <Textarea id={field.name} value={asInputValue(formValues[field.name])} placeholder={field.placeholder} onChange={(event) => setField(field.name, event.target.value)} />
+                  ) : field.type === 'select' ? (
+                    <Select value={asInputValue(formValues[field.name])} onValueChange={(value) => setField(field.name, value)}>
+                      <SelectTrigger id={field.name} className="w-full"><SelectValue placeholder={`Select ${field.label}`} /></SelectTrigger>
+                      <SelectContent>{(optionValues[field.name] ?? field.options)?.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
+                    </Select>
+                  ) : field.type === 'checkbox' ? (
+                    <div className="flex h-8 items-center gap-2"><Checkbox id={field.name} checked={Boolean(formValues[field.name])} onCheckedChange={(checked) => setField(field.name, Boolean(checked))} /><Label htmlFor={field.name}>Yes</Label></div>
+                  ) : (
+                    <Input id={field.name} type={field.type} value={asInputValue(formValues[field.name])} placeholder={field.placeholder} onChange={(event) => setField(field.name, event.target.value)} />
+                  )}
+                  {errors[field.name] && <p className="text-xs text-destructive">{errors[field.name]}</p>}
+                </div>
+              ))
+            )}
+            <DialogFooter className={editingRecord ? "pt-4 border-t border-border flex gap-2 justify-end shrink-0" : "sm:col-span-2"}>
               <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>Cancel</Button>
               <Button type="submit">{editingRecord ? 'Save changes' : `Add ${moduleName}`}</Button>
             </DialogFooter>
@@ -249,14 +364,38 @@ export function GenericCrudPage<TRecord extends { id: string }>({
       </Dialog>
 
       <Dialog open={Boolean(viewingRecord)} onOpenChange={(open) => !open && setViewingRecord(null)}>
-        <DialogContent className="max-w-lg p-6">
+        <DialogContent className="fixed inset-y-0 right-0 z-50 h-full w-full max-w-lg border-l border-border bg-background p-6 shadow-lg overflow-y-auto animate-in slide-in-from-right duration-300 flex flex-col gap-4">
           <DialogHeader>
             <DialogTitle>{moduleName} details</DialogTitle>
           </DialogHeader>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-            {viewingRecord && Object.entries(viewingRecord).map(([key, value]) => (
-              <React.Fragment key={key}><dt className="font-medium text-muted-foreground">{key}</dt><dd className="break-words">{asInputValue(value)}</dd></React.Fragment>
-            ))}
+          <dl className="grid grid-cols-1 gap-x-4 gap-y-3 text-sm divide-y divide-border/40">
+            {viewingRecord && Object.entries(viewingRecord)
+              .filter(([key, value]) => {
+                if (['id', 'companyId', 'createdById', 'deletedAt', 'password', 'createdAt', 'updatedAt'].includes(key)) {
+                  return false;
+                }
+                if (value && typeof value === 'object' && !((value as any) instanceof Date) && key !== '_count') {
+                  return false;
+                }
+                return true;
+              })
+              .map(([key, value]) => {
+                const matchedOption = optionValues[key]?.find((opt) => opt.value === value);
+                const displayValue = matchedOption ? matchedOption.label : renderDetailsValue(value);
+                const cleanKey = key
+                  .replace(/Id$/, '')
+                  .replace(/([A-Z])/g, ' $1')
+                  .replace(/_/g, ' ')
+                  .replace(/^./, (str) => str.toUpperCase())
+                  .trim();
+
+                return (
+                  <div key={key} className="pt-2 flex flex-col gap-1">
+                    <dt className="font-semibold text-xs text-muted-foreground uppercase tracking-wider">{cleanKey}</dt>
+                    <dd className="break-words text-foreground font-medium text-xs">{displayValue || 'None'}</dd>
+                  </div>
+                );
+              })}
           </dl>
         </DialogContent>
       </Dialog>

@@ -70,6 +70,7 @@ async function readUsersRoute(
           message: "Users fetched successfully.",
           data: users.map((user) => ({
             id: user.id,
+            name: user.name,
             email: user.email,
             phone: user.phone,
             isEmailVerified: user.isEmailVerified,

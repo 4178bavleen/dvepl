@@ -61,6 +61,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         if (!isMounted) return;
         setHeaderCompanies(companies.map((company) => ({ id: company.id, name: String(company.name ?? '') })));
         setProfile(userProfile);
+        if (userProfile.id) store.setUserId(userProfile.id);
         if (userProfile.company?.id) store.setCompanyId(userProfile.company.id);
       })
       .catch(() => {
@@ -153,7 +154,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         />
 
         {/* MAIN PAGE BODY */}
-        <main className="flex-1 overflow-y-auto p-6 md:p-8 max-w-7xl w-full mx-auto min-w-0">
+        <main className="flex-1 overflow-y-auto p-6 md:p-8 w-full min-w-0">
           <motion.div
             initial={{ opacity: 0, y: 5 }}
             animate={{ opacity: 1, y: 0 }}
