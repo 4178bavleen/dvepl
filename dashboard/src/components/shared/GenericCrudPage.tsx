@@ -61,9 +61,7 @@ interface GenericCrudPageProps<
   zodSchema: ZodType;
   breadcrumbs?: BreadcrumbItem[];
   searchPlaceholder?: string;
-  statsCards?: (
-    data: TRecord[],
-  ) => Array<{
+  statsCards?: (data: TRecord[]) => Array<{
     label: string;
     value: React.ReactNode;
     change?: string;
@@ -147,9 +145,14 @@ export function GenericCrudPage<TRecord extends { id: string }>({
         console.log("FIELD:", field);
         console.log("RAW ITEMS:", items);
 
-        const options = items.map((item) => ({
+        const options = items.map((item: any) => ({
           value: item.id,
-          label: item.name ?? item.title ?? item.code ?? item.id,
+          label:
+            item.name ??
+            item.title ??
+            (item.firstName && item.lastName
+              ? `${item.firstName} ${item.lastName} (${item.employeeCode})`
+              : (item.employeeCode ?? item.code ?? item.id)),
         }));
 
         console.log("OPTIONS:", options);
@@ -160,9 +163,14 @@ export function GenericCrudPage<TRecord extends { id: string }>({
         }));
         setOptionValues((current) => ({
           ...current,
-          [field]: items.map((item) => ({
+          [field]: items.map((item: any) => ({
             value: item.id,
-            label: item.name ?? item.title ?? item.code ?? item.id,
+            label:
+              item.name ??
+              item.title ??
+              (item.firstName && item.lastName
+                ? `${item.firstName} ${item.lastName} (${item.employeeCode})`
+                : (item.employeeCode ?? item.code ?? item.id)),
           })),
         }));
       }),
@@ -237,36 +245,7 @@ export function GenericCrudPage<TRecord extends { id: string }>({
   };
 
   const cards = statsCards?.(records) ?? [];
-
-  const processedColumns = useMemo(() => {
-    return columns.map((col) => {
-      const accessorKey = (col as any).accessorKey;
-      if (typeof accessorKey === 'string' && FK_RELATION_MAP[accessorKey] && !(col as any).cell) {
-        return {
-          ...col,
-          cell: ({ getValue, row }: any) => {
-            const val = getValue();
-            return renderDisplayValue(accessorKey, val, row.original, optionValues, fields);
-          },
-        };
-      }
-      return col;
-    });
-  }, [columns, optionValues, fields]);
-
-  const viewingGroups = useMemo(
-    () => (viewingRecord ? groupRecordFields(viewingRecord as unknown as Record<string, any>) : null),
-    [viewingRecord]
-  );
-
-  if (isLoading && records.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[450px] w-full gap-3">
-        <Loader2 className="animate-spin text-primary size-10" />
-        <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground/80 animate-pulse">Loading {pluralName}...</span>
-      </div>
-    );
-  }
+  console.log("Viewing Record:", viewingRecord);
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
@@ -467,19 +446,73 @@ export function GenericCrudPage<TRecord extends { id: string }>({
         open={Boolean(viewingRecord)}
         onOpenChange={(open) => !open && setViewingRecord(null)}
       >
-        <DialogContent className="max-w-lg p-6">
+        <DialogContent className="max-w-2xl rounded-2xl">
           <DialogHeader>
-            <DialogTitle>{moduleName} details</DialogTitle>
+            <DialogTitle className="text-xl font-bold">
+              👥 Team Details
+            </DialogTitle>
           </DialogHeader>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-            {viewingRecord &&
-              Object.entries(viewingRecord).map(([key, value]) => (
-                <React.Fragment key={key}>
-                  <dt className="font-medium text-muted-foreground">{key}</dt>
-                  <dd className="break-words">{asInputValue(value)}</dd>
-                </React.Fragment>
-              ))}
-          </dl>
+
+          {viewingRecord && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-5">
+                <div>
+                  <p className="text-xs text-muted-foreground">Team Name</p>
+
+                  <p className="font-semibold text-lg">{viewingRecord.name}</p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-muted-foreground">Department</p>
+
+                  <span className="rounded-full bg-violet-100 text-violet-700 px-3 py-1 text-xs font-medium">
+                    {viewingRecord.department?.name ?? "—"}
+                  </span>
+                </div>
+
+                <div>
+                  <p className="text-xs text-muted-foreground">Status</p>
+
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                      viewingRecord.isActive
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-red-100 text-red-700"
+                    }`}
+                  >
+                    {viewingRecord.isActive ? "Active" : "Inactive"}
+                  </span>
+                </div>
+
+                <div>
+                  <p className="text-xs text-muted-foreground">Members</p>
+
+                  <p className="font-semibold">
+                    {viewingRecord._count?.employees ?? 0}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-sm font-semibold mb-3">👥 Team Members</p>
+
+                <div className="flex flex-wrap gap-2">
+                  {viewingRecord.employees?.length ? (
+                    viewingRecord.employees.map((emp: any) => (
+                      <span
+                        key={emp.id}
+                        className="rounded-full bg-sky-100 text-sky-700 px-3 py-1 text-xs font-medium"
+                      >
+                        {emp.firstName} {emp.lastName} ({emp.employeeCode})
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-muted-foreground">No Employees</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
