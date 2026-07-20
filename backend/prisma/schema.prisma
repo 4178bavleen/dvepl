@@ -25,19 +25,52 @@ model Company {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  branches              Branch[]
-  users                 User[]
-  costCenters           CostCenter[]
-  customers             Customer[]
-  tenderRequests        TenderRequest[]
-  roles                 Role[]
-  employees             Employee[]
-  tenders               Tender[]
-  governmentDepartments GovernmentDepartment[]
-  sections              Section[]
-  divisions             Division[]
-  subDivisions          SubDivision[]
-  referenceCodeCounters ReferenceCodeCounter[]
+  branches                Branch[]
+  users                   User[]
+  costCenters             CostCenter[]
+  customers               Customer[]
+  tenderRequests          TenderRequest[]
+  roles                   Role[]
+  employees               Employee[]
+  tenders                 Tender[]
+  governmentDepartments   GovernmentDepartment[]
+  sections                Section[]
+  divisions               Division[]
+  subDivisions            SubDivision[]
+  referenceCodeCounters   ReferenceCodeCounter[]
+  technicalClarifications TechnicalClarification[]
+  boqs                    BOQ[]
+  quotations              Quotation[]
+  approvalWorkflows       ApprovalWorkflow[]
+  approvalRequests        ApprovalRequest[]
+  salesOrders             SalesOrder[]
+  engineeringProjects     EngineeringProject[]
+  boms                    BOM[]
+  materials               Material[]
+  materialCategories      MaterialCategory[]
+  materialBrands          MaterialBrand[]
+  materialSpecifications  MaterialSpecification[]
+  purchaseRequests        PurchaseRequest[]
+  purchaseOrders          PurchaseOrder[]
+  goodsReceipts           GoodsReceipt[]
+  warehouses              Warehouse[]
+  inventories             Inventory[]
+  stockTransfers          StockTransfer[]
+  productionPlans         ProductionPlan[]
+  workOrders              WorkOrder[]
+  inspections             Inspection[]
+  inspectionChecklists    InspectionChecklist[]
+  dispatches              Dispatch[]
+  vehicles                Vehicle[]
+  invoices                Invoice[]
+  payments                Payment[]
+  creditNotes             CreditNote[]
+  debitNotes              DebitNote[]
+  expenses                Expense[]
+  ledgerEntries           LedgerEntry[]
+  reportDefinitions       ReportDefinition[]
+  reportSchedules         ReportSchedule[]
+  dashboardWidgets        DashboardWidget[]
 
   @@map("companies")
 }
@@ -142,7 +175,7 @@ model CostCenter {
 // 2. AUTHENTICATION
 model User {
   id        String  @id @default(uuid())
-  name      String 
+  name      String
   companyId String
   company   Company @relation(fields: [companyId], references: [id])
 
@@ -166,12 +199,55 @@ model User {
   communicationLogs      CommunicationHistory[]
   auditLogs              AuditLog[]
 
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  deletedAt       DateTime?
-  tendersCreated  Tender[]       @relation("TenderCreatedBy")
-  tendersAssigned Tender[]       @relation("TenderAssignedTo")
-  tenderRemarks   TenderRemark[]
+  quotationsCreated                 Quotation[]                        @relation("QuotationCreatedBy")
+  quotationsApproved                Quotation[]                        @relation("QuotationApprovedBy")
+  createdAt                         DateTime                           @default(now())
+  updatedAt                         DateTime                           @updatedAt
+  deletedAt                         DateTime?
+  tendersCreated                    Tender[]                           @relation("TenderCreatedBy")
+  tendersAssigned                   Tender[]                           @relation("TenderAssignedTo")
+  tenderRemarks                     TenderRemark[]
+  technicalClarifications           TechnicalClarification[]
+  technicalClarificationReplies     TechnicalClarificationReply[]
+  technicalClarificationAttachments TechnicalClarificationAttachment[]
+  technicalClarificationActivities  TechnicalClarificationActivity[]
+  boqattachments                    BOQAttachment[]
+  quotationRevisions                QuotationRevision[]
+  quotationAttachments              QuotationAttachment[]
+  approvalRequestsRequested ApprovalRequest[] @relation("ApprovalRequestRequestedBy")
+  approvalRequestsAssigned ApprovalRequest[] @relation("ApprovalRequestAssignedTo")
+  approvalHistories                 ApprovalHistory[]
+  salesOrders                       SalesOrder[]
+  salesOrderAttachments             SalesOrderAttachment[]
+  engineeringProjectsCreated EngineeringProject[]@relation("EngineeringProjectCreatedBy")
+  
+  engineeringProjectsApproved EngineeringProject[]   @relation("EngineeringProjectApprovedBy")
+  engineeringDrawings               EngineeringDrawing[]
+  drawingRevisions                  DrawingRevision[]
+  boms                              BOM[]
+  bomrevisions                      BOMRevision[]
+  materials                         Material[]
+  purchaseRequests                  PurchaseRequest[]
+  purchaseOrders                    PurchaseOrder[]
+  goodsReceipts                     GoodsReceipt[]
+  inventoryTransactions             InventoryTransaction[]
+  stockTransfers                    StockTransfer[]
+  productionPlans                   ProductionPlan[]
+  workOrders                        WorkOrder[]
+  productionLogs                    ProductionLog[]
+  inspections                       Inspection[]
+  reworks                           Rework[]
+  dispatches                        Dispatch[]
+  deliveryProofs                    DeliveryProof[]
+  invoices                          Invoice[]
+  payments                          Payment[]
+  creditNotes                       CreditNote[]
+  debitNotes                        DebitNote[]
+  expenses                          Expense[]
+  ledgerEntries                     LedgerEntry[]
+  reportDefinitions                 ReportDefinition[]
+  reportSchedules                   ReportSchedule[]
+  dashboardWidgets                  DashboardWidget[]
 
   @@index([companyId])
   @@map("users")
@@ -266,9 +342,10 @@ model Role {
   rolePermissions RolePermission[]
   userRoles       UserRole[]
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
+  approvalLevels ApprovalLevel[]
 
   @@unique([companyId, name])
   @@map("roles")
@@ -607,10 +684,14 @@ model Customer {
   communicationLogs CommunicationHistory[]
   tenderRequests    TenderRequest[]
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-  tenders   Tender[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
+  tenders        Tender[]
+  quotations     Quotation[]
+  salesOrders    SalesOrder[]
+  purchaseOrders PurchaseOrder[]
+  invoices       Invoice[]
 
   @@index([companyId])
   @@map("customers")
@@ -711,12 +792,16 @@ model Tender {
 
   assignedTo User? @relation("TenderAssignedTo", fields: [assignedToId], references: [id])
 
-  files                  TenderFile[]
-  remarks                TenderRemark[]
-  activities             TenderActivity[]
-  referenceCodes         ReferenceCode[]
-  governmentDepartment   GovernmentDepartment? @relation(fields: [governmentDepartmentId], references: [id])
-  governmentDepartmentId String?
+  files                   TenderFile[]
+  remarks                 TenderRemark[]
+  activities              TenderActivity[]
+  referenceCodes          ReferenceCode[]
+  governmentDepartment    GovernmentDepartment?    @relation(fields: [governmentDepartmentId], references: [id])
+  governmentDepartmentId  String?
+  technicalClarifications TechnicalClarification[]
+  boqs                    BOQ[]
+  quotations              Quotation[]
+  salesOrders             SalesOrder[]
 
   @@index([companyId])
   @@index([status])
@@ -951,15 +1036,15 @@ model AuditLog {
 
 // Reference Code Tracking & Logging (Tender Management)
 model ReferenceCode {
-  id                 String              @id @default(uuid())
-  tenderId           String
-  tender             Tender              @relation(fields: [tenderId], references: [id])
-  oldReferenceCode   String?
-  newReferenceCode   String?
-  actionType         ReferenceCodeAction
-  actionReason       String?
-  actionBy           String?
-  createdAt          DateTime            @default(now())
+  id               String              @id @default(uuid())
+  tenderId         String
+  tender           Tender              @relation(fields: [tenderId], references: [id])
+  oldReferenceCode String?
+  newReferenceCode String?
+  actionType       ReferenceCodeAction
+  actionReason     String?
+  actionBy         String?
+  createdAt        DateTime            @default(now())
 
   @@map("reference_codes")
 }
@@ -983,4 +1068,1971 @@ model ReferenceCodeCounter {
 
   @@unique([companyId, prefix])
   @@map("reference_code_counters")
+}
+
+// ============================================================
+// TECHNICAL CLARIFICATION MODULE
+// ============================================================
+
+model TechnicalClarification {
+  id String @id @default(uuid())
+
+  companyId String
+  tenderId  String
+
+  question String
+
+  raisedById   String
+  assignedToId String?
+
+  dueDate DateTime?
+
+  priority TechnicalClarificationPriority @default(MEDIUM)
+  status   TechnicalClarificationStatus   @default(OPEN)
+  revision Int                            @default(1)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  company Company @relation(fields: [companyId], references: [id])
+  tender  Tender  @relation(fields: [tenderId], references: [id])
+
+  raisedBy   User  @relation("TechnicalClarificationRaisedBy", fields: [raisedById], references: [id])
+  assignedTo User? @relation("TechnicalClarificationAssignedTo", fields: [assignedToId], references: [id])
+
+  replies     TechnicalClarificationReply[]
+  attachments TechnicalClarificationAttachment[]
+  activities  TechnicalClarificationActivity[]
+  user        User?                              @relation(fields: [userId], references: [id])
+  userId      String?
+
+  @@index([companyId])
+  @@index([tenderId])
+  @@index([status])
+  @@index([priority])
+  @@map("technical_clarifications")
+}
+
+enum TechnicalClarificationStatus {
+  OPEN
+  ANSWERED
+  REVISED
+  CLOSED
+}
+
+enum TechnicalClarificationPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model TechnicalClarificationReply {
+  id              String   @id @default(uuid())
+  clarificationId String
+  reply           String
+  repliedById     String
+  isInternal      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  clarification TechnicalClarification @relation(fields: [clarificationId], references: [id])
+  repliedBy     User                   @relation(fields: [repliedById], references: [id])
+
+  @@index([clarificationId])
+  @@map("technical_clarification_replies")
+}
+
+model TechnicalClarificationAttachment {
+  id              String   @id @default(uuid())
+  clarificationId String
+  fileName        String
+  fileUrl         String
+  fileSize        Int?
+  mimeType        String?
+  uploadedById    String
+  createdAt       DateTime @default(now())
+
+  clarification TechnicalClarification @relation(fields: [clarificationId], references: [id])
+  uploadedBy    User                   @relation(fields: [uploadedById], references: [id])
+
+  @@index([clarificationId])
+  @@map("technical_clarification_attachments")
+}
+
+model TechnicalClarificationActivity {
+  id              String   @id @default(uuid())
+  clarificationId String
+  action          String
+  oldValue        Json?
+  newValue        Json?
+  performedById   String?
+  createdAt       DateTime @default(now())
+
+  clarification TechnicalClarification @relation(fields: [clarificationId], references: [id])
+  performedBy   User?                  @relation(fields: [performedById], references: [id])
+
+  @@index([clarificationId])
+  @@map("technical_clarification_activities")
+}
+
+// ============================================================
+// BOQ / RFQ ANALYSIS MODULE
+// ============================================================
+
+model BOQ {
+  id           String    @id @default(uuid())
+  companyId    String
+  tenderId     String
+  version      Int       @default(1)
+  isActive     Boolean   @default(true)
+  importedFrom String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  company Company @relation(fields: [companyId], references: [id])
+  tender  Tender  @relation(fields: [tenderId], references: [id])
+
+  items       BOQItem[]
+  attachments BOQAttachment[]
+
+  @@unique([tenderId, version])
+  @@index([companyId])
+  @@map("boqs")
+}
+
+model BOQItem {
+  id              String    @id @default(uuid())
+  boqId           String
+  itemCode        String
+  description     String
+  specification   String?
+  unit            String
+  quantity        Decimal   @db.Decimal(15, 3)
+  brand           String?
+  make            String?
+  preferredVendor String?
+  remarks         String?
+  estimatedCost   Decimal?  @db.Decimal(15, 2)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  boq BOQ @relation(fields: [boqId], references: [id])
+
+  @@index([boqId])
+  @@index([itemCode])
+  @@map("boq_items")
+}
+
+model BOQAttachment {
+  id           String   @id @default(uuid())
+  boqId        String
+  fileName     String
+  fileUrl      String
+  fileSize     Int?
+  mimeType     String?
+  uploadedById String
+  createdAt    DateTime @default(now())
+
+  boq        BOQ  @relation(fields: [boqId], references: [id])
+  uploadedBy User @relation(fields: [uploadedById], references: [id])
+
+  @@index([boqId])
+  @@map("boq_attachments")
+}
+
+// ============================================================
+// 3. QUOTATION MANAGEMENT MODULE
+// ============================================================
+
+model Quotation {
+  id              String          @id @default(uuid())
+  companyId       String
+  quotationNo     String          @unique
+  tenderId        String?
+  customerId      String
+  revision        Int             @default(1)
+  status          QuotationStatus @default(DRAFT)
+  materialCost    Decimal         @db.Decimal(15, 2)
+  labourCost      Decimal         @default(0) @db.Decimal(15, 2)
+  transportation  Decimal         @default(0) @db.Decimal(15, 2)
+  packing         Decimal         @default(0) @db.Decimal(15, 2)
+  insurance       Decimal         @default(0) @db.Decimal(15, 2)
+  discount        Decimal         @default(0) @db.Decimal(15, 2)
+  gst             Decimal         @db.Decimal(5, 2)
+  profitMargin    Decimal         @db.Decimal(5, 2)
+  finalAmount     Decimal         @db.Decimal(15, 2)
+  currency        String          @default("INR")
+  validUntil      DateTime
+  remarks         String?
+  createdById     String
+  approvedById    String?
+  approvedAt      DateTime?
+  sentAt          DateTime?
+  acceptedAt      DateTime?
+  rejectedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  deletedAt       DateTime?
+
+  company   Company  @relation(fields: [companyId], references: [id])
+  tender    Tender?  @relation(fields: [tenderId], references: [id])
+  customer  Customer @relation(fields: [customerId], references: [id])
+  createdBy User     @relation("QuotationCreatedBy", fields: [createdById], references: [id])
+
+  approvedBy User? @relation("QuotationApprovedBy", fields: [approvedById], references: [id])
+
+  revisions   QuotationRevision[]
+  items       QuotationItem[]
+  charges     QuotationCharge[]
+  attachments QuotationAttachment[]
+  salesOrdersCreated SalesOrder[] @relation("SalesOrderCreatedBy")
+  salesOrdersConfirmed SalesOrder[] @relation("SalesOrderConfirmedBy")
+  salesOrdersCancelled SalesOrder[] @relation("SalesOrderCancelledBy")
+  user        User?                 @relation(fields: [userId], references: [id])
+  userId      String?
+
+  @@index([companyId])
+  @@index([status])
+  @@index([validUntil])
+  @@map("quotations")
+}
+
+enum QuotationStatus {
+  DRAFT
+  WAITING_APPROVAL
+  APPROVED
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+model QuotationRevision {
+  id          String   @id @default(uuid())
+  quotationId String
+  revisionNo  Int
+  changes     Json?
+  reason      String?
+  revisedById String
+  createdAt   DateTime @default(now())
+
+  quotation Quotation @relation(fields: [quotationId], references: [id])
+  revisedBy User      @relation(fields: [revisedById], references: [id])
+
+  @@unique([quotationId, revisionNo])
+  @@index([quotationId])
+  @@map("quotation_revisions")
+}
+
+model QuotationItem {
+  id            String    @id @default(uuid())
+  quotationId   String
+  itemCode      String
+  description   String
+  specification String?
+  unit          String
+  quantity      Decimal   @db.Decimal(15, 3)
+  unitPrice     Decimal   @db.Decimal(15, 2)
+  totalPrice    Decimal   @db.Decimal(15, 2)
+  brand         String?
+  make          String?
+  remarks       String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  quotation Quotation @relation(fields: [quotationId], references: [id])
+
+  @@index([quotationId])
+  @@map("quotation_items")
+}
+
+model QuotationCharge {
+  id           String   @id @default(uuid())
+  quotationId  String
+  chargeType   String
+  description  String?
+  amount       Decimal  @db.Decimal(15, 2)
+  isPercentage Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  quotation Quotation @relation(fields: [quotationId], references: [id])
+
+  @@index([quotationId])
+  @@map("quotation_charges")
+}
+
+model QuotationAttachment {
+  id           String   @id @default(uuid())
+  quotationId  String
+  fileName     String
+  fileUrl      String
+  fileSize     Int?
+  mimeType     String?
+  uploadedById String
+  createdAt    DateTime @default(now())
+
+  quotation  Quotation @relation(fields: [quotationId], references: [id])
+  uploadedBy User      @relation(fields: [uploadedById], references: [id])
+
+  @@index([quotationId])
+  @@map("quotation_attachments")
+}
+
+// ============================================================
+// 4. QUOTATION APPROVAL ENGINE
+// ============================================================
+
+model ApprovalWorkflow {
+  id          String    @id @default(uuid())
+  companyId   String
+  name        String
+  description String?
+  module      String // QUOTATION, PURCHASE, etc
+  isActive    Boolean   @default(true)
+  isSystem    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  levels   ApprovalLevel[]
+  requests ApprovalRequest[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@map("approval_workflows")
+}
+
+model ApprovalLevel {
+  id              String       @id @default(uuid())
+  workflowId      String
+  levelNo         Int
+  name            String
+  approverRoleId  String
+  minAmount       Decimal?     @db.Decimal(15, 2)
+  maxAmount       Decimal?     @db.Decimal(15, 2)
+  escalationHours Int?
+  approvalType    ApprovalType @default(SEQUENTIAL)
+  isParallel      Boolean      @default(false)
+  isFinal         Boolean      @default(false)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  deletedAt       DateTime?
+
+  workflow     ApprovalWorkflow @relation(fields: [workflowId], references: [id])
+  approverRole Role             @relation(fields: [approverRoleId], references: [id])
+
+  requests          ApprovalRequest[]
+  approvalHistories ApprovalHistory[]
+
+  @@unique([workflowId, levelNo])
+  @@index([workflowId])
+  @@map("approval_levels")
+}
+
+enum ApprovalType {
+  SEQUENTIAL
+  PARALLEL
+  ANY
+}
+
+model ApprovalRequest {
+  id            String         @id @default(uuid())
+  companyId     String
+  workflowId    String
+  levelId       String
+  recordId      String
+  recordType    String
+  status        ApprovalStatus @default(PENDING)
+
+  requestedById String
+  assignedToId  String?
+
+  dueDate       DateTime?
+  escalatedAt   DateTime?
+  remarks       String?
+
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  deletedAt     DateTime?
+
+  company     Company          @relation(fields: [companyId], references: [id])
+  workflow    ApprovalWorkflow @relation(fields: [workflowId], references: [id])
+  level       ApprovalLevel    @relation(fields: [levelId], references: [id])
+
+  requestedBy User @relation("ApprovalRequestRequestedBy",fields: [requestedById],references: [id])
+
+  assignedTo User? @relation("ApprovalRequestAssignedTo",fields: [assignedToId],references: [id])
+
+  history ApprovalHistory[]
+
+  @@index([companyId])
+  @@index([recordId])
+  @@index([status])
+  @@map("approval_requests")
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  ESCALATED
+  REASSIGNED
+  CANCELLED
+}
+
+model ApprovalHistory {
+  id                   String         @id @default(uuid())
+  requestId            String
+  levelId              String
+  action               ApprovalAction
+  comments             String?
+  performedById        String
+  previousAssignedToId String?
+  createdAt            DateTime       @default(now())
+
+  request     ApprovalRequest @relation(fields: [requestId], references: [id])
+  level       ApprovalLevel   @relation(fields: [levelId], references: [id])
+  performedBy User            @relation(fields: [performedById], references: [id])
+
+  @@index([requestId])
+  @@map("approval_history")
+}
+
+enum ApprovalAction {
+  APPROVED
+  REJECTED
+  REASSIGNED
+  ESCALATED
+  COMMENTED
+}
+
+// ============================================================
+// 5. SALES ORDER MODULE
+// ============================================================
+
+model SalesOrder {
+  id                 String           @id @default(uuid())
+  companyId          String
+  orderNo            String           @unique
+  customerId         String
+  tenderId           String?
+  quotationId        String?
+  orderDate          DateTime         @default(now())
+  deliveryDate       DateTime?
+  status             SalesOrderStatus @default(DRAFT)
+  paymentTerms       String?
+  deliverySchedule   String?
+  warranty           String?
+  freight            Decimal          @default(0) @db.Decimal(15, 2)
+  gst                Decimal          @db.Decimal(5, 2)
+  total              Decimal          @db.Decimal(15, 2)
+  remarks            String?
+
+  createdById        String
+  confirmedById      String?
+  cancelledById      String?
+
+  confirmedAt        DateTime?
+  cancelledAt        DateTime?
+  cancellationReason String?
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  deletedAt          DateTime?
+
+  company   Company    @relation(fields: [companyId], references: [id])
+  customer  Customer   @relation(fields: [customerId], references: [id])
+  tender    Tender?    @relation(fields: [tenderId], references: [id])
+  quotation Quotation? @relation(fields: [quotationId], references: [id])
+
+  createdBy User @relation("SalesOrderCreatedBy",fields: [createdById],references: [id]  )
+
+  confirmedBy User? @relation("SalesOrderConfirmedBy",fields: [confirmedById],references: [id]  )
+
+  cancelledBy User? @relation("SalesOrderCancelledBy",fields: [cancelledById],references: [id])
+
+  items               SalesOrderItem[]
+  attachments         SalesOrderAttachment[]
+  invoices            Invoice[]
+  engineeringProjects EngineeringProject[]
+  workOrders          WorkOrder[]
+  dispatches          Dispatch[]
+
+  @@index([companyId])
+  @@index([status])
+  @@index([orderDate])
+
+  @@map("sales_orders")
+}
+enum SalesOrderStatus {
+  DRAFT
+  CONFIRMED
+  IN_PRODUCTION
+  READY
+  DISPATCHED
+  COMPLETED
+  CANCELLED
+}
+
+model SalesOrderItem {
+  id           String    @id @default(uuid())
+  salesOrderId String
+  itemCode     String
+  description  String
+  unit         String
+  quantity     Decimal   @db.Decimal(15, 3)
+  unitPrice    Decimal   @db.Decimal(15, 2)
+  totalPrice   Decimal   @db.Decimal(15, 2)
+  remarks      String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  salesOrder    SalesOrder     @relation(fields: [salesOrderId], references: [id])
+  dispatchItems DispatchItem[]
+
+  @@index([salesOrderId])
+  @@map("sales_order_items")
+}
+
+model SalesOrderAttachment {
+  id           String   @id @default(uuid())
+  salesOrderId String
+  fileName     String
+  fileUrl      String
+  fileSize     Int?
+  mimeType     String?
+  uploadedById String
+  createdAt    DateTime @default(now())
+
+  salesOrder SalesOrder @relation(fields: [salesOrderId], references: [id])
+  uploadedBy User       @relation(fields: [uploadedById], references: [id])
+
+  @@index([salesOrderId])
+  @@map("sales_order_attachments")
+}
+
+// ============================================================
+// 6. ENGINEERING MODULE
+// ============================================================
+
+model EngineeringProject {
+  id           String            @id @default(uuid())
+  companyId    String
+  salesOrderId String?
+  name         String
+  description  String?
+  status       EngineeringStatus @default(DRAFT)
+  approvedById String?
+  approvedAt   DateTime?
+  createdById  String
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  deletedAt    DateTime?
+
+  company    Company     @relation(fields: [companyId], references: [id])
+  salesOrder SalesOrder? @relation(fields: [salesOrderId], references: [id])
+  approvedBy User? @relation("EngineeringProjectApprovedBy",fields: [approvedById],references: [id])
+  
+  createdBy User @relation("EngineeringProjectCreatedBy",fields: [createdById],references: [id])
+
+  drawings EngineeringDrawing[]
+  boms     BOM[]
+
+  @@index([companyId])
+  @@map("engineering_projects")
+}
+
+enum EngineeringStatus {
+  DRAFT
+  IN_PROGRESS
+  REVIEW
+  APPROVED
+  RELEASED
+  REJECTED
+  CANCELLED
+}
+
+model EngineeringDrawing {
+  id           String        @id @default(uuid())
+  projectId    String
+  drawingNo    String        @unique
+  title        String
+  description  String?
+  drawingType  DrawingType
+  fileUrl      String
+  fileName     String
+  fileSize     Int?
+  mimeType     String?
+  status       DrawingStatus @default(DRAFT)
+  approvedById String?
+  approvedAt   DateTime?
+  createdById  String
+  version      Int           @default(1)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  deletedAt    DateTime?
+
+  project    EngineeringProject @relation(fields: [projectId], references: [id])
+  approvedBy User?              @relation(fields: [approvedById], references: [id])
+  createdBy  User               @relation(fields: [createdById], references: [id])
+
+  revisions DrawingRevision[]
+
+  @@index([projectId])
+  @@index([drawingType])
+  @@map("engineering_drawings")
+}
+
+enum DrawingType {
+  SLD
+  GA_DRAWING
+  WIRING_DIAGRAM
+  LAYOUT
+  CAD
+  PDF
+}
+
+enum DrawingStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  OBSOLETE
+}
+
+model DrawingRevision {
+  id           String    @id @default(uuid())
+  drawingId    String
+  revisionNo   Int
+  fileUrl      String
+  fileName     String
+  changes      String?
+  approvedById String?
+  approvedAt   DateTime?
+  createdById  String
+  createdAt    DateTime  @default(now())
+
+  drawing    EngineeringDrawing @relation(fields: [drawingId], references: [id])
+  approvedBy User?              @relation(fields: [approvedById], references: [id])
+  createdBy  User               @relation(fields: [createdById], references: [id])
+
+  @@unique([drawingId, revisionNo])
+  @@index([drawingId])
+  @@map("drawing_revisions")
+}
+
+// ============================================================
+// 7. BILL OF MATERIALS (BOM) MODULE
+// ============================================================
+
+model BOM {
+  id           String    @id @default(uuid())
+  companyId    String
+  projectId    String
+  name         String
+  description  String?
+  version      Int       @default(1)
+  isActive     Boolean   @default(true)
+  approvedById String?
+  approvedAt   DateTime?
+  createdById  String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  company    Company            @relation(fields: [companyId], references: [id])
+  project    EngineeringProject @relation(fields: [projectId], references: [id])
+  approvedBy User?              @relation(fields: [approvedById], references: [id])
+  createdBy  User               @relation(fields: [createdById], references: [id])
+
+  assemblies BOMAssembly[]
+  revisions  BOMRevision[]
+
+  @@unique([projectId, version])
+  @@index([companyId])
+  @@map("boms")
+}
+
+model BOMAssembly {
+  id              String    @id @default(uuid())
+  bomId           String
+  parentId        String?
+  name            String
+  description     String?
+  quantity        Decimal   @db.Decimal(15, 3)
+  wastePercentage Decimal   @default(0) @db.Decimal(5, 2)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  bom      BOM           @relation(fields: [bomId], references: [id])
+  parent   BOMAssembly?  @relation("BOMAssemblyHierarchy", fields: [parentId], references: [id])
+  children BOMAssembly[] @relation("BOMAssemblyHierarchy")
+
+  items BOMItem[]
+
+  @@index([bomId])
+  @@index([parentId])
+  @@map("bom_assemblies")
+}
+
+model BOMItem {
+  id              String    @id @default(uuid())
+  assemblyId      String
+  materialId      String
+  quantity        Decimal   @db.Decimal(15, 3)
+  wastePercentage Decimal   @default(0) @db.Decimal(5, 2)
+  remarks         String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  assembly BOMAssembly @relation(fields: [assemblyId], references: [id])
+  material Material    @relation(fields: [materialId], references: [id])
+
+  @@index([assemblyId])
+  @@index([materialId])
+  @@map("bom_items")
+}
+
+model BOMRevision {
+  id          String   @id @default(uuid())
+  bomId       String
+  revisionNo  Int
+  changes     Json?
+  reason      String?
+  revisedById String
+  createdAt   DateTime @default(now())
+
+  bom       BOM  @relation(fields: [bomId], references: [id])
+  revisedBy User @relation(fields: [revisedById], references: [id])
+
+  @@unique([bomId, revisionNo])
+  @@index([bomId])
+  @@map("bom_revisions")
+}
+
+// ============================================================
+// 8. MATERIAL MASTER MODULE
+// ============================================================
+
+model Material {
+  id                    String    @id @default(uuid())
+  companyId             String
+  categoryId            String?
+  brandId               String?
+  specificationId       String?
+  materialCode          String    @unique
+  name                  String
+  description           String?
+  hsnCode               String?
+  gst                   Decimal   @db.Decimal(5, 2)
+  unit                  String
+  weight                Decimal?  @db.Decimal(10, 3)
+  color                 String?
+  alternativeMaterialId String?
+  preferredVendorId     String?
+  isActive              Boolean   @default(true)
+  createdById           String
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  deletedAt             DateTime?
+
+  company       Company                @relation(fields: [companyId], references: [id])
+  category      MaterialCategory?      @relation(fields: [categoryId], references: [id])
+  brand         MaterialBrand?         @relation(fields: [brandId], references: [id])
+  specification MaterialSpecification? @relation(fields: [specificationId], references: [id])
+  alternative   Material?              @relation("MaterialAlternative", fields: [alternativeMaterialId], references: [id])
+  alternatives  Material[]             @relation("MaterialAlternative")
+  createdBy     User                   @relation(fields: [createdById], references: [id])
+
+  inventories          Inventory[]
+  purchaseOrderItems   PurchaseOrderItem[]
+  goodsReceiptItems    GoodsReceiptItem[]
+  bomItems             BOMItem[]
+  purchaseRequestItems PurchaseRequestItem[]
+  stockTransfers       StockTransfer[]
+  workOrders           WorkOrder[]
+  workOrderItems       WorkOrderItem[]
+  inspections          Inspection[]
+
+  @@index([companyId])
+  @@index([materialCode])
+  @@index([categoryId])
+  @@map("materials")
+}
+
+model MaterialCategory {
+  id          String    @id @default(uuid())
+  companyId   String
+  parentId    String?
+  name        String
+  code        String
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  company  Company            @relation(fields: [companyId], references: [id])
+  parent   MaterialCategory?  @relation("MaterialCategoryHierarchy", fields: [parentId], references: [id])
+  children MaterialCategory[] @relation("MaterialCategoryHierarchy")
+
+  materials Material[]
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@map("material_categories")
+}
+
+model MaterialBrand {
+  id          String    @id @default(uuid())
+  companyId   String
+  name        String
+  code        String
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  materials Material[]
+
+  @@unique([companyId, code])
+  @@map("material_brands")
+}
+
+model MaterialSpecification {
+  id          String    @id @default(uuid())
+  companyId   String
+  name        String
+  value       String
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  materials Material[]
+
+  @@map("material_specifications")
+}
+
+// ============================================================
+// 9. PURCHASE MODULE
+// ============================================================
+
+model PurchaseRequest {
+  id            String                @id @default(uuid())
+  companyId     String
+  requestNo     String                @unique
+  title         String
+  description   String?
+  priority      Priority              @default(MEDIUM)
+  status        PurchaseRequestStatus @default(DRAFT)
+  requestedById String
+  approvedById  String?
+  approvedAt    DateTime?
+  requiredBy    DateTime?
+  remarks       String?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  deletedAt     DateTime?
+
+  company     Company @relation(fields: [companyId], references: [id])
+  requestedBy User    @relation(fields: [requestedById], references: [id])
+  approvedBy  User?   @relation(fields: [approvedById], references: [id])
+
+  items  PurchaseRequestItem[]
+  orders PurchaseOrder[]
+
+  @@index([companyId])
+  @@index([status])
+  @@map("purchase_requests")
+}
+
+enum PurchaseRequestStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  PO_CREATED
+  CANCELLED
+}
+
+model PurchaseRequestItem {
+  id             String    @id @default(uuid())
+  requestId      String
+  materialId     String
+  quantity       Decimal   @db.Decimal(15, 3)
+  unit           String
+  estimatedPrice Decimal   @db.Decimal(15, 2)
+  remarks        String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  request  PurchaseRequest @relation(fields: [requestId], references: [id])
+  material Material        @relation(fields: [materialId], references: [id])
+
+  @@index([requestId])
+  @@map("purchase_request_items")
+}
+
+model PurchaseOrder {
+  id               String              @id @default(uuid())
+  companyId        String
+  poNo             String              @unique
+  requestId        String?
+  vendorId         String
+  orderDate        DateTime            @default(now())
+  expectedDelivery DateTime?
+  status           PurchaseOrderStatus @default(DRAFT)
+  paymentTerms     String?
+  shippingTerms    String?
+  currency         String              @default("INR")
+  subtotal         Decimal             @db.Decimal(15, 2)
+  tax              Decimal             @db.Decimal(15, 2)
+  total            Decimal             @db.Decimal(15, 2)
+  createdById      String
+  approvedById     String?
+  approvedAt       DateTime?
+  sentAt           DateTime?
+  remarks          String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  deletedAt        DateTime?
+
+  company    Company          @relation(fields: [companyId], references: [id])
+  request    PurchaseRequest? @relation(fields: [requestId], references: [id])
+  vendor     Customer         @relation(fields: [vendorId], references: [id])
+  createdBy  User             @relation(fields: [createdById], references: [id])
+  approvedBy User?            @relation(fields: [approvedById], references: [id])
+
+  items         PurchaseOrderItem[]
+  goodsReceipts GoodsReceipt[]
+  invoices      Invoice[]
+
+  @@index([companyId])
+  @@index([status])
+  @@index([poNo])
+  @@map("purchase_orders")
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  APPROVED
+  SENT
+  PARTIAL_RECEIVED
+  COMPLETED
+  CANCELLED
+}
+
+model PurchaseOrderItem {
+  id          String    @id @default(uuid())
+  poId        String
+  materialId  String
+  quantity    Decimal   @db.Decimal(15, 3)
+  unitPrice   Decimal   @db.Decimal(15, 2)
+  totalPrice  Decimal   @db.Decimal(15, 2)
+  receivedQty Decimal   @default(0) @db.Decimal(15, 3)
+  remarks     String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  po       PurchaseOrder @relation(fields: [poId], references: [id])
+  material Material      @relation(fields: [materialId], references: [id])
+
+  goodsReceiptItems GoodsReceiptItem[]
+
+  @@index([poId])
+  @@map("purchase_order_items")
+}
+
+model GoodsReceipt {
+  id           String             @id @default(uuid())
+  companyId    String
+  poId         String
+  grnNo        String             @unique
+  receiptDate  DateTime           @default(now())
+  status       GoodsReceiptStatus @default(DRAFT)
+  invoiceNo    String?
+  invoiceDate  DateTime?
+  receivedById String
+  approvedById String?
+  approvedAt   DateTime?
+  remarks      String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  deletedAt    DateTime?
+
+  company    Company       @relation(fields: [companyId], references: [id])
+  po         PurchaseOrder @relation(fields: [poId], references: [id])
+  receivedBy User          @relation(fields: [receivedById], references: [id])
+  approvedBy User?         @relation(fields: [approvedById], references: [id])
+
+  items GoodsReceiptItem[]
+
+  @@index([companyId])
+  @@index([poId])
+  @@map("goods_receipts")
+}
+
+enum GoodsReceiptStatus {
+  DRAFT
+  PENDING_INSPECTION
+  INSPECTED
+  APPROVED
+  REJECTED
+  PARTIAL
+}
+
+model GoodsReceiptItem {
+  id          String    @id @default(uuid())
+  grnId       String
+  poItemId    String
+  materialId  String
+  quantity    Decimal   @db.Decimal(15, 3)
+  acceptedQty Decimal   @db.Decimal(15, 3)
+  rejectedQty Decimal   @default(0) @db.Decimal(15, 3)
+  unitPrice   Decimal   @db.Decimal(15, 2)
+  totalPrice  Decimal   @db.Decimal(15, 2)
+  batchNo     String?
+  serialNo    String?
+  expiryDate  DateTime?
+  remarks     String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  grn      GoodsReceipt      @relation(fields: [grnId], references: [id])
+  poItem   PurchaseOrderItem @relation(fields: [poItemId], references: [id])
+  material Material          @relation(fields: [materialId], references: [id])
+
+  inventory   Inventory[]
+  inspections Inspection[]
+
+  @@index([grnId])
+  @@map("goods_receipt_items")
+}
+
+// ============================================================
+// 10. INVENTORY MODULE
+// ============================================================
+
+model Warehouse {
+  id        String    @id @default(uuid())
+  companyId String
+  code      String
+  name      String
+  location  String?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  racks              Rack[]
+  inventories        Inventory[]
+  stockTransfersFrom StockTransfer[] @relation("StockTransferFrom")
+  stockTransfersTo   StockTransfer[] @relation("StockTransferTo")
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@map("warehouses")
+}
+
+model Rack {
+  id          String    @id @default(uuid())
+  warehouseId String
+  code        String
+  name        String
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+
+  shelves Shelf[]
+
+  @@unique([warehouseId, code])
+  @@map("racks")
+}
+
+model Shelf {
+  id        String    @id @default(uuid())
+  rackId    String
+  code      String
+  name      String
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  rack Rack @relation(fields: [rackId], references: [id])
+
+  bins Bin[]
+
+  @@unique([rackId, code])
+  @@map("shelves")
+}
+
+model Bin {
+  id        String    @id @default(uuid())
+  shelfId   String
+  code      String
+  name      String
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  shelf Shelf @relation(fields: [shelfId], references: [id])
+
+  inventories Inventory[]
+
+  @@unique([shelfId, code])
+  @@map("bins")
+}
+
+model Inventory {
+  id                 String    @id @default(uuid())
+  companyId          String
+  materialId         String
+  warehouseId        String
+  binId              String?
+  batchNo            String?
+  serialNo           String?
+  barcode            String?
+  qrCode             String?
+  quantity           Decimal   @db.Decimal(15, 3)
+  reservedQty        Decimal   @default(0) @db.Decimal(15, 3)
+  damagedQty         Decimal   @default(0) @db.Decimal(15, 3)
+  scrapQty           Decimal   @default(0) @db.Decimal(15, 3)
+  transitQty         Decimal   @default(0) @db.Decimal(15, 3)
+  stockType          StockType @default(AVAILABLE)
+  unitPrice          Decimal   @db.Decimal(15, 2)
+  expiryDate         DateTime?
+  lastCountedAt      DateTime?
+  goodsReceiptItemId String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
+
+  company          Company           @relation(fields: [companyId], references: [id])
+  material         Material          @relation(fields: [materialId], references: [id])
+  warehouse        Warehouse         @relation(fields: [warehouseId], references: [id])
+  bin              Bin?              @relation(fields: [binId], references: [id])
+  goodsReceiptItem GoodsReceiptItem? @relation(fields: [goodsReceiptItemId], references: [id])
+
+  transactions   InventoryTransaction[]
+  stockTransfers StockTransfer[]
+
+  @@unique([materialId, warehouseId, batchNo, serialNo])
+  @@index([companyId])
+  @@index([materialId])
+  @@index([warehouseId])
+  @@map("inventories")
+}
+
+enum StockType {
+  AVAILABLE
+  RESERVED
+  DAMAGED
+  SCRAP
+  TRANSIT
+}
+
+model InventoryTransaction {
+  id              String          @id @default(uuid())
+  inventoryId     String
+  transactionType TransactionType
+  quantity        Decimal         @db.Decimal(15, 3)
+  referenceType   String // PURCHASE, SALES, TRANSFER, ADJUSTMENT, etc
+  referenceId     String
+  remarks         String?
+  createdById     String
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  inventory Inventory @relation(fields: [inventoryId], references: [id])
+  createdBy User      @relation(fields: [createdById], references: [id])
+
+  @@index([inventoryId])
+  @@index([referenceType, referenceId])
+  @@map("inventory_transactions")
+}
+
+enum TransactionType {
+  IN
+  OUT
+  ADJUSTMENT
+  TRANSFER_IN
+  TRANSFER_OUT
+  RESERVED
+  UNRESERVED
+}
+
+model StockTransfer {
+  id              String              @id @default(uuid())
+  companyId       String
+  transferNo      String              @unique
+  fromWarehouseId String
+  toWarehouseId   String
+  materialId      String
+  quantity        Decimal             @db.Decimal(15, 3)
+  batchNo         String?
+  serialNo        String?
+  status          StockTransferStatus @default(REQUESTED)
+  requestedById   String
+  approvedById    String?
+  approvedAt      DateTime?
+  completedById   String?
+  completedAt     DateTime?
+  remarks         String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  deletedAt       DateTime?
+
+  company       Company    @relation(fields: [companyId], references: [id])
+  fromWarehouse Warehouse  @relation("StockTransferFrom", fields: [fromWarehouseId], references: [id])
+  toWarehouse   Warehouse  @relation("StockTransferTo", fields: [toWarehouseId], references: [id])
+  material      Material   @relation(fields: [materialId], references: [id])
+  requestedBy   User       @relation(fields: [requestedById], references: [id])
+  approvedBy    User?      @relation(fields: [approvedById], references: [id])
+  completedBy   User?      @relation(fields: [completedById], references: [id])
+  inventory     Inventory? @relation(fields: [inventoryId], references: [id])
+  inventoryId   String?
+
+  @@index([companyId])
+  @@index([fromWarehouseId])
+  @@index([toWarehouseId])
+  @@map("stock_transfers")
+}
+
+enum StockTransferStatus {
+  REQUESTED
+  APPROVED
+  COMPLETED
+  CANCELLED
+}
+
+// ============================================================
+// 11. PRODUCTION MODULE
+// ============================================================
+
+model ProductionPlan {
+  id           String               @id @default(uuid())
+  companyId    String
+  planNo       String               @unique
+  name         String
+  description  String?
+  startDate    DateTime
+  endDate      DateTime?
+  status       ProductionPlanStatus @default(DRAFT)
+  createdById  String
+  approvedById String?
+  approvedAt   DateTime?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  deletedAt    DateTime?
+
+  company    Company @relation(fields: [companyId], references: [id])
+  createdBy  User    @relation(fields: [createdById], references: [id])
+  approvedBy User?   @relation(fields: [approvedById], references: [id])
+
+  workOrders WorkOrder[]
+
+  @@index([companyId])
+  @@index([status])
+  @@map("production_plans")
+}
+
+enum ProductionPlanStatus {
+  DRAFT
+  APPROVED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model WorkOrder {
+  id                   String          @id @default(uuid())
+  companyId            String
+  productionPlanId     String?
+  orderNo              String          @unique
+  salesOrderId         String?
+  productId            String
+  quantity             Decimal         @db.Decimal(15, 3)
+  startDate            DateTime
+  dueDate              DateTime?
+  status               WorkOrderStatus @default(DRAFT)
+  priority             Priority        @default(MEDIUM)
+  assignedToId         String?
+  machineId            String?
+  completionPercentage Decimal         @default(0) @db.Decimal(5, 2)
+  createdById          String
+  approvedById         String?
+  approvedAt           DateTime?
+  completedAt          DateTime?
+  remarks              String?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  deletedAt            DateTime?
+
+  company        Company         @relation(fields: [companyId], references: [id])
+  productionPlan ProductionPlan? @relation(fields: [productionPlanId], references: [id])
+  salesOrder     SalesOrder?     @relation(fields: [salesOrderId], references: [id])
+  product        Material        @relation(fields: [productId], references: [id])
+  assignedTo     User?           @relation(fields: [assignedToId], references: [id])
+  createdBy      User            @relation(fields: [createdById], references: [id])
+  approvedBy     User?           @relation(fields: [approvedById], references: [id])
+
+  items       WorkOrderItem[]
+  logs        ProductionLog[]
+  inspections Inspection[]
+
+  @@index([companyId])
+  @@index([status])
+  @@map("work_orders")
+}
+
+enum WorkOrderStatus {
+  DRAFT
+  APPROVED
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+model WorkOrderItem {
+  id          String    @id @default(uuid())
+  workOrderId String
+  materialId  String
+  requiredQty Decimal   @db.Decimal(15, 3)
+  consumedQty Decimal   @default(0) @db.Decimal(15, 3)
+  wasteQty    Decimal   @default(0) @db.Decimal(15, 3)
+  remarks     String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id])
+  material  Material  @relation(fields: [materialId], references: [id])
+
+  @@index([workOrderId])
+  @@map("work_order_items")
+}
+
+model ProductionLog {
+  id          String   @id @default(uuid())
+  workOrderId String
+  operatorId  String
+  machineId   String?
+  outputQty   Decimal  @db.Decimal(15, 3)
+  rejectedQty Decimal  @default(0) @db.Decimal(15, 3)
+  timeSpent   Int? // in minutes
+  remarks     String?
+  loggedAt    DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id])
+  operator  User      @relation(fields: [operatorId], references: [id])
+
+  @@index([workOrderId])
+  @@map("production_logs")
+}
+
+// ============================================================
+// 12. QUALITY CONTROL MODULE
+// ============================================================
+
+model Inspection {
+  id                 String           @id @default(uuid())
+  companyId          String
+  inspectionNo       String           @unique
+  inspectionType     InspectionType
+  goodsReceiptItemId String?
+  workOrderId        String?
+  productId          String
+  quantity           Decimal          @db.Decimal(15, 3)
+  inspectedQty       Decimal          @db.Decimal(15, 3)
+  acceptedQty        Decimal          @db.Decimal(15, 3)
+  rejectedQty        Decimal          @db.Decimal(15, 3)
+  status             InspectionStatus @default(PENDING)
+  checklistId        String?
+  inspectedById      String
+  approvedById       String?
+  approvedAt         DateTime?
+  remarks            String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  deletedAt          DateTime?
+
+  company          Company              @relation(fields: [companyId], references: [id])
+  goodsReceiptItem GoodsReceiptItem?    @relation(fields: [goodsReceiptItemId], references: [id])
+  workOrder        WorkOrder?           @relation(fields: [workOrderId], references: [id])
+  product          Material             @relation(fields: [productId], references: [id])
+  checklist        InspectionChecklist? @relation(fields: [checklistId], references: [id])
+  inspectedBy      User                 @relation(fields: [inspectedById], references: [id])
+  approvedBy       User?                @relation(fields: [approvedById], references: [id])
+
+  results InspectionResult[]
+  defects Defect[]
+  reworks Rework[]
+
+  @@index([companyId])
+  @@index([inspectionType])
+  @@index([status])
+  @@map("inspections")
+}
+
+enum InspectionType {
+  INCOMING
+  PRODUCTION
+  FINAL
+}
+
+enum InspectionStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  APPROVED
+  REJECTED
+}
+
+model InspectionChecklist {
+  id             String         @id @default(uuid())
+  companyId      String
+  name           String
+  description    String?
+  inspectionType InspectionType
+  isActive       Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  deletedAt      DateTime?
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  inspections Inspection[]
+
+  @@index([companyId])
+  @@map("inspection_checklists")
+}
+
+model InspectionResult {
+  id           String   @id @default(uuid())
+  inspectionId String
+  parameter    String
+  value        String?
+  expected     String?
+  isPass       Boolean
+  remarks      String?
+  createdAt    DateTime @default(now())
+
+  inspection Inspection @relation(fields: [inspectionId], references: [id])
+
+  @@index([inspectionId])
+  @@map("inspection_results")
+}
+
+model Defect {
+  id           String         @id @default(uuid())
+  inspectionId String
+  defectType   String
+  description  String
+  quantity     Decimal        @db.Decimal(15, 3)
+  severity     DefectSeverity @default(MINOR)
+  remarks      String?
+  createdAt    DateTime       @default(now())
+
+  inspection Inspection @relation(fields: [inspectionId], references: [id])
+
+  @@index([inspectionId])
+  @@map("defects")
+}
+
+enum DefectSeverity {
+  MINOR
+  MAJOR
+  CRITICAL
+}
+
+model Rework {
+  id           String       @id @default(uuid())
+  inspectionId String
+  description  String
+  quantity     Decimal      @db.Decimal(15, 3)
+  reworkType   String
+  assignedToId String
+  status       ReworkStatus @default(PENDING)
+  completedAt  DateTime?
+  remarks      String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  deletedAt    DateTime?
+
+  inspection Inspection @relation(fields: [inspectionId], references: [id])
+  assignedTo User       @relation(fields: [assignedToId], references: [id])
+
+  @@index([inspectionId])
+  @@map("reworks")
+}
+
+enum ReworkStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  REJECTED
+}
+
+// ============================================================
+// 13. DISPATCH MODULE
+// ============================================================
+
+model Dispatch {
+  id            String         @id @default(uuid())
+  companyId     String
+  dispatchNo    String         @unique
+  salesOrderId  String
+  vehicleId     String?
+  driverName    String?
+  driverPhone   String?
+  lrNumber      String? // LR - Lorry Receipt
+  ewayBillNo    String?
+  dispatchDate  DateTime       @default(now())
+  deliveredDate DateTime?
+  status        DispatchStatus @default(PENDING)
+  deliveryProof String? // URL to delivery proof document
+  remarks       String?
+  createdById   String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  deletedAt     DateTime?
+
+  company    Company    @relation(fields: [companyId], references: [id])
+  salesOrder SalesOrder @relation(fields: [salesOrderId], references: [id])
+  vehicle    Vehicle?   @relation(fields: [vehicleId], references: [id])
+  createdBy  User       @relation(fields: [createdById], references: [id])
+
+  items          DispatchItem[]
+  deliveryProofs DeliveryProof[]
+
+  @@index([companyId])
+  @@index([status])
+  @@map("dispatches")
+}
+
+enum DispatchStatus {
+  PENDING
+  DISPATCHED
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+model DispatchItem {
+  id               String    @id @default(uuid())
+  dispatchId       String
+  salesOrderItemId String
+  quantity         Decimal   @db.Decimal(15, 3)
+  batchNo          String?
+  serialNo         String?
+  remarks          String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+
+  dispatch       Dispatch       @relation(fields: [dispatchId], references: [id])
+  salesOrderItem SalesOrderItem @relation(fields: [salesOrderItemId], references: [id])
+
+  @@index([dispatchId])
+  @@map("dispatch_items")
+}
+
+model Vehicle {
+  id        String    @id @default(uuid())
+  companyId String
+  vehicleNo String    @unique
+  type      String // TRUCK, VAN, etc
+  capacity  Decimal?  @db.Decimal(10, 2)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  dispatches Dispatch[]
+
+  @@index([companyId])
+  @@map("vehicles")
+}
+
+model DeliveryProof {
+  id           String   @id @default(uuid())
+  dispatchId   String
+  fileName     String
+  fileUrl      String
+  fileSize     Int?
+  mimeType     String?
+  uploadedById String
+  createdAt    DateTime @default(now())
+
+  dispatch   Dispatch @relation(fields: [dispatchId], references: [id])
+  uploadedBy User     @relation(fields: [uploadedById], references: [id])
+
+  @@index([dispatchId])
+  @@map("delivery_proofs")
+}
+
+// ============================================================
+// 14. FINANCE MODULE
+// ============================================================
+
+model Invoice {
+  id              String        @id @default(uuid())
+  companyId       String
+  invoiceNo       String        @unique
+  invoiceType     InvoiceType   @default(SALES)
+  salesOrderId    String?
+  purchaseOrderId String?
+  customerId      String?
+  vendorId        String?
+  invoiceDate     DateTime      @default(now())
+  dueDate         DateTime?
+  subtotal        Decimal       @db.Decimal(15, 2)
+  tax             Decimal       @db.Decimal(15, 2)
+  discount        Decimal       @default(0) @db.Decimal(15, 2)
+  total           Decimal       @db.Decimal(15, 2)
+  paidAmount      Decimal       @default(0) @db.Decimal(15, 2)
+  outstanding     Decimal       @db.Decimal(15, 2)
+  currency        String        @default("INR")
+  status          InvoiceStatus @default(DRAFT)
+  gstAmount       Decimal?      @db.Decimal(15, 2)
+  tdsAmount       Decimal?      @db.Decimal(15, 2)
+  createdById     String
+  approvedById    String?
+  approvedAt      DateTime?
+  remarks         String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  deletedAt       DateTime?
+
+  company       Company        @relation(fields: [companyId], references: [id])
+  salesOrder    SalesOrder?    @relation(fields: [salesOrderId], references: [id])
+  purchaseOrder PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
+  customer      Customer?      @relation(fields: [customerId], references: [id])
+  vendor        Customer?      @relation("VendorInvoices", fields: [vendorId], references: [id])
+  createdBy     User           @relation(fields: [createdById], references: [id])
+  approvedBy    User?          @relation(fields: [approvedById], references: [id])
+
+  items         InvoiceItem[]
+  payments      Payment[]
+  creditNotes   CreditNote[]
+  debitNotes    DebitNote[]
+  ledgerEntries LedgerEntry[]
+
+  @@index([companyId])
+  @@index([status])
+  @@index([invoiceNo])
+  @@map("invoices")
+}
+
+enum InvoiceType {
+  SALES
+  PURCHASE
+  CREDIT_NOTE
+  DEBIT_NOTE
+}
+
+enum InvoiceStatus {
+  DRAFT
+  APPROVED
+  SENT
+  PARTIAL_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+model InvoiceItem {
+  id          String    @id @default(uuid())
+  invoiceId   String
+  description String
+  quantity    Decimal   @db.Decimal(15, 3)
+  unitPrice   Decimal   @db.Decimal(15, 2)
+  totalPrice  Decimal   @db.Decimal(15, 2)
+  taxRate     Decimal?  @db.Decimal(5, 2)
+  taxAmount   Decimal?  @db.Decimal(15, 2)
+  remarks     String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  @@index([invoiceId])
+  @@map("invoice_items")
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  companyId     String
+  paymentNo     String        @unique
+  invoiceId     String
+  amount        Decimal       @db.Decimal(15, 2)
+  paymentDate   DateTime      @default(now())
+  paymentMethod PaymentMethod @default(CASH)
+  referenceNo   String?
+  remarks       String?
+  receivedById  String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  deletedAt     DateTime?
+
+  company    Company @relation(fields: [companyId], references: [id])
+  invoice    Invoice @relation(fields: [invoiceId], references: [id])
+  receivedBy User    @relation(fields: [receivedById], references: [id])
+
+  @@index([companyId])
+  @@index([invoiceId])
+  @@map("payments")
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CHEQUE
+  DD
+  CREDIT_CARD
+  DEBIT_CARD
+  UPI
+  NEFT
+  RTGS
+  IMPS
+}
+
+model CreditNote {
+  id           String    @id @default(uuid())
+  companyId    String
+  creditNoteNo String    @unique
+  invoiceId    String
+  amount       Decimal   @db.Decimal(15, 2)
+  reason       String
+  createdById  String
+  approvedById String?
+  approvedAt   DateTime?
+  remarks      String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  company    Company @relation(fields: [companyId], references: [id])
+  invoice    Invoice @relation(fields: [invoiceId], references: [id])
+  createdBy  User    @relation(fields: [createdById], references: [id])
+  approvedBy User?   @relation(fields: [approvedById], references: [id])
+
+  @@index([companyId])
+  @@index([invoiceId])
+  @@map("credit_notes")
+}
+
+model DebitNote {
+  id           String    @id @default(uuid())
+  companyId    String
+  debitNoteNo  String    @unique
+  invoiceId    String
+  amount       Decimal   @db.Decimal(15, 2)
+  reason       String
+  createdById  String
+  approvedById String?
+  approvedAt   DateTime?
+  remarks      String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  company    Company @relation(fields: [companyId], references: [id])
+  invoice    Invoice @relation(fields: [invoiceId], references: [id])
+  createdBy  User    @relation(fields: [createdById], references: [id])
+  approvedBy User?   @relation(fields: [approvedById], references: [id])
+
+  @@index([companyId])
+  @@index([invoiceId])
+  @@map("debit_notes")
+}
+
+model Expense {
+  id           String    @id @default(uuid())
+  companyId    String
+  expenseNo    String    @unique
+  category     String
+  amount       Decimal   @db.Decimal(15, 2)
+  expenseDate  DateTime  @default(now())
+  description  String
+  referenceNo  String?
+  approvedById String?
+  approvedAt   DateTime?
+  createdById  String
+  remarks      String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  company    Company @relation(fields: [companyId], references: [id])
+  approvedBy User?   @relation(fields: [approvedById], references: [id])
+  createdBy  User    @relation(fields: [createdById], references: [id])
+
+  ledgerEntries LedgerEntry[]
+
+  @@index([companyId])
+  @@index([category])
+  @@map("expenses")
+}
+
+model LedgerEntry {
+  id            String    @id @default(uuid())
+  companyId     String
+  entryNo       String    @unique
+  account       String
+  debit         Decimal?  @db.Decimal(15, 2)
+  credit        Decimal?  @db.Decimal(15, 2)
+  balance       Decimal?  @db.Decimal(15, 2)
+  entryDate     DateTime  @default(now())
+  description   String
+  referenceType String? // INVOICE, PAYMENT, EXPENSE, etc
+  referenceId   String?
+  createdById   String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  company   Company  @relation(fields: [companyId], references: [id])
+  invoice   Invoice? @relation(fields: [referenceId], references: [id])
+  expense   Expense? @relation(fields: [referenceId], references: [id])
+  createdBy User     @relation(fields: [createdById], references: [id])
+
+  @@index([companyId])
+  @@index([account])
+  @@index([entryDate])
+  @@map("ledger_entries")
+}
+
+// ============================================================
+// 15. REPORTING MODULE
+// ============================================================
+
+model ReportDefinition {
+  id           String    @id @default(uuid())
+  companyId    String
+  name         String
+  description  String?
+  reportType   String // SALES, PURCHASE, INVENTORY, FINANCE, etc
+  query        String // SQL query or report definition
+  parameters   Json? // Report parameters schema
+  outputFormat String // PDF, EXCEL, CSV, etc
+  isSystem     Boolean   @default(false)
+  isActive     Boolean   @default(true)
+  createdById  String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  company   Company @relation(fields: [companyId], references: [id])
+  createdBy User    @relation(fields: [createdById], references: [id])
+
+  schedules ReportSchedule[]
+  widgets   DashboardWidget[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@map("report_definitions")
+}
+
+model ReportSchedule {
+  id          String            @id @default(uuid())
+  companyId   String
+  reportId    String
+  name        String
+  frequency   ScheduleFrequency
+  dayOfWeek   Int? // 1-7 for weekly
+  dayOfMonth  Int? // 1-31 for monthly
+  time        String // HH:mm format
+  recipients  String[] // Email addresses
+  formats     String[] // Output formats
+  isActive    Boolean           @default(true)
+  lastRunAt   DateTime?
+  nextRunAt   DateTime?
+  createdById String
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  deletedAt   DateTime?
+
+  company   Company          @relation(fields: [companyId], references: [id])
+  report    ReportDefinition @relation(fields: [reportId], references: [id])
+  createdBy User             @relation(fields: [createdById], references: [id])
+
+  @@index([companyId])
+  @@index([reportId])
+  @@map("report_schedules")
+}
+
+enum ScheduleFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+  CUSTOM
+}
+
+model DashboardWidget {
+  id            String    @id @default(uuid())
+  companyId     String
+  reportId      String
+  name          String
+  widgetType    String // CHART, TABLE, KPI, METRIC
+  configuration Json // Chart config, filters, etc
+  position      Int // Order on dashboard
+  isActive      Boolean   @default(true)
+  createdById   String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  company   Company          @relation(fields: [companyId], references: [id])
+  report    ReportDefinition @relation(fields: [reportId], references: [id])
+  createdBy User             @relation(fields: [createdById], references: [id])
+
+  @@index([companyId])
+  @@map("dashboard_widgets")
+}
+
+// ============================================================
+// ENUMS USED ACROSS MODULES
+// ============================================================
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
 }
