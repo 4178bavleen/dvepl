@@ -2,7 +2,7 @@ import { z } from "zod";
 import { EmployeeStatus } from "@prisma/client";
 
 export const createEmployeeSchema = z.object({
-    companyId: z.string().uuid("Invalid company id"),
+    
 
     branchId: z.string().uuid().optional().nullable(),
 
