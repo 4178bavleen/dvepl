@@ -1,17 +1,3 @@
-<<<<<<< HEAD:dashboard/src/configs/hrms.config.tsx
-import { ColumnDef } from '@tanstack/react-table';
-import * as z from 'zod';
-import { ExternalLink } from 'lucide-react';
-import { sortableHeader } from '@/components/tables/GenericTable';
-import { hrmsApi } from '@/services/modules';
-import { organizationApi } from '@/services/organization';
-import { 
-  Employee, 
-  Attendance, 
-  Leave, 
-  Salary 
-} from '@/types/erp';
-=======
 import { ColumnDef } from "@tanstack/react-table";
 import * as z from "zod";
 import { sortableHeader } from "@/components/tables/GenericTable";
@@ -19,26 +5,12 @@ import { hrmsApi } from "@/services/modules";
 import { organizationApi } from "@/services/organization";
 import { EmployeeStatus } from "@/types/erp";
 import { Employee, Attendance, Leave, Salary } from "@/types/erp";
->>>>>>> ff5e4d8 (employeeCrud_fix):dashboard/src/constants/configs/hrms.config.tsx
 
 // ==========================================
 // 7. EMPLOYEES ROUTE CONFIG
 // ==========================================
 export const employeesConfig = {
   api: hrmsApi.employees,
-<<<<<<< HEAD:dashboard/src/configs/hrms.config.tsx
-  selectOptions: { 
-    branchId: organizationApi.branches.list, 
-    departmentId: organizationApi.departments.list, 
-    designationId: organizationApi.designations.list,
-    teamId: organizationApi.teams.list,
-    reportsToId: hrmsApi.employees.list,
-  },
-  tableName: 'employees',
-  moduleName: 'Employee',
-  pluralName: 'Employees',
-  searchPlaceholder: 'Search by name or code...',
-=======
   selectOptions: {
     branchId: organizationApi.branches.list,
     departmentId: organizationApi.departments.list,
@@ -48,7 +20,6 @@ export const employeesConfig = {
   moduleName: "Employee",
   pluralName: "Employees",
   searchPlaceholder: "Search by name or code...",
->>>>>>> ff5e4d8 (employeeCrud_fix):dashboard/src/constants/configs/hrms.config.tsx
   zodSchema: z.object({
     employeeCode: z
       .string()
@@ -61,13 +32,6 @@ export const employeesConfig = {
     departmentId: z.string().optional().nullable(),
     teamId: z.string().optional().nullable(),
     designationId: z.string().optional().nullable(),
-<<<<<<< HEAD:dashboard/src/configs/hrms.config.tsx
-    reportsToId: z.string().optional().nullable(),
-    status: z.string().default('ACTIVE')
-  }),
-  defaultFormValues: { employeeCode: '', firstName: '', lastName: '', gender: 'MALE', branchId: 'branch-1', departmentId: 'dept-1', teamId: '', designationId: 'desg-4', reportsToId: '', status: 'ACTIVE' },
-  breadcrumbs: [{ label: 'Dashboard', href: '/' }, { label: 'Employees' }],
-=======
     status: z.nativeEnum(EmployeeStatus).default(EmployeeStatus.ACTIVE),
   }),
   defaultFormValues: {
@@ -81,7 +45,6 @@ export const employeesConfig = {
     status: "ACTIVE",
   },
   breadcrumbs: [{ label: "Dashboard", href: "/" }, { label: "Employees" }],
->>>>>>> ff5e4d8 (employeeCrud_fix):dashboard/src/constants/configs/hrms.config.tsx
   columns: [
     { accessorKey: "employeeCode", header: sortableHeader("Emp Code") },
     {
@@ -133,40 +96,6 @@ export const employeesConfig = {
     },
   ] as ColumnDef<Employee>[],
   fields: [
-<<<<<<< HEAD:dashboard/src/configs/hrms.config.tsx
-    { name: 'employeeCode', label: 'Employee Code', type: 'text', placeholder: 'EMP-004', required: true },
-    { name: 'firstName', label: 'First Name', type: 'text', placeholder: 'John', required: true },
-    { name: 'lastName', label: 'Last Name', type: 'text', placeholder: 'Doe', required: true },
-    { name: 'gender', label: 'Gender', type: 'select', options: [
-      { label: 'Male', value: 'MALE' },
-      { label: 'Female', value: 'FEMALE' },
-      { label: 'Other', value: 'OTHER' }
-    ] },
-    { name: 'branchId', label: 'Work Branch', type: 'select', options: [
-      { label: 'Mumbai HQ', value: 'branch-1' },
-      { label: 'Pune Plant', value: 'branch-2' },
-      { label: 'Delhi Office', value: 'branch-3' }
-    ] },
-    { name: 'departmentId', label: 'Department', type: 'select', options: [
-      { label: 'Sales & Marketing', value: 'dept-1' },
-      { label: 'Human Resources', value: 'dept-2' },
-      { label: 'Finance & Accounts', value: 'dept-3' }
-    ] },
-    { name: 'teamId', label: 'Work Team', type: 'select' },
-    { name: 'designationId', label: 'Designation', type: 'select', options: [
-      { label: 'Managing Director', value: 'desg-1' },
-      { label: 'Operations Manager', value: 'desg-2' },
-      { label: 'HR Manager', value: 'desg-3' },
-      { label: 'Senior Proposal Engineer', value: 'desg-4' }
-    ] },
-    { name: 'reportsToId', label: 'Reports To (Supervisor)', type: 'select' },
-    { name: 'status', label: 'Status', type: 'select', options: [
-      { label: 'Active', value: 'ACTIVE' },
-      { label: 'On Leave', value: 'ON_LEAVE' },
-      { label: 'Suspended', value: 'SUSPENDED' },
-      { label: 'Resigned', value: 'RESIGNED' }
-    ] }
-=======
     {
       name: "employeeCode",
       label: "Employee Code",
@@ -240,7 +169,6 @@ export const employeesConfig = {
         { label: "Resigned", value: "RESIGNED" },
       ],
     },
->>>>>>> ff5e4d8 (employeeCrud_fix):dashboard/src/constants/configs/hrms.config.tsx
   ] as any[],
   statsCards: (data: Employee[]) => [
     { label: "Total Employees", value: data.length },
@@ -296,15 +224,25 @@ export const attendanceConfig = {
     },
     {
       accessorKey: "checkIn",
-      header: "Check In Time",
+      header: "Check In",
       cell: ({ getValue }) =>
-        getValue() ? new Date(getValue() as string).toLocaleTimeString() : "—",
+        getValue()
+          ? new Date(getValue() as string).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "—",
     },
     {
       accessorKey: "checkOut",
-      header: "Check Out Time",
+      header: "Check Out",
       cell: ({ getValue }) =>
-        getValue() ? new Date(getValue() as string).toLocaleTimeString() : "—",
+        getValue()
+          ? new Date(getValue() as string).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "—",
     },
     {
       accessorKey: "status",
@@ -342,7 +280,22 @@ export const attendanceConfig = {
       ],
       required: true,
     },
-    { name: "date", label: "Attendance Date", type: "date", required: true },
+    {
+      name: "date",
+      label: "Attendance Date",
+      type: "date",
+      required: true,
+    },
+    {
+      name: "checkIn",
+      label: "Check In Time",
+      type: "datetime-local",
+    },
+    {
+      name: "checkOut",
+      label: "Check Out Time",
+      type: "datetime-local",
+    },
     {
       name: "status",
       label: "Attendance Status",
