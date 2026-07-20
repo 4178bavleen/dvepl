@@ -224,15 +224,25 @@ export const attendanceConfig = {
     },
     {
       accessorKey: "checkIn",
-      header: "Check In Time",
+      header: "Check In",
       cell: ({ getValue }) =>
-        getValue() ? new Date(getValue() as string).toLocaleTimeString() : "—",
+        getValue()
+          ? new Date(getValue() as string).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "—",
     },
     {
       accessorKey: "checkOut",
-      header: "Check Out Time",
+      header: "Check Out",
       cell: ({ getValue }) =>
-        getValue() ? new Date(getValue() as string).toLocaleTimeString() : "—",
+        getValue()
+          ? new Date(getValue() as string).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "—",
     },
     {
       accessorKey: "status",
@@ -268,7 +278,22 @@ export const attendanceConfig = {
       ],
       required: true,
     },
-    { name: "date", label: "Attendance Date", type: "date", required: true },
+    {
+      name: "date",
+      label: "Attendance Date",
+      type: "date",
+      required: true,
+    },
+    {
+      name: "checkIn",
+      label: "Check In Time",
+      type: "datetime-local",
+    },
+    {
+      name: "checkOut",
+      label: "Check Out Time",
+      type: "datetime-local",
+    },
     {
       name: "status",
       label: "Attendance Status",
