@@ -1,6 +1,7 @@
+import "dotenv/config";
 import { prisma } from "../../src/lib/prisma";
 
-import { seedOrganization } from "./Organization";
+import { seedOrganization } from "./organization";
 import { seedAuth } from "./auth";
 import { seedPermissions } from "./auth/permission.seed";
 import { seedHrms } from "./hrms";

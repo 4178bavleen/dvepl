@@ -31,6 +31,7 @@ type FieldType =
   | "text"
   | "number"
   | "date"
+  | "datetime-local"
   | "textarea"
   | "select"
   | "checkbox";
@@ -147,10 +148,17 @@ export function GenericCrudPage<TRecord extends { id: string }>({
         console.log("FIELD:", field);
         console.log("RAW ITEMS:", items);
 
-        const options = items.map((item) => ({
-          value: item.id,
-          label: item.name ?? item.title ?? item.code ?? item.id,
-        }));
+      const options = items.map((item: any) => ({
+  value: item.id,
+  label:
+    item.name ??
+    item.title ??
+    (item.firstName && item.lastName
+      ? `${item.firstName} ${item.lastName} (${item.employeeCode})`
+      : item.employeeCode ??
+        item.code ??
+        item.id),
+}));
 
         console.log("OPTIONS:", options);
 
@@ -158,13 +166,20 @@ export function GenericCrudPage<TRecord extends { id: string }>({
           ...current,
           [field]: options,
         }));
-        setOptionValues((current) => ({
-          ...current,
-          [field]: items.map((item) => ({
-            value: item.id,
-            label: item.name ?? item.title ?? item.code ?? item.id,
-          })),
-        }));
+    setOptionValues((current) => ({
+  ...current,
+  [field]: items.map((item: any) => ({
+    value: item.id,
+    label:
+      item.name ??
+      item.title ??
+      (item.firstName && item.lastName
+        ? `${item.firstName} ${item.lastName} (${item.employeeCode})`
+        : item.employeeCode ??
+          item.code ??
+          item.id),
+  })),
+}));
       }),
     ).catch(() => toast.error("Unable to load form options."));
   }, [selectOptions]);
