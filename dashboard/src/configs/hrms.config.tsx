@@ -5,6 +5,7 @@ import { hrmsApi } from "@/services/modules";
 import { organizationApi } from "@/services/organization";
 import { EmployeeStatus } from "@/types/erp";
 import { Employee, Attendance, Leave, Salary } from "@/types/erp";
+import { ExternalLink } from "lucide-react";
 
 // ==========================================
 // 7. EMPLOYEES ROUTE CONFIG
@@ -223,25 +224,15 @@ export const attendanceConfig = {
     },
     {
       accessorKey: "checkIn",
-      header: "Check In",
+      header: "Check In Time",
       cell: ({ getValue }) =>
-        getValue()
-          ? new Date(getValue() as string).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })
-          : "—",
+        getValue() ? new Date(getValue() as string).toLocaleTimeString() : "—",
     },
     {
       accessorKey: "checkOut",
-      header: "Check Out",
+      header: "Check Out Time",
       cell: ({ getValue }) =>
-        getValue()
-          ? new Date(getValue() as string).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })
-          : "—",
+        getValue() ? new Date(getValue() as string).toLocaleTimeString() : "—",
     },
     {
       accessorKey: "status",
@@ -277,22 +268,7 @@ export const attendanceConfig = {
       ],
       required: true,
     },
-    {
-      name: "date",
-      label: "Attendance Date",
-      type: "date",
-      required: true,
-    },
-    {
-      name: "checkIn",
-      label: "Check In Time",
-      type: "datetime-local",
-    },
-    {
-      name: "checkOut",
-      label: "Check Out Time",
-      type: "datetime-local",
-    },
+    { name: "date", label: "Attendance Date", type: "date", required: true },
     {
       name: "status",
       label: "Attendance Status",
