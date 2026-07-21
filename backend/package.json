@@ -16,7 +16,7 @@
     "db:status": "prisma migrate status",
     "db:generate": "prisma generate",
     "prisma:studio": "prisma studio",
-    "build": "tsc",
+    "build": "prisma generate && tsc",
     "production": "pm2 start dist/bin/www.js --name ts-backend-framework"
   },
   "dependencies": {
