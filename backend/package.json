@@ -8,6 +8,9 @@
   "main": "app.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only ./src/bin/www",
+    "build": "prisma generate && tsc",
+    "start": "node dist/bin/www.js",
+    "production": "pm2 start dist/bin/www.js --name ts-backend-framework",
     "db:seed": "ts-node ./prisma/seed/index.ts",
     "db:format": "prisma format",
     "db:migrate": "prisma migrate dev",
@@ -15,9 +18,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:status": "prisma migrate status",
     "db:generate": "prisma generate",
-    "prisma:studio": "prisma studio",
-    "build": "prisma generate && tsc",
-    "production": "pm2 start dist/bin/www.js --name ts-backend-framework"
+    "prisma:studio": "prisma studio"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",
