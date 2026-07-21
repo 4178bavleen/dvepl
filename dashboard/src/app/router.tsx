@@ -1,6 +1,6 @@
 import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { ProtectedRoute } from '@/app/routes/protected';
+import { ProtectedRoute } from './routes/protected';
 import { PublicRoute } from '@/app/routes/public';
 import { UiConfigProvider } from '@/contexts/ui/UiConfigContext';
 import NotFound from '@/pages/NotFound';

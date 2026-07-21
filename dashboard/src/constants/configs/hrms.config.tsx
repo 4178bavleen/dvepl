@@ -14,6 +14,7 @@ export const employeesConfig = {
   selectOptions: {
     branchId: organizationApi.branches.list,
     departmentId: organizationApi.departments.list,
+    teamId: organizationApi.teams.list,
     designationId: organizationApi.designations.list,
   },
   tableName: "employees",
@@ -21,26 +22,38 @@ export const employeesConfig = {
   pluralName: "Employees",
   searchPlaceholder: "Search by name or code...",
   zodSchema: z.object({
-    employeeCode: z
-      .string()
-      .min(2, "Employee Code must be at least 2 characters"),
-    firstName: z.string().min(2, "First Name must be at least 2 characters"),
-    lastName: z.string().min(1, "Last Name is required"),
+    employeeCode: z.string().min(2),
+    firstName: z.string().min(2),
+    lastName: z.string().min(1),
+
     gender: z.string().optional().nullable(),
+
     branchId: z.string().optional().nullable(),
     departmentId: z.string().optional().nullable(),
+    teamId: z.string().optional().nullable(),
     designationId: z.string().optional().nullable(),
+
+    dateOfBirth: z.string().optional().nullable(),
+    dateOfJoining: z.string().optional().nullable(),
+
     status: z.nativeEnum(EmployeeStatus).default(EmployeeStatus.ACTIVE),
   }),
   defaultFormValues: {
     employeeCode: "",
     firstName: "",
     lastName: "",
+
     gender: "MALE",
+
     branchId: "",
     departmentId: "",
+    teamId: "",
     designationId: "",
-    status: "ACTIVE",
+
+    dateOfBirth: "",
+    dateOfJoining: "",
+
+    status: EmployeeStatus.ACTIVE,
   },
   breadcrumbs: [{ label: "Dashboard", href: "/" }, { label: "Employees" }],
   columns: [
@@ -98,21 +111,18 @@ export const employeesConfig = {
       name: "employeeCode",
       label: "Employee Code",
       type: "text",
-      placeholder: "EMP-004",
       required: true,
     },
     {
       name: "firstName",
       label: "First Name",
       type: "text",
-      placeholder: "John",
       required: true,
     },
     {
       name: "lastName",
       label: "Last Name",
       type: "text",
-      placeholder: "Doe",
       required: true,
     },
     {
@@ -126,35 +136,44 @@ export const employeesConfig = {
       ],
     },
     {
+      name: "dateOfBirth",
+      label: "Date of Birth",
+      type: "date",
+    },
+    {
+      name: "dateOfJoining",
+      label: "Date of Joining",
+      type: "date",
+    },
+    {
       name: "branchId",
-      label: "Work Branch",
+      label: "Branch",
       type: "select",
-      options: [
-        { label: "Mumbai HQ", value: "branch-1" },
-        { label: "Pune Plant", value: "branch-2" },
-        { label: "Delhi Office", value: "branch-3" },
-      ],
     },
     {
       name: "departmentId",
       label: "Department",
       type: "select",
-      options: [
-        { label: "Sales & Marketing", value: "dept-1" },
-        { label: "Human Resources", value: "dept-2" },
-        { label: "Finance & Accounts", value: "dept-3" },
-      ],
+    },
+    {
+      name: "teamId",
+      label: "Team",
+      type: "select",
     },
     {
       name: "designationId",
       label: "Designation",
       type: "select",
-      options: [
-        { label: "Managing Director", value: "desg-1" },
-        { label: "Operations Manager", value: "desg-2" },
-        { label: "HR Manager", value: "desg-3" },
-        { label: "Senior Proposal Engineer", value: "desg-4" },
-      ],
+    },
+    {
+      name: "checkIn",
+      label: "Check In Time",
+      type: "datetime-local",
+    },
+    {
+      name: "checkOut",
+      label: "Check Out Time",
+      type: "datetime-local",
     },
     {
       name: "status",
@@ -187,64 +206,94 @@ export const employeesConfig = {
 // ==========================================
 export const attendanceConfig = {
   api: hrmsApi.attendance,
-  selectOptions: { employeeId: hrmsApi.employees.list },
+
+  selectOptions: {
+    employeeId: hrmsApi.employees.list,
+  },
+
   tableName: "attendances",
   moduleName: "Attendance Log",
   pluralName: "Attendance",
+
   zodSchema: z.object({
     employeeId: z.string().min(1, "Select an employee"),
-    date: z.string().min(2, "Select a date"),
+    date: z.string().min(1, "Select a date"),
+    checkIn: z.string().optional().nullable(),
+    checkOut: z.string().optional().nullable(),
     status: z.string().default("PRESENT"),
     remarks: z.string().optional().nullable(),
   }),
+
   defaultFormValues: {
-    employeeId: "emp-1",
+    employeeId: "",
     date: new Date().toISOString().split("T")[0],
+    checkIn: "",
+    checkOut: "",
     status: "PRESENT",
-    remarks: "On time",
+    remarks: "",
   },
+
   breadcrumbs: [
     { label: "Dashboard", href: "/" },
     { label: "Attendance Logs" },
   ],
+
   columns: [
-    { accessorKey: "date", header: sortableHeader("Date") },
     {
-      accessorKey: "employeeId",
-      header: "Employee Code",
-      cell: ({ getValue }) => {
-        const id = getValue();
-        if (id === "emp-1") return "Gabriel Dhillon (EMP-001)";
-        if (id === "emp-2") return "Rajesh Kumar (EMP-002)";
-        if (id === "emp-3") return "Priya Sharma (EMP-003)";
-        return String(id);
+      accessorKey: "date",
+      header: sortableHeader("Date"),
+      cell: ({ getValue }) =>
+        getValue()
+          ? new Date(getValue() as string).toLocaleDateString()
+          : "—",
+    },
+    {
+      id: "employee",
+      header: "Employee",
+      cell: ({ row }) => {
+        const employee = row.original.employee;
+
+        if (!employee) return "-";
+
+        return `${employee.firstName} ${employee.lastName} (${employee.employeeCode})`;
       },
     },
     {
       accessorKey: "checkIn",
-      header: "Check In Time",
+      header: "Check In",
       cell: ({ getValue }) =>
-        getValue() ? new Date(getValue() as string).toLocaleTimeString() : "—",
+        getValue()
+          ? new Date(getValue() as string).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "—",
     },
     {
       accessorKey: "checkOut",
-      header: "Check Out Time",
+      header: "Check Out",
       cell: ({ getValue }) =>
-        getValue() ? new Date(getValue() as string).toLocaleTimeString() : "—",
+        getValue()
+          ? new Date(getValue() as string).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : "—",
     },
     {
       accessorKey: "status",
       header: "Attendance Status",
       cell: ({ getValue }) => {
         const val = getValue() as string;
+
         return (
           <span
             className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
               val === "PRESENT"
                 ? "bg-success/15 text-success"
                 : val === "ON_LEAVE"
-                  ? "bg-warning/15 text-warning"
-                  : "bg-destructive/15 text-destructive"
+                ? "bg-warning/15 text-warning"
+                : "bg-destructive/15 text-destructive"
             }`}
           >
             {val}
@@ -252,21 +301,35 @@ export const attendanceConfig = {
         );
       },
     },
-    { accessorKey: "remarks", header: "Remarks" },
+    {
+      accessorKey: "remarks",
+      header: "Remarks",
+    },
   ] as ColumnDef<Attendance>[],
+
   fields: [
     {
       name: "employeeId",
-      label: "Select Employee",
+      label: "Employee",
       type: "select",
-      options: [
-        { label: "Gabriel Dhillon (EMP-001)", value: "emp-1" },
-        { label: "Rajesh Kumar (EMP-002)", value: "emp-2" },
-        { label: "Priya Sharma (EMP-003)", value: "emp-3" },
-      ],
       required: true,
     },
-    { name: "date", label: "Attendance Date", type: "date", required: true },
+    {
+      name: "date",
+      label: "Attendance Date",
+      type: "date",
+      required: true,
+    },
+    {
+      name: "checkIn",
+      label: "Check In Time",
+      type: "datetime-local",
+    },
+    {
+      name: "checkOut",
+      label: "Check Out Time",
+      type: "datetime-local",
+    },
     {
       name: "status",
       label: "Attendance Status",
@@ -281,13 +344,17 @@ export const attendanceConfig = {
     },
     {
       name: "remarks",
-      label: "Remarks / Exceptions",
+      label: "Remarks",
       type: "text",
-      placeholder: "On time, Late arrival, etc.",
+      placeholder: "Enter remarks",
     },
   ] as any[],
+
   statsCards: (data: Attendance[]) => [
-    { label: "Total Attendance Logs", value: data.length },
+    {
+      label: "Total Attendance Logs",
+      value: data.length,
+    },
     {
       label: "Present Today",
       value: data.filter((a) => a.status === "PRESENT").length,
