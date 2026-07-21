@@ -21,7 +21,11 @@ import {
   Settings2,
   FolderOpen,
   FileCheck,
-  Zap
+  Zap,
+  HelpCircle,
+  FileSpreadsheet,
+  ShoppingCart,
+  CheckSquare,
 } from 'lucide-react';
 import { ROUTES } from './routes';
 
@@ -57,20 +61,25 @@ export const sidebarItems: SidebarItem[] = [
   { name: 'Contact Persons', icon: Contact, path: ROUTES.CRM_CONTACTS, section: 'CRM' },
   { name: 'Communication History', icon: MessageSquare, path: ROUTES.CRM_COMMUNICATION, section: 'CRM' },
 
-  // Lead Management
+  // Lead Management & Tenders
   { name: 'Tender Requests', icon: FolderOpen, path: ROUTES.TENDER_REQUESTS, section: 'Lead Management' },
   { name: 'Tenders', icon: FolderGit2, path: ROUTES.TENDER_TENDERS, section: 'Lead Management' },
+  { name: 'Technical Clarifications', icon: HelpCircle, path: ROUTES.TENDER_CLARIFICATIONS, section: 'Lead Management' },
+  { name: 'BOQ Master', icon: FileSpreadsheet, path: ROUTES.TENDER_BOQS, section: 'Lead Management' },
+  { name: 'Quotations', icon: FileText, path: ROUTES.TENDER_QUOTATIONS, section: 'Lead Management' },
+  { name: 'Sales Orders', icon: ShoppingCart, path: ROUTES.TENDER_SALES_ORDERS, section: 'Lead Management' },
   { name: 'Government Departments', icon: Building2, path: ROUTES.TENDER_GOVERNMENT, section: 'Lead Management' },
   { name: 'Sections', icon: GitBranch, path: ROUTES.TENDER_SECTIONS, section: 'Lead Management' },
   { name: 'Divisions', icon: Network, path: ROUTES.TENDER_DIVISIONS, section: 'Lead Management' },
   { name: 'Sub Divisions', icon: Users2, path: ROUTES.TENDER_SUBDIVISIONS, section: 'Lead Management' },
   { name: 'Reference Codes', icon: FileCheck, path: ROUTES.TENDER_REF_CODES, section: 'Lead Management' },
 
-  // Security (PRBAC) - ONLY these 4 visible
+  // Security (PRBAC)
   { name: 'Users', icon: UserCheck, path: ROUTES.SECURITY_USERS, section: 'Security' },
   { name: 'Roles', icon: ShieldCheck, path: ROUTES.SECURITY_ROLES, section: 'Security' },
   { name: 'Permissions', icon: Zap, path: ROUTES.SECURITY_PERMISSIONS, section: 'Security' },
   { name: 'Permission Groups', icon: FolderOpen, path: ROUTES.SECURITY_PERMISSION_GROUPS, section: 'Security' },
+  { name: 'Approval Requests', icon: CheckSquare, path: ROUTES.SECURITY_APPROVAL_REQUESTS, section: 'Security' },
 
   // Engineering & Manufacturing
   { name: 'Design Projects', icon: FolderGit2, path: ROUTES.ENGINEERING_PROJECTS, section: 'Engineering' },
