@@ -217,6 +217,12 @@ model User {
   quotationRevisions     QuotationRevision[]
   quotationAttachments   QuotationAttachment[]
 
+  requestedStockTransfers StockTransfer[] @relation("StockTransferRequestedBy")
+
+  approvedStockTransfers StockTransfer[] @relation("StockTransferApprovedBy")
+
+  completedStockTransfers StockTransfer[] @relation("StockTransferCompletedBy")
+
   approvalRequestsRequested ApprovalRequest[] @relation("ApprovalRequestRequestedBy")
   approvalRequestsAssigned  ApprovalRequest[] @relation("ApprovalRequestAssignedTo")
   approvalHistories         ApprovalHistory[]
@@ -1711,11 +1717,9 @@ model EngineeringDrawing {
   updatedAt    DateTime      @updatedAt
   deletedAt    DateTime?
 
-  project EngineeringProject @relation(fields: [projectId], references: [id])
-
-  approvedBy User? @relation("EngineeringDrawingApprovedBy", fields: [approvedById], references: [id])
-
-  createdBy User @relation("EngineeringDrawingCreatedBy", fields: [createdById], references: [id])
+ project    EngineeringProject @relation(fields: [projectId], references: [id])
+  approvedBy User?              @relation("EngineeringDrawingApprovedBy", fields: [approvedById], references: [id])
+  createdBy  User               @relation("EngineeringDrawingCreatedBy", fields: [createdById], references: [id])
 
   revisions DrawingRevision[]
 
@@ -2326,40 +2330,17 @@ enum TransactionType {
 }
 
 model StockTransfer {
-  id              String              @id @default(uuid())
-  companyId       String
-  transferNo      String              @unique
-  fromWarehouseId String
-  toWarehouseId   String
-  materialId      String
-  quantity        Decimal             @db.Decimal(15, 3)
-  batchNo         String?
-  serialNo        String?
-  status          StockTransferStatus @default(REQUESTED)
+  id String @id @default(uuid())
+
   requestedById   String
   approvedById    String?
-  approvedAt      DateTime?
   completedById   String?
-  completedAt     DateTime?
-  remarks         String?
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-  deletedAt       DateTime?
 
-  company       Company    @relation(fields: [companyId], references: [id])
-  fromWarehouse Warehouse  @relation("StockTransferFrom", fields: [fromWarehouseId], references: [id])
-  toWarehouse   Warehouse  @relation("StockTransferTo", fields: [toWarehouseId], references: [id])
-  material      Material   @relation(fields: [materialId], references: [id])
-  requestedBy   User       @relation(fields: [requestedById], references: [id])
-  approvedBy    User?      @relation(fields: [approvedById], references: [id])
-  completedBy   User?      @relation(fields: [completedById], references: [id])
-  inventory     Inventory? @relation(fields: [inventoryId], references: [id])
-  inventoryId   String?
+  requestedBy User @relation("StockTransferRequestedBy",fields: [requestedById],references: [id])
 
-  @@index([companyId])
-  @@index([fromWarehouseId])
-  @@index([toWarehouseId])
-  @@map("stock_transfers")
+  approvedBy User? @relation("StockTransferApprovedBy",fields: [approvedById],references: [id])
+
+  completedBy User? @relation("StockTransferCompletedBy",fields: [completedById],references: [id])
 }
 
 enum StockTransferStatus {
@@ -2392,6 +2373,7 @@ model ProductionPlan {
   company    Company @relation(fields: [companyId], references: [id])
   createdBy  User    @relation(fields: [createdById], references: [id])
   approvedBy User?   @relation(fields: [approvedById], references: [id])
+  
 
   workOrders WorkOrder[]
 
