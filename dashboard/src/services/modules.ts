@@ -34,7 +34,12 @@ export const tenderApi = {
   requests: crud(API_ENDPOINTS.tender.requests), tenders: crud(API_ENDPOINTS.tender.tenders),
   governmentDepartments: crud(API_ENDPOINTS.tender.governmentDepartments), sections: crud(API_ENDPOINTS.tender.sections),
   divisions: crud(API_ENDPOINTS.tender.divisions), subDivisions: crud(API_ENDPOINTS.tender.subDivisions),
-  technicalClarifications: crud(API_ENDPOINTS.tender.technicalClarifications),
+  technicalClarifications: {
+    ...crud(API_ENDPOINTS.tender.technicalClarifications),
+    read: (id: string) => unwrap(apiClient.get<ApiResponse<any>>(`/technical-clarification/read/${id}`)),
+    reply: (id: string, data: { reply: string; repliedById?: string; isInternal?: boolean }) => unwrap(apiClient.post<ApiResponse<any>>(`/technical-clarification/reply/${id}`, data)),
+    addAttachment: (id: string, data: { fileName: string; fileUrl: string; fileSize?: number; mimeType?: string; uploadedById?: string }) => unwrap(apiClient.post<ApiResponse<any>>(`/technical-clarification/attachment/${id}`, data)),
+  },
   boqs: crud(API_ENDPOINTS.tender.boqs),
   referenceCodes: {
     list: () => unwrap(apiClient.get<ApiResponse<ApiRecord[]>>(API_ENDPOINTS.tender.referenceCodes.list)),
