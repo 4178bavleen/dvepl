@@ -27,7 +27,15 @@ export const hrmsApi = {
 };
 
 export const crmApi = {
-  customers: crud(API_ENDPOINTS.crm.customers), contacts: crud(API_ENDPOINTS.crm.contacts), communications: crud(API_ENDPOINTS.crm.communications, { update: false }),
+  customers: crud(API_ENDPOINTS.crm.customers),
+
+  contacts: crud(API_ENDPOINTS.crm.contacts),
+
+  communications: crud(
+      API_ENDPOINTS.crm.communications,
+      { update: false }
+  ),
+
 };
 
 export const tenderApi = {
@@ -47,86 +55,3 @@ export const tenderApi = {
   } satisfies ResourceApi<any>,
 };
 
-export const quotationApi = {
-  quotations: {
-    ...crud(API_ENDPOINTS.quotation.quotations),
-    read: (id: string) => unwrap(apiClient.get<ApiResponse<any>>(`/quotation/read/${id}`)),
-    submit: (id: string) => unwrap(apiClient.post<ApiResponse<any>>(API_ENDPOINTS.quotation.quotations.submit(id), {})),
-    send: (id: string) => unwrap(apiClient.post<ApiResponse<any>>(API_ENDPOINTS.quotation.quotations.send(id), {})),
-    respond: (id: string, data: { response: string; remarks?: string }) => unwrap(apiClient.post<ApiResponse<any>>(API_ENDPOINTS.quotation.quotations.respond(id), data)),
-    revise: (id: string, data: any) => unwrap(apiClient.post<ApiResponse<any>>(API_ENDPOINTS.quotation.quotations.revise(id), data)),
-  },
-  items: crud(API_ENDPOINTS.quotation.items),
-  approvals: crud(API_ENDPOINTS.quotation.approvals),
-  activities: crud(API_ENDPOINTS.quotation.activities, { update: false }),
-};
-
-export const salesOrderApi = {
-  salesOrders: crud(API_ENDPOINTS.salesOrder.salesOrders),
-};
-
-export const approvalRuleApi = {
-  approvalRules: crud(API_ENDPOINTS.approvalRule.approvalRules),
-};
-
-export const securityApi = {
-  users: crud(API_ENDPOINTS.security.users),
-  roles: crud(API_ENDPOINTS.security.roles),
-  permissions: {
-    list: () => unwrap(apiClient.get<ApiResponse<ApiRecord[]>>(API_ENDPOINTS.security.permissions.list)),
-    create: async () => { throw new Error('Permissions are read-only.'); },
-  } satisfies ResourceApi<any>,
-  permissionGroups: crud(API_ENDPOINTS.security.permissionGroups),
-};
-
-export const engineeringApi = {
-  projects: crud((API_ENDPOINTS as any).engineering.projects),
-  drawings: crud((API_ENDPOINTS as any).engineering.drawings),
-  boms: crud((API_ENDPOINTS as any).engineering.boms),
-};
-
-export const workflowApi = {
-  approvalRequests: crud((API_ENDPOINTS as any).workflow.approvalRequests),
-};
-
-export const materialApi = {
-  materials: crud((API_ENDPOINTS as any).material.materials),
-  categories: crud((API_ENDPOINTS as any).material.categories),
-  brands: crud((API_ENDPOINTS as any).material.brands),
-  specifications: crud((API_ENDPOINTS as any).material.specifications),
-};
-
-export const purchaseApi = {
-  requests: crud((API_ENDPOINTS as any).purchase.requests),
-  orders: crud((API_ENDPOINTS as any).purchase.orders),
-  receipts: crud((API_ENDPOINTS as any).purchase.receipts),
-};
-
-export const inventoryApi = {
-  warehouses: crud((API_ENDPOINTS as any).inventory.warehouses),
-  bins: crud((API_ENDPOINTS as any).inventory.bins),
-  stocks: crud((API_ENDPOINTS as any).inventory.stocks),
-  transfers: crud((API_ENDPOINTS as any).inventory.transfers),
-};
-
-export const productionApi = {
-  plans: crud((API_ENDPOINTS as any).production.plans),
-  workOrders: crud((API_ENDPOINTS as any).production.workOrders),
-  logs: crud((API_ENDPOINTS as any).production.logs),
-};
-
-export const qualityApi = {
-  inspections: crud((API_ENDPOINTS as any).quality.inspections),
-  reworks: crud((API_ENDPOINTS as any).quality.reworks),
-};
-
-export const logisticsApi = {
-  dispatches: crud((API_ENDPOINTS as any).logistics.dispatches),
-  vehicles: crud((API_ENDPOINTS as any).logistics.vehicles),
-};
-
-export const financeApi = {
-  invoices: crud((API_ENDPOINTS as any).finance.invoices),
-  payments: crud((API_ENDPOINTS as any).finance.payments),
-  expenses: crud((API_ENDPOINTS as any).finance.expenses),
-};
