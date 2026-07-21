@@ -105,7 +105,13 @@ export const API_ENDPOINTS = {
       list: '/customer/read/',
       create: '/customer/create/',
       update: (id: string) => `/customer/update/${id}`,
-      remove: (id: string) => `/customer/delete/${id}`
+      remove: (id: string) => `/customer/delete/${id}`,
+    },
+    leads: {
+      list: '/lead/read',
+      create: '/lead/create',
+      update: (id: string) => `/lead/update/${id}`,
+      remove: (id: string) => `/lead/delete/${id}`,
     },
 
     contacts: {
