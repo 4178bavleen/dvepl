@@ -29,16 +29,15 @@ import {
 import { toast } from 'react-hot-toast';
 
 import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 
-// ── typed imports directly from constants (single source of truth) ──
-import { initialAuditLogs } from '@/constants/security';
-import {
-  initialDashboardTasks,
-} from '@/constants/dashboard';
 import { hrmsApi, crmApi, tenderApi } from '@/services/modules';
 import { organizationApi } from '@/services/organization';
+import { useERPStore } from '@/store/erpStore';
 
 export function DashboardOverview() {
+  const navigate = useNavigate();
+  const currentCompanyId = useERPStore((state) => state.currentCompanyId);
   const [employees, setEmployees] = useState<any[]>([]);
   const [attendances, setAttendances] = useState<any[]>([]);
   const [tenders, setTenders] = useState<any[]>([]);
@@ -64,25 +63,19 @@ export function DashboardOverview() {
     }).catch(() => toast.error('Unable to load live dashboard data.'))
       .finally(() => { if (isMounted) setIsLoading(false); });
     return () => { isMounted = false; };
-  }, []);
+  }, [currentCompanyId]);
   // ── data derived directly from typed constants ──
-  const rawEmployees = employees.filter((employee) => !employee.deletedAt);
+  const rawEmployees = employees.filter((employee) => !employee.deletedAt && (!employee.companyId || employee.companyId === currentCompanyId));
   const activeEmployees = rawEmployees.filter(e => e.status === 'ACTIVE').length;
-  const rawTenders = tenders.filter((tender) => !tender.deletedAt);
+  const rawTenders = tenders.filter((tender) => !tender.deletedAt && (!tender.companyId || tender.companyId === currentCompanyId));
   const activeTenders = rawTenders.filter(t => t.status === 'OPEN' || t.status === 'IN_PROGRESS').length;
-  const rawCustomers = customers.filter((customer) => !customer.deletedAt);
-  const recentActivities = initialAuditLogs.slice(0, 5);
-
-  // Task list – seeded from constants
-  const [tasks, setTasks] = useState(initialDashboardTasks);
-
-  const toggleTask = (id: number) => {
-    setTasks(tasks.map(t => t.id === id ? { ...t, checked: !t.checked } : t));
-    toast.success('Task status updated.');
-  };
+  const rawCustomers = customers.filter((customer) => !customer.deletedAt && (!customer.companyId || customer.companyId === currentCompanyId));
+  const rawCostCenters = costCenters.filter((cc) => !cc.companyId || cc.companyId === currentCompanyId);
+  // Calculate total cost budget dynamically
+  const totalBudget = rawCostCenters.reduce((sum, cc) => sum + Number(cc.budget || 0), 0);
 
   // Chart data – from constants
-  const departmentBudgetData = costCenters.map(cc => ({
+  const departmentBudgetData = rawCostCenters.map(cc => ({
     name: cc.name.replace(' Cost Center', '').replace(' Overhead', '').slice(0, 15),
     Budget: Number(cc.budget || 0) / 100000 // In Lakhs
   }));
@@ -145,7 +138,10 @@ export function DashboardOverview() {
   }, [attendances]);
 
   const handleQuickCreate = (type: string) => {
-    toast.success(`Quick Create triggered for: ${type}`);
+    if (type === 'Tender') navigate('/tender/tenders');
+    else if (type === 'Employee') navigate('/hrms/employees');
+    else if (type === 'Customer') navigate('/crm/customers');
+    else if (type === 'Log') navigate('/crm/communication');
   };
 
   return (
@@ -209,17 +205,18 @@ export function DashboardOverview() {
         {/* Card 4 */}
         <div className="bg-card border border-border rounded-xl p-5 shadow-sm relative overflow-hidden group">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Monthly Revenue</span>
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Budgets</span>
             <div className="p-2 bg-primary/10 rounded-lg text-primary"><DollarSign className="h-4 w-4" /></div>
           </div>
           <div className="mt-3.5 flex items-baseline justify-between">
-            <span className="text-3xl font-extrabold tracking-tight">₹7.2L</span>
+            <span className="text-3xl font-extrabold tracking-tight">
+              ₹{totalBudget >= 100000 ? `${(totalBudget / 100000).toFixed(1)}L` : totalBudget.toLocaleString()}
+            </span>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-success/15 text-success flex items-center gap-0.5">
-              <TrendingUp className="h-3 w-3" />
-              <span>+8.4%</span>
+              <span>{rawCostCenters.length} Cost Centers</span>
             </span>
           </div>
-          <p className="text-[10px] text-muted-foreground mt-1 font-medium">Project sales receipts</p>
+          <p className="text-[10px] text-muted-foreground mt-1 font-medium">Aggregated operational budgets</p>
         </div>
       </div>
 
@@ -361,87 +358,36 @@ export function DashboardOverview() {
           </div>
         </div>
 
-      </div>
-
       {/* 4. LOWER LEVEL WIDGETS */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         
         {/* Quick Actions Panel */}
-        <div className="bg-card border border-border rounded-xl p-5 shadow-sm flex flex-col justify-between">
+        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
           <div>
-            <h2 className="text-sm font-bold tracking-tight text-foreground">Operational Actions</h2>
-            <p className="text-[10px] text-muted-foreground">Shortcuts to common operations</p>
+            <h2 className="text-sm font-bold tracking-tight text-foreground">Operational Shortcuts</h2>
+            <p className="text-[10px] text-muted-foreground">Quick access actions to core system operations</p>
           </div>
-          <div className="grid grid-cols-2 gap-2 mt-4">
-            <Button variant="outline" size="sm" onClick={() => handleQuickCreate('Tender')} className="h-10 text-xs font-semibold justify-start gap-2 border-border hover:bg-muted/40">
-              <Plus className="h-3.5 w-3.5 text-primary" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+            <Button variant="outline" size="sm" onClick={() => handleQuickCreate('Tender')} className="h-12 text-xs font-semibold justify-start gap-2.5 border-border hover:bg-muted/40 px-4">
+              <Plus className="h-4 w-4 text-primary" />
               <span>Add Tender</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={() => handleQuickCreate('Employee')} className="h-10 text-xs font-semibold justify-start gap-2 border-border hover:bg-muted/40">
-              <Plus className="h-3.5 w-3.5 text-success" />
+            <Button variant="outline" size="sm" onClick={() => handleQuickCreate('Employee')} className="h-12 text-xs font-semibold justify-start gap-2.5 border-border hover:bg-muted/40 px-4">
+              <Plus className="h-4 w-4 text-success" />
               <span>Add Employee</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={() => handleQuickCreate('Customer')} className="h-10 text-xs font-semibold justify-start gap-2 border-border hover:bg-muted/40">
-              <Plus className="h-3.5 w-3.5 text-warning" />
+            <Button variant="outline" size="sm" onClick={() => handleQuickCreate('Customer')} className="h-12 text-xs font-semibold justify-start gap-2.5 border-border hover:bg-muted/40 px-4">
+              <Plus className="h-4 w-4 text-warning" />
               <span>Add Customer</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={() => handleQuickCreate('Log')} className="h-10 text-xs font-semibold justify-start gap-2 border-border hover:bg-muted/40">
-              <Plus className="h-3.5 w-3.5 text-indigo-500" />
+            <Button variant="outline" size="sm" onClick={() => handleQuickCreate('Log')} className="h-12 text-xs font-semibold justify-start gap-2.5 border-border hover:bg-muted/40 px-4">
+              <Plus className="h-4 w-4 text-indigo-500" />
               <span>Log Call</span>
             </Button>
           </div>
-          <div className="border-t border-border pt-4 mt-4 flex items-center justify-between text-xs font-bold text-primary hover:underline cursor-pointer">
-            <span>Access system modules</span>
-            <ArrowRight className="h-3.5 w-3.5" />
-          </div>
         </div>
 
-        {/* Task Checklist Widget */}
-        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-          <div>
-            <h2 className="text-sm font-bold tracking-tight text-foreground">Task & Approvals Checklist</h2>
-            <p className="text-[10px] text-muted-foreground">Pending manual verification tasks</p>
-          </div>
-          <div className="mt-4 space-y-3">
-            {tasks.map(task => (
-              <div key={task.id} className="flex items-center gap-3.5 py-1">
-                <input 
-                  type="checkbox"
-                  checked={task.checked}
-                  onChange={() => toggleTask(task.id)}
-                  className="h-4 w-4 border-border rounded text-primary cursor-pointer"
-                />
-                <span className={`text-xs font-semibold leading-none cursor-pointer ${task.checked ? 'line-through text-muted-foreground' : 'text-foreground/95'}`} onClick={() => toggleTask(task.id)}>
-                  {task.text}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Audit Log / Recent Activities */}
-        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-sm font-bold tracking-tight text-foreground">System Audit Feed</h2>
-              <p className="text-[10px] text-muted-foreground">Live transaction audit log entries</p>
-            </div>
-            <Activity className="h-4 w-4 text-muted-foreground/60" />
-          </div>
-          <div className="space-y-4">
-            {recentActivities.map((log) => (
-              <div key={log.id} className="flex gap-3 text-xs leading-normal">
-                <div className="mt-0.5 h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-foreground/95 text-xs truncate">
-                    {log.action} in {log.module}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground">ID: {log.recordId} &bull; {new Date(log.createdAt).toLocaleTimeString()}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+      </div>
 
       </div>
 

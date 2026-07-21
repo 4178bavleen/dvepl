@@ -81,6 +81,50 @@ interface GenericCrudPageProps<
 
 const asInputValue = (value: unknown) => (value == null ? "" : String(value));
 
+const renderDetailsValue = (value: unknown): string => {
+  if (value == null) return '';
+  
+  if (Array.isArray(value)) {
+    return value.map((item) => {
+      if (item && typeof item === 'object') {
+        return item.name || item.title || item.code || item.label || item.email || String(item);
+      }
+      return String(item);
+    }).join(', ');
+  }
+  
+  if (typeof value === 'object') {
+    if (value instanceof Date) {
+      return value.toLocaleString();
+    }
+    const obj = value as Record<string, unknown>;
+    if (obj.name || obj.title || obj.code || obj.label || obj.email) {
+      return String(obj.name ?? obj.title ?? obj.code ?? obj.label ?? obj.email);
+    }
+    // Handle plain objects (like count or config mappings)
+    return Object.entries(obj)
+      .map(([k, v]) => `${k.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase())}: ${renderDetailsValue(v)}`)
+      .join(', ');
+  }
+  
+  if (typeof value === 'boolean') {
+    return value ? 'Yes' : 'No';
+  }
+  
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+    try {
+      const date = new Date(value);
+      if (!isNaN(date.getTime())) {
+        return date.toLocaleString();
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
+  return String(value);
+};
+
 export function GenericCrudPage<TRecord extends { id: string }>({
   tableName,
   moduleName,
@@ -237,6 +281,23 @@ export function GenericCrudPage<TRecord extends { id: string }>({
 
   const cards = statsCards?.(records) ?? [];
 
+  const enrichedColumns = useMemo(() => {
+    return columns.map((col) => {
+      const key = (col as any).accessorKey;
+      if (key && optionValues[key]) {
+        return {
+          ...col,
+          cell: (info: any) => {
+            const val = info.getValue();
+            const matched = optionValues[key]?.find((opt) => opt.value === val);
+            return matched ? matched.label : (val || '—');
+          }
+        };
+      }
+      return col;
+    });
+  }, [columns, optionValues]);
+
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       {breadcrumbs.length > 0 && (
@@ -304,7 +365,7 @@ export function GenericCrudPage<TRecord extends { id: string }>({
       </div>
 
       <GenericTable
-        columns={columns}
+        columns={enrichedColumns}
         data={filteredRecords}
         onView={setViewingRecord}
         onEdit={!readOnly && (!api || api.update) ? openEdit : undefined}
@@ -332,7 +393,7 @@ export function GenericCrudPage<TRecord extends { id: string }>({
       />
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto p-6">
+        <DialogContent className={editingRecord ? "fixed inset-y-0 right-0 z-50 h-full w-full max-w-lg border-l border-border bg-background p-6 shadow-lg overflow-y-auto animate-in slide-in-from-right duration-300 flex flex-col gap-4" : "max-h-[90vh] max-w-2xl overflow-y-auto p-6"}>
           <DialogHeader>
             <DialogTitle>
               {editingRecord ? `Edit ${moduleName}` : `Add ${moduleName}`}

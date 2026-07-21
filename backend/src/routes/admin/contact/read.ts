@@ -54,24 +54,39 @@ async function readContactRoutes(
 
         const { customerId } = validation.data;
 
-        //--------------------------------
-        // Tenant Verification
-        //--------------------------------
-        const customer = await fastify.prisma.customer.findFirst({
-          where: { id: customerId, companyId, deletedAt: null },
-        });
+        let contacts;
+        if (customerId) {
+          //--------------------------------
+          // Tenant Verification
+          //--------------------------------
+          const customer = await fastify.prisma.customer.findFirst({
+            where: { id: customerId, companyId, deletedAt: null },
+          });
 
-        if (!customer) {
-          return reply.status(404).send({
-            success: false,
-            message: "Customer not found.",
+          if (!customer) {
+            return reply.status(404).send({
+              success: false,
+              message: "Customer not found.",
+            });
+          }
+
+          contacts = await fastify.prisma.contactPerson.findMany({
+            where: { customerId, deletedAt: null },
+            orderBy: { createdAt: "desc" },
+          });
+        } else {
+          // Fetch all contacts for this company
+          contacts = await fastify.prisma.contactPerson.findMany({
+            where: {
+              customer: {
+                companyId,
+                deletedAt: null,
+              },
+              deletedAt: null,
+            },
+            orderBy: { createdAt: "desc" },
           });
         }
-
-        const contacts = await fastify.prisma.contactPerson.findMany({
-          where: { customerId, deletedAt: null },
-          orderBy: { createdAt: "desc" },
-        });
 
         return reply.status(200).send({
           success: true,

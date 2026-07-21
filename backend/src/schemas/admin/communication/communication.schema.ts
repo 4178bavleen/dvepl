@@ -9,5 +9,5 @@ export const createCommunicationHistorySchema = z.object({
 });
 
 export const communicationListQuerySchema = z.object({
-  customerId: z.string().uuid("Invalid customer ID"),
+  customerId: z.string().uuid("Invalid customer ID").optional(),
 });

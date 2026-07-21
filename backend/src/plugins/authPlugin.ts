@@ -30,9 +30,13 @@ async function authPlugin(fastify: FastifyInstance) {
 
 
         console.log("Decoded JWT:", decoded);
+        const activeCompanyId = (request.query as any)?.companyId || decoded.companyId;
+        if (request.query && (request.query as any).companyId) {
+          delete (request.query as any).companyId;
+        }
         const tokenUser = {
           id: decoded.userId,
-          companyId: decoded.companyId,
+          companyId: activeCompanyId,
           roles: decoded.roles || [],
           permissions: decoded.permissions || [],
         };
