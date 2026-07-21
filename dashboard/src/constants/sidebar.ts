@@ -57,24 +57,52 @@ export const sidebarItems: SidebarItem[] = [
   { name: 'Contact Persons', icon: Contact, path: ROUTES.CRM_CONTACTS, section: 'CRM' },
   { name: 'Communication History', icon: MessageSquare, path: ROUTES.CRM_COMMUNICATION, section: 'CRM' },
 
-  // Tenders
-  { name: 'Tender Requests', icon: FolderOpen, path: ROUTES.TENDER_REQUESTS, section: 'Tender Management' },
-  { name: 'Tenders ', icon: FolderGit2, path: ROUTES.TENDER_TENDERS, section: 'Tender Management' },
-  { name: 'Government Departments', icon: Building2, path: ROUTES.TENDER_GOVERNMENT, section: 'Tender Management' },
-  { name: 'Sections', icon: GitBranch, path: ROUTES.TENDER_SECTIONS, section: 'Tender Management' },
-  { name: 'Divisions', icon: Network, path: ROUTES.TENDER_DIVISIONS, section: 'Tender Management' },
-  { name: 'Sub Divisions', icon: Users2, path: ROUTES.TENDER_SUBDIVISIONS, section: 'Tender Management' },
-  { name: 'Reference Codes', icon: FileCheck, path: ROUTES.TENDER_REF_CODES, section: 'Tender Management' },
-  { name: 'Technical Clarifications', icon: MessageSquare, path: ROUTES.TENDER_CLARIFICATIONS, section: 'Tender Management' },
-  { name: 'Quotations', icon: FileText, path: ROUTES.TENDER_QUOTATIONS, section: 'Tender Management' },
-  { name: 'Sales Orders', icon: FileCheck, path: ROUTES.TENDER_SALES_ORDERS, section: 'Tender Management' },
+  // Lead Management
+  { name: 'Tender Requests', icon: FolderOpen, path: ROUTES.TENDER_REQUESTS, section: 'Lead Management' },
+  { name: 'Tenders', icon: FolderGit2, path: ROUTES.TENDER_TENDERS, section: 'Lead Management' },
+  { name: 'Government Departments', icon: Building2, path: ROUTES.TENDER_GOVERNMENT, section: 'Lead Management' },
+  { name: 'Sections', icon: GitBranch, path: ROUTES.TENDER_SECTIONS, section: 'Lead Management' },
+  { name: 'Divisions', icon: Network, path: ROUTES.TENDER_DIVISIONS, section: 'Lead Management' },
+  { name: 'Sub Divisions', icon: Users2, path: ROUTES.TENDER_SUBDIVISIONS, section: 'Lead Management' },
+  { name: 'Reference Codes', icon: FileCheck, path: ROUTES.TENDER_REF_CODES, section: 'Lead Management' },
 
-  // Security & Audits
+  // Security (PRBAC) - ONLY these 4 visible
   { name: 'Users', icon: UserCheck, path: ROUTES.SECURITY_USERS, section: 'Security' },
   { name: 'Roles', icon: ShieldCheck, path: ROUTES.SECURITY_ROLES, section: 'Security' },
   { name: 'Permissions', icon: Zap, path: ROUTES.SECURITY_PERMISSIONS, section: 'Security' },
   { name: 'Permission Groups', icon: FolderOpen, path: ROUTES.SECURITY_PERMISSION_GROUPS, section: 'Security' },
-  { name: 'Approval Rules', icon: Settings2, path: ROUTES.SETTINGS_APPROVAL_RULES, section: 'Security' },
+
+  // Engineering & Manufacturing
+  { name: 'Design Projects', icon: FolderGit2, path: ROUTES.ENGINEERING_PROJECTS, section: 'Engineering' },
+  { name: 'Drawings Master', icon: FolderOpen, path: ROUTES.ENGINEERING_DRAWINGS, section: 'Engineering' },
+  { name: 'BOM Master', icon: Zap, path: ROUTES.ENGINEERING_BOMS, section: 'Engineering' },
+
+  // Materials & Master Catalog
+  { name: 'Materials Catalog', icon: Briefcase, path: ROUTES.MATERIAL_MATERIALS, section: 'Material Master' },
+  { name: 'Material Categories', icon: GitBranch, path: ROUTES.MATERIAL_CATEGORIES, section: 'Material Master' },
+
+  // Procurement & Purchase
+  { name: 'Purchase Requests', icon: FileText, path: ROUTES.PURCHASE_REQUESTS, section: 'Procurement' },
+  { name: 'Purchase Orders', icon: FileCheck, path: ROUTES.PURCHASE_ORDERS, section: 'Procurement' },
+
+  // Inventory & Logistics
+  { name: 'Warehouses', icon: Building2, path: ROUTES.INVENTORY_WAREHOUSES, section: 'Inventory & Warehousing' },
+  { name: 'Stock Master', icon: Wallet, path: ROUTES.INVENTORY_STOCKS, section: 'Inventory & Warehousing' },
+  { name: 'Stock Transfers', icon: GitBranch, path: ROUTES.INVENTORY_TRANSFERS, section: 'Inventory & Warehousing' },
+  { name: 'Logistics Dispatches', icon: FileCheck, path: ROUTES.LOGISTICS_DISPATCHES, section: 'Inventory & Warehousing' },
+
+  // Production Control
+  { name: 'Production Plans', icon: CalendarDays, path: ROUTES.PRODUCTION_PLANS, section: 'Production' },
+  { name: 'Work Orders', icon: FolderOpen, path: ROUTES.PRODUCTION_WORK_ORDERS, section: 'Production' },
+
+  // Quality Assurance
+  { name: 'Quality Inspections', icon: ShieldCheck, path: ROUTES.QUALITY_INSPECTIONS, section: 'Quality Assurance' },
+
+  // Finance & Accounts
+  { name: 'Customer Invoices', icon: FileText, path: ROUTES.FINANCE_INVOICES, section: 'Finance & Accounts' },
+  { name: 'Received Payments', icon: DollarSign, path: ROUTES.FINANCE_PAYMENTS, section: 'Finance & Accounts' },
+  { name: 'Office Expenses', icon: Wallet, path: ROUTES.FINANCE_EXPENSES, section: 'Finance & Accounts' },
+
   { name: 'Audit Logs', icon: AuditIcon, path: ROUTES.AUDIT_LOGS },
   { name: 'Settings', icon: Settings2, path: ROUTES.SETTINGS }
 ];

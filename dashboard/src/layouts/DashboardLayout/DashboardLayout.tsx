@@ -30,8 +30,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { logout } = useAuth();
 
   const t = (key: string) => {
-    const lang = store.language || 'English';
-    return translations[lang]?.[key] || key;
+    return key;
   };
 
   // Component UI States

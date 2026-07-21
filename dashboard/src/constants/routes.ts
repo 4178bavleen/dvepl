@@ -34,6 +34,7 @@ export const ROUTES = {
   TENDER_REF_CODES: '/tender/reference-codes',
   TENDER_CLARIFICATIONS: '/tender/clarifications',
   TENDER_QUOTATIONS: '/tender/quotations',
+  TENDER_BOQS: '/tender/boqs',
   TENDER_SALES_ORDERS: '/tender/sales-orders',
 
   // Security
@@ -41,6 +42,38 @@ export const ROUTES = {
   SECURITY_ROLES: '/security/roles',
   SECURITY_PERMISSIONS: '/security/permissions',
   SECURITY_PERMISSION_GROUPS: '/security/permission-groups',
+  SECURITY_APPROVAL_REQUESTS: '/security/approval-requests',
+  
+  // Engineering & Manufacturing
+  ENGINEERING_PROJECTS: '/engineering/projects',
+  ENGINEERING_DRAWINGS: '/engineering/drawings',
+  ENGINEERING_BOMS: '/engineering/boms',
+
+  // Materials & Master Catalog
+  MATERIAL_MATERIALS: '/material/materials',
+  MATERIAL_CATEGORIES: '/material/categories',
+
+  // Procurement & Purchase
+  PURCHASE_REQUESTS: '/purchase/requests',
+  PURCHASE_ORDERS: '/purchase/orders',
+
+  // Inventory & Logistics
+  INVENTORY_WAREHOUSES: '/inventory/warehouses',
+  INVENTORY_STOCKS: '/inventory/stocks',
+  INVENTORY_TRANSFERS: '/inventory/transfers',
+  LOGISTICS_DISPATCHES: '/logistics/dispatches',
+
+  // Production Control
+  PRODUCTION_PLANS: '/production/plans',
+  PRODUCTION_WORK_ORDERS: '/production/work-orders',
+
+  // Quality Assurance
+  QUALITY_INSPECTIONS: '/quality/inspections',
+
+  // Finance & Accounts
+  FINANCE_INVOICES: '/finance/invoices',
+  FINANCE_PAYMENTS: '/finance/payments',
+  FINANCE_EXPENSES: '/finance/expenses',
   
   AUDIT_LOGS: '/audit-logs',
   SETTINGS: '/settings',

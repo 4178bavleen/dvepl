@@ -140,8 +140,7 @@ export function GenericTable<TData extends { id: string }>({
   const store = useERPStore();
 
   const t = (key: string) => {
-    const lang = store.language || 'English';
-    return translations[lang]?.[key] || key;
+    return key;
   };
 
   // Append selection checkbox column if bulk actions exist
@@ -449,8 +448,7 @@ export function sortableHeader(title: string) {
   return ({ column }: { column: any }) => {
     const store = useERPStore();
     const t = (key: string) => {
-      const lang = store.language || 'English';
-      return translations[lang]?.[key] || key;
+      return key;
     };
     return (
       <Button

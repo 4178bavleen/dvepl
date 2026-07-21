@@ -1,5 +1,6 @@
 import { ColumnDef } from '@tanstack/react-table';
 import * as z from 'zod';
+import { ExternalLink } from 'lucide-react';
 import { sortableHeader } from '@/components/tables/GenericTable';
 import { hrmsApi } from '@/services/modules';
 import { organizationApi } from '@/services/organization';
@@ -408,3 +409,63 @@ export const shiftsConfig = {
     { name: 'endTime', label: 'End Time (HH:MM)', type: 'text', placeholder: '18:00', required: true }
   ] as any[]
 };
+
+// ==========================================
+// 13. DOCUMENTS MASTER CONFIG
+// ==========================================
+export const documentsConfig = {
+  api: hrmsApi.documents,
+  selectOptions: { employeeId: hrmsApi.employees.list },
+  tableName: 'employeeDocuments',
+  moduleName: 'Employee Document',
+  pluralName: 'Documents Registry',
+  zodSchema: z.object({
+    employeeId: z.string().min(1, 'Select an employee'),
+    documentType: z.string().min(1, 'Select a document type'),
+    fileName: z.string().min(2, 'File name must be at least 2 characters'),
+    fileUrl: z.string().min(2, 'File URL/Path must be at least 2 characters')
+  }),
+  defaultFormValues: { employeeId: '', documentType: 'AADHAR', fileName: '', fileUrl: '' },
+  breadcrumbs: [{ label: 'Dashboard', href: '/' }, { label: 'Documents' }],
+  columns: [
+    { 
+      accessorKey: 'employeeId', 
+      header: 'Employee',
+      cell: ({ row }) => {
+        const emp = row.original.employee;
+        return emp ? `${emp.firstName} ${emp.lastName} (${emp.employeeCode})` : row.original.employeeId;
+      }
+    },
+    { accessorKey: 'documentType', header: 'Document Type' },
+    { accessorKey: 'fileName', header: 'File Name' },
+    { 
+      accessorKey: 'fileUrl', 
+      header: 'File Link',
+      cell: ({ getValue }) => (
+        <a href={String(getValue())} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
+          View File <ExternalLink className="h-3 w-3" />
+        </a>
+      )
+    },
+    { accessorKey: 'createdAt', header: 'Uploaded Date', cell: ({ getValue }) => getValue() ? new Date(getValue() as string).toLocaleDateString() : '—' }
+  ] as ColumnDef<any>[],
+  fields: [
+    { name: 'employeeId', label: 'Select Employee', type: 'select', required: true },
+    { name: 'documentType', label: 'Document Type', type: 'select', options: [
+      { label: 'Aadhar Card', value: 'AADHAR' },
+      { label: 'PAN Card', value: 'PAN' },
+      { label: 'Resume', value: 'RESUME' },
+      { label: 'Offer Letter', value: 'OFFER_LETTER' },
+      { label: 'Other', value: 'OTHER' }
+    ], required: true },
+    { name: 'fileName', label: 'File Name', type: 'text', placeholder: 'e.g. resume_john.pdf', required: true },
+    { name: 'fileUrl', label: 'File URL / Path', type: 'text', placeholder: 'e.g. https://minio.dvepl.com/hrms/resume_john.pdf', required: true }
+  ] as any[],
+  statsCards: (data: any[]) => [
+    { label: 'Total Documents', value: data.length },
+    { label: 'Aadhar Cards', value: data.filter(d => d.documentType === 'AADHAR').length },
+    { label: 'PAN Cards', value: data.filter(d => d.documentType === 'PAN').length },
+    { label: 'Resumes', value: data.filter(d => d.documentType === 'RESUME').length }
+  ]
+};
+

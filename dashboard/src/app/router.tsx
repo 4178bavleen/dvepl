@@ -45,17 +45,49 @@ const ReferenceCodesPage = lazy(() => import('@/pages/tenders/ReferenceCodesPage
 const TechnicalClarificationsPage = lazy(() => import('@/pages/tenders/TechnicalClarificationsPage'));
 const QuotationsPage = lazy(() => import('@/pages/tenders/QuotationsPage'));
 const SalesOrdersPage = lazy(() => import('@/pages/tenders/SalesOrdersPage'));
+const BoqsPage = lazy(() => import('@/pages/tenders/BoqsPage'));
+
+// Engineering & Manufacturing
+const EngineeringProjectsPage = lazy(() => import('@/pages/engineering/EngineeringProjectsPage'));
+const EngineeringDrawingsPage = lazy(() => import('@/pages/engineering/EngineeringDrawingsPage'));
+const BomsPage = lazy(() => import('@/pages/engineering/BomsPage'));
 
 // Security & Audit
 const UsersPage = lazy(() => import('@/pages/roles/UsersPage'));
 const RolesPage = lazy(() => import('@/pages/roles/RolesPage'));
 const PermissionsPage = lazy(() => import('@/pages/permissions/PermissionsPage'));
 const PermissionGroupsPage = lazy(() => import('@/pages/permissions/PermissionGroupsPage'));
+const ApprovalRequestsPage = lazy(() => import('@/pages/roles/ApprovalRequestsPage'));
 const AuditLogsPage = lazy(() => import('@/pages/audit/AuditLogsPage'));
 
-// Settings & Profiles
 const SettingsPage = lazy(() => import('@/pages/settings/SettingsPage'));
 const ProfilePage = lazy(() => import('@/pages/profile/ProfilePage'));
+
+// Materials & Master Catalog
+const MaterialsPage = lazy(() => import('@/pages/material/MaterialsPage'));
+const MaterialCategoriesPage = lazy(() => import('@/pages/material/MaterialCategoriesPage'));
+
+// Procurement & Purchase
+const PurchaseRequestsPage = lazy(() => import('@/pages/purchase/PurchaseRequestsPage'));
+const PurchaseOrdersPage = lazy(() => import('@/pages/purchase/PurchaseOrdersPage'));
+
+// Inventory & Warehousing
+const WarehousesPage = lazy(() => import('@/pages/inventory/WarehousesPage'));
+const InventoryStocksPage = lazy(() => import('@/pages/inventory/InventoryStocksPage'));
+const StockTransfersPage = lazy(() => import('@/pages/inventory/StockTransfersPage'));
+const LogisticsDispatchesPage = lazy(() => import('@/pages/inventory/LogisticsDispatchesPage'));
+
+// Production
+const ProductionPlansPage = lazy(() => import('@/pages/production/ProductionPlansPage'));
+const WorkOrdersPage = lazy(() => import('@/pages/production/WorkOrdersPage'));
+
+// Quality Assurance
+const InspectionsPage = lazy(() => import('@/pages/qc/InspectionsPage'));
+
+// Finance & Accounts
+const InvoicesPage = lazy(() => import('@/pages/finance/InvoicesPage'));
+const PaymentsPage = lazy(() => import('@/pages/finance/PaymentsPage'));
+const ExpensesPage = lazy(() => import('@/pages/finance/ExpensesPage'));
 const NotificationsPage = lazy(() => import('@/pages/notifications/NotificationsPage'));
 
 
@@ -104,11 +136,45 @@ export function AppRouter() {
               <Route path="/tender/clarifications" element={<TechnicalClarificationsPage />} />
               <Route path="/tender/quotations" element={<QuotationsPage />} />
               <Route path="/tender/sales-orders" element={<SalesOrdersPage />} />
+              <Route path="/tender/boqs" element={<BoqsPage />} />
               {/* Security */}
               <Route path="/security/users" element={<UsersPage />} />
               <Route path="/security/roles" element={<RolesPage />} />
               <Route path="/security/permissions" element={<PermissionsPage />} />
               <Route path="/security/permission-groups" element={<PermissionGroupsPage />} />
+              <Route path="/security/approval-requests" element={<ApprovalRequestsPage />} />
+              
+              {/* Engineering & Manufacturing */}
+              <Route path="/engineering/projects" element={<EngineeringProjectsPage />} />
+              <Route path="/engineering/drawings" element={<EngineeringDrawingsPage />} />
+              <Route path="/engineering/boms" element={<BomsPage />} />
+
+              {/* Materials & Master Catalog */}
+              <Route path="/material/materials" element={<MaterialsPage />} />
+              <Route path="/material/categories" element={<MaterialCategoriesPage />} />
+
+              {/* Procurement & Purchase */}
+              <Route path="/purchase/requests" element={<PurchaseRequestsPage />} />
+              <Route path="/purchase/orders" element={<PurchaseOrdersPage />} />
+
+              {/* Inventory & Warehousing */}
+              <Route path="/inventory/warehouses" element={<WarehousesPage />} />
+              <Route path="/inventory/stocks" element={<InventoryStocksPage />} />
+              <Route path="/inventory/transfers" element={<StockTransfersPage />} />
+              <Route path="/logistics/dispatches" element={<LogisticsDispatchesPage />} />
+
+              {/* Production */}
+              <Route path="/production/plans" element={<ProductionPlansPage />} />
+              <Route path="/production/work-orders" element={<WorkOrdersPage />} />
+
+              {/* Quality Assurance */}
+              <Route path="/quality/inspections" element={<InspectionsPage />} />
+
+              {/* Finance & Accounts */}
+              <Route path="/finance/invoices" element={<InvoicesPage />} />
+              <Route path="/finance/payments" element={<PaymentsPage />} />
+              <Route path="/finance/expenses" element={<ExpensesPage />} />
+              
               <Route path="/audit-logs" element={<AuditLogsPage />} />
               {/* Settings */}
               <Route path="/settings" element={<SettingsPage />} />
