@@ -5,6 +5,7 @@ import { hrmsApi } from "@/services/modules";
 import { organizationApi } from "@/services/organization";
 import { EmployeeStatus } from "@/types/erp";
 import { Employee, Attendance, Leave, Salary } from "@/types/erp";
+import { ExternalLink } from "lucide-react";
 
 // ==========================================
 // 7. EMPLOYEES ROUTE CONFIG
