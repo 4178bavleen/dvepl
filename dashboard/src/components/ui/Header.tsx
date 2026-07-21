@@ -21,6 +21,7 @@ type Company = { id: string; name: string };
 type CurrentUser = {
   name?: string | null;
   email?: string | null;
+  [key: string]: unknown;
 } | null | undefined;
 
 export type HeaderProps = {

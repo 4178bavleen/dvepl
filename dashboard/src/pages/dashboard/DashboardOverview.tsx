@@ -29,15 +29,12 @@ import {
 import { toast } from 'react-hot-toast';
 
 import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
 
+// ── API and Service Imports ──
 import { hrmsApi, crmApi, tenderApi } from '@/services/modules';
 import { organizationApi } from '@/services/organization';
-import { useERPStore } from '@/store/erpStore';
 
 export function DashboardOverview() {
-  const navigate = useNavigate();
-  const currentCompanyId = useERPStore((state) => state.currentCompanyId);
   const [employees, setEmployees] = useState<any[]>([]);
   const [attendances, setAttendances] = useState<any[]>([]);
   const [tenders, setTenders] = useState<any[]>([]);
@@ -63,19 +60,98 @@ export function DashboardOverview() {
     }).catch(() => toast.error('Unable to load live dashboard data.'))
       .finally(() => { if (isMounted) setIsLoading(false); });
     return () => { isMounted = false; };
-  }, [currentCompanyId]);
-  // ── data derived directly from typed constants ──
-  const rawEmployees = employees.filter((employee) => !employee.deletedAt && (!employee.companyId || employee.companyId === currentCompanyId));
+  }, []);
+  // ── data derived directly from backend response ──
+  const rawEmployees = employees.filter((employee) => !employee.deletedAt);
   const activeEmployees = rawEmployees.filter(e => e.status === 'ACTIVE').length;
-  const rawTenders = tenders.filter((tender) => !tender.deletedAt && (!tender.companyId || tender.companyId === currentCompanyId));
+  const rawTenders = tenders.filter((tender) => !tender.deletedAt);
   const activeTenders = rawTenders.filter(t => t.status === 'OPEN' || t.status === 'IN_PROGRESS').length;
-  const rawCustomers = customers.filter((customer) => !customer.deletedAt && (!customer.companyId || customer.companyId === currentCompanyId));
-  const rawCostCenters = costCenters.filter((cc) => !cc.companyId || cc.companyId === currentCompanyId);
-  // Calculate total cost budget dynamically
-  const totalBudget = rawCostCenters.reduce((sum, cc) => sum + Number(cc.budget || 0), 0);
+  const rawCustomers = customers.filter((customer) => !customer.deletedAt);
+
+  // Calculate dynamic monthly revenue and growth
+  const { currentMonthRevenue, momGrowth, hasGrowth } = useMemo(() => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+
+    let currentSum = 0;
+    let prevSum = 0;
+
+    rawTenders.forEach(t => {
+      const dateStr = t.dueDate || t.createdAt;
+      if (!dateStr) return;
+      const d = new Date(dateStr);
+      const cost = Number(t.estimatedCost || 0);
+
+      if (d.getFullYear() === currentYear && d.getMonth() === currentMonth) {
+        currentSum += cost;
+      } else if (
+        (currentMonth === 0 && d.getFullYear() === currentYear - 1 && d.getMonth() === 11) ||
+        (currentMonth > 0 && d.getFullYear() === currentYear && d.getMonth() === currentMonth - 1)
+      ) {
+        prevSum += cost;
+      }
+    });
+
+    let growthStr = '0%';
+    let hasGrowthVal = false;
+    if (prevSum > 0) {
+      const pct = ((currentSum - prevSum) / prevSum) * 100;
+      growthStr = `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`;
+      hasGrowthVal = pct >= 0;
+    } else if (currentSum > 0) {
+      growthStr = '+100%';
+      hasGrowthVal = true;
+    }
+
+    return {
+      currentMonthRevenue: currentSum,
+      momGrowth: growthStr,
+      hasGrowth: hasGrowthVal
+    };
+  }, [rawTenders]);
+
+  // Calculate dynamic customer MoM growth
+  const { customerGrowthPct, hasCustomerGrowth } = useMemo(() => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+
+    let currentCount = 0;
+    let prevCount = 0;
+
+    rawCustomers.forEach(c => {
+      if (!c.createdAt) return;
+      const d = new Date(c.createdAt);
+      if (d.getFullYear() === currentYear && d.getMonth() === currentMonth) {
+        currentCount++;
+      } else if (
+        (currentMonth === 0 && d.getFullYear() === currentYear - 1 && d.getMonth() === 11) ||
+        (currentMonth > 0 && d.getFullYear() === currentYear && d.getMonth() === currentMonth - 1)
+      ) {
+        prevCount++;
+      }
+    });
+
+    let growthStr = '0%';
+    let hasGrowthVal = false;
+    if (prevCount > 0) {
+      const pct = ((currentCount - prevCount) / prevCount) * 100;
+      growthStr = `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}% MoM`;
+      hasGrowthVal = pct >= 0;
+    } else if (currentCount > 0) {
+      growthStr = `+${currentCount} new`;
+      hasGrowthVal = true;
+    }
+
+    return {
+      customerGrowthPct: growthStr,
+      hasCustomerGrowth: hasGrowthVal
+    };
+  }, [rawCustomers]);
 
   // Chart data – from constants
-  const departmentBudgetData = rawCostCenters.map(cc => ({
+  const departmentBudgetData = costCenters.map(cc => ({
     name: cc.name.replace(' Cost Center', '').replace(' Overhead', '').slice(0, 15),
     Budget: Number(cc.budget || 0) / 100000 // In Lakhs
   }));
@@ -87,21 +163,6 @@ export function DashboardOverview() {
     { name: 'Draft', value: rawTenders.filter(t => t.status === 'DRAFT').length, color: '#6B7280' },
   ].filter(item => item.value > 0);
 
-  const revenueData = useMemo(() => {
-    const MONTH_ORDER = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const totals = new Map<string, number>();
-    rawTenders.forEach((tender) => {
-      // prefer dueDate, fall back to createdAt so every tender is counted
-      const dateStr = tender.dueDate || tender.createdAt;
-      if (!dateStr) return;
-      const month = new Date(dateStr).toLocaleString('default', { month: 'short' });
-      totals.set(month, (totals.get(month) ?? 0) + Number(tender.estimatedCost ?? 0));
-    });
-    // Sort by calendar month order, only include months that have data
-    return MONTH_ORDER
-      .filter((m) => totals.has(m))
-      .map((month) => ({ month, Revenue: totals.get(month)! }));
-  }, [rawTenders]);
 
   const customerGrowthData = useMemo(() => {
     const MONTH_ORDER = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -138,10 +199,7 @@ export function DashboardOverview() {
   }, [attendances]);
 
   const handleQuickCreate = (type: string) => {
-    if (type === 'Tender') navigate('/tender/tenders');
-    else if (type === 'Employee') navigate('/hrms/employees');
-    else if (type === 'Customer') navigate('/crm/customers');
-    else if (type === 'Log') navigate('/crm/communication');
+    toast.success(`Quick Create triggered for: ${type}`);
   };
 
   return (
@@ -194,10 +252,14 @@ export function DashboardOverview() {
           </div>
           <div className="mt-3.5 flex items-baseline justify-between">
             <span className="text-3xl font-extrabold tracking-tight">{rawCustomers.length}</span>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-success/15 text-success flex items-center gap-0.5">
-              <TrendingUp className="h-3 w-3" />
-              <span>+12% MoM</span>
-            </span>
+            {customerGrowthPct !== '0%' && (
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5 ${
+                hasCustomerGrowth ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'
+              }`}>
+                {hasCustomerGrowth && <TrendingUp className="h-3 w-3" />}
+                <span>{customerGrowthPct}</span>
+              </span>
+            )}
           </div>
           <p className="text-[10px] text-muted-foreground mt-1 font-medium">Active corporate accounts</p>
         </div>
@@ -205,18 +267,23 @@ export function DashboardOverview() {
         {/* Card 4 */}
         <div className="bg-card border border-border rounded-xl p-5 shadow-sm relative overflow-hidden group">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Budgets</span>
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Monthly Revenue</span>
             <div className="p-2 bg-primary/10 rounded-lg text-primary"><DollarSign className="h-4 w-4" /></div>
           </div>
           <div className="mt-3.5 flex items-baseline justify-between">
             <span className="text-3xl font-extrabold tracking-tight">
-              ₹{totalBudget >= 100000 ? `${(totalBudget / 100000).toFixed(1)}L` : totalBudget.toLocaleString()}
+              ₹{(currentMonthRevenue / 100000).toFixed(1)}L
             </span>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-success/15 text-success flex items-center gap-0.5">
-              <span>{rawCostCenters.length} Cost Centers</span>
-            </span>
+            {currentMonthRevenue > 0 && (
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5 ${
+                hasGrowth ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'
+              }`}>
+                {hasGrowth && <TrendingUp className="h-3 w-3" />}
+                <span>{momGrowth}</span>
+              </span>
+            )}
           </div>
-          <p className="text-[10px] text-muted-foreground mt-1 font-medium">Aggregated operational budgets</p>
+          <p className="text-[10px] text-muted-foreground mt-1 font-medium">Project sales receipts</p>
         </div>
       </div>
 
@@ -358,36 +425,107 @@ export function DashboardOverview() {
           </div>
         </div>
 
+      </div>
+
       {/* 4. LOWER LEVEL WIDGETS */}
-      <div className="grid grid-cols-1 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Quick Actions Panel */}
-        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+        <div className="bg-card border border-border rounded-xl p-5 shadow-sm flex flex-col justify-between">
           <div>
-            <h2 className="text-sm font-bold tracking-tight text-foreground">Operational Shortcuts</h2>
-            <p className="text-[10px] text-muted-foreground">Quick access actions to core system operations</p>
+            <h2 className="text-sm font-bold tracking-tight text-foreground">Operational Actions</h2>
+            <p className="text-[10px] text-muted-foreground">Shortcuts to common operations</p>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-            <Button variant="outline" size="sm" onClick={() => handleQuickCreate('Tender')} className="h-12 text-xs font-semibold justify-start gap-2.5 border-border hover:bg-muted/40 px-4">
-              <Plus className="h-4 w-4 text-primary" />
+          <div className="grid grid-cols-2 gap-2 mt-4">
+            <Button variant="outline" size="sm" onClick={() => handleQuickCreate('Tender')} className="h-10 text-xs font-semibold justify-start gap-2 border-border hover:bg-muted/40">
+              <Plus className="h-3.5 w-3.5 text-primary" />
               <span>Add Tender</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={() => handleQuickCreate('Employee')} className="h-12 text-xs font-semibold justify-start gap-2.5 border-border hover:bg-muted/40 px-4">
-              <Plus className="h-4 w-4 text-success" />
+            <Button variant="outline" size="sm" onClick={() => handleQuickCreate('Employee')} className="h-10 text-xs font-semibold justify-start gap-2 border-border hover:bg-muted/40">
+              <Plus className="h-3.5 w-3.5 text-success" />
               <span>Add Employee</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={() => handleQuickCreate('Customer')} className="h-12 text-xs font-semibold justify-start gap-2.5 border-border hover:bg-muted/40 px-4">
-              <Plus className="h-4 w-4 text-warning" />
+            <Button variant="outline" size="sm" onClick={() => handleQuickCreate('Customer')} className="h-10 text-xs font-semibold justify-start gap-2 border-border hover:bg-muted/40">
+              <Plus className="h-3.5 w-3.5 text-warning" />
               <span>Add Customer</span>
             </Button>
-            <Button variant="outline" size="sm" onClick={() => handleQuickCreate('Log')} className="h-12 text-xs font-semibold justify-start gap-2.5 border-border hover:bg-muted/40 px-4">
-              <Plus className="h-4 w-4 text-indigo-500" />
+            <Button variant="outline" size="sm" onClick={() => handleQuickCreate('Log')} className="h-10 text-xs font-semibold justify-start gap-2 border-border hover:bg-muted/40">
+              <Plus className="h-3.5 w-3.5 text-indigo-500" />
               <span>Log Call</span>
             </Button>
           </div>
+          <div className="border-t border-border pt-4 mt-4 flex items-center justify-between text-xs font-bold text-primary hover:underline cursor-pointer">
+            <span>Access system modules</span>
+            <ArrowRight className="h-3.5 w-3.5" />
+          </div>
         </div>
 
-      </div>
+        {/* Recent Tenders Pipeline Widget */}
+        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+          <div>
+            <h2 className="text-sm font-bold tracking-tight text-foreground">Recent Tenders Pipeline</h2>
+            <p className="text-[10px] text-muted-foreground">Latest updates in active bidding</p>
+          </div>
+          <div className="mt-4 space-y-3.5">
+            {rawTenders.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No tenders available.</p>
+            ) : (
+              rawTenders.slice(0, 5).map(tender => {
+                let statusBadgeColor = 'bg-muted text-muted-foreground border-border/10';
+                if (tender.status === 'OPEN') statusBadgeColor = 'bg-blue-500/10 text-blue-500 border-blue-500/20';
+                else if (tender.status === 'IN_PROGRESS') statusBadgeColor = 'bg-amber-500/10 text-amber-500 border-amber-500/20';
+                else if (tender.status === 'COMPLETED') statusBadgeColor = 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
+                else if (tender.status === 'SUBMITTED') statusBadgeColor = 'bg-purple-500/10 text-purple-500 border-purple-500/20';
+
+                return (
+                  <div key={tender.id} className="flex items-start justify-between gap-3 text-xs py-1 border-b border-border/30 last:border-0 last:pb-0">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-foreground truncate">{tender.title}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        Est. Cost: ₹{(Number(tender.estimatedCost || 0) / 100000).toFixed(2)}L
+                      </p>
+                    </div>
+                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded border shrink-0 uppercase tracking-wider ${statusBadgeColor}`}>
+                      {tender.status}
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Recently Joined Staff Widget */}
+        <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-sm font-bold tracking-tight text-foreground">Recently Joined Staff</h2>
+              <p className="text-[10px] text-muted-foreground">Latest additions to the directory</p>
+            </div>
+            <Activity className="h-4 w-4 text-muted-foreground/60" />
+          </div>
+          <div className="space-y-3.5">
+            {rawEmployees.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No employees available.</p>
+            ) : (
+              rawEmployees.slice(0, 5).map(emp => (
+                <div key={emp.id} className="flex items-center justify-between gap-3 text-xs py-1 border-b border-border/30 last:border-0 last:pb-0">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-foreground truncate">
+                      {emp.firstName} {emp.lastName}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      Code: {emp.employeeCode} &bull; Joined: {emp.dateOfJoining ? new Date(emp.dateOfJoining).toLocaleDateString() : 'N/A'}
+                    </p>
+                  </div>
+                  <span className="text-[9px] font-bold px-2 py-0.5 rounded border bg-emerald-500/10 text-emerald-500 border-emerald-500/20 shrink-0 uppercase tracking-wider">
+                    {emp.status}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
 
       </div>
 

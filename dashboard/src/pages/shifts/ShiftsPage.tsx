@@ -1,6 +1,6 @@
 import React from 'react';
 import { GenericCrudPage } from '@/components/shared/GenericCrudPage';
-import { shiftsConfig } from '@/constants/configs';
+import { shiftsConfig } from '@/configs';
 
 export function ShiftsPage() {
   return <GenericCrudPage {...shiftsConfig} />;

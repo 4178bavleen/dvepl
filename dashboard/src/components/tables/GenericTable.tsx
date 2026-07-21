@@ -29,7 +29,8 @@ import {
   Edit, 
   Trash2, 
   SlidersHorizontal,
-  ArrowUpDown
+  ArrowUpDown,
+  Loader2
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useERPStore } from '@/store/erpStore';
@@ -351,16 +352,14 @@ export function GenericTable<TData extends { id: string }>({
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              // Skeletons for Loading State
-              Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i} className="animate-pulse border-b border-border/50">
-                  {tableColumns.map((_, colIndex) => (
-                    <TableCell key={colIndex} className="py-4 px-4">
-                      <div className="h-4 bg-muted rounded-md w-full" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
+              <TableRow>
+                <TableCell colSpan={tableColumns.length} className="h-48 text-center py-12">
+                  <div className="flex flex-col items-center justify-center gap-3">
+                    <Loader2 className="animate-spin text-primary size-8" />
+                    <span className="text-xs text-muted-foreground uppercase tracking-widest font-semibold animate-pulse">Loading Records...</span>
+                  </div>
+                </TableCell>
+              </TableRow>
             ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow

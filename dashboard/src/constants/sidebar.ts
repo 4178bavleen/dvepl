@@ -65,12 +65,16 @@ export const sidebarItems: SidebarItem[] = [
   { name: 'Divisions', icon: Network, path: ROUTES.TENDER_DIVISIONS, section: 'Tender Management' },
   { name: 'Sub Divisions', icon: Users2, path: ROUTES.TENDER_SUBDIVISIONS, section: 'Tender Management' },
   { name: 'Reference Codes', icon: FileCheck, path: ROUTES.TENDER_REF_CODES, section: 'Tender Management' },
+  { name: 'Technical Clarifications', icon: MessageSquare, path: ROUTES.TENDER_CLARIFICATIONS, section: 'Tender Management' },
+  { name: 'Quotations', icon: FileText, path: ROUTES.TENDER_QUOTATIONS, section: 'Tender Management' },
+  { name: 'Sales Orders', icon: FileCheck, path: ROUTES.TENDER_SALES_ORDERS, section: 'Tender Management' },
 
   // Security & Audits
   { name: 'Users', icon: UserCheck, path: ROUTES.SECURITY_USERS, section: 'Security' },
   { name: 'Roles', icon: ShieldCheck, path: ROUTES.SECURITY_ROLES, section: 'Security' },
   { name: 'Permissions', icon: Zap, path: ROUTES.SECURITY_PERMISSIONS, section: 'Security' },
   { name: 'Permission Groups', icon: FolderOpen, path: ROUTES.SECURITY_PERMISSION_GROUPS, section: 'Security' },
+  { name: 'Approval Rules', icon: Settings2, path: ROUTES.SETTINGS_APPROVAL_RULES, section: 'Security' },
   { name: 'Audit Logs', icon: AuditIcon, path: ROUTES.AUDIT_LOGS },
   { name: 'Settings', icon: Settings2, path: ROUTES.SETTINGS }
 ];

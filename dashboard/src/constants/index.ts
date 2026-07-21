@@ -4,4 +4,4 @@ export * from './crm';
 export * from './tender';
 export * from './security';
 export * from './translations';
-export * from './configs';
+export * from '../configs';

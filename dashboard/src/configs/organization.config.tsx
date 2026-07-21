@@ -32,6 +32,7 @@ export const companiesConfig = {
   defaultFormValues: { name: '', gst: '', pan: '', email: '', phone: '', address: '', isActive: true },
   breadcrumbs: [{ label: 'Dashboard', href: '/' }, { label: 'Companies' }],
   columns: [
+    { accessorKey: 'id', header: 'ID', enableSorting: false },
     { accessorKey: 'name', header: sortableHeader('Name') },
     { accessorKey: 'gst', header: 'GSTIN' },
     { accessorKey: 'pan', header: 'PAN' },
@@ -183,6 +184,7 @@ export const teamsConfig = {
   selectOptions: { departmentId: organizationApi.departments.list },
   breadcrumbs: [{ label: 'Dashboard', href: '/' }, { label: 'Teams' }],
   columns: [
+    { accessorKey: 'id', header: 'ID' },
     { accessorKey: 'name', header: sortableHeader('Team Name') },
     { accessorKey: 'departmentId', header: 'Department ID' },
     { 

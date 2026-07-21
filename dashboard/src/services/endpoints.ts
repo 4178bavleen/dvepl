@@ -161,5 +161,80 @@ export const API_ENDPOINTS = {
       list: '/reference-code/read/',
       regenerate: (tenderId: string) => `/reference-code/regenerate/${tenderId}`
     },
+
+    technicalClarifications: {
+      list: '/technical-clarification/read/',
+      create: '/technical-clarification/create',
+      update: (id: string) => `/technical-clarification/update/${id}`,
+      remove: (id: string) => `/technical-clarification/delete/${id}`
+    },
+  },
+  quotation: {
+    quotations: {
+      list: '/quotation/read/',
+      create: '/quotation/create/',
+      update: (id: string) => `/quotation/update/${id}`,
+      remove: (id: string) => `/quotation/delete/${id}`,
+      submit: (id: string) => `/quotation/action/${id}/submit`,
+      send: (id: string) => `/quotation/action/${id}/send`,
+      respond: (id: string) => `/quotation/action/${id}/respond`,
+      revise: (id: string) => `/quotation/action/${id}/revise`,
+    },
+    items: {
+      list: '/quotation-item/read/',
+      create: '/quotation-item/create/',
+      update: (id: string) => `/quotation-item/update/${id}`,
+      remove: (id: string) => `/quotation-item/delete/${id}`,
+    },
+    approvals: {
+      list: '/quotation-approval/read/',
+      create: '/quotation-approval/create/',
+      update: (id: string) => `/quotation-approval/update/${id}`,
+      remove: (id: string) => `/quotation-approval/delete/${id}`,
+    },
+    activities: {
+      list: '/quotation-activity/read/',
+      create: '/quotation-activity/create/',
+      remove: (id: string) => `/quotation-activity/delete/${id}`,
+    },
+  },
+  salesOrder: {
+    salesOrders: {
+      list: '/sales-order/read/',
+      create: '/sales-order/create/',
+      update: (id: string) => `/sales-order/update/${id}`,
+      remove: (id: string) => `/sales-order/delete/${id}`,
+    },
+  },
+  approvalRule: {
+    approvalRules: {
+      list: '/approval-rule/read/',
+      create: '/approval-rule/create/',
+      update: (id: string) => `/approval-rule/update/${id}`,
+      remove: (id: string) => `/approval-rule/delete/${id}`,
+    },
+  },
+  security: {
+    users: {
+      list: '/user/read/',
+      create: '/user/create/',
+      update: (id: string) => `/user/update/${id}`,
+      remove: (id: string) => `/user/delete/${id}`,
+    },
+    roles: {
+      list: '/role/read/',
+      create: '/role/create/',
+      update: (id: string) => `/role/update/${id}`,
+      remove: (id: string) => `/role/delete/${id}`,
+    },
+    permissions: {
+      list: '/permission/read/',
+    },
+    permissionGroups: {
+      list: '/permission-group/read/',
+      create: '/permission-group/create/',
+      update: (id: string) => `/permission-group/update/${id}`,
+      remove: (id: string) => `/permission-group/delete/${id}`,
+    },
   },
 } as const;

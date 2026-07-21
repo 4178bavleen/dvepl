@@ -32,6 +32,9 @@ export const ROUTES = {
   TENDER_DIVISIONS: '/tender/divisions',
   TENDER_SUBDIVISIONS: '/tender/subdivisions',
   TENDER_REF_CODES: '/tender/reference-codes',
+  TENDER_CLARIFICATIONS: '/tender/clarifications',
+  TENDER_QUOTATIONS: '/tender/quotations',
+  TENDER_SALES_ORDERS: '/tender/sales-orders',
 
   // Security
   SECURITY_USERS: '/security/users',
@@ -41,4 +44,5 @@ export const ROUTES = {
   
   AUDIT_LOGS: '/audit-logs',
   SETTINGS: '/settings',
+  SETTINGS_APPROVAL_RULES: '/settings/approval-rules',
 };

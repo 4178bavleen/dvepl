@@ -4,6 +4,7 @@ import { ProtectedRoute } from '@/app/routes/protected';
 import { PublicRoute } from '@/app/routes/public';
 import { UiConfigProvider } from '@/contexts/ui/UiConfigContext';
 import NotFound from '@/pages/NotFound';
+import PageLoader from '@/components/ui/PageLoader';
 
 // Auth
 const LoginPage = lazy(() => import('@/pages/auth/LoginPage'));
@@ -41,6 +42,8 @@ const SectionsPage = lazy(() => import('@/pages/tenders/SectionsPage'));
 const DivisionsPage = lazy(() => import('@/pages/tenders/DivisionsPage'));
 const SubDivisionsPage = lazy(() => import('@/pages/tenders/SubDivisionsPage'));
 const ReferenceCodesPage = lazy(() => import('@/pages/tenders/ReferenceCodesPage'));
+const TechnicalClarificationsPage = lazy(() => import('@/pages/tenders/TechnicalClarificationsPage'));
+const QuotationsPage = lazy(() => import('@/pages/tenders/QuotationsPage'));
 
 // Security & Audit
 const UsersPage = lazy(() => import('@/pages/roles/UsersPage'));
@@ -54,13 +57,7 @@ const SettingsPage = lazy(() => import('@/pages/settings/SettingsPage'));
 const ProfilePage = lazy(() => import('@/pages/profile/ProfilePage'));
 const NotificationsPage = lazy(() => import('@/pages/notifications/NotificationsPage'));
 
-const PageLoader = () => (
-  <div className="flex items-center justify-center min-h-[500px] w-full">
-    <div className="text-[9px] uppercase tracking-[0.3em] text-muted-foreground/65 font-bold animate-pulse">
-      Initialising System
-    </div>
-  </div>
-);
+
 
 export function AppRouter() {
   return (
@@ -103,6 +100,8 @@ export function AppRouter() {
               <Route path="/tender/divisions" element={<DivisionsPage />} />
               <Route path="/tender/subdivisions" element={<SubDivisionsPage />} />
               <Route path="/tender/reference-codes" element={<ReferenceCodesPage />} />
+              <Route path="/tender/clarifications" element={<TechnicalClarificationsPage />} />
+              <Route path="/tender/quotations" element={<QuotationsPage />} />
               {/* Security */}
               <Route path="/security/users" element={<UsersPage />} />
               <Route path="/security/roles" element={<RolesPage />} />
