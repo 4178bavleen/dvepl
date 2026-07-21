@@ -79,7 +79,15 @@ export enum OtpPurpose {
   PHONE_VERIFICATION = 'PHONE_VERIFICATION',
   PASSWORD_RESET = 'PASSWORD_RESET'
 }
-
+export enum LeadStatus {
+  NEW = "NEW",
+  CONTACTED = "CONTACTED",
+  QUALIFIED = "QUALIFIED",
+  PROPOSAL_SENT = "PROPOSAL_SENT",
+  NEGOTIATION = "NEGOTIATION",
+  WON = "WON",
+  LOST = "LOST",
+}
 export interface Company {
   id: string;
   name: string;
@@ -172,6 +180,26 @@ export interface Role {
   name: string;
   description?: string | null;
   isSystem: boolean;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+}
+export interface Lead {
+  id: string;
+  companyId: string;
+
+  name: string;
+  company?: string | null;
+  email?: string | null;
+  phone?: string | null;
+
+  source?: string | null;
+  status: LeadStatus;
+
+  assignedToId?: string | null;
+
+  remarks?: string | null;
+
   createdAt: string;
   updatedAt: string;
   deletedAt?: string | null;
