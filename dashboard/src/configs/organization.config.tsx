@@ -40,15 +40,15 @@ export const companiesConfig = {
   },
   breadcrumbs: [{ label: "Dashboard", href: "/" }, { label: "Companies" }],
   columns: [
-    { accessorKey: 'id', header: 'ID', enableSorting: false },
-    { accessorKey: 'name', header: sortableHeader('Name') },
-    { accessorKey: 'gst', header: 'GSTIN' },
-    { accessorKey: 'pan', header: 'PAN' },
-    { accessorKey: 'email', header: 'Email' },
-    { accessorKey: 'phone', header: 'Phone' },
-    { 
-      accessorKey: 'isActive', 
-      header: 'Status',
+    { accessorKey: "id", header: "ID", enableSorting: false },
+    { accessorKey: "name", header: sortableHeader("Name") },
+    { accessorKey: "gst", header: "GSTIN" },
+    { accessorKey: "pan", header: "PAN" },
+    { accessorKey: "email", header: "Email" },
+    { accessorKey: "phone", header: "Phone" },
+    {
+      accessorKey: "isActive",
+      header: "Status",
       cell: ({ getValue }) => {
         const val = getValue();
         return (
@@ -270,24 +270,29 @@ export const teamsConfig = {
     departmentId: z.string().min(1, "Select a department"),
     isActive: z.boolean().default(true),
   }),
-  defaultFormValues: { name: '', departmentId: '', isActive: true },
+  defaultFormValues: { name: "", departmentId: "", isActive: true },
   selectOptions: { departmentId: organizationApi.departments.list },
-  breadcrumbs: [{ label: 'Dashboard', href: '/' }, { label: 'Teams' }],
+  breadcrumbs: [{ label: "Dashboard", href: "/" }, { label: "Teams" }],
   columns: [
-    { accessorKey: 'id', header: 'ID' },
-    { accessorKey: 'name', header: sortableHeader('Team Name') },
-    { accessorKey: 'departmentId', header: 'Department ID' },
-    { 
-      accessorKey: 'isActive', 
-      header: 'Status',
+    { accessorKey: "id", header: "ID" },
+    { accessorKey: "name", header: sortableHeader("Team Name") },
+    { accessorKey: "departmentId", header: "Department ID" },
+    {
+      accessorKey: "isActive",
+      header: "Status",
       cell: ({ getValue }) => (
-        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${getValue() ? 'bg-success/15 text-success' : 'bg-muted-foreground/15 text-muted-foreground'}`}>
-          {getValue() ? 'Active' : 'Inactive'}
+        <span
+          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+            getValue()
+              ? "bg-success/15 text-success"
+              : "bg-muted-foreground/15 text-muted-foreground"
+          }`}
+        >
+          {getValue() ? "Active" : "Inactive"}
         </span>
-      );
+      ),
     },
-  },
-] as ColumnDef<Team>[],
+  ] as ColumnDef<Team>[],
 
   fields: [
     {
