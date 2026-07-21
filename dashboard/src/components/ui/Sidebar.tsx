@@ -23,8 +23,7 @@ export default function Sidebar() {
 
 
   const t = (key: string) => {
-    const lang = store.language || 'English';
-    return translations[lang]?.[key] || key;
+    return key;
   };
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);

@@ -1,6 +1,6 @@
 import React from 'react';
 import { GenericCrudPage } from '@/components/shared/GenericCrudPage';
-import { holidaysConfig } from '@/constants/configs';
+import { holidaysConfig } from '@/configs';
 
 export function HolidaysPage() {
   return <GenericCrudPage {...holidaysConfig} />;

@@ -1,6 +1,6 @@
 import React from 'react';
 import { GenericCrudPage } from '@/components/shared/GenericCrudPage';
-import { divisionsConfig } from '@/constants/configs';
+import { divisionsConfig } from '@/configs';
 
 export function DivisionsPage() {
   return <GenericCrudPage {...divisionsConfig} />;

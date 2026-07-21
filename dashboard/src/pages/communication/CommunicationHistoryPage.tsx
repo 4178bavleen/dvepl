@@ -1,6 +1,6 @@
 import React from 'react';
 import { GenericCrudPage } from '@/components/shared/GenericCrudPage';
-import { communicationConfig } from '@/constants/configs';
+import { communicationConfig } from '@/configs';
 
 export function CommunicationHistoryPage() {
   return <GenericCrudPage {...communicationConfig} />;

@@ -1,6 +1,6 @@
 import React from 'react';
 import { GenericCrudPage } from '@/components/shared/GenericCrudPage';
-import { permissionGroupsConfig } from '@/constants/configs';
+import { permissionGroupsConfig } from '@/configs';
 
 export function PermissionGroupsPage() {
   return <GenericCrudPage {...permissionGroupsConfig} />;

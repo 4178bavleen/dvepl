@@ -1,6 +1,6 @@
 import React from 'react';
 import { GenericCrudPage } from '@/components/shared/GenericCrudPage';
-import { usersConfig } from '@/constants/configs';
+import { usersConfig } from '@/configs';
 
 export function UsersPage() {
   return <GenericCrudPage {...usersConfig} />;

@@ -13,14 +13,14 @@ export interface FooterLink {
 }
 
 export interface UiConfig {
-  readonly sidebarItems: readonly SidebarItem[];
-  readonly navLinks: readonly NavLink[];
-  readonly footerLinks: readonly FooterLink[];
-  readonly fallback: {
-    readonly title: string;
-    readonly message: string;
-    readonly ctaLabel: string;
-    readonly ctaPath: string;
+  sidebarItems: SidebarItem[];
+  navLinks: NavLink[];
+  footerLinks: FooterLink[];
+  fallback: {
+    title: string;
+    message: string;
+    ctaLabel: string;
+    ctaPath: string;
   };
 }
 
@@ -28,7 +28,7 @@ export interface UiConfig {
 import { defaultUiConfig } from '@/constants/uiConfig';
 
 // Use the imported config as the initial state
-const defaultConfig: UiConfig = defaultUiConfig;
+const defaultConfig: UiConfig = defaultUiConfig as unknown as UiConfig;
 
 // Context --------------------------------------------------------
 const UiConfigContext = createContext<{ config: UiConfig; setConfig: React.Dispatch<React.SetStateAction<UiConfig>> } | undefined>(undefined);

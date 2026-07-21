@@ -1,7 +1,9 @@
 import { ColumnDef } from '@tanstack/react-table';
 import * as z from 'zod';
 import { sortableHeader } from '@/components/tables/GenericTable';
-import { crmApi, tenderApi } from '@/services/modules';
+import { crmApi, tenderApi, hrmsApi, securityApi } from '@/services/modules';
+import { Link } from 'react-router-dom';
+import { HelpCircle } from 'lucide-react';
 import { 
   Tender, 
   TenderRequest, 
@@ -17,7 +19,11 @@ import {
 // ==========================================
 export const tenderRequestsConfig = {
   api: tenderApi.requests,
-  selectOptions: { customerId: crmApi.customers.list },
+  selectOptions: { 
+    customerId: crmApi.customers.list,
+    assignedToId: securityApi.users.list,
+    createdById: hrmsApi.employees.list,
+  },
   tableName: 'tenderRequests',
   moduleName: 'Tender Request',
   pluralName: 'Tender Requests',
@@ -27,9 +33,11 @@ export const tenderRequestsConfig = {
     description: z.string().optional().nullable(),
     estimatedValue: z.coerce.number(),
     source: z.string().default('EMAIL'),
-    status: z.string().default('NEW')
+    status: z.string().default('NEW'),
+    assignedToId: z.string().optional().nullable(),
+    createdById: z.string().optional().nullable(),
   }),
-  defaultFormValues: { customerId: 'cust-1', title: '', description: '', estimatedValue: '0', source: 'EMAIL', status: 'NEW' },
+  defaultFormValues: { customerId: 'cust-1', title: '', description: '', estimatedValue: '0', source: 'EMAIL', status: 'NEW', assignedToId: '', createdById: '' },
   breadcrumbs: [{ label: 'Dashboard', href: '/' }, { label: 'Tender Requests' }],
   columns: [
     { accessorKey: 'title', header: sortableHeader('Request Title') },
@@ -85,7 +93,9 @@ export const tenderRequestsConfig = {
       { label: 'Qualified Lead', value: 'QUALIFIED' },
       { label: 'Won Deal', value: 'WON' },
       { label: 'Lost Opportunity', value: 'LOST' }
-    ] }
+    ] },
+    { name: 'assignedToId', label: 'Assigned Engineer / User', type: 'select' },
+    { name: 'createdById', label: 'Created By Employee', type: 'select' },
   ] as any[],
   statsCards: (data: TenderRequest[]) => [
     { label: 'Total RFPs Received', value: data.length },
@@ -98,21 +108,50 @@ export const tenderRequestsConfig = {
 // ==========================================
 export const tendersConfig = {
   api: tenderApi.tenders,
-  selectOptions: { customerId: crmApi.customers.list },
+  selectOptions: { 
+    customerId: crmApi.customers.list,
+    departmentId: tenderApi.governmentDepartments.list,
+    sectionId: tenderApi.sections.list,
+    divisionId: tenderApi.divisions.list,
+    subDivisionId: tenderApi.subDivisions.list,
+    tenderRequestId: tenderApi.requests.list,
+    assignedToId: securityApi.users.list,
+  },
   tableName: 'tenders',
   moduleName: 'Tender Bidding File',
   pluralName: 'Tender Bids',
   zodSchema: z.object({
     customerId: z.string().min(1, 'Select customer'),
+    tenderRequestId: z.string().optional().nullable(),
+    departmentId: z.string().optional().nullable(),
+    sectionId: z.string().optional().nullable(),
+    divisionId: z.string().optional().nullable(),
+    subDivisionId: z.string().optional().nullable(),
     tenderNo: z.string().min(2, 'Enter tender bidding file number'),
     title: z.string().min(2, 'Enter tender bidding title'),
     description: z.string().optional().nullable(),
     projectLocation: z.string().optional().nullable(),
     estimatedCost: z.coerce.number(),
     dueDate: z.string().min(2, 'Select due date'),
-    status: z.string().default('DRAFT')
+    status: z.string().default('DRAFT'),
+    assignedToId: z.string().optional().nullable(),
   }),
-  defaultFormValues: { customerId: 'cust-1', tenderNo: '', title: '', description: '', projectLocation: '', estimatedCost: '0', dueDate: '', status: 'DRAFT' },
+  defaultFormValues: {
+    customerId: 'cust-1',
+    tenderRequestId: '',
+    departmentId: '',
+    sectionId: '',
+    divisionId: '',
+    subDivisionId: '',
+    tenderNo: '',
+    title: '',
+    description: '',
+    projectLocation: '',
+    estimatedCost: '0',
+    dueDate: '',
+    status: 'DRAFT',
+    assignedToId: '',
+  },
   breadcrumbs: [{ label: 'Dashboard', href: '/' }, { label: 'Tenders Pipeline' }],
   columns: [
     { accessorKey: 'tenderCode', header: sortableHeader('System Ref Code') },
@@ -136,6 +175,22 @@ export const tendersConfig = {
           </span>
         );
       }
+    },
+    {
+      id: 'clarifications',
+      header: 'Clarifications',
+      cell: ({ row }) => {
+        const tender = row.original;
+        return (
+          <Link
+            to={`/tender/clarifications?tenderId=${tender.id}`}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-all cursor-pointer"
+          >
+            <HelpCircle className="size-3.5" />
+            <span>Ask / View</span>
+          </Link>
+        );
+      }
     }
   ] as ColumnDef<Tender>[],
   fields: [
@@ -144,19 +199,25 @@ export const tendersConfig = {
       { label: 'Larsen & Toubro Ltd', value: 'cust-2' },
       { label: 'ONGC', value: 'cust-3' }
     ], required: true },
+    { name: 'tenderRequestId', label: 'Linked Tender Request', type: 'select' },
+    { name: 'departmentId', label: 'Government Department', type: 'select' },
+    { name: 'sectionId', label: 'Link Section', type: 'select' },
+    { name: 'divisionId', label: 'Link Division', type: 'select' },
+    { name: 'subDivisionId', label: 'Link Sub Division', type: 'select' },
     { name: 'tenderNo', label: 'Client RFP Tender No', type: 'text', placeholder: 'TND-2026-CR-089', required: true },
     { name: 'title', label: 'Tender Project Name', type: 'text', placeholder: 'Supply and Testing of Cast Steel Gate Valves', required: true },
     { name: 'estimatedCost', label: 'Project Valuation Bid Value (INR)', type: 'number', placeholder: '1500000', required: true },
     { name: 'dueDate', label: 'Bid Submission Deadline', type: 'date', required: true },
     { name: 'projectLocation', label: 'Project Site Location', type: 'text', placeholder: 'Central Railway Workshop, Kurla' },
     { name: 'description', label: 'Internal Bid Scope Remarks', type: 'textarea', placeholder: 'Triple-offset body material parameters' },
+    { name: 'assignedToId', label: 'Assigned Estimator / User', type: 'select' },
     { name: 'status', label: 'Bid Pipeline Status', type: 'select', options: [
       { label: 'Draft Bid Doc', value: 'DRAFT' },
       { label: 'Open Public Bidding', value: 'OPEN' },
       { label: 'Assigned Estimator', value: 'ASSIGNED' },
       { label: 'In Progress Prep', value: 'IN_PROGRESS' },
       { label: 'Submitted to Client', value: 'SUBMITTED' },
-      { label: 'Won and Awarded', value: 'COMPLETED' },
+      { label: 'Completed', value: 'COMPLETED' },
       { label: 'Cancelled Bidding', value: 'CANCELLED' }
     ] }
   ] as any[],
@@ -347,3 +408,106 @@ export const referenceCodesConfig = {
     { label: 'Total Codes Issued', value: data.length }
   ]
 };
+
+// ==========================================
+// 23. TECHNICAL CLARIFICATIONS CONFIG
+// ==========================================
+export const technicalClarificationsConfig = {
+  api: tenderApi.technicalClarifications,
+  selectOptions: {
+    tenderId: tenderApi.tenders.list,
+  },
+  tableName: 'technicalClarifications',
+  moduleName: 'Technical Clarification',
+  pluralName: 'Technical Clarifications',
+  zodSchema: z.object({
+    tenderId: z.string().optional().nullable(),
+    tenderRequestId: z.string().optional().nullable(),
+    category: z.string().default('TECHNICAL'),
+    question: z.string().min(5, 'Enter the clarification question'),
+    answer: z.string().optional().nullable(),
+    status: z.string().default('OPEN'),
+    isInternal: z.boolean().default(false),
+  }).refine(data => data.tenderId || data.tenderRequestId, {
+    message: 'Must be linked to a Tender or Tender Request',
+    path: ['tenderId'],
+  }),
+  defaultFormValues: {
+    tenderId: '', tenderRequestId: '', category: 'TECHNICAL',
+    question: '', answer: '', status: 'OPEN', isInternal: false,
+  },
+  breadcrumbs: [
+    { label: 'Dashboard', href: '/' },
+    { label: 'Tenders', href: '/tender/tenders' },
+    { label: 'Technical Clarifications' }
+  ],
+  columns: [
+    { accessorKey: 'questionNo', header: 'Q. No', cell: ({ getValue }: any) => `#${getValue()}` },
+    {
+      accessorKey: 'tender',
+      header: 'Linked Tender',
+      cell: ({ getValue }: any) => getValue()?.title || getValue()?.tenderNo || '—'
+    },
+    { accessorKey: 'category', header: 'Category' },
+    { accessorKey: 'question', header: 'Question', cell: ({ getValue }: any) => {
+      const val = getValue() as string;
+      return val?.length > 60 ? val.slice(0, 60) + '…' : val;
+    }},
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ getValue }: any) => {
+        const val = getValue() as string;
+        return (
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+            val === 'OPEN'     ? 'bg-warning/15 text-warning' :
+            val === 'ANSWERED' ? 'bg-success/15 text-success' :
+            val === 'CLOSED'   ? 'bg-muted-foreground/15 text-muted-foreground' :
+            'bg-primary/15 text-primary'
+          }`}>
+            {val}
+          </span>
+        );
+      }
+    },
+    {
+      accessorKey: 'isInternal',
+      header: 'Visibility',
+      cell: ({ getValue }: any) => (
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${getValue() ? 'bg-destructive/15 text-destructive' : 'bg-success/15 text-success'}`}>
+          {getValue() ? 'Internal' : 'Customer-Facing'}
+        </span>
+      )
+    },
+    {
+      accessorKey: 'answeredAt',
+      header: 'Answered At',
+      cell: ({ getValue }: any) => getValue() ? new Date(getValue()).toLocaleDateString() : '—'
+    },
+  ] as ColumnDef<any>[],
+  fields: [
+    { name: 'tenderId', label: 'Linked Tender', type: 'select', required: false },
+    { name: 'category', label: 'Category', type: 'select', options: [
+      { label: 'Technical', value: 'TECHNICAL' },
+      { label: 'Commercial', value: 'COMMERCIAL' },
+      { label: 'Scope', value: 'SCOPE' },
+      { label: 'Document', value: 'DOCUMENT' },
+      { label: 'Legal', value: 'LEGAL' },
+    ], required: true },
+    { name: 'question', label: 'Clarification Question', type: 'textarea', placeholder: 'What is the minimum cable size required for LT Panel feeder?', required: true },
+    { name: 'answer', label: 'Answer / Response', type: 'textarea', placeholder: 'Minimum 4 sq.mm copper conductor is required.' },
+    { name: 'status', label: 'Status', type: 'select', options: [
+      { label: 'Open', value: 'OPEN' },
+      { label: 'Answered', value: 'ANSWERED' },
+      { label: 'Closed', value: 'CLOSED' },
+    ] },
+    { name: 'isInternal', label: 'Internal Note Only (not visible to customer)', type: 'checkbox' },
+  ] as any[],
+  statsCards: (data: any[]) => [
+    { label: 'Total Clarifications', value: data.length },
+    { label: 'Open', value: data.filter(d => d.status === 'OPEN').length },
+    { label: 'Answered', value: data.filter(d => d.status === 'ANSWERED').length },
+    { label: 'Internal Notes', value: data.filter(d => d.isInternal).length },
+  ]
+};
+

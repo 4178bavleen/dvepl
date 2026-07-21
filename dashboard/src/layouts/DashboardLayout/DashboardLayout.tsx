@@ -30,8 +30,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { logout } = useAuth();
 
   const t = (key: string) => {
-    const lang = store.language || 'English';
-    return translations[lang]?.[key] || key;
+    return key;
   };
 
   // Component UI States
@@ -61,7 +60,6 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         if (!isMounted) return;
         setHeaderCompanies(companies.map((company) => ({ id: company.id, name: String(company.name ?? '') })));
         setProfile(userProfile);
-        if (userProfile.id) store.setUserId(userProfile.id);
         if (userProfile.company?.id) store.setCompanyId(userProfile.company.id);
       })
       .catch(() => {
@@ -141,7 +139,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         <Header
           store={store}
           companies={companies}
-          currentUser={currentUser}
+          currentUser={currentUser as any}
           t={t}
           isNotificationOpen={isNotificationOpen}
           setIsNotificationOpen={setIsNotificationOpen}

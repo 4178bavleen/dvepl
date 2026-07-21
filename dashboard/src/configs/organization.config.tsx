@@ -40,15 +40,15 @@ export const companiesConfig = {
   },
   breadcrumbs: [{ label: "Dashboard", href: "/" }, { label: "Companies" }],
   columns: [
-    { accessorKey: "id", header: "ID", enableSorting: false },
-    { accessorKey: "name", header: sortableHeader("Name") },
-    { accessorKey: "gst", header: "GSTIN" },
-    { accessorKey: "pan", header: "PAN" },
-    { accessorKey: "email", header: "Email" },
-    { accessorKey: "phone", header: "Phone" },
-    {
-      accessorKey: "isActive",
-      header: "Status",
+    { accessorKey: 'id', header: 'ID', enableSorting: false },
+    { accessorKey: 'name', header: sortableHeader('Name') },
+    { accessorKey: 'gst', header: 'GSTIN' },
+    { accessorKey: 'pan', header: 'PAN' },
+    { accessorKey: 'email', header: 'Email' },
+    { accessorKey: 'phone', header: 'Phone' },
+    { 
+      accessorKey: 'isActive', 
+      header: 'Status',
       cell: ({ getValue }) => {
         const val = getValue();
         return (
@@ -270,87 +270,19 @@ export const teamsConfig = {
     departmentId: z.string().min(1, "Select a department"),
     isActive: z.boolean().default(true),
   }),
-
-  defaultFormValues: {
-    name: "",
-    departmentId: "",
-    isActive: true,
-  },
-
-  selectOptions: {
-    departmentId: organizationApi.departments.list,
-  },
-
-  breadcrumbs: [
-    { label: "Dashboard", href: "/" },
-    { label: "Teams" },
-  ],
-
-columns: [
-  {
-    accessorKey: "name",
-    header: sortableHeader("Team"),
-    cell: ({ getValue }) => (
-      <div className="flex items-center gap-2 font-semibold">
-        <span className="text-lg"></span>
-        <span>{getValue() as string}</span>
-      </div>
-    ),
-  },
-
-  {
-    id: "department",
-    header: "Department",
-    cell: ({ row }) => (
-      <span className="rounded-full bg-violet-100 text-violet-700 px-3 py-1 text-xs font-medium">
-        {row.original.department?.name ?? "—"}
-      </span>
-    ),
-  },
-
-  {
-    id: "members",
-    header: "Members",
-    cell: ({ row }) => {
-      const count = row.original._count?.employees ?? 0;
-
-      return (
-        <div className="flex items-center gap-2">
-          <span className="rounded-full bg-sky-100 text-sky-700 px-3 py-1 text-xs font-semibold">
-            👥 {count} {count === 1 ? "Member" : "Members"}
-          </span>
-
-          <button
-            type="button"
-            className="text-xs font-medium text-primary hover:underline"
-            onClick={() => {
-              // Open dialog / drawer here
-              console.log(row.original.employees);
-            }}
-          >
-            View
-          </button>
-        </div>
-      );
-    },
-  },
-
-  {
-    accessorKey: "isActive",
-    header: "Status",
-    cell: ({ getValue }) => {
-      const active = getValue() as boolean;
-
-      return (
-        <span
-          className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
-            active
-              ? "bg-emerald-100 text-emerald-700"
-              : "bg-red-100 text-red-700"
-          }`}
-        >
-          <span className="h-2 w-2 rounded-full bg-current"></span>
-          {active ? "Active" : "Inactive"}
+  defaultFormValues: { name: '', departmentId: '', isActive: true },
+  selectOptions: { departmentId: organizationApi.departments.list },
+  breadcrumbs: [{ label: 'Dashboard', href: '/' }, { label: 'Teams' }],
+  columns: [
+    { accessorKey: 'id', header: 'ID' },
+    { accessorKey: 'name', header: sortableHeader('Team Name') },
+    { accessorKey: 'departmentId', header: 'Department ID' },
+    { 
+      accessorKey: 'isActive', 
+      header: 'Status',
+      cell: ({ getValue }) => (
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${getValue() ? 'bg-success/15 text-success' : 'bg-muted-foreground/15 text-muted-foreground'}`}>
+          {getValue() ? 'Active' : 'Inactive'}
         </span>
       );
     },

@@ -2,11 +2,13 @@ import { ColumnDef } from '@tanstack/react-table';
 import * as z from 'zod';
 import { sortableHeader } from '@/components/tables/GenericTable';
 import { User } from '@/types/erp';
+import { securityApi } from '@/services/modules';
 
 // ==========================================
 // 23. USERS ROUTE CONFIG
 // ==========================================
 export const usersConfig = {
+  api: securityApi.users,
   tableName: 'users',
   moduleName: 'User File',
   pluralName: 'Security Users',
@@ -48,6 +50,7 @@ export const usersConfig = {
 // 24. ROLES CONFIG
 // ==========================================
 export const rolesConfig = {
+  api: securityApi.roles,
   tableName: 'roles',
   moduleName: 'Role',
   pluralName: 'PRBAC Roles',
@@ -78,6 +81,7 @@ export const rolesConfig = {
 // 25. PERMISSIONS CONFIG
 // ==========================================
 export const permissionsConfig = {
+  api: securityApi.permissions,
   tableName: 'permissions',
   moduleName: 'Permission',
   pluralName: 'Granular Policies',
@@ -101,6 +105,7 @@ export const permissionsConfig = {
 // 26. PERMISSION GROUPS CONFIG
 // ==========================================
 export const permissionGroupsConfig = {
+  api: securityApi.permissionGroups,
   tableName: 'permissionGroups',
   moduleName: 'Permission Group',
   pluralName: 'Policy Categories',

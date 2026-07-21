@@ -1,6 +1,6 @@
 import React from 'react';
 import { GenericCrudPage } from '@/components/shared/GenericCrudPage';
-import { attendanceConfig } from '@/constants/configs';
+import { attendanceConfig } from '@/configs';
 
 export function AttendancePage() {
   return <GenericCrudPage {...attendanceConfig} />;

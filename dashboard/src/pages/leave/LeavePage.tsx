@@ -1,6 +1,6 @@
 import React from 'react';
 import { GenericCrudPage } from '@/components/shared/GenericCrudPage';
-import { leaveConfig } from '@/constants/configs';
+import { leaveConfig } from '@/configs';
 
 export function LeavePage() {
   return <GenericCrudPage {...leaveConfig} />;
