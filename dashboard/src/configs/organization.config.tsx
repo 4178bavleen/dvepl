@@ -11,7 +11,6 @@ import {
   CostCenter,
 } from "@/types/erp";
 
-
 // ==========================================
 // 1. COMPANIES ROUTE CONFIG
 // ==========================================
@@ -41,19 +40,6 @@ export const companiesConfig = {
   },
   breadcrumbs: [{ label: "Dashboard", href: "/" }, { label: "Companies" }],
   columns: [
-    { accessorKey: "id", header: "ID", enableSorting: false },
-    { accessorKey: "name", header: sortableHeader("Name") },
-    { accessorKey: "gst", header: "GSTIN" },
-    { accessorKey: "pan", header: "PAN" },
-    { accessorKey: "email", header: "Email" },
-    { accessorKey: "phone", header: "Phone" },
-    {
-      accessorKey: "isActive",
-<<<<<<< HEAD
-      header: "Status",
-=======
-      header: "Status"},
->>>>>>> 67ec60af2d3c804931b810fa758e06fb6d5f1bb9
     { accessorKey: "id", header: "ID", enableSorting: false },
     { accessorKey: "name", header: sortableHeader("Name") },
     { accessorKey: "gst", header: "GSTIN" },
