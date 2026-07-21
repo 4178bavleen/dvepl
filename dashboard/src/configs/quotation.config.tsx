@@ -2,8 +2,6 @@ import { ColumnDef } from '@tanstack/react-table';
 import * as z from 'zod';
 import { sortableHeader } from '@/components/tables/GenericTable';
 import { crmApi, tenderApi, hrmsApi, quotationApi } from '@/services/modules';
-import { Link } from 'react-router-dom';
-import { ClipboardList, UserCheck } from 'lucide-react';
 import { Quotation } from '@/types/erp';
 
 // ==========================================
@@ -22,39 +20,33 @@ export const quotationsConfig = {
   pluralName: 'Quotations',
   zodSchema: z.object({
     customerId: z.string().min(1, 'Select customer'),
-    tenderId: z.string().uuid('Invalid tender ID').optional().nullable(),
+    tenderId: z.string().optional().nullable(),
     materialCost: z.coerce.number().nonnegative(),
     labourCost: z.coerce.number().nonnegative(),
-    transportCost: z.coerce.number().nonnegative().default(0),
-    taxes: z.coerce.number().nonnegative().default(0),
+    transportation: z.coerce.number().nonnegative().default(0),
+    packing: z.coerce.number().nonnegative().default(0),
+    insurance: z.coerce.number().nonnegative().default(0),
     discount: z.coerce.number().nonnegative().default(0),
-    margin: z.coerce.number().nonnegative().default(0),
-    validityDays: z.coerce.number().int().positive().optional().nullable(),
-    paymentTerms: z.string().optional().nullable(),
-    deliveryDays: z.coerce.number().int().positive().optional().nullable(),
-    warrantyMonths: z.coerce.number().int().nonnegative().optional().nullable(),
-    specialTerms: z.string().optional().nullable(),
-    notes: z.string().optional().nullable(),
+    gst: z.coerce.number().nonnegative().default(0),
+    profitMargin: z.coerce.number().nonnegative().default(0),
+    validUntil: z.string().min(2, 'Select validity date'),
+    remarks: z.string().optional().nullable(),
     status: z.string().default('DRAFT'),
-    approvalRequired: z.boolean().default(true),
   }),
   defaultFormValues: {
     customerId: '',
     tenderId: '',
     materialCost: '0',
     labourCost: '0',
-    transportCost: '0',
-    taxes: '0',
+    transportation: '0',
+    packing: '0',
+    insurance: '0',
     discount: '0',
-    margin: '0',
-    validityDays: '30',
-    paymentTerms: '',
-    deliveryDays: '15',
-    warrantyMonths: '12',
-    specialTerms: '',
-    notes: '',
+    gst: '18',
+    profitMargin: '10',
+    validUntil: '',
+    remarks: '',
     status: 'DRAFT',
-    approvalRequired: true,
   },
   breadcrumbs: [
     { label: 'Dashboard', href: '/' },
@@ -62,7 +54,7 @@ export const quotationsConfig = {
   ],
   columns: [
     { accessorKey: 'quotationNo', header: sortableHeader('Quotation No') },
-    { accessorKey: 'revisionNo', header: sortableHeader('Rev') },
+    { accessorKey: 'revision', header: sortableHeader('Rev') },
     {
       accessorKey: 'customerId',
       header: 'Client Partner',
@@ -80,7 +72,7 @@ export const quotationsConfig = {
       },
     },
     {
-      accessorKey: 'totalValue',
+      accessorKey: 'finalAmount',
       header: 'Total Value',
       cell: ({ getValue }) => `₹${Number(getValue() || 0).toLocaleString()}`,
     },
@@ -94,7 +86,7 @@ export const quotationsConfig = {
             className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
               val === 'DRAFT'
                 ? 'bg-muted-foreground/15 text-muted-foreground'
-                : val === 'PENDING_APPROVAL'
+                : val === 'WAITING_APPROVAL'
                 ? 'bg-warning/15 text-warning'
                 : val === 'APPROVED'
                 ? 'bg-success/15 text-success'
@@ -104,10 +96,8 @@ export const quotationsConfig = {
                 ? 'bg-emerald-500/15 text-emerald-500'
                 : val === 'REJECTED'
                 ? 'bg-danger/15 text-danger'
-                : val === 'NEGOTIATING'
-                ? 'bg-yellow-500/15 text-yellow-500'
-                : val === 'REVISED'
-                ? 'bg-indigo-500/15 text-indigo-500'
+                : val === 'EXPIRED'
+                ? 'bg-red-500/15 text-red-500'
                 : 'bg-muted-foreground/15 text-muted-foreground'
             }`}
           >
@@ -146,14 +136,20 @@ export const quotationsConfig = {
       required: true,
     },
     {
-      name: 'transportCost',
-      label: 'Transport Cost (INR)',
+      name: 'transportation',
+      label: 'Transportation Cost (INR)',
       type: 'number',
       placeholder: '0',
     },
     {
-      name: 'taxes',
-      label: 'Taxes / Duties (INR)',
+      name: 'packing',
+      label: 'Packing Cost (INR)',
+      type: 'number',
+      placeholder: '0',
+    },
+    {
+      name: 'insurance',
+      label: 'Insurance Cost (INR)',
       type: 'number',
       placeholder: '0',
     },
@@ -164,51 +160,28 @@ export const quotationsConfig = {
       placeholder: '0',
     },
     {
-      name: 'margin',
-      label: 'Markup Margin (INR)',
+      name: 'gst',
+      label: 'GST Rate (%)',
       type: 'number',
-      placeholder: '0',
+      placeholder: '18',
     },
     {
-      name: 'validityDays',
-      label: 'Validity Duration (Days)',
+      name: 'profitMargin',
+      label: 'Profit Margin (%)',
       type: 'number',
-      placeholder: '30',
+      placeholder: '10',
     },
     {
-      name: 'paymentTerms',
-      label: 'Payment Milestones / Terms',
-      type: 'text',
-      placeholder: 'e.g. 50% advance, balance against delivery',
+      name: 'validUntil',
+      label: 'Valid Until',
+      type: 'date',
+      required: true,
     },
     {
-      name: 'deliveryDays',
-      label: 'Delivery Timeline (Days)',
-      type: 'number',
-      placeholder: '15',
-    },
-    {
-      name: 'warrantyMonths',
-      label: 'Warranty Scope (Months)',
-      type: 'number',
-      placeholder: '12',
-    },
-    {
-      name: 'specialTerms',
-      label: 'Special Terms (Erect / Install)',
+      name: 'remarks',
+      label: 'Remarks / Special Terms',
       type: 'textarea',
-      placeholder: 'Unloading or crane charges detail...',
-    },
-    {
-      name: 'notes',
-      label: 'Internal Notes',
-      type: 'textarea',
-      placeholder: 'Detailed busbar or panel spec comments...',
-    },
-    {
-      name: 'approvalRequired',
-      label: 'Requires Sequential Approvals',
-      type: 'checkbox',
+      placeholder: 'Remarks or special installation criteria...',
     },
     {
       name: 'status',
@@ -216,13 +189,12 @@ export const quotationsConfig = {
       type: 'select',
       options: [
         { label: 'Draft Mode', value: 'DRAFT' },
-        { label: 'Pending Management Approval', value: 'PENDING_APPROVAL' },
+        { label: 'Waiting Approval', value: 'WAITING_APPROVAL' },
         { label: 'Approved & Active', value: 'APPROVED' },
         { label: 'Sent to Client Account', value: 'SENT' },
         { label: 'Accepted by Client', value: 'ACCEPTED' },
         { label: 'Rejected by Client', value: 'REJECTED' },
-        { label: 'Commercial Negotiations', value: 'NEGOTIATING' },
-        { label: 'Superseded / Revised', value: 'REVISED' },
+        { label: 'Expired', value: 'EXPIRED' },
       ],
     },
   ] as any[],
@@ -231,7 +203,7 @@ export const quotationsConfig = {
     {
       label: 'Active Valuation Pipeline',
       value: `₹${data
-        .reduce((sum, item) => sum + Number(item.totalValue || 0), 0)
+        .reduce((sum, item) => sum + Number(item.finalAmount || item.totalValue || 0), 0)
         .toLocaleString()}`,
     },
   ],

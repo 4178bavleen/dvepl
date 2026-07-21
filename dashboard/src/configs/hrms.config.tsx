@@ -15,7 +15,13 @@ import {
 // ==========================================
 export const employeesConfig = {
   api: hrmsApi.employees,
-  selectOptions: { branchId: organizationApi.branches.list, departmentId: organizationApi.departments.list, designationId: organizationApi.designations.list },
+  selectOptions: { 
+    branchId: organizationApi.branches.list, 
+    departmentId: organizationApi.departments.list, 
+    designationId: organizationApi.designations.list,
+    teamId: organizationApi.teams.list,
+    reportsToId: hrmsApi.employees.list,
+  },
   tableName: 'employees',
   moduleName: 'Employee',
   pluralName: 'Employees',
@@ -27,10 +33,12 @@ export const employeesConfig = {
     gender: z.string().optional().nullable(),
     branchId: z.string().optional().nullable(),
     departmentId: z.string().optional().nullable(),
+    teamId: z.string().optional().nullable(),
     designationId: z.string().optional().nullable(),
+    reportsToId: z.string().optional().nullable(),
     status: z.string().default('ACTIVE')
   }),
-  defaultFormValues: { employeeCode: '', firstName: '', lastName: '', gender: 'MALE', branchId: 'branch-1', departmentId: 'dept-1', designationId: 'desg-4', status: 'ACTIVE' },
+  defaultFormValues: { employeeCode: '', firstName: '', lastName: '', gender: 'MALE', branchId: 'branch-1', departmentId: 'dept-1', teamId: '', designationId: 'desg-4', reportsToId: '', status: 'ACTIVE' },
   breadcrumbs: [{ label: 'Dashboard', href: '/' }, { label: 'Employees' }],
   columns: [
     { accessorKey: 'employeeCode', header: sortableHeader('Emp Code') },
@@ -98,12 +106,14 @@ export const employeesConfig = {
       { label: 'Human Resources', value: 'dept-2' },
       { label: 'Finance & Accounts', value: 'dept-3' }
     ] },
+    { name: 'teamId', label: 'Work Team', type: 'select' },
     { name: 'designationId', label: 'Designation', type: 'select', options: [
       { label: 'Managing Director', value: 'desg-1' },
       { label: 'Operations Manager', value: 'desg-2' },
       { label: 'HR Manager', value: 'desg-3' },
       { label: 'Senior Proposal Engineer', value: 'desg-4' }
     ] },
+    { name: 'reportsToId', label: 'Reports To (Supervisor)', type: 'select' },
     { name: 'status', label: 'Status', type: 'select', options: [
       { label: 'Active', value: 'ACTIVE' },
       { label: 'On Leave', value: 'ON_LEAVE' },

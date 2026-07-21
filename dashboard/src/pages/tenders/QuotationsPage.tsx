@@ -190,22 +190,30 @@ export function QuotationsPage() {
 
   const openEditMode = (record: any) => {
     setEditingQuotation(record);
+    
+    let valDays = record.validityDays;
+    if (!valDays && record.validUntil) {
+      const diffTime = new Date(record.validUntil).getTime() - new Date(record.createdAt ?? Date.now()).getTime();
+      valDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    }
+    if (!valDays) valDays = 30;
+
     setFormValues({
       customerId: record.customerId,
       tenderId: record.tenderId ?? '',
       materialCost: Number(record.materialCost),
       labourCost: Number(record.labourCost),
-      transportCost: Number(record.transportCost),
-      taxes: Number(record.taxes),
+      transportCost: Number(record.transportCost ?? record.transportation ?? 0),
+      taxes: Number(record.taxes ?? record.gst ?? 0),
       discount: Number(record.discount),
-      margin: Number(record.margin),
-      validityDays: record.validityDays ?? 30,
+      margin: Number(record.margin ?? record.profitMargin ?? 0),
+      validityDays: Number(valDays),
       paymentTerms: record.paymentTerms ?? '',
       deliveryDays: record.deliveryDays ?? 15,
       warrantyMonths: record.warrantyMonths ?? 12,
-      specialTerms: record.specialTerms ?? '',
+      specialTerms: record.specialTerms ?? record.remarks ?? '',
       notes: record.notes ?? '',
-      approvalRequired: record.approvalRequired,
+      approvalRequired: record.approvalRequired ?? true,
     });
     // Load nested items
     const items = (record.items ?? []).map((item: any) => ({
@@ -237,6 +245,16 @@ export function QuotationsPage() {
 
     const payload = {
       ...formValues,
+      // Database model alignment
+      transportation: Number(formValues.transportCost),
+      gst: Number(formValues.taxes),
+      profitMargin: Number(formValues.margin),
+      validUntil: new Date(Date.now() + Number(formValues.validityDays) * 24 * 60 * 60 * 1000).toISOString(),
+      remarks: formValues.specialTerms || formValues.notes || null,
+      finalAmount: calculatedTotal,
+
+      // UI state / local compatibility
+      totalValue: calculatedTotal,
       tenderId: formValues.tenderId || null,
       materialCost: Number(formValues.materialCost),
       labourCost: Number(formValues.labourCost),
@@ -261,7 +279,7 @@ export function QuotationsPage() {
 
     try {
       if (editingQuotation) {
-        await quotationApi.quotations.update(editingQuotation.id, payload);
+        await quotationApi.quotations.update!(editingQuotation.id, payload);
         toast.success('Quotation updated successfully.');
       } else {
         await quotationApi.quotations.create(payload);
@@ -340,7 +358,7 @@ export function QuotationsPage() {
 
     setIsSubmittingApproval(true);
     try {
-      await quotationApi.approvals.update(currentApproval.id, {
+      await quotationApi.approvals.update!(currentApproval.id, {
         status,
         remarks: approvalRemarks
       });
@@ -433,7 +451,7 @@ export function QuotationsPage() {
         onDelete={async (row) => {
           if (!window.confirm('Are you sure you want to delete this quotation?')) return;
           try {
-            await quotationApi.quotations.remove(row.id);
+            await quotationApi.quotations.remove!(row.id);
             toast.success('Quotation deleted successfully.');
             await loadAllData();
           } catch (err: any) {
@@ -454,7 +472,7 @@ export function QuotationsPage() {
             <div className="grid grid-cols-1 gap-4">
               <div className="flex flex-col gap-1.5">
                 <Label className="text-xs font-bold text-muted-foreground uppercase">Client Partner *</Label>
-                <Select value={formValues.customerId} onValueChange={(val) => setFormValues(prev => ({ ...prev, customerId: val }))}>
+                <Select value={formValues.customerId} onValueChange={(val) => setFormValues(prev => ({ ...prev, customerId: val || '' }))}>
                   <SelectTrigger><SelectValue placeholder="Select Client" /></SelectTrigger>
                   <SelectContent>
                     {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
@@ -464,7 +482,7 @@ export function QuotationsPage() {
 
               <div className="flex flex-col gap-1.5">
                 <Label className="text-xs font-bold text-muted-foreground uppercase">Linked Tender Project</Label>
-                <Select value={formValues.tenderId} onValueChange={(val) => setFormValues(prev => ({ ...prev, tenderId: val }))}>
+                <Select value={formValues.tenderId} onValueChange={(val) => setFormValues(prev => ({ ...prev, tenderId: val || '' }))}>
                   <SelectTrigger><SelectValue placeholder="Select Tender (Optional)" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None</SelectItem>
@@ -676,15 +694,15 @@ export function QuotationsPage() {
                     </div>
                     <div>
                       <p className="text-muted-foreground">Transport Cost</p>
-                      <p className="font-semibold">₹{Number(selectedQuotation.transportCost || 0).toLocaleString()}</p>
+                      <p className="font-semibold">₹{Number(selectedQuotation.transportCost ?? selectedQuotation.transportation ?? 0).toLocaleString()}</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Taxes</p>
-                      <p className="font-semibold">₹{Number(selectedQuotation.taxes || 0).toLocaleString()}</p>
+                      <p className="font-semibold">₹{Number(selectedQuotation.taxes ?? selectedQuotation.gst ?? 0).toLocaleString()}</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Markup Margin</p>
-                      <p className="font-semibold text-emerald-600 dark:text-emerald-400">₹{Number(selectedQuotation.margin || 0).toLocaleString()}</p>
+                      <p className="font-semibold text-emerald-600 dark:text-emerald-400">₹{Number(selectedQuotation.margin ?? selectedQuotation.profitMargin ?? 0).toLocaleString()}</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Discount</p>
@@ -694,7 +712,7 @@ export function QuotationsPage() {
 
                   <div className="flex justify-between items-center text-sm font-bold bg-primary/5 p-3 rounded-lg border border-primary/10">
                     <span className="text-muted-foreground">Total Quotation Value:</span>
-                    <span className="text-primary text-base font-extrabold">₹{Number(selectedQuotation.totalValue || 0).toLocaleString()}</span>
+                    <span className="text-primary text-base font-extrabold">₹{Number(selectedQuotation.totalValue ?? selectedQuotation.finalAmount ?? 0).toLocaleString()}</span>
                   </div>
 
                   <div className="h-px bg-border my-2" />
@@ -706,7 +724,20 @@ export function QuotationsPage() {
                     </div>
                     <div>
                       <span className="text-muted-foreground uppercase text-[10px] font-semibold">Validity</span>
-                      <p className="font-medium">{selectedQuotation.validityDays ? `${selectedQuotation.validityDays} Days` : '—'}</p>
+                      <p className="font-medium">
+                        {selectedQuotation.validityDays
+                          ? `${selectedQuotation.validityDays} Days`
+                          : selectedQuotation.validUntil
+                          ? `${Math.max(
+                              1,
+                              Math.ceil(
+                                (new Date(selectedQuotation.validUntil).getTime() -
+                                  new Date(selectedQuotation.createdAt ?? Date.now()).getTime()) /
+                                  (1000 * 60 * 60 * 24)
+                              )
+                            )} Days`
+                          : '—'}
+                      </p>
                     </div>
                     <div>
                       <span className="text-muted-foreground uppercase text-[10px] font-semibold">Warranty Scope</span>
@@ -718,10 +749,10 @@ export function QuotationsPage() {
                     </div>
                   </div>
 
-                  {selectedQuotation.specialTerms && (
+                  {(selectedQuotation.specialTerms || selectedQuotation.remarks) && (
                     <div className="text-xs bg-muted/10 p-2.5 rounded border">
                       <span className="text-[10px] uppercase font-bold text-muted-foreground">Special Erection details</span>
-                      <p className="mt-1 font-medium whitespace-pre-line">{selectedQuotation.specialTerms}</p>
+                      <p className="mt-1 font-medium whitespace-pre-line">{selectedQuotation.specialTerms ?? selectedQuotation.remarks}</p>
                     </div>
                   )}
 
@@ -901,7 +932,7 @@ export function QuotationsPage() {
           <div className="space-y-4.5 py-4">
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs font-bold text-muted-foreground uppercase">Response Outcome</Label>
-              <Select value={customerResponse} onValueChange={setCustomerResponse}>
+              <Select value={customerResponse} onValueChange={(val) => setCustomerResponse(val || '')}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ACCEPTED">Client Accepted</SelectItem>

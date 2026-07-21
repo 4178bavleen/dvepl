@@ -533,3 +533,98 @@ export interface AuditLog {
   userAgent?: string | null;
   createdAt: string;
 }
+
+export enum QuotationStatus {
+  DRAFT = 'DRAFT',
+  WAITING_APPROVAL = 'WAITING_APPROVAL',
+  APPROVED = 'APPROVED',
+  SENT = 'SENT',
+  ACCEPTED = 'ACCEPTED',
+  REJECTED = 'REJECTED',
+  EXPIRED = 'EXPIRED'
+}
+
+export interface Quotation {
+  id: string;
+  companyId: string;
+  quotationNo: string;
+  tenderId?: string | null;
+  customerId: string;
+  revision: number;
+  status: QuotationStatus;
+  materialCost: number;
+  labourCost: number;
+  transportation: number;
+  packing: number;
+  insurance: number;
+  discount: number;
+  gst: number;
+  profitMargin: number;
+  finalAmount: number;
+  totalValue?: number;
+  currency: string;
+  validUntil: string;
+  remarks?: string | null;
+  createdById: string;
+  approvedById?: string | null;
+  approvedAt?: string | null;
+  sentAt?: string | null;
+  acceptedAt?: string | null;
+  rejectedAt?: string | null;
+  rejectionReason?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+}
+
+export enum SalesOrderStatus {
+  DRAFT = 'DRAFT',
+  CONFIRMED = 'CONFIRMED',
+  IN_PRODUCTION = 'IN_PRODUCTION',
+  READY = 'READY',
+  DISPATCHED = 'DISPATCHED',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED'
+}
+
+export interface SalesOrder {
+  id: string;
+  companyId: string;
+  orderNo: string;
+  customerId: string;
+  tenderId?: string | null;
+  quotationId?: string | null;
+  orderDate: string;
+  deliveryDate?: string | null;
+  status: SalesOrderStatus;
+  paymentTerms?: string | null;
+  deliverySchedule?: string | null;
+  warranty?: string | null;
+  freight: number;
+  gst: number;
+  total: number;
+  totalValue?: number;
+  remarks?: string | null;
+  createdById: string;
+  confirmedById?: string | null;
+  cancelledById?: string | null;
+  confirmedAt?: string | null;
+  cancelledAt?: string | null;
+  cancellationReason?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+}
+
+export interface ApprovalRule {
+  id: string;
+  module: string;
+  level: number;
+  roleId: string;
+  minValue?: number | null;
+  maxValue?: number | null;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+

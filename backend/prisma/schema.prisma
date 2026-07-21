@@ -207,7 +207,8 @@ model User {
   tendersCreated                    Tender[]                           @relation("TenderCreatedBy")
   tendersAssigned                   Tender[]                           @relation("TenderAssignedTo")
   tenderRemarks                     TenderRemark[]
-  technicalClarifications           TechnicalClarification[]
+  technicalClarificationsRaised      TechnicalClarification[]           @relation("TechnicalClarificationRaisedBy")
+  technicalClarificationsAssigned    TechnicalClarification[]           @relation("TechnicalClarificationAssignedTo")
   technicalClarificationReplies     TechnicalClarificationReply[]
   technicalClarificationAttachments TechnicalClarificationAttachment[]
   technicalClarificationActivities  TechnicalClarificationActivity[]
@@ -217,33 +218,51 @@ model User {
   approvalRequestsRequested ApprovalRequest[] @relation("ApprovalRequestRequestedBy")
   approvalRequestsAssigned ApprovalRequest[] @relation("ApprovalRequestAssignedTo")
   approvalHistories                 ApprovalHistory[]
-  salesOrders                       SalesOrder[]
+  salesOrdersCreated                SalesOrder[]                       @relation("SalesOrderCreatedBy")
+  salesOrdersConfirmed              SalesOrder[]                       @relation("SalesOrderConfirmedBy")
+  salesOrdersCancelled              SalesOrder[]                       @relation("SalesOrderCancelledBy")
   salesOrderAttachments             SalesOrderAttachment[]
   engineeringProjectsCreated EngineeringProject[]@relation("EngineeringProjectCreatedBy")
   
   engineeringProjectsApproved EngineeringProject[]   @relation("EngineeringProjectApprovedBy")
-  engineeringDrawings               EngineeringDrawing[]
-  drawingRevisions                  DrawingRevision[]
-  boms                              BOM[]
+  approvedDrawings EngineeringDrawing[] @relation("DrawingApprovedBy")
+  createdDrawings  EngineeringDrawing[] @relation("DrawingCreatedBy")
+  approvedRevisions DrawingRevision[]    @relation("RevisionApprovedBy")
+  createdRevisions  DrawingRevision[]    @relation("RevisionCreatedBy")
+  approvedBOMs BOM[] @relation("BOMApprovedBy")
+  createdBOMs  BOM[] @relation("BOMCreatedBy")
   bomrevisions                      BOMRevision[]
   materials                         Material[]
-  purchaseRequests                  PurchaseRequest[]
-  purchaseOrders                    PurchaseOrder[]
-  goodsReceipts                     GoodsReceipt[]
+  requestedPurchaseRequests PurchaseRequest[] @relation("PurchaseRequestRequestedBy")
+  approvedPurchaseRequests PurchaseRequest[] @relation("PurchaseRequestApprovedBy")
+  createdPurchaseOrders  PurchaseOrder[] @relation("PurchaseOrderCreatedBy")
+  approvedPurchaseOrders PurchaseOrder[] @relation("PurchaseOrderApprovedBy")
+  receivedGoodsReceipts GoodsReceipt[] @relation("GoodsReceiptReceivedBy")
+approvedGoodsReceipts GoodsReceipt[] @relation("GoodsReceiptApprovedBy")
   inventoryTransactions             InventoryTransaction[]
-  stockTransfers                    StockTransfer[]
-  productionPlans                   ProductionPlan[]
-  workOrders                        WorkOrder[]
+  requestedStockTransfers StockTransfer[] @relation("StockTransferRequestedBy")
+approvedStockTransfers  StockTransfer[] @relation("StockTransferApprovedBy")
+completedStockTransfers StockTransfer[] @relation("StockTransferCompletedBy")
+  createdProductionPlans  ProductionPlan[] @relation("ProductionPlanCreatedBy")
+approvedProductionPlans ProductionPlan[] @relation("ProductionPlanApprovedBy")
+  assignedWorkOrders WorkOrder[] @relation("WorkOrderAssignedTo")
+createdWorkOrders  WorkOrder[] @relation("WorkOrderCreatedBy")
+approvedWorkOrders WorkOrder[] @relation("WorkOrderApprovedBy")
   productionLogs                    ProductionLog[]
-  inspections                       Inspection[]
+  inspectedInspections Inspection[] @relation("InspectionInspectedBy")
+approvedInspections  Inspection[] @relation("InspectionApprovedBy")
   reworks                           Rework[]
   dispatches                        Dispatch[]
   deliveryProofs                    DeliveryProof[]
-  invoices                          Invoice[]
+  createdInvoices  Invoice[] @relation("InvoiceCreatedBy")
+approvedInvoices Invoice[] @relation("InvoiceApprovedBy")
   payments                          Payment[]
-  creditNotes                       CreditNote[]
-  debitNotes                        DebitNote[]
-  expenses                          Expense[]
+  createdCreditNotes  CreditNote[] @relation("CreditNoteCreatedBy")
+approvedCreditNotes CreditNote[] @relation("CreditNoteApprovedBy")
+  createdDebitNotes  DebitNote[] @relation("DebitNoteCreatedBy")
+approvedDebitNotes DebitNote[] @relation("DebitNoteApprovedBy")
+  approvedExpenses Expense[] @relation("ExpenseApprovedBy")
+createdExpenses  Expense[] @relation("ExpenseCreatedBy")
   ledgerEntries                     LedgerEntry[]
   reportDefinitions                 ReportDefinition[]
   reportSchedules                   ReportSchedule[]
@@ -692,6 +711,7 @@ model Customer {
   salesOrders    SalesOrder[]
   purchaseOrders PurchaseOrder[]
   invoices       Invoice[]
+  vendorInvoices Invoice[] @relation("VendorInvoices")
 
   @@index([companyId])
   @@map("customers")
@@ -1104,8 +1124,7 @@ model TechnicalClarification {
   replies     TechnicalClarificationReply[]
   attachments TechnicalClarificationAttachment[]
   activities  TechnicalClarificationActivity[]
-  user        User?                              @relation(fields: [userId], references: [id])
-  userId      String?
+
 
   @@index([companyId])
   @@index([tenderId])
@@ -1290,11 +1309,7 @@ model Quotation {
   items       QuotationItem[]
   charges     QuotationCharge[]
   attachments QuotationAttachment[]
-  salesOrdersCreated SalesOrder[] @relation("SalesOrderCreatedBy")
-  salesOrdersConfirmed SalesOrder[] @relation("SalesOrderConfirmedBy")
-  salesOrdersCancelled SalesOrder[] @relation("SalesOrderCancelledBy")
-  user        User?                 @relation(fields: [userId], references: [id])
-  userId      String?
+  salesOrders         SalesOrder[]
 
   @@index([companyId])
   @@index([status])
@@ -1682,9 +1697,10 @@ model EngineeringDrawing {
   updatedAt    DateTime      @updatedAt
   deletedAt    DateTime?
 
-  project    EngineeringProject @relation(fields: [projectId], references: [id])
-  approvedBy User?              @relation(fields: [approvedById], references: [id])
-  createdBy  User               @relation(fields: [createdById], references: [id])
+  project EngineeringProject @relation(fields: [projectId], references: [id])
+
+  approvedBy User? @relation("DrawingApprovedBy", fields: [approvedById], references: [id])
+  createdBy  User  @relation("DrawingCreatedBy", fields: [createdById], references: [id])
 
   revisions DrawingRevision[]
 
@@ -1723,8 +1739,8 @@ model DrawingRevision {
   createdAt    DateTime  @default(now())
 
   drawing    EngineeringDrawing @relation(fields: [drawingId], references: [id])
-  approvedBy User?              @relation(fields: [approvedById], references: [id])
-  createdBy  User               @relation(fields: [createdById], references: [id])
+  aapprovedBy User? @relation("RevisionApprovedBy", fields: [approvedById], references: [id])
+  createdBy  User  @relation("RevisionCreatedBy", fields: [createdById], references: [id])
 
   @@unique([drawingId, revisionNo])
   @@index([drawingId])
@@ -1752,8 +1768,8 @@ model BOM {
 
   company    Company            @relation(fields: [companyId], references: [id])
   project    EngineeringProject @relation(fields: [projectId], references: [id])
-  approvedBy User?              @relation(fields: [approvedById], references: [id])
-  createdBy  User               @relation(fields: [createdById], references: [id])
+   approvedBy User? @relation("BOMApprovedBy", fields: [approvedById], references: [id])
+  createdBy  User  @relation("BOMCreatedBy", fields: [createdById], references: [id])
 
   assemblies BOMAssembly[]
   revisions  BOMRevision[]
@@ -1952,9 +1968,10 @@ model PurchaseRequest {
   updatedAt     DateTime              @updatedAt
   deletedAt     DateTime?
 
-  company     Company @relation(fields: [companyId], references: [id])
-  requestedBy User    @relation(fields: [requestedById], references: [id])
-  approvedBy  User?   @relation(fields: [approvedById], references: [id])
+  company Company @relation(fields: [companyId], references: [id])
+
+  requestedBy User  @relation("PurchaseRequestRequestedBy", fields: [requestedById], references: [id])
+  approvedBy  User? @relation("PurchaseRequestApprovedBy", fields: [approvedById], references: [id])
 
   items  PurchaseRequestItem[]
   orders PurchaseOrder[]
@@ -2016,11 +2033,12 @@ model PurchaseOrder {
   updatedAt        DateTime            @updatedAt
   deletedAt        DateTime?
 
-  company    Company          @relation(fields: [companyId], references: [id])
-  request    PurchaseRequest? @relation(fields: [requestId], references: [id])
-  vendor     Customer         @relation(fields: [vendorId], references: [id])
-  createdBy  User             @relation(fields: [createdById], references: [id])
-  approvedBy User?            @relation(fields: [approvedById], references: [id])
+  company Company @relation(fields: [companyId], references: [id])
+  request PurchaseRequest? @relation(fields: [requestId], references: [id])
+  vendor  Customer @relation(fields: [vendorId], references: [id])
+
+  createdBy  User  @relation("PurchaseOrderCreatedBy", fields: [createdById], references: [id])
+  approvedBy User? @relation("PurchaseOrderApprovedBy", fields: [approvedById], references: [id])
 
   items         PurchaseOrderItem[]
   goodsReceipts GoodsReceipt[]
@@ -2080,10 +2098,11 @@ model GoodsReceipt {
   updatedAt    DateTime           @updatedAt
   deletedAt    DateTime?
 
-  company    Company       @relation(fields: [companyId], references: [id])
-  po         PurchaseOrder @relation(fields: [poId], references: [id])
-  receivedBy User          @relation(fields: [receivedById], references: [id])
-  approvedBy User?         @relation(fields: [approvedById], references: [id])
+  company Company       @relation(fields: [companyId], references: [id])
+  po      PurchaseOrder @relation(fields: [poId], references: [id])
+
+  receivedBy User  @relation("GoodsReceiptReceivedBy", fields: [receivedById], references: [id])
+  approvedBy User? @relation("GoodsReceiptApprovedBy", fields: [approvedById], references: [id])
 
   items GoodsReceiptItem[]
 
@@ -2314,11 +2333,13 @@ model StockTransfer {
   fromWarehouse Warehouse  @relation("StockTransferFrom", fields: [fromWarehouseId], references: [id])
   toWarehouse   Warehouse  @relation("StockTransferTo", fields: [toWarehouseId], references: [id])
   material      Material   @relation(fields: [materialId], references: [id])
-  requestedBy   User       @relation(fields: [requestedById], references: [id])
-  approvedBy    User?      @relation(fields: [approvedById], references: [id])
-  completedBy   User?      @relation(fields: [completedById], references: [id])
-  inventory     Inventory? @relation(fields: [inventoryId], references: [id])
-  inventoryId   String?
+
+  requestedBy User  @relation("StockTransferRequestedBy", fields: [requestedById], references: [id])
+  approvedBy  User? @relation("StockTransferApprovedBy", fields: [approvedById], references: [id])
+  completedBy User? @relation("StockTransferCompletedBy", fields: [completedById], references: [id])
+
+  inventory   Inventory? @relation(fields: [inventoryId], references: [id])
+  inventoryId String?
 
   @@index([companyId])
   @@index([fromWarehouseId])
@@ -2353,9 +2374,10 @@ model ProductionPlan {
   updatedAt    DateTime             @updatedAt
   deletedAt    DateTime?
 
-  company    Company @relation(fields: [companyId], references: [id])
-  createdBy  User    @relation(fields: [createdById], references: [id])
-  approvedBy User?   @relation(fields: [approvedById], references: [id])
+  company Company @relation(fields: [companyId], references: [id])
+
+  createdBy  User  @relation("ProductionPlanCreatedBy", fields: [createdById], references: [id])
+  approvedBy User? @relation("ProductionPlanApprovedBy", fields: [approvedById], references: [id])
 
   workOrders WorkOrder[]
 
@@ -2400,9 +2422,10 @@ model WorkOrder {
   productionPlan ProductionPlan? @relation(fields: [productionPlanId], references: [id])
   salesOrder     SalesOrder?     @relation(fields: [salesOrderId], references: [id])
   product        Material        @relation(fields: [productId], references: [id])
-  assignedTo     User?           @relation(fields: [assignedToId], references: [id])
-  createdBy      User            @relation(fields: [createdById], references: [id])
-  approvedBy     User?           @relation(fields: [approvedById], references: [id])
+
+  assignedTo User? @relation("WorkOrderAssignedTo", fields: [assignedToId], references: [id])
+  createdBy  User  @relation("WorkOrderCreatedBy", fields: [createdById], references: [id])
+  approvedBy User? @relation("WorkOrderApprovedBy", fields: [approvedById], references: [id])
 
   items       WorkOrderItem[]
   logs        ProductionLog[]
@@ -2491,8 +2514,9 @@ model Inspection {
   workOrder        WorkOrder?           @relation(fields: [workOrderId], references: [id])
   product          Material             @relation(fields: [productId], references: [id])
   checklist        InspectionChecklist? @relation(fields: [checklistId], references: [id])
-  inspectedBy      User                 @relation(fields: [inspectedById], references: [id])
-  approvedBy       User?                @relation(fields: [approvedById], references: [id])
+
+  inspectedBy User  @relation("InspectionInspectedBy", fields: [inspectedById], references: [id])
+  approvedBy  User? @relation("InspectionApprovedBy", fields: [approvedById], references: [id])
 
   results InspectionResult[]
   defects Defect[]
@@ -2741,8 +2765,9 @@ model Invoice {
   purchaseOrder PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
   customer      Customer?      @relation(fields: [customerId], references: [id])
   vendor        Customer?      @relation("VendorInvoices", fields: [vendorId], references: [id])
-  createdBy     User           @relation(fields: [createdById], references: [id])
-  approvedBy    User?          @relation(fields: [approvedById], references: [id])
+
+  createdBy  User  @relation("InvoiceCreatedBy", fields: [createdById], references: [id])
+  approvedBy User? @relation("InvoiceApprovedBy", fields: [approvedById], references: [id])
 
   items         InvoiceItem[]
   payments      Payment[]
@@ -2845,10 +2870,11 @@ model CreditNote {
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
-  company    Company @relation(fields: [companyId], references: [id])
-  invoice    Invoice @relation(fields: [invoiceId], references: [id])
-  createdBy  User    @relation(fields: [createdById], references: [id])
-  approvedBy User?   @relation(fields: [approvedById], references: [id])
+  company Company @relation(fields: [companyId], references: [id])
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  createdBy  User  @relation("CreditNoteCreatedBy", fields: [createdById], references: [id])
+  approvedBy User? @relation("CreditNoteApprovedBy", fields: [approvedById], references: [id])
 
   @@index([companyId])
   @@index([invoiceId])
@@ -2870,10 +2896,11 @@ model DebitNote {
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
-  company    Company @relation(fields: [companyId], references: [id])
-  invoice    Invoice @relation(fields: [invoiceId], references: [id])
-  createdBy  User    @relation(fields: [createdById], references: [id])
-  approvedBy User?   @relation(fields: [approvedById], references: [id])
+  company Company @relation(fields: [companyId], references: [id])
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  createdBy  User  @relation("DebitNoteCreatedBy", fields: [createdById], references: [id])
+  approvedBy User? @relation("DebitNoteApprovedBy", fields: [approvedById], references: [id])
 
   @@index([companyId])
   @@index([invoiceId])
@@ -2897,9 +2924,10 @@ model Expense {
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
-  company    Company @relation(fields: [companyId], references: [id])
-  approvedBy User?   @relation(fields: [approvedById], references: [id])
-  createdBy  User    @relation(fields: [createdById], references: [id])
+  company Company @relation(fields: [companyId], references: [id])
+
+  approvedBy User? @relation("ExpenseApprovedBy", fields: [approvedById], references: [id])
+  createdBy  User  @relation("ExpenseCreatedBy", fields: [createdById], references: [id])
 
   ledgerEntries LedgerEntry[]
 
@@ -2926,8 +2954,8 @@ model LedgerEntry {
   deletedAt     DateTime?
 
   company   Company  @relation(fields: [companyId], references: [id])
-  invoice   Invoice? @relation(fields: [referenceId], references: [id])
-  expense   Expense? @relation(fields: [referenceId], references: [id])
+  invoice   Invoice? @relation(fields: [referenceId], references: [id], map: "ledger_entries_invoice_referenceId_fkey")
+  expense   Expense? @relation(fields: [referenceId], references: [id], map: "ledger_entries_expense_referenceId_fkey")
   createdBy User     @relation(fields: [createdById], references: [id])
 
   @@index([companyId])

@@ -1,7 +1,7 @@
 import { ColumnDef } from '@tanstack/react-table';
 import * as z from 'zod';
 import { sortableHeader } from '@/components/tables/GenericTable';
-import { crmApi, tenderApi, hrmsApi } from '@/services/modules';
+import { crmApi, tenderApi, hrmsApi, securityApi } from '@/services/modules';
 import { Link } from 'react-router-dom';
 import { HelpCircle } from 'lucide-react';
 import { 
@@ -21,6 +21,7 @@ export const tenderRequestsConfig = {
   api: tenderApi.requests,
   selectOptions: { 
     customerId: crmApi.customers.list,
+    assignedToId: securityApi.users.list,
     createdById: hrmsApi.employees.list,
   },
   tableName: 'tenderRequests',
@@ -32,9 +33,11 @@ export const tenderRequestsConfig = {
     description: z.string().optional().nullable(),
     estimatedValue: z.coerce.number(),
     source: z.string().default('EMAIL'),
-    status: z.string().default('NEW')
+    status: z.string().default('NEW'),
+    assignedToId: z.string().optional().nullable(),
+    createdById: z.string().optional().nullable(),
   }),
-  defaultFormValues: { customerId: 'cust-1', title: '', description: '', estimatedValue: '0', source: 'EMAIL', status: 'NEW' },
+  defaultFormValues: { customerId: 'cust-1', title: '', description: '', estimatedValue: '0', source: 'EMAIL', status: 'NEW', assignedToId: '', createdById: '' },
   breadcrumbs: [{ label: 'Dashboard', href: '/' }, { label: 'Tender Requests' }],
   columns: [
     { accessorKey: 'title', header: sortableHeader('Request Title') },
@@ -90,7 +93,9 @@ export const tenderRequestsConfig = {
       { label: 'Qualified Lead', value: 'QUALIFIED' },
       { label: 'Won Deal', value: 'WON' },
       { label: 'Lost Opportunity', value: 'LOST' }
-    ] }
+    ] },
+    { name: 'assignedToId', label: 'Assigned Engineer / User', type: 'select' },
+    { name: 'createdById', label: 'Created By Employee', type: 'select' },
   ] as any[],
   statsCards: (data: TenderRequest[]) => [
     { label: 'Total RFPs Received', value: data.length },
@@ -110,21 +115,43 @@ export const tendersConfig = {
     divisionId: tenderApi.divisions.list,
     subDivisionId: tenderApi.subDivisions.list,
     tenderRequestId: tenderApi.requests.list,
+    assignedToId: securityApi.users.list,
   },
   tableName: 'tenders',
   moduleName: 'Tender Bidding File',
   pluralName: 'Tender Bids',
   zodSchema: z.object({
     customerId: z.string().min(1, 'Select customer'),
+    tenderRequestId: z.string().optional().nullable(),
+    departmentId: z.string().optional().nullable(),
+    sectionId: z.string().optional().nullable(),
+    divisionId: z.string().optional().nullable(),
+    subDivisionId: z.string().optional().nullable(),
     tenderNo: z.string().min(2, 'Enter tender bidding file number'),
     title: z.string().min(2, 'Enter tender bidding title'),
     description: z.string().optional().nullable(),
     projectLocation: z.string().optional().nullable(),
     estimatedCost: z.coerce.number(),
     dueDate: z.string().min(2, 'Select due date'),
-    status: z.string().default('DRAFT')
+    status: z.string().default('DRAFT'),
+    assignedToId: z.string().optional().nullable(),
   }),
-  defaultFormValues: { customerId: 'cust-1', tenderNo: '', title: '', description: '', projectLocation: '', estimatedCost: '0', dueDate: '', status: 'DRAFT' },
+  defaultFormValues: {
+    customerId: 'cust-1',
+    tenderRequestId: '',
+    departmentId: '',
+    sectionId: '',
+    divisionId: '',
+    subDivisionId: '',
+    tenderNo: '',
+    title: '',
+    description: '',
+    projectLocation: '',
+    estimatedCost: '0',
+    dueDate: '',
+    status: 'DRAFT',
+    assignedToId: '',
+  },
   breadcrumbs: [{ label: 'Dashboard', href: '/' }, { label: 'Tenders Pipeline' }],
   columns: [
     { accessorKey: 'tenderCode', header: sortableHeader('System Ref Code') },
@@ -172,35 +199,27 @@ export const tendersConfig = {
       { label: 'Larsen & Toubro Ltd', value: 'cust-2' },
       { label: 'ONGC', value: 'cust-3' }
     ], required: true },
+    { name: 'tenderRequestId', label: 'Linked Tender Request', type: 'select' },
+    { name: 'departmentId', label: 'Government Department', type: 'select' },
+    { name: 'sectionId', label: 'Link Section', type: 'select' },
+    { name: 'divisionId', label: 'Link Division', type: 'select' },
+    { name: 'subDivisionId', label: 'Link Sub Division', type: 'select' },
     { name: 'tenderNo', label: 'Client RFP Tender No', type: 'text', placeholder: 'TND-2026-CR-089', required: true },
     { name: 'title', label: 'Tender Project Name', type: 'text', placeholder: 'Supply and Testing of Cast Steel Gate Valves', required: true },
     { name: 'estimatedCost', label: 'Project Valuation Bid Value (INR)', type: 'number', placeholder: '1500000', required: true },
     { name: 'dueDate', label: 'Bid Submission Deadline', type: 'date', required: true },
     { name: 'projectLocation', label: 'Project Site Location', type: 'text', placeholder: 'Central Railway Workshop, Kurla' },
     { name: 'description', label: 'Internal Bid Scope Remarks', type: 'textarea', placeholder: 'Triple-offset body material parameters' },
-    // Phase 2 fields
-    { name: 'tenderType', label: 'Tender Type', type: 'select', options: [
-      { label: 'Government', value: 'GOVERNMENT' },
-      { label: 'Private', value: 'PRIVATE' },
-      { label: 'Semi-Government', value: 'SEMI_GOVERNMENT' }
-    ] },
-    { name: 'emd', label: 'EMD Amount (INR)', type: 'number', placeholder: '50000' },
-    { name: 'emdRefNo', label: 'EMD Receipt / DD No', type: 'text', placeholder: 'DD/2026/00123' },
-    { name: 'boqUrl', label: 'BOQ File URL', type: 'text', placeholder: 'https://minio.../boq.pdf' },
-    { name: 'bidDate', label: 'Tender Opening Date', type: 'date' },
-    { name: 'submissionDate', label: 'Last Submission Date', type: 'date' },
+    { name: 'assignedToId', label: 'Assigned Estimator / User', type: 'select' },
     { name: 'status', label: 'Bid Pipeline Status', type: 'select', options: [
       { label: 'Draft Bid Doc', value: 'DRAFT' },
       { label: 'Open Public Bidding', value: 'OPEN' },
       { label: 'Assigned Estimator', value: 'ASSIGNED' },
       { label: 'In Progress Prep', value: 'IN_PROGRESS' },
       { label: 'Submitted to Client', value: 'SUBMITTED' },
-      { label: 'Won and Awarded', value: 'WON' },
-      { label: 'Lost Bid', value: 'LOST' },
       { label: 'Completed', value: 'COMPLETED' },
       { label: 'Cancelled Bidding', value: 'CANCELLED' }
-    ] },
-    { name: 'lostReason', label: 'Loss Reason (if LOST)', type: 'textarea', placeholder: 'Competitor offered lower pricing' },
+    ] }
   ] as any[],
   statsCards: (data: Tender[]) => [
     { label: 'Total Tenders Listed', value: data.length },

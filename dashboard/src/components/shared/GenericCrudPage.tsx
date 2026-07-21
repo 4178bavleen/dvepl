@@ -117,7 +117,7 @@ const FK_RELATION_MAP: Record<string, RelationResolver> = {
   // CRM / Sales
   customerId: { storeKey: 'customers', label: nameLabel },
   quotationId: { storeKey: 'quotations', label: (r) => r?.quotationNo },
-  salesOrderId: { storeKey: 'salesOrders', label: (r) => r?.soNumber },
+  salesOrderId: { storeKey: 'salesOrders', label: (r) => r?.orderNo ?? r?.soNumber },
   portalUserId: { storeKey: 'customerPortalUsers', label: (r) => r?.name },
 };
 
@@ -264,10 +264,10 @@ const renderDisplayValue = (
     }
   }
 
-  // 4. Resolve UUIDs globally using Zustand store lists, driven by
+  // 4. Resolve IDs globally using Zustand store lists, driven by
   //    FK_RELATION_MAP so every relation defined in schema.prisma is covered
   //    (not just the handful the view happens to embed eagerly).
-  if (typeof value === 'string' && /^[0-9a-fA-F-]{36}$/.test(value)) {
+  if (typeof value === 'string') {
     const resolver = FK_RELATION_MAP[key];
     if (resolver) {
       const store = useERPStore.getState() as Record<string, any>;
@@ -289,7 +289,7 @@ const renderDisplayValue = (
       return (
         <div className="flex flex-wrap gap-1.5 mt-1.5">
           {value.map((item: any, i) => {
-            const label = item.name ?? item.title ?? item.fileName ?? item.code ?? item.quotationNo ?? item.soNumber ?? `Item #${i + 1}`;
+            const label = item.name ?? item.title ?? item.fileName ?? item.code ?? item.quotationNo ?? item.orderNo ?? item.soNumber ?? `Item #${i + 1}`;
             return (
               <span key={i} className="inline-flex items-center gap-1.5 rounded-lg bg-muted border hover:bg-muted/80 transition-all px-2.5 py-1 text-xs font-semibold text-foreground">
                 <Paperclip className="size-3 text-muted-foreground" />
@@ -309,7 +309,7 @@ const renderDisplayValue = (
     if (obj.firstName) {
       return `${obj.firstName} ${obj.lastName ?? ''}`.trim();
     }
-    const label = obj.name ?? obj.title ?? obj.code ?? obj.quotationNo ?? obj.soNumber ?? obj.id;
+    const label = obj.name ?? obj.title ?? obj.code ?? obj.quotationNo ?? obj.orderNo ?? obj.soNumber ?? obj.id;
     return label ? String(label) : '—';
   }
 
@@ -347,7 +347,24 @@ const getCombinedOptions = (
 ) => {
   const loaded = optionValues?.[fieldName] ?? [];
   const statics = staticOptions ?? [];
-  const combined = [...loaded, ...statics];
+  
+  // Resolve from store globally if available
+  const storeOptions: Array<{ value: string; label: string }> = [];
+  const resolver = FK_RELATION_MAP[fieldName];
+  if (resolver) {
+    const store = useERPStore.getState() as Record<string, any>;
+    const list = store[resolver.storeKey];
+    if (Array.isArray(list)) {
+      list.forEach((item: any) => {
+        const label = resolver.label(item);
+        if (label && item.id) {
+          storeOptions.push({ value: item.id, label });
+        }
+      });
+    }
+  }
+
+  const combined = [...loaded, ...storeOptions, ...statics];
   
   return combined.filter(
     (opt, index, self) => self.findIndex((o) => o.value === opt.value) === index
@@ -501,6 +518,22 @@ export function GenericCrudPage<TRecord extends { id: string }>({
 
   const cards = statsCards?.(records) ?? [];
 
+  const processedColumns = useMemo(() => {
+    return columns.map((col) => {
+      const accessorKey = (col as any).accessorKey;
+      if (typeof accessorKey === 'string' && FK_RELATION_MAP[accessorKey] && !(col as any).cell) {
+        return {
+          ...col,
+          cell: ({ getValue, row }: any) => {
+            const val = getValue();
+            return renderDisplayValue(accessorKey, val, row.original, optionValues, fields);
+          },
+        };
+      }
+      return col;
+    });
+  }, [columns, optionValues, fields]);
+
   const viewingGroups = useMemo(
     () => (viewingRecord ? groupRecordFields(viewingRecord as unknown as Record<string, any>) : null),
     [viewingRecord]
@@ -556,7 +589,7 @@ export function GenericCrudPage<TRecord extends { id: string }>({
       </div>
 
       <GenericTable
-        columns={columns}
+        columns={processedColumns}
         data={filteredRecords}
         onView={setViewingRecord}
         onEdit={!readOnly && (!api || api.update) ? openEdit : undefined}
