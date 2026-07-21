@@ -10,6 +10,18 @@ import {
   Designation,
   CostCenter,
 } from "@/types/erp";
+import { ColumnDef } from "@tanstack/react-table";
+import * as z from "zod";
+import { sortableHeader } from "@/components/tables/GenericTable";
+import { organizationApi } from "@/services/organization";
+import {
+  Company,
+  Branch,
+  Department,
+  Team,
+  Designation,
+  CostCenter,
+} from "@/types/erp";
 
 // ==========================================
 // 1. COMPANIES ROUTE CONFIG
@@ -40,6 +52,15 @@ export const companiesConfig = {
   },
   breadcrumbs: [{ label: "Dashboard", href: "/" }, { label: "Companies" }],
   columns: [
+    { accessorKey: "id", header: "ID", enableSorting: false },
+    { accessorKey: "name", header: sortableHeader("Name") },
+    { accessorKey: "gst", header: "GSTIN" },
+    { accessorKey: "pan", header: "PAN" },
+    { accessorKey: "email", header: "Email" },
+    { accessorKey: "phone", header: "Phone" },
+    {
+      accessorKey: "isActive",
+      header: "Status",
     { accessorKey: "id", header: "ID", enableSorting: false },
     { accessorKey: "name", header: sortableHeader("Name") },
     { accessorKey: "gst", header: "GSTIN" },

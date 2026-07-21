@@ -1,48 +1,51 @@
-import { ColumnDef } from '@tanstack/react-table';
-import * as z from 'zod';
-import { ExternalLink } from 'lucide-react';
-import { sortableHeader } from '@/components/tables/GenericTable';
-import { hrmsApi } from '@/services/modules';
-import { organizationApi } from '@/services/organization';
-import { 
-  Employee, 
-  Attendance, 
-  Leave, 
-  Salary 
-} from '@/types/erp';
+import { ColumnDef } from "@tanstack/react-table";
+import * as z from "zod";
+import { sortableHeader } from "@/components/tables/GenericTable";
+import { hrmsApi } from "@/services/modules";
+import { organizationApi } from "@/services/organization";
+import { EmployeeStatus } from "@/types/erp";
+import { Employee, Attendance, Leave, Salary } from "@/types/erp";
+import { ExternalLink } from "lucide-react";
 
 // ==========================================
 // 7. EMPLOYEES ROUTE CONFIG
 // ==========================================
 export const employeesConfig = {
   api: hrmsApi.employees,
-  selectOptions: { 
-    branchId: organizationApi.branches.list, 
-    departmentId: organizationApi.departments.list, 
+  selectOptions: {
+    branchId: organizationApi.branches.list,
+    departmentId: organizationApi.departments.list,
     designationId: organizationApi.designations.list,
-    teamId: organizationApi.teams.list,
-    reportsToId: hrmsApi.employees.list,
   },
-  tableName: 'employees',
-  moduleName: 'Employee',
-  pluralName: 'Employees',
-  searchPlaceholder: 'Search by name or code...',
+  tableName: "employees",
+  moduleName: "Employee",
+  pluralName: "Employees",
+  searchPlaceholder: "Search by name or code...",
   zodSchema: z.object({
-    employeeCode: z.string().min(2),
-    firstName: z.string().min(2),
-    lastName: z.string().min(1),
-
+    employeeCode: z
+      .string()
+      .min(2, "Employee Code must be at least 2 characters"),
+    firstName: z.string().min(2, "First Name must be at least 2 characters"),
+    lastName: z.string().min(1, "Last Name is required"),
     gender: z.string().optional().nullable(),
 
     branchId: z.string().optional().nullable(),
     departmentId: z.string().optional().nullable(),
     teamId: z.string().optional().nullable(),
     designationId: z.string().optional().nullable(),
-    reportsToId: z.string().optional().nullable(),
-    status: z.string().default('ACTIVE')
+    status: z.nativeEnum(EmployeeStatus).default(EmployeeStatus.ACTIVE),
   }),
-  defaultFormValues: { employeeCode: '', firstName: '', lastName: '', gender: 'MALE', branchId: 'branch-1', departmentId: 'dept-1', teamId: '', designationId: 'desg-4', reportsToId: '', status: 'ACTIVE' },
-  breadcrumbs: [{ label: 'Dashboard', href: '/' }, { label: 'Employees' }],
+  defaultFormValues: {
+    employeeCode: "",
+    firstName: "",
+    lastName: "",
+    gender: "MALE",
+    branchId: "",
+    departmentId: "",
+    designationId: "",
+    status: "ACTIVE",
+  },
+  breadcrumbs: [{ label: "Dashboard", href: "/" }, { label: "Employees" }],
   columns: [
     { accessorKey: "employeeCode", header: sortableHeader("Emp Code") },
     {
@@ -94,38 +97,79 @@ export const employeesConfig = {
     },
   ] as ColumnDef<Employee>[],
   fields: [
-    { name: 'employeeCode', label: 'Employee Code', type: 'text', placeholder: 'EMP-004', required: true },
-    { name: 'firstName', label: 'First Name', type: 'text', placeholder: 'John', required: true },
-    { name: 'lastName', label: 'Last Name', type: 'text', placeholder: 'Doe', required: true },
-    { name: 'gender', label: 'Gender', type: 'select', options: [
-      { label: 'Male', value: 'MALE' },
-      { label: 'Female', value: 'FEMALE' },
-      { label: 'Other', value: 'OTHER' }
-    ] },
-    { name: 'branchId', label: 'Work Branch', type: 'select', options: [
-      { label: 'Mumbai HQ', value: 'branch-1' },
-      { label: 'Pune Plant', value: 'branch-2' },
-      { label: 'Delhi Office', value: 'branch-3' }
-    ] },
-    { name: 'departmentId', label: 'Department', type: 'select', options: [
-      { label: 'Sales & Marketing', value: 'dept-1' },
-      { label: 'Human Resources', value: 'dept-2' },
-      { label: 'Finance & Accounts', value: 'dept-3' }
-    ] },
-    { name: 'teamId', label: 'Work Team', type: 'select' },
-    { name: 'designationId', label: 'Designation', type: 'select', options: [
-      { label: 'Managing Director', value: 'desg-1' },
-      { label: 'Operations Manager', value: 'desg-2' },
-      { label: 'HR Manager', value: 'desg-3' },
-      { label: 'Senior Proposal Engineer', value: 'desg-4' }
-    ] },
-    { name: 'reportsToId', label: 'Reports To (Supervisor)', type: 'select' },
-    { name: 'status', label: 'Status', type: 'select', options: [
-      { label: 'Active', value: 'ACTIVE' },
-      { label: 'On Leave', value: 'ON_LEAVE' },
-      { label: 'Suspended', value: 'SUSPENDED' },
-      { label: 'Resigned', value: 'RESIGNED' }
-    ] }
+    {
+      name: "employeeCode",
+      label: "Employee Code",
+      type: "text",
+      placeholder: "EMP-004",
+      required: true,
+    },
+    {
+      name: "firstName",
+      label: "First Name",
+      type: "text",
+      placeholder: "John",
+      required: true,
+    },
+    {
+      name: "lastName",
+      label: "Last Name",
+      type: "text",
+      placeholder: "Doe",
+      required: true,
+    },
+    {
+      name: "gender",
+      label: "Gender",
+      type: "select",
+      options: [
+        { label: "Male", value: "MALE" },
+        { label: "Female", value: "FEMALE" },
+        { label: "Other", value: "OTHER" },
+      ],
+    },
+    {
+      name: "branchId",
+      label: "Work Branch",
+      type: "select",
+      options: [
+        { label: "Mumbai HQ", value: "branch-1" },
+        { label: "Pune Plant", value: "branch-2" },
+        { label: "Delhi Office", value: "branch-3" },
+      ],
+    },
+    {
+      name: "departmentId",
+      label: "Department",
+      type: "select",
+      options: [
+        { label: "Sales & Marketing", value: "dept-1" },
+        { label: "Human Resources", value: "dept-2" },
+        { label: "Finance & Accounts", value: "dept-3" },
+      ],
+    },
+    {
+      name: "designationId",
+      label: "Designation",
+      type: "select",
+      options: [
+        { label: "Managing Director", value: "desg-1" },
+        { label: "Operations Manager", value: "desg-2" },
+        { label: "HR Manager", value: "desg-3" },
+        { label: "Senior Proposal Engineer", value: "desg-4" },
+      ],
+    },
+    {
+      name: "status",
+      label: "Status",
+      type: "select",
+      options: [
+        { label: "Active", value: "ACTIVE" },
+        { label: "On Leave", value: "ON_LEAVE" },
+        { label: "Suspended", value: "SUSPENDED" },
+        { label: "Resigned", value: "RESIGNED" },
+      ],
+    },
   ] as any[],
   statsCards: (data: Employee[]) => [
     { label: "Total Employees", value: data.length },
@@ -146,56 +190,37 @@ export const employeesConfig = {
 // ==========================================
 export const attendanceConfig = {
   api: hrmsApi.attendance,
-
-  selectOptions: {
-    employeeId: hrmsApi.employees.list,
-  },
-
+  selectOptions: { employeeId: hrmsApi.employees.list },
   tableName: "attendances",
   moduleName: "Attendance Log",
   pluralName: "Attendance",
-
   zodSchema: z.object({
     employeeId: z.string().min(1, "Select an employee"),
-    date: z.string().min(1, "Select a date"),
-    checkIn: z.string().optional().nullable(),
-    checkOut: z.string().optional().nullable(),
+    date: z.string().min(2, "Select a date"),
     status: z.string().default("PRESENT"),
     remarks: z.string().optional().nullable(),
   }),
-
   defaultFormValues: {
-    employeeId: "",
+    employeeId: "emp-1",
     date: new Date().toISOString().split("T")[0],
-    checkIn: "",
-    checkOut: "",
     status: "PRESENT",
-    remarks: "",
+    remarks: "On time",
   },
-
   breadcrumbs: [
     { label: "Dashboard", href: "/" },
     { label: "Attendance Logs" },
   ],
-
   columns: [
+    { accessorKey: "date", header: sortableHeader("Date") },
     {
-      accessorKey: "date",
-      header: sortableHeader("Date"),
-      cell: ({ getValue }) =>
-        getValue()
-          ? new Date(getValue() as string).toLocaleDateString()
-          : "—",
-    },
-    {
-      id: "employee",
-      header: "Employee",
-      cell: ({ row }) => {
-        const employee = row.original.employee;
-
-        if (!employee) return "-";
-
-        return `${employee.firstName} ${employee.lastName} (${employee.employeeCode})`;
+      accessorKey: "employeeId",
+      header: "Employee Code",
+      cell: ({ getValue }) => {
+        const id = getValue();
+        if (id === "emp-1") return "Gabriel Dhillon (EMP-001)";
+        if (id === "emp-2") return "Rajesh Kumar (EMP-002)";
+        if (id === "emp-3") return "Priya Sharma (EMP-003)";
+        return String(id);
       },
     },
     {
@@ -232,8 +257,8 @@ export const attendanceConfig = {
               val === "PRESENT"
                 ? "bg-success/15 text-success"
                 : val === "ON_LEAVE"
-                ? "bg-warning/15 text-warning"
-                : "bg-destructive/15 text-destructive"
+                  ? "bg-warning/15 text-warning"
+                  : "bg-destructive/15 text-destructive"
             }`}
           >
             {val}
@@ -241,17 +266,19 @@ export const attendanceConfig = {
         );
       },
     },
-    {
-      accessorKey: "remarks",
-      header: "Remarks",
-    },
+    { accessorKey: "remarks", header: "Remarks" },
   ] as ColumnDef<Attendance>[],
 
   fields: [
     {
       name: "employeeId",
-      label: "Employee",
+      label: "Select Employee",
       type: "select",
+      options: [
+        { label: "Gabriel Dhillon (EMP-001)", value: "emp-1" },
+        { label: "Rajesh Kumar (EMP-002)", value: "emp-2" },
+        { label: "Priya Sharma (EMP-003)", value: "emp-3" },
+      ],
       required: true,
     },
     {
@@ -284,17 +311,14 @@ export const attendanceConfig = {
     },
     {
       name: "remarks",
-      label: "Remarks",
+      label: "Remarks / Exceptions",
       type: "text",
-      placeholder: "Enter remarks",
+      placeholder: "On time, Late arrival, etc.",
     },
   ] as any[],
 
   statsCards: (data: Attendance[]) => [
-    {
-      label: "Total Attendance Logs",
-      value: data.length,
-    },
+    { label: "Total Attendance Logs", value: data.length },
     {
       label: "Present Today",
       value: data.filter((a) => a.status === "PRESENT").length,

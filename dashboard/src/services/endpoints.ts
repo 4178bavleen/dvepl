@@ -106,9 +106,9 @@ export const API_ENDPOINTS = {
       update: (id: string) => `/customer/update/${id}`,
       remove: (id: string) => `/customer/delete/${id}`,
     },
-       leads: {
-      list: "/lead/read",
-      create: "/lead/create",
+    leads: {
+      list: '/lead/read',
+      create: '/lead/create',
       update: (id: string) => `/lead/update/${id}`,
       remove: (id: string) => `/lead/delete/${id}`,
     },

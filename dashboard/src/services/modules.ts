@@ -28,14 +28,11 @@ export const hrmsApi = {
 
 export const crmApi = {
   customers: crud(API_ENDPOINTS.crm.customers),
-
   contacts: crud(API_ENDPOINTS.crm.contacts),
-
   communications: crud(
-      API_ENDPOINTS.crm.communications,
-      { update: false }
+    API_ENDPOINTS.crm.communications,
+    { update: false }
   ),
-
   leads: crud(API_ENDPOINTS.crm.leads),
 };
 
