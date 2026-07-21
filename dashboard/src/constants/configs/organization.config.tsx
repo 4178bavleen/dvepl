@@ -40,7 +40,6 @@ export const companiesConfig = {
   },
   breadcrumbs: [{ label: "Dashboard", href: "/" }, { label: "Companies" }],
   columns: [
-<<<<<<< HEAD
     { accessorKey: "id", header: "ID", enableSorting: false },
     { accessorKey: "name", header: sortableHeader("Name") },
     { accessorKey: "gst", header: "GSTIN" },
@@ -50,16 +49,6 @@ export const companiesConfig = {
     {
       accessorKey: "isActive",
       header: "Status",
-=======
-    { accessorKey: 'name', header: sortableHeader('Name') },
-    { accessorKey: 'gst', header: 'GSTIN' },
-    { accessorKey: 'pan', header: 'PAN' },
-    { accessorKey: 'email', header: 'Email' },
-    { accessorKey: 'phone', header: 'Phone' },
-    { 
-      accessorKey: 'isActive', 
-      header: 'Status',
->>>>>>> dbcd82f736f1192a784dcf112b6177c2608b811d
       cell: ({ getValue }) => {
         const val = getValue();
         return (
@@ -281,7 +270,6 @@ export const teamsConfig = {
     departmentId: z.string().min(1, "Select a department"),
     isActive: z.boolean().default(true),
   }),
-<<<<<<< HEAD
 
   defaultFormValues: {
     name: "",
@@ -363,20 +351,6 @@ columns: [
         >
           <span className="h-2 w-2 rounded-full bg-current"></span>
           {active ? "Active" : "Inactive"}
-=======
-  defaultFormValues: { name: '', departmentId: '', isActive: true },
-  selectOptions: { departmentId: organizationApi.departments.list },
-  breadcrumbs: [{ label: 'Dashboard', href: '/' }, { label: 'Teams' }],
-  columns: [
-    { accessorKey: 'name', header: sortableHeader('Team Name') },
-    { accessorKey: 'departmentId', header: 'Department ID' },
-    { 
-      accessorKey: 'isActive', 
-      header: 'Status',
-      cell: ({ getValue }) => (
-        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${getValue() ? 'bg-success/15 text-success' : 'bg-muted-foreground/15 text-muted-foreground'}`}>
-          {getValue() ? 'Active' : 'Inactive'}
->>>>>>> dbcd82f736f1192a784dcf112b6177c2608b811d
         </span>
       );
     },

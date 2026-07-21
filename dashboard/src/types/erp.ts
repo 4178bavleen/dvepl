@@ -129,13 +129,32 @@ export interface Department {
 }
 
 export interface Team {
-  id: string;
-  departmentId: string;
-  name: string;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-  deletedAt?: string | null;
+
+  id:string;
+
+  departmentId:string;
+
+  name:string;
+
+  isActive:boolean;
+
+  department?:{
+    id:string;
+    name:string;
+  };
+
+  employees?: Array<{
+    id:string;
+    firstName:string;
+    lastName:string;
+  }>;
+
+  _count?:{
+    employees:number;
+  };
+
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Designation {
@@ -244,20 +263,48 @@ export interface UserPermission {
 export interface Employee {
   id: string;
   userId?: string | null;
+
   companyId: string;
+
   branchId?: string | null;
   departmentId?: string | null;
   teamId?: string | null;
   designationId?: string | null;
+
   reportsToId?: string | null;
+
+  branch?: {
+    id: string;
+    name: string;
+  };
+
+  department?: {
+    id: string;
+    name: string;
+  };
+
+  designation?: {
+    id: string;
+    title: string;
+  };
+
+  team?: {
+    id: string;
+    name: string;
+  };
+
   employeeCode: string;
   firstName: string;
   lastName: string;
+
   dateOfBirth?: string | null;
   gender?: string | null;
+
   dateOfJoining?: string | null;
   dateOfExit?: string | null;
+
   status: EmployeeStatus;
+
   createdAt: string;
   updatedAt: string;
   deletedAt?: string | null;
@@ -336,14 +383,28 @@ export interface Holiday {
 }
 
 export interface Attendance {
-  id: string;
-  employeeId: string;
-  date: string;
-  checkIn?: string | null;
-  checkOut?: string | null;
+
+  id:string;
+
+  employeeId:string;
+
+  date:string;
+
   status: AttendanceStatus;
   remarks?: string | null;
-  createdAt: string;
+
+  employee?:{
+    id:string;
+    firstName:string;
+    lastName:string;
+    employeeCode:string;
+  };
+    checkIn?: string | null;
+
+  checkOut?: string | null;
+
+  createdAt?:string;
+  updatedAt?:string;
 }
 
 export interface Leave {
