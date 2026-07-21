@@ -1,4 +1,5 @@
 import { crmApi } from "@/services/modules";
+import type { CrudField } from "@/components/crud/types";
 import { LeadStatus } from "@/types/erp";
 import * as z from "zod";
 
@@ -91,5 +92,5 @@ export const leadsConfig = {
         { label: "Lost", value: "LOST" },
       ],
     },
-  ],
+  ] satisfies CrudField[],
 };
