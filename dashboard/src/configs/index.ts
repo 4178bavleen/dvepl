@@ -16,3 +16,5 @@ export * from './production.config';
 export * from './qc.config';
 export * from './logistics.config';
 export * from './finance.config';
+export * from './leads.config';
+
