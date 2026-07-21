@@ -8,7 +8,7 @@ import { adminLogs } from "../../../services/logger/contextLogger";
 
 async function readTeamRoutes(
   fastify: FastifyInstance,
-  options: FastifyPluginOptions
+  options: FastifyPluginOptions,
 ) {
   fastify.get(
     "/",
@@ -34,7 +34,8 @@ async function readTeamRoutes(
 
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const companyId = (request.query as any)?.companyId || request.admin?.companyId;
+        const companyId =
+          (request.query as any)?.companyId || request.admin?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({
@@ -43,7 +44,10 @@ async function readTeamRoutes(
           });
         }
 
-        const { departmentId, branchId } = request.query as { departmentId?: string; branchId?: string };
+        const { departmentId, branchId } = request.query as {
+          departmentId?: string;
+          branchId?: string;
+        };
 
         const teams = await fastify.prisma.team.findMany({
           where: {
@@ -56,6 +60,7 @@ async function readTeamRoutes(
               ...(departmentId ? { id: departmentId } : {}),
             },
           },
+
           include: {
             department: {
               select: {
@@ -71,12 +76,26 @@ async function readTeamRoutes(
                 },
               },
             },
+
+            employees: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                employeeCode: true,
+              },
+              orderBy: {
+                firstName: "asc",
+              },
+            },
+
             _count: {
               select: {
                 employees: true,
               },
             },
           },
+
           orderBy: {
             createdAt: "desc",
           },
@@ -105,7 +124,7 @@ async function readTeamRoutes(
               : undefined,
         });
       }
-    }
+    },
   );
 }
 

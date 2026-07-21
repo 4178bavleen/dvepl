@@ -8,7 +8,7 @@ import { adminLogs } from "../../../services/logger/contextLogger";
 
 async function readEmployeeRoutes(
   fastify: FastifyInstance,
-  options: FastifyPluginOptions
+  options: FastifyPluginOptions,
 ) {
   // Read all employees
   fastify.get(
@@ -32,7 +32,9 @@ async function readEmployeeRoutes(
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const companyId = (request.query as any)?.companyId || (request.admin as any)?.companyId;
+        const companyId =
+          (request.query as any)?.companyId ||
+          (request.admin as any)?.companyId;
 
         if (!companyId) {
           return reply.status(401).send({
@@ -46,8 +48,31 @@ async function readEmployeeRoutes(
             companyId,
             deletedAt: null,
           },
-          orderBy: {
-            createdAt: "desc",
+          include: {
+            department: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            designation: {
+              select: {
+                id: true,
+                title: true,
+              },
+            },
+            branch: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            team: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
         });
 
@@ -62,12 +87,10 @@ async function readEmployeeRoutes(
           success: false,
           message: "Server error.",
           details:
-            process.env.NODE_ENV === "development"
-              ? error.message
-              : undefined,
+            process.env.NODE_ENV === "development" ? error.message : undefined,
         });
       }
-    }
+    },
   );
 
   // Read employee by ID
@@ -122,12 +145,10 @@ async function readEmployeeRoutes(
           success: false,
           message: "Server error.",
           details:
-            process.env.NODE_ENV === "development"
-              ? error.message
-              : undefined,
+            process.env.NODE_ENV === "development" ? error.message : undefined,
         });
       }
-    }
+    },
   );
 }
 

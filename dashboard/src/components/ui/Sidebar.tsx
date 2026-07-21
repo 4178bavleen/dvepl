@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import logo from '@/assets/logos/dvepl.png';
+import logo from '@/assets/logos/dvepl-logo.png';
+import mobile_logo from '@/assets/logos/dvepl.png';
 import {
   ChevronLeft,
   ChevronRight,
@@ -48,12 +49,12 @@ export default function Sidebar() {
         <div className="h-16 flex items-center justify-between px-4 border-border">
           {!isSidebarCollapsed && (
             <Link to="/" className="flex items-center gap-2 font-bold text-md tracking-tight hover:opacity-90">
-              <img src={logo} alt="DVEPL Logo" className="h-7 w-7 rounded-lg" />
-              <span>DVEPL ERP</span>
+              <img src={logo} alt="DVEPL Logo" className="" />
+              
             </Link>
           )}
           {isSidebarCollapsed && (
-            <img src={logo} alt="DVEPL Logo" className="h-7 w-7 rounded-lg" />
+            <img src={mobile_logo} alt="DVEPL Logo" className="h-7 w-7 rounded-lg" />
           )}
           <Button
             variant="ghost"
