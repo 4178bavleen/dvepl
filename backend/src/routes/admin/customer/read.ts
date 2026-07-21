@@ -18,7 +18,8 @@ async function readCustomerRoutes(
       schema: {
         tags: ["Customer"],
         summary: "Read Customers",
-        description: "Returns all active customers of the authenticated company.",
+        description:
+          "Returns all active customers of the authenticated company.",
       },
       preHandler: [
         fastify.verifyToken,
@@ -27,9 +28,6 @@ async function readCustomerRoutes(
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        //--------------------------------
-        // Company From JWT
-        //--------------------------------
         const companyId = request.admin?.companyId;
 
         if (!companyId) {
@@ -39,9 +37,6 @@ async function readCustomerRoutes(
           });
         }
 
-        //--------------------------------
-        // Fetch Customers
-        //--------------------------------
         const customers = await fastify.prisma.customer.findMany({
           where: {
             companyId,
@@ -59,6 +54,7 @@ async function readCustomerRoutes(
         });
       } catch (error: any) {
         adminLogs.error("Read Customers failed", { error });
+
         return reply.status(500).send({
           success: false,
           message: "Server Error.",
@@ -78,7 +74,8 @@ async function readCustomerRoutes(
       schema: {
         tags: ["Customer"],
         summary: "Read Customer By Id",
-        description: "Returns detailed information of a customer, including contacts and communications.",
+        description:
+          "Returns detailed information of a customer, including contacts and communications.",
       },
       preHandler: [
         fastify.verifyToken,
@@ -87,9 +84,6 @@ async function readCustomerRoutes(
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        //--------------------------------
-        // Company From JWT
-        //--------------------------------
         const companyId = request.admin?.companyId;
 
         if (!companyId) {
@@ -101,9 +95,6 @@ async function readCustomerRoutes(
 
         const { id } = request.params as { id: string };
 
-        //--------------------------------
-        // Fetch Customer
-        //--------------------------------
         const customer = await fastify.prisma.customer.findFirst({
           where: {
             id,
@@ -112,11 +103,17 @@ async function readCustomerRoutes(
           },
           include: {
             contacts: {
-              where: { deletedAt: null },
-              orderBy: { createdAt: "desc" },
+              where: {
+                deletedAt: null,
+              },
+              orderBy: {
+                createdAt: "desc",
+              },
             },
             communicationLogs: {
-              orderBy: { createdAt: "desc" },
+              orderBy: {
+                createdAt: "desc",
+              },
               include: {
                 user: {
                   select: {
@@ -144,6 +141,7 @@ async function readCustomerRoutes(
         });
       } catch (error: any) {
         adminLogs.error("Read Customer By Id failed", { error });
+
         return reply.status(500).send({
           success: false,
           message: "Server Error.",

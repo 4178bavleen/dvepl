@@ -715,7 +715,12 @@ model Customer {
   salesOrders    SalesOrder[]
   purchaseOrders PurchaseOrder[]
   invoices       Invoice[]
-  vendorInvoices Invoice[]       @relation("VendorInvoices")
+  vendorInvoices Invoice[] @relation("VendorInvoices")
+
+  // Audit Fields
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([companyId])
   @@map("customers")
