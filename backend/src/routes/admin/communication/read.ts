@@ -54,33 +54,62 @@ async function readCommunicationRoutes(
 
         const { customerId } = validation.data;
 
-        //--------------------------------
-        // Tenant Verification
-        //--------------------------------
-        const customer = await fastify.prisma.customer.findFirst({
-          where: { id: customerId, companyId, deletedAt: null },
-        });
-
-        if (!customer) {
-          return reply.status(404).send({
-            success: false,
-            message: "Customer not found.",
+        let logs;
+        if (customerId) {
+          //--------------------------------
+          // Tenant Verification
+          //--------------------------------
+          const customer = await fastify.prisma.customer.findFirst({
+            where: { id: customerId, companyId, deletedAt: null },
           });
-        }
 
-        const logs = await fastify.prisma.communicationHistory.findMany({
-          where: { customerId },
-          orderBy: { createdAt: "desc" },
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
+          if (!customer) {
+            return reply.status(404).send({
+              success: false,
+              message: "Customer not found.",
+            });
+          }
+
+          logs = await fastify.prisma.communicationHistory.findMany({
+            where: { customerId },
+            orderBy: { createdAt: "desc" },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                },
               },
             },
-          },
-        });
+          });
+        } else {
+          // Fetch all communication history logs for this company
+          logs = await fastify.prisma.communicationHistory.findMany({
+            where: {
+              customer: {
+                companyId,
+                deletedAt: null,
+              },
+            },
+            orderBy: { createdAt: "desc" },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                },
+              },
+              customer: {
+                select: {
+                  id: true,
+                  name: true,
+                },
+              },
+            },
+          });
+        }
 
         return reply.status(200).send({
           success: true,

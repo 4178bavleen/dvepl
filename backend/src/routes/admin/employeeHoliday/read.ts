@@ -34,15 +34,13 @@ async function readHolidayRoutes(
       try {
         const { year } = request.query as { year?: number };
 
-        let whereClause = {};
+        let whereClause: any = {};
         if (year) {
           const startDate = new Date(`${year}-01-01T00:00:00.000Z`);
           const endDate = new Date(`${year}-12-31T23:59:59.999Z`);
-          whereClause = {
-            date: {
-              gte: startDate,
-              lte: endDate,
-            },
+          whereClause.date = {
+            gte: startDate,
+            lte: endDate,
           };
         }
 
@@ -90,7 +88,7 @@ async function readHolidayRoutes(
       try {
         const { id } = request.params as { id: string };
 
-        const holiday = await fastify.prisma.holiday.findUnique({
+        const holiday = await fastify.prisma.holiday.findFirst({
           where: {
             id,
           },

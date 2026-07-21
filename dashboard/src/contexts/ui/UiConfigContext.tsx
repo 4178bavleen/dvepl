@@ -13,14 +13,14 @@ export interface FooterLink {
 }
 
 export interface UiConfig {
-  sidebarItems: SidebarItem[];
-  navLinks: NavLink[];
-  footerLinks: FooterLink[];
-  fallback: {
-    title: string;
-    message: string;
-    ctaLabel: string;
-    ctaPath: string;
+  readonly sidebarItems: readonly SidebarItem[];
+  readonly navLinks: readonly NavLink[];
+  readonly footerLinks: readonly FooterLink[];
+  readonly fallback: {
+    readonly title: string;
+    readonly message: string;
+    readonly ctaLabel: string;
+    readonly ctaPath: string;
   };
 }
 

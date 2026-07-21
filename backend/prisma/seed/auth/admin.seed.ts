@@ -6,7 +6,7 @@ export async function seedAdmin(prisma: any, companyId: string) {
 
     const adminUser = await prisma.user.upsert({
         where: {
-            email: "admin@vibrantick.com",
+            email: "admin@dvepl.com",
         },
         update: {
             isActive: true,
@@ -15,7 +15,7 @@ export async function seedAdmin(prisma: any, companyId: string) {
         create: {
             companyId,
             name:"Admin",
-            email: "admin@vibrantick.com",
+            email: "admin@dvepl.com",
             passwordHash,
             isEmailVerified: true,
         },
