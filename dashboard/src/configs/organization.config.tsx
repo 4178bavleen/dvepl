@@ -49,7 +49,7 @@ export const companiesConfig = {
     { accessorKey: "phone", header: "Phone" },
     {
       accessorKey: "isActive",
-      header: "Status",
+      header: "Status"},
     { accessorKey: "id", header: "ID", enableSorting: false },
     { accessorKey: "name", header: sortableHeader("Name") },
     { accessorKey: "gst", header: "GSTIN" },
