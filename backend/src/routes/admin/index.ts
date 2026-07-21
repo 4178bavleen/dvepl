@@ -40,6 +40,7 @@ import adminDivisionRouteGroup from "./division/index"
 import adminSubDivisionRouteGroup from "./subDivision/index"
 import adminDeptRouteGroup from "./department/index"
 import adminTeamRouteGroup from "./team/index"
+import adminTechnicalClarificationRouteGroup from "./technicalClarification/index";
 
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 
@@ -130,10 +131,11 @@ async function adminRoutes(
     instance.register(adminGovernmentDepartmentRouteGroup, { prefix: "/government-department" });
     instance.register(adminSectionRouteGroup, { prefix: "/section" });
     instance.register(adminDivisionRouteGroup, { prefix: "/division" });
-    instance.register(adminSubDivisionRouteGroup, { prefix: "/sub-division" });
-    fastify.register(accessRoutes, {
-      prefix: "/user/access",
-    });
+     instance.register(adminSubDivisionRouteGroup, { prefix: "/sub-division" });
+     instance.register(adminTechnicalClarificationRouteGroup, { prefix: "/technical-clarification" });
+     fastify.register(accessRoutes, {
+       prefix: "/user/access",
+     });
    
   });
 }
