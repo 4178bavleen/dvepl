@@ -155,7 +155,7 @@ async function adminSalesOrderCreateRoutes(
         for (const item of items) {
           const itemAmount = Number(item.quantity) * Number(item.rate);
 
-          const itemGST = (itemAmount * Number(item.gstPercentage)) / 100;
+          const itemGST = 0;
 
           subtotal += itemAmount;
           gstTotal += itemGST;
@@ -235,7 +235,7 @@ async function adminSalesOrderCreateRoutes(
 
                   description: item.description,
 
-                  unit: item.unit ?? "Nos",
+                  unit: "Nos",
 
                   quantity: new Prisma.Decimal(item.quantity),
 
