@@ -254,7 +254,7 @@ async function adminSalesOrderUpdateRoutes(
 
                 description: item.description,
 
-                unit: item.unit ?? "Nos",
+                unit: "Nos",
 
                 quantity: new Prisma.Decimal(item.quantity),
 
