@@ -219,12 +219,10 @@ model User {
 
   completedStockTransfers StockTransfer[] @relation("StockTransferCompletedBy")
 
-  approvalRequestsRequested  ApprovalRequest[]      @relation("ApprovalRequestRequestedBy")
-  approvalRequestsAssigned   ApprovalRequest[]      @relation("ApprovalRequestAssignedTo")
-  approvalHistories          ApprovalHistory[]
-  salesOrdersCreated         SalesOrder[]           @relation("SalesOrderCreatedBy")
-  salesOrdersConfirmed       SalesOrder[]           @relation("SalesOrderConfirmedBy")
-  salesOrdersCancelled       SalesOrder[]           @relation("SalesOrderCancelledBy")
+  approvalRequestsRequested ApprovalRequest[] @relation("ApprovalRequestRequestedBy")
+  approvalRequestsAssigned  ApprovalRequest[] @relation("ApprovalRequestAssignedTo")
+  approvalHistories         ApprovalHistory[]
+
   salesOrderAttachments      SalesOrderAttachment[]
   engineeringProjectsCreated EngineeringProject[]   @relation("EngineeringProjectCreatedBy")
 
@@ -271,6 +269,10 @@ model User {
   reportDefinitions       ReportDefinition[]
   reportSchedules         ReportSchedule[]
   dashboardWidgets        DashboardWidget[]
+
+  orderAssignments   SalesOrderAssignment[]
+  salesOrdersTaken   SalesOrder[]           @relation("OrderTakenBy")
+  salesOrdersCreated SalesOrder[]           @relation("OrderCreatedBy")
 
   @@index([companyId])
   @@map("users")
@@ -712,7 +714,7 @@ model Customer {
   salesOrders    SalesOrder[]
   purchaseOrders PurchaseOrder[]
   invoices       Invoice[]
-  vendorInvoices Invoice[] @relation("VendorInvoices")
+  vendorInvoices Invoice[]       @relation("VendorInvoices")
 
   // Audit Fields
   createdAt DateTime  @default(now())
@@ -1548,86 +1550,193 @@ enum ApprovalAction {
 // 5. SALES ORDER MODULE
 // ============================================================
 
+// model SalesOrder {
+//   id               String           @id @default(uuid())
+//   companyId        String
+//   orderNo          String           @unique
+//   customerId       String
+//   tenderId         String?
+//   quotationId      String?
+//   orderDate        DateTime         @default(now())
+//   deliveryDate     DateTime?
+//   status           SalesOrderStatus @default(DRAFT)
+//   paymentTerms     String?
+//   deliverySchedule String?
+//   warranty         String?
+//   freight          Decimal          @default(0) @db.Decimal(15, 2)
+//   gst              Decimal          @db.Decimal(5, 2)
+//   total            Decimal          @db.Decimal(15, 2)
+//   remarks          String?
+
+//   createdById   String
+//   confirmedById String?
+//   cancelledById String?
+
+//   confirmedAt        DateTime?
+//   cancelledAt        DateTime?
+//   cancellationReason String?
+
+//   createdAt DateTime  @default(now())
+//   updatedAt DateTime  @updatedAt
+//   deletedAt DateTime?
+
+//   company   Company    @relation(fields: [companyId], references: [id])
+//   customer  Customer   @relation(fields: [customerId], references: [id])
+//   tender    Tender?    @relation(fields: [tenderId], references: [id])
+//   quotation Quotation? @relation(fields: [quotationId], references: [id])
+
+//   createdBy   User  @relation("SalesOrderCreatedBy", fields: [createdById], references: [id])
+//   confirmedBy User? @relation("SalesOrderConfirmedBy", fields: [confirmedById], references: [id])
+//   cancelledBy User? @relation("SalesOrderCancelledBy", fields: [cancelledById], references: [id])
+
+//   items               SalesOrderItem[]
+//   attachments         SalesOrderAttachment[]
+//   invoices            Invoice[]
+//   engineeringProjects EngineeringProject[]
+//   workOrders          WorkOrder[]
+//   dispatches          Dispatch[]
+
+//   @@index([companyId])
+//   @@index([status])
+//   @@index([orderDate])
+//   @@map("sales_orders")
+// }
+
 model SalesOrder {
-  id               String           @id @default(uuid())
-  companyId        String
-  orderNo          String           @unique
-  customerId       String
-  tenderId         String?
-  quotationId      String?
-  orderDate        DateTime         @default(now())
-  deliveryDate     DateTime?
-  status           SalesOrderStatus @default(DRAFT)
-  paymentTerms     String?
-  deliverySchedule String?
-  warranty         String?
-  freight          Decimal          @default(0) @db.Decimal(15, 2)
-  gst              Decimal          @db.Decimal(5, 2)
-  total            Decimal          @db.Decimal(15, 2)
-  remarks          String?
+  id String @id @default(uuid())
 
-  createdById   String
-  confirmedById String?
-  cancelledById String?
+  companyId String
 
-  confirmedAt        DateTime?
-  cancelledAt        DateTime?
-  cancellationReason String?
+  // Assignment
+  dveplCode String           @unique
+  status    SalesOrderStatus @default(PENDING)
+
+  orderTakenById String?
+  assignedToId   String?
+
+  // Order Information
+  partyName           String
+  caNo                String?
+  contactDetails      String?
+  orderConfirmDate    DateTime?
+  deliveryMonthTarget String?
+  poDate              DateTime?
+
+  // Drawing
+  drawingConcernedPerson String?
+  drawingApprovedDate    DateTime?
+  drawingStatus          DrawingStatus?
+  drawingRemarks         String?
+
+  // Totals
+  subtotal   Decimal @default(0) @db.Decimal(15, 2)
+  gstTotal   Decimal @default(0) @db.Decimal(15, 2)
+  grandTotal Decimal @default(0) @db.Decimal(15, 2)
+
+  // Additional
+  inspectionField  String?
+  sendNotification Boolean @default(true)
+
+  remarks String?
+
+  createdById String
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  company   Company    @relation(fields: [companyId], references: [id])
-  customer  Customer   @relation(fields: [customerId], references: [id])
-  tender    Tender?    @relation(fields: [tenderId], references: [id])
-  quotation Quotation? @relation(fields: [quotationId], references: [id])
+  company Company @relation(fields: [companyId], references: [id])
 
-  createdBy   User  @relation("SalesOrderCreatedBy", fields: [createdById], references: [id])
-  confirmedBy User? @relation("SalesOrderConfirmedBy", fields: [confirmedById], references: [id])
-  cancelledBy User? @relation("SalesOrderCancelledBy", fields: [cancelledById], references: [id])
+  orderTakenBy User?                  @relation("OrderTakenBy", fields: [orderTakenById], references: [id])
+  assignments  SalesOrderAssignment[]
 
-  items               SalesOrderItem[]
-  attachments         SalesOrderAttachment[]
-  invoices            Invoice[]
-  engineeringProjects EngineeringProject[]
-  workOrders          WorkOrder[]
-  dispatches          Dispatch[]
+  createdBy User @relation("OrderCreatedBy", fields: [createdById], references: [id])
+
+  items SalesOrderItem[]
+  // concernedPersons  SalesOrderConcernedPerson[]
+
+  customer              Customer?              @relation(fields: [customerId], references: [id])
+  customerId            String?
+  tender                Tender?                @relation(fields: [tenderId], references: [id])
+  tenderId              String?
+  quotation             Quotation?             @relation(fields: [quotationId], references: [id])
+  quotationId           String?
+  salesOrderAttachments SalesOrderAttachment[]
+  engineeringProjects   EngineeringProject[]
+  workOrders            WorkOrder[]
+  dispatches            Dispatch[]
+  invoices              Invoice[]
 
   @@index([companyId])
   @@index([status])
-  @@index([orderDate])
+  @@index([orderTakenById])
   @@map("sales_orders")
 }
 
 enum SalesOrderStatus {
-  DRAFT
-  CONFIRMED
-  IN_PRODUCTION
-  READY
-  DISPATCHED
+  PENDING
+  IN_PROGRESS
   COMPLETED
-  CANCELLED
+  ON_HOLD
 }
 
-model SalesOrderItem {
-  id           String    @id @default(uuid())
+model SalesOrderAssignment {
+  id String @id @default(uuid())
+
   salesOrderId String
-  itemCode     String
-  description  String
-  unit         String
-  quantity     Decimal   @db.Decimal(15, 3)
-  unitPrice    Decimal   @db.Decimal(15, 2)
-  totalPrice   Decimal   @db.Decimal(15, 2)
-  remarks      String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  deletedAt    DateTime?
 
-  salesOrder    SalesOrder     @relation(fields: [salesOrderId], references: [id])
+  userId String
+
+  assignedAt DateTime @default(now())
+
+  salesOrder SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([salesOrderId, userId])
+  @@index([userId])
+  @@map("sales_order_assignments")
+}
+
+// enum SalesOrderStatus {
+//   DRAFT
+//   CONFIRMED
+//   IN_PRODUCTION
+//   READY
+//   DISPATCHED
+//   COMPLETED
+//   CANCELLED
+// }
+
+model SalesOrderItem {
+  id String @id @default(uuid())
+
+  salesOrderId String
+
+  itemCode String
+
+  description String
+
+  unit String?
+
+  quantity Decimal @db.Decimal(15, 3)
+
+  unitPrice Decimal @db.Decimal(15, 2)
+
+  gstPercentage Decimal @db.Decimal(5, 2)
+
+  totalPrice Decimal @db.Decimal(15, 2)
+
+  remarks String?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  deletedAt     DateTime?
   dispatchItems DispatchItem[]
+  salesOrder    SalesOrder     @relation(fields: [salesOrderId], references: [id])
 
-  @@index([salesOrderId])
   @@map("sales_order_items")
 }
 
@@ -1736,6 +1845,7 @@ enum DrawingStatus {
   APPROVED
   REJECTED
   OBSOLETE
+  PENDING
 }
 
 model DrawingRevision {
