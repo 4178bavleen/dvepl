@@ -35,7 +35,7 @@ export const ROUTES = {
   TENDER_CLARIFICATIONS: '/tender/clarifications',
   TENDER_QUOTATIONS: '/tender/quotations',
   TENDER_BOQS: '/tender/boqs',
-  TENDER_SALES_ORDERS: '/tender/sales-orders',
+  TENDER_ORDERS: '/tender/orders',
 
   // Security
   SECURITY_USERS: '/security/users',
@@ -56,6 +56,7 @@ export const ROUTES = {
   // Procurement & Purchase
   PURCHASE_REQUESTS: '/purchase/requests',
   PURCHASE_ORDERS: '/purchase/orders',
+  PURCHASE_VENDORS: '/purchase/vendors',
 
   // Inventory & Logistics
   INVENTORY_WAREHOUSES: '/inventory/warehouses',

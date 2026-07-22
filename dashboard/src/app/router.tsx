@@ -44,7 +44,8 @@ const SubDivisionsPage = lazy(() => import('@/pages/tenders/SubDivisionsPage'));
 const ReferenceCodesPage = lazy(() => import('@/pages/tenders/ReferenceCodesPage'));
 const TechnicalClarificationsPage = lazy(() => import('@/pages/tenders/TechnicalClarificationsPage'));
 const QuotationsPage = lazy(() => import('@/pages/tenders/QuotationsPage'));
-const SalesOrdersPage = lazy(() => import('@/pages/tenders/SalesOrdersPage'));
+const OrdersPage = lazy(() => import('@/pages/tenders/OrdersPage'));
+const VendorsPage = lazy(() => import('@/pages/tenders/VendorsPage'));
 const BoqsPage = lazy(() => import('@/pages/tenders/BoqsPage'));
 
 // Engineering & Manufacturing
@@ -135,7 +136,8 @@ export function AppRouter() {
               <Route path="/tender/reference-codes" element={<ReferenceCodesPage />} />
               <Route path="/tender/clarifications" element={<TechnicalClarificationsPage />} />
               <Route path="/tender/quotations" element={<QuotationsPage />} />
-              <Route path="/tender/sales-orders" element={<SalesOrdersPage />} />
+               <Route path="/tender/orders" element={<OrdersPage />} />
+              <Route path="/purchase/vendors" element={<VendorsPage />} />
               <Route path="/tender/boqs" element={<BoqsPage />} />
               {/* Security */}
               <Route path="/security/users" element={<UsersPage />} />
