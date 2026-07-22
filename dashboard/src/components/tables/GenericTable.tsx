@@ -81,7 +81,7 @@ const TableRow = React.forwardRef<
   <tr
     ref={ref}
     className={cn(
-      "border-b transition-colors hover:bg-muted/50 has-aria-expanded:bg-muted/50 data-[state=selected]:bg-muted",
+      "border-b transition-colors hover:bg-muted/50 has-aria-expanded:bg-muted/50 data-[state=selected]:bg-muted group/row",
       className,
     )}
     {...props}
@@ -131,6 +131,7 @@ interface GenericTableProps<TData> {
   onDelete?: (row: TData) => void;
   bulkActions?: (selectedRows: TData[]) => React.ReactNode;
   isLoading?: boolean;
+  showColumnVisibility?: boolean;
 }
 
 export function GenericTable<TData extends { id: string }>({
@@ -141,6 +142,7 @@ export function GenericTable<TData extends { id: string }>({
   onDelete,
   bulkActions,
   isLoading = false,
+  showColumnVisibility = true,
 }: GenericTableProps<TData>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
@@ -295,57 +297,59 @@ export function GenericTable<TData extends { id: string }>({
           )}
         </div>
 
-        <div className="flex items-center gap-2 ml-auto">
-          {/* Column Visibility Selector */}
-          <div className="relative">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsColumnsOpen(!isColumnsOpen)}
-              className="h-8 gap-2 border border-border text-xs px-3 py-1.5 flex items-center justify-center rounded-md hover:bg-muted transition-colors font-medium cursor-pointer outline-none bg-card text-foreground"
-            >
-              <SlidersHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
-              <span>{t("Columns")}</span>
-            </Button>
-            {isColumnsOpen && (
-              <>
-                {/* Overlay to close on click outside */}
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setIsColumnsOpen(false)}
-                />
-                <div className="absolute right-0 top-9.5 z-50 w-[180px] bg-popover border border-border shadow-md rounded-lg p-2.5 space-y-1.5 text-popover-foreground">
-                  <div className="px-1 py-0.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                    {t("Toggle Columns")}
+        {showColumnVisibility && (
+          <div className="flex items-center gap-2 ml-auto">
+            {/* Column Visibility Selector */}
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsColumnsOpen(!isColumnsOpen)}
+                className="h-8 gap-2 border border-border text-xs px-3 py-1.5 flex items-center justify-center rounded-md hover:bg-muted transition-colors font-medium cursor-pointer outline-none bg-card text-foreground"
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+                <span>{t("Columns")}</span>
+              </Button>
+              {isColumnsOpen && (
+                <>
+                  {/* Overlay to close on click outside */}
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setIsColumnsOpen(false)}
+                  />
+                  <div className="absolute right-0 top-9.5 z-50 w-[180px] bg-popover border border-border shadow-md rounded-lg p-2.5 space-y-1.5 text-popover-foreground">
+                    <div className="px-1 py-0.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                      {t("Toggle Columns")}
+                    </div>
+                    <div className="h-px bg-border my-1" />
+                    <div className="max-h-[220px] overflow-y-auto space-y-0.5">
+                      {table
+                        .getAllColumns()
+                        .filter((column) => column.getCanHide())
+                        .map((column) => {
+                          return (
+                            <div
+                              key={column.id}
+                              onClick={() =>
+                                column.toggleVisibility(!column.getIsVisible())
+                              }
+                              className="flex items-center justify-between text-xs py-1.5 px-2 rounded-md hover:bg-muted cursor-pointer transition-colors"
+                            >
+                              <span className="capitalize">{t(column.id)}</span>
+                              <Checkbox
+                                checked={column.getIsVisible()}
+                                className="h-3.5 w-3.5"
+                              />
+                            </div>
+                          );
+                        })}
+                    </div>
                   </div>
-                  <div className="h-px bg-border my-1" />
-                  <div className="max-h-[220px] overflow-y-auto space-y-0.5">
-                    {table
-                      .getAllColumns()
-                      .filter((column) => column.getCanHide())
-                      .map((column) => {
-                        return (
-                          <div
-                            key={column.id}
-                            onClick={() =>
-                              column.toggleVisibility(!column.getIsVisible())
-                            }
-                            className="flex items-center justify-between text-xs py-1.5 px-2 rounded-md hover:bg-muted cursor-pointer transition-colors"
-                          >
-                            <span className="capitalize">{t(column.id)}</span>
-                            <Checkbox
-                              checked={column.getIsVisible()}
-                              className="h-3.5 w-3.5"
-                            />
-                          </div>
-                        );
-                      })}
-                  </div>
-                </div>
-              </>
-            )}
+                </>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Actual Data Table */}
@@ -360,7 +364,7 @@ export function GenericTable<TData extends { id: string }>({
                       key={header.id}
                       className={cn(
                         "text-xs font-semibold py-3.5 px-4 text-muted-foreground whitespace-nowrap",
-                        header.id === "actions" && "text-center",
+                        header.id === "actions" && "text-center sticky right-0 bg-muted border-l border-l-border shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)] z-10",
                       )}
                     >
                       {header.isPlaceholder
@@ -383,8 +387,14 @@ export function GenericTable<TData extends { id: string }>({
                   key={i}
                   className="animate-pulse border-b border-border/50"
                 >
-                  {tableColumns.map((_, colIndex) => (
-                    <TableCell key={colIndex} className="py-4 px-4">
+                  {tableColumns.map((col, colIndex) => (
+                    <TableCell 
+                      key={colIndex} 
+                      className={cn(
+                        "py-4 px-4",
+                        col.id === "actions" && "sticky right-0 bg-card border-l border-l-border z-10"
+                      )}
+                    >
                       <div className="h-4 bg-muted rounded-md w-full" />
                     </TableCell>
                   ))}
@@ -402,7 +412,7 @@ export function GenericTable<TData extends { id: string }>({
                       key={cell.id}
                       className={cn(
                         "py-3.5 px-4 text-sm font-normal align-middle",
-                        cell.column.id === "actions" && "text-center",
+                        cell.column.id === "actions" && "text-center sticky right-0 bg-card group-hover/row:bg-muted/40 group-data-[state=selected]/row:bg-muted border-l border-l-border shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)] z-10",
                       )}
                     >
                       {flexRender(

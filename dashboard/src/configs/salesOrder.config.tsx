@@ -11,7 +11,6 @@ export const salesOrdersConfig = {
   api: salesOrderApi.salesOrders,
   selectOptions: {
     customerId: crmApi.customers.list,
-    quotationId: quotationApi.quotations.list,
     createdById: hrmsApi.employees.list,
   },
   tableName: 'salesOrders',

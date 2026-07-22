@@ -24,7 +24,13 @@ export const authService = {
     return data;
   },
   logout: async () => {
-    try { await apiClient.post(API_ENDPOINTS.auth.logout); } finally { localStorage.removeItem('token'); }
+    try { 
+      await apiClient.post(API_ENDPOINTS.auth.logout); 
+    } catch (error) {
+      console.warn('Logout API call failed:', error);
+    } finally { 
+      localStorage.removeItem('token'); 
+    }
   },
   profile: async () => {
     const { data } = await apiClient.get<{ success: boolean; data: ProfileResponse }>(API_ENDPOINTS.auth.profile);
