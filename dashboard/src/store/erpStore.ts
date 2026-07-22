@@ -24,9 +24,6 @@ interface ERPStore {
   attendances: Attendance[];
   leaves: Leave[];
   salaries: Salary[];
-  customers: Customer[];
-  contactPersons: ContactPerson[];
-  communicationHistories: CommunicationHistory[];
   tenders: Tender[];
   tenderRequests: TenderRequest[];
   governmentDepartments: GovernmentDepartment[];
@@ -105,9 +102,6 @@ export const useERPStore = create<ERPStore>((set) => ({
   attendances: initialAttendances,
   leaves: initialLeaves,
   salaries: initialSalaries,
-  customers: initialCustomers,
-  contactPersons: initialContactPersons,
-  communicationHistories: initialCommunicationHistories,
   tenders: initialTenders,
   tenderRequests: initialTenderRequests,
   governmentDepartments: initialGovernmentDepartments,

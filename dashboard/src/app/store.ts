@@ -1,2 +1,2 @@
 export { useERPStore } from '../store/erpStore';
-// Add future stores here (auth, ui, etc.)
+export { useCRMStore } from '../store/crmStore';
