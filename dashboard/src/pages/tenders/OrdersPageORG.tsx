@@ -438,6 +438,7 @@ export function OrdersPage() {
         quantity: Number(item.qty || 0),
         rate: Number(item.rate || 0),
         gstPercentage: Number(item.gstPercent || 0),
+        total: Number(item.total || 0),
         remarks: item.remarks || ''
       }))
     };
