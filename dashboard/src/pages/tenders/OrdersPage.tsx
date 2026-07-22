@@ -3,7 +3,10 @@ import { ColumnDef } from '@tanstack/react-table';
 import * as z from 'zod';
 import {
   Plus, Search, Calendar, Info, Loader2, ShoppingCart, DollarSign,
-  Clock, CheckCircle2, Trash2, Edit, Eye, Upload, Download, RefreshCw, X, Users, MessageSquare, Mail, SlidersHorizontal, Check
+  Clock, CheckCircle2, Trash2, Edit, Eye, Upload, Download, RefreshCw, X, Users, MessageSquare, Mail, SlidersHorizontal, Check,
+  FileText,
+  AlertCircle,
+  Sparkles
 } from 'lucide-react';
 import { GenericTable, sortableHeader } from '@/components/tables/GenericTable';
 import { Button } from '@/components/ui/button';
@@ -15,16 +18,21 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useERPStore } from '@/store/erpStore';
+import { useCRMStore } from '@/store/crmStore';
 import { toast } from 'react-hot-toast';
 import { crmApi, salesOrderApi, hrmsApi } from '@/services/modules';
+import { apiClient } from '@/services/axios';
 import { SalesOrder } from '@/types/erp';
 
 interface LineItemRow {
   id: string;
+  itemCode: string;
   description: string;
+  unit: string;
   qty: number;
   rate: number;
   gstPercent: number;
+  remarks?: string;
   total: number;
 }
 
@@ -52,7 +60,8 @@ const ALL_COLUMN_KEYS = [
 type ColumnKey = (typeof ALL_COLUMN_KEYS)[number]['id'];
 
 const orderSchema = z.object({
-  companyCode: z.string().optional(),
+  companyId: z.string().min(1, 'Company is required'),
+  companyCode: z.string().min(1, 'DVEPL Code is required'),
   customerName: z.string().min(1, 'Party Name is required'),
   caNo: z.string().optional(),
   contact: z.string().optional(),
@@ -94,11 +103,12 @@ export function OrdersPage() {
   const [editingOrder, setEditingOrder] = useState<SalesOrder | null>(null);
   const [viewingOrder, setViewingOrder] = useState<SalesOrder | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoading, setIsLoading] = useState(Boolean(salesOrderApi.salesOrders));
-  const [remoteOrders, setRemoteOrders] = useState<SalesOrder[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([]);
 
   // Form Fields
   const [formValues, setFormValues] = useState<Record<string, any>>({
+    companyId: '',
     companyCode: '',
     customerName: '',
     caNo: '',
@@ -123,39 +133,81 @@ export function OrdersPage() {
 
   // Line Items State
   const [lineItems, setLineItems] = useState<LineItemRow[]>([
-    { id: '1', description: '', qty: 1, rate: 0, gstPercent: 18, total: 0 }
+    { id: '1', itemCode: '', description: '', unit: 'Nos', qty: 1, rate: 0, gstPercent: 18, remarks: '', total: 0 }
   ]);
 
   // Options Data
   const [users, setUsers] = useState<Array<{ id: string; name: string }>>([]);
 
-  const api = salesOrderApi.salesOrders;
-  const orders = api ? remoteOrders : localOrders;
+  const orders = useCRMStore((state) => state.salesOrders || EMPTY_ARRAY);
+  const setSalesOrders = useCRMStore((state) => state.setSalesOrders);
 
   // Load backend orders
   const loadOrders = useCallback(async () => {
-    if (!api) return;
     setIsLoading(true);
     try {
-      const data = await api.list();
-      setRemoteOrders(data);
+      const response = await apiClient.get('/order/read');
+      if (response.data && response.data.success) {
+        const mapped = (response.data.data || []).map((o: any) => ({
+          id: o.id,
+          orderNo: o.dveplCode,
+          companyCode: o.dveplCode,
+          customerName: o.partyName,
+          companyId: o.companyId || '',
+          status: o.status ? o.status.toLowerCase() : 'pending',
+          caNo: o.caNo || '',
+          contact: o.contactDetails || '',
+          orderTakenDate: o.orderConfirmDate ? o.orderConfirmDate.split('T')[0] : '',
+          deliveryTarget: o.deliveryMonthTarget || '',
+          poDate: o.poDate ? o.poDate.split('T')[0] : '',
+          orderTakenById: o.orderTakenById || '',
+          orderTakenByName: o.orderTakenBy?.name || '',
+          drawingConcernedPerson: o.drawingConcernedPerson || '',
+          drawingApprovedDate: o.drawingApprovedDate ? o.drawingApprovedDate.split('T')[0] : '',
+          drawingStatus: o.drawingStatus || 'Pending',
+          drawingRemarks: o.drawingRemarks || '',
+          inspectionField: o.inspectionField || '',
+          concernedPeople: o.concernedPersons || [],
+          lineItems: (o.items || []).map((item: any) => ({
+            id: item.id || item._id || Date.now().toString(),
+            itemCode: item.itemCode || '',
+            description: item.description || '',
+            unit: item.unit || 'Nos',
+            qty: item.quantity || 0,
+            rate: item.rate || 0,
+            gstPercent: item.gstPercentage || 0,
+            remarks: item.remarks || '',
+            total: (item.quantity || 0) * (item.rate || 0) * (1 + (item.gstPercentage || 0) / 100)
+          }))
+        }));
+        setSalesOrders(mapped);
+      }
     } catch (error: any) {
       toast.error(error.response?.data?.message ?? 'Unable to load orders.');
     } finally {
       setIsLoading(false);
     }
-  }, [api]);
+  }, [setSalesOrders]);
 
   useEffect(() => {
     void loadOrders();
   }, [loadOrders]);
 
-  // Load Users/Employees
+  // Load Companies & Users/Employees
   useEffect(() => {
+    apiClient.get('/company/read/')
+      .then((res: any) => {
+        if (res.data && res.data.success) {
+          setCompanies(res.data.data || []);
+        }
+      })
+      .catch(() => { });
+
     hrmsApi.employees.list()
-      .then((items: any[]) => setUsers(items.map((i) => ({ id: i.id, name: `${i.firstName ?? ''} ${i.lastName ?? ''}`.trim() || i.name }))))
-      .catch(() => {});
+      .then((items: any[]) => setUsers(items.map((i) => ({ id: i.userId, name: `${i.firstName ?? ''} ${i.lastName ?? ''}`.trim() || i.name }))))
+      .catch(() => { });
   }, []);
+
   // Column Picker helper
   const toggleColumn = (key: string) => {
     setVisibleColumns((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -168,6 +220,7 @@ export function OrdersPage() {
     });
     setVisibleColumns(updated);
   };
+
   // Line Item Calculations
   const updateLineItem = (id: string, field: keyof LineItemRow, val: any) => {
     setLineItems((prev) =>
@@ -187,7 +240,7 @@ export function OrdersPage() {
   const addLineItemRow = () => {
     setLineItems((prev) => [
       ...prev,
-      { id: Date.now().toString(), description: '', qty: 1, rate: 0, gstPercent: 18, total: 0 }
+      { id: Date.now().toString(), itemCode: '', description: '', unit: 'Nos', qty: 1, rate: 0, gstPercent: 18, remarks: '', total: 0 }
     ]);
   };
 
@@ -282,7 +335,8 @@ export function OrdersPage() {
   const openCreate = () => {
     setEditingOrder(null);
     setFormValues({
-      companyCode: `DVEPL-${Math.floor(100 + Math.random() * 900)}`,
+      companyId: '',
+      companyCode: '',
       customerName: '',
       caNo: '',
       contact: '',
@@ -299,7 +353,7 @@ export function OrdersPage() {
     });
     setAssignedUserIds([]);
     setConcernedPeople([]);
-    setLineItems([{ id: '1', description: '', qty: 1, rate: 0, gstPercent: 18, total: 0 }]);
+    setLineItems([{ id: '1', itemCode: '', description: '', unit: 'Nos', qty: 1, rate: 0, gstPercent: 18, remarks: '', total: 0 }]);
     setErrors({});
     setIsFormOpen(true);
   };
@@ -308,6 +362,7 @@ export function OrdersPage() {
     const o = order as any;
     setEditingOrder(order);
     setFormValues({
+      companyId: o.companyId || '',
       companyCode: o.companyCode || o.orderNo || '',
       customerName: o.customerName || o.customer?.name || '',
       caNo: o.caNo || '',
@@ -328,7 +383,7 @@ export function OrdersPage() {
     if (Array.isArray(o.lineItems) && o.lineItems.length > 0) {
       setLineItems(o.lineItems);
     } else {
-      setLineItems([{ id: '1', description: 'Default Item', qty: 1, rate: Number(o.total || 0), gstPercent: 18, total: Number(o.total || 0) }]);
+      setLineItems([{ id: '1', itemCode: '', description: 'Default Item', unit: 'Nos', qty: 1, rate: Number(o.total || 0), gstPercent: 18, remarks: '', total: Number(o.total || 0) }]);
     }
     setErrors({});
     setIsFormOpen(true);
@@ -346,27 +401,57 @@ export function OrdersPage() {
       return;
     }
 
+    let mappedDrawingStatus = 'PENDING';
+    const ds = (formValues.drawingStatus || '').toUpperCase();
+    if (ds === 'IN PROCESS' || ds === 'IN_PROCESS' || ds === 'IN PROGRESS' || ds === 'IN_PROGRESS') {
+      mappedDrawingStatus = 'IN_PROGRESS';
+    } else if (ds === 'APPROVED') {
+      mappedDrawingStatus = 'APPROVED';
+    } else if (ds === 'REJECTED') {
+      mappedDrawingStatus = 'REJECTED';
+    }
+
     const payload = {
-      ...result.data,
-      orderNo: result.data.companyCode,
-      total: totals.grandTotal,
-      assignedUserIds,
-      concernedPeople,
-      lineItems,
-      notifications: { whatsapp: sendWaNotif, email: sendEmailNotif }
+      companyId: formValues.companyId,
+      dveplCode: formValues.companyCode,
+      status: (formValues.status || 'PENDING').toUpperCase().replace('-', '_'),
+      orderTakenById: formValues.orderTakenById || null,
+      assignedToIds: assignedUserIds,
+      partyName: formValues.customerName,
+      caNo: formValues.caNo || null,
+      contactDetails: formValues.contact || null,
+      orderConfirmDate: formValues.orderTakenDate || null,
+      deliveryMonthTarget: formValues.deliveryTarget || null,
+      poDate: formValues.poDate || null,
+      concernedPersons: concernedPeople,
+      drawingConcernedPerson: formValues.drawingConcernedPerson || null,
+      drawingApprovedDate: formValues.drawingApprovedDate || null,
+      drawingStatus: mappedDrawingStatus,
+      drawingRemarks: formValues.drawingRemarks || null,
+      inspectionField: formValues.inspectionField || null,
+      sendNotification: true,
+      remarks: '',
+      items: lineItems.map((item, idx) => ({
+        itemCode: item.itemCode || `ITEM-${idx + 1}`,
+        description: item.description || 'No description',
+        unit: item.unit || 'Nos',
+        quantity: Number(item.qty || 0),
+        rate: Number(item.rate || 0),
+        gstPercentage: Number(item.gstPercent || 0),
+        remarks: item.remarks || ''
+      }))
     };
 
     setIsSubmitting(true);
     try {
-      if (api) {
-        if (editingOrder && api.update) await api.update(editingOrder.id, payload);
-        else await api.create(payload);
-        await loadOrders();
-      } else if (editingOrder) {
-        updateRecord('salesOrders', editingOrder.id, payload);
+      if (editingOrder) {
+        await apiClient.patch(`/order/update/${editingOrder.id}`, payload);
       } else {
-        addRecord('salesOrders', payload);
+        console.log("Payload:", payload);
+        console.log("orderTakenById:", payload.orderTakenById);
+        await apiClient.post('/order/create', payload);
       }
+      await loadOrders();
       setIsFormOpen(false);
       toast.success(`Order ${editingOrder ? 'updated' : 'created'} successfully.`);
     } catch (err: any) {
@@ -380,12 +465,8 @@ export function OrdersPage() {
     if (!window.confirm('Delete this order?')) return;
     setIsLoading(true);
     try {
-      if (api?.remove) {
-        await api.remove(order.id);
-        await loadOrders();
-      } else {
-        deleteRecord('salesOrders', order.id);
-      }
+      await apiClient.delete(`/order/delete/${order.id}`);
+      await loadOrders();
       toast.success('Order deleted.');
     } catch (err: any) {
       toast.error(err.response?.data?.message ?? 'Failed to delete order.');
@@ -712,7 +793,11 @@ export function OrdersPage() {
 
       {/* Add / Edit Order Modal */}
       <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <SheetContent side="right" className="h-full w-full max-w-4xl p-0 flex flex-col gap-0 border-l shadow-2xl">
+        <SheetContent
+          side="right"
+          className="h-full p-0 flex flex-col gap-0 border-l shadow-2xl"
+          style={{ width: '90vw', maxWidth: '1200px' }}
+        >
           <div className="bg-gradient-to-r from-primary/10 via-background to-transparent border-b p-6 pt-8 space-y-1">
             <h2 className="text-xl font-bold tracking-tight text-foreground">
               {editingOrder ? 'Edit Order' : 'Add New Order'}
@@ -720,231 +805,300 @@ export function OrdersPage() {
             <p className="text-xs text-muted-foreground">Complete assignment, line items, drawing, and inspection details.</p>
           </div>
 
-          <form onSubmit={submitForm} className="flex-1 flex flex-col justify-between overflow-y-auto">
-            <div className="p-6 space-y-6">
+          <form onSubmit={submitForm} className="flex-1 flex flex-col overflow-hidden bg-background">
+            {/* Main Content Area: Split Pane */}
+            <div className="flex-1 flex flex-col lg:flex-row overflow-hidden divide-y lg:divide-y-0 lg:divide-x divide-border">
 
-              {/* Assignment Section */}
-              <div className="space-y-3">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
-                  <Users className="size-4" /> Assignment & Code
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Left Column: Form Fields & Configuration */}
+              <div className="w-full lg:w-[45%] p-6 space-y-6 overflow-y-auto">
+
+                {/* Assignment & Code Section */}
+                <div className="rounded-xl border border-border/80 bg-card p-4 space-y-4 shadow-sm">
+                  <div className="flex items-center gap-2 border-b pb-2">
+                    <Users className="size-4 text-primary" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-primary">Assignment & Identifiers</h3>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1.5 sm:col-span-2">
+                      <Label className="text-xs font-semibold text-foreground">Company *</Label>
+                      <Select
+                        value={formValues.companyId}
+                        onValueChange={(val) => setFormValues({ ...formValues, companyId: val })}
+                      >
+                        <SelectTrigger className="h-9"><SelectValue placeholder="Select Company..." /></SelectTrigger>
+                        <SelectContent>
+                          {companies.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {errors.companyId && <p className="text-xs text-destructive mt-0.5">{errors.companyId}</p>}
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <Label className="text-xs font-semibold text-foreground">DVEPL Code *</Label>
+                      <Input
+                        value={formValues.companyCode}
+                        onChange={(e) => setFormValues({ ...formValues, companyCode: e.target.value })}
+                        placeholder="DVEPL-2026-001"
+                        className="h-9"
+                      />
+                      {errors.companyCode && <p className="text-xs text-destructive mt-0.5">{errors.companyCode}</p>}
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <Label className="text-xs font-semibold text-foreground">Order Status</Label>
+                      <Select
+                        value={formValues.status}
+                        onValueChange={(val) => setFormValues({ ...formValues, status: val })}
+                      >
+                        <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="in-progress">In Progress</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                          <SelectItem value="on-hold">On Hold</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5 sm:col-span-2">
+                      <Label className="text-xs font-semibold text-foreground">Order Taken By</Label>
+                      <Select
+                        value={formValues.orderTakenById}
+                        onValueChange={(val) => setFormValues({ ...formValues, orderTakenById: val })}
+                      >
+                        <SelectTrigger className="h-9"><SelectValue placeholder="Select team member..." /></SelectTrigger>
+                        <SelectContent>
+                          {users.map((u) => (
+                            <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Customer Details Section */}
+                <div className="rounded-xl border border-border/80 bg-card p-4 space-y-4 shadow-sm">
+                  <div className="flex items-center gap-2 border-b pb-2">
+                    <Info className="size-4 text-primary" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-primary">Order & Client Details</h3>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1.5 sm:col-span-2">
+                      <Label className="text-xs font-semibold text-foreground">Party Name *</Label>
+                      <Input
+                        value={formValues.customerName}
+                        onChange={(e) => setFormValues({ ...formValues, customerName: e.target.value })}
+                        placeholder="e.g. Havells India Ltd"
+                        className="h-9"
+                      />
+                      {errors.customerName && <p className="text-xs text-destructive mt-0.5">{errors.customerName}</p>}
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <Label className="text-xs font-semibold text-foreground">CA No</Label>
+                      <Input
+                        value={formValues.caNo}
+                        onChange={(e) => setFormValues({ ...formValues, caNo: e.target.value })}
+                        placeholder="CA-88902"
+                        className="h-9"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <Label className="text-xs font-semibold text-foreground">Contact Details</Label>
+                      <Input
+                        value={formValues.contact}
+                        onChange={(e) => setFormValues({ ...formValues, contact: e.target.value })}
+                        placeholder="Email or phone"
+                        className="h-9"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <Label className="text-xs font-semibold text-foreground">Order Confirm Date</Label>
+                      <Input
+                        type="date"
+                        value={formValues.orderTakenDate}
+                        onChange={(e) => setFormValues({ ...formValues, orderTakenDate: e.target.value })}
+                        className="h-9 text-xs"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <Label className="text-xs font-semibold text-foreground">PO Date</Label>
+                      <Input
+                        type="date"
+                        value={formValues.poDate}
+                        onChange={(e) => setFormValues({ ...formValues, poDate: e.target.value })}
+                        className="h-9 text-xs"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5 sm:col-span-2">
+                      <Label className="text-xs font-semibold text-foreground">Delivery Month Target</Label>
+                      <Input
+                        placeholder="e.g. June 2026"
+                        value={formValues.deliveryTarget}
+                        onChange={(e) => setFormValues({ ...formValues, deliveryTarget: e.target.value })}
+                        className="h-9"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Concerned Persons tag input */}
+                  <div className="flex flex-col gap-1.5 border-t pt-3">
+                    <Label className="text-xs font-semibold text-foreground">Concerned Persons</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Type name and press Add..."
+                        value={cpInput}
+                        onChange={(e) => setCpInput(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCP(); } }}
+                        className="h-9 text-xs"
+                      />
+                      <Button type="button" onClick={handleAddCP} variant="secondary" size="sm" className="h-9 px-3">Add</Button>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      {concernedPeople.map((cp, idx) => (
+                        <span key={idx} className="inline-flex items-center gap-1 bg-primary/5 hover:bg-primary/10 border border-primary/20 text-primary px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition-colors duration-150">
+                          {cp}
+                          <X className="size-3 cursor-pointer text-primary hover:text-destructive" onClick={() => handleRemoveCP(idx)} />
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Drawing details Section */}
+                <div className="rounded-xl border border-border/80 bg-card p-4 space-y-4 shadow-sm">
+                  <div className="flex items-center gap-2 border-b pb-2">
+                    <FileText className="size-4 text-primary" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-primary">Drawing Details</h3>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <Label className="text-xs font-semibold text-foreground">Drawing Person</Label>
+                      <Input
+                        value={formValues.drawingConcernedPerson}
+                        onChange={(e) => setFormValues({ ...formValues, drawingConcernedPerson: e.target.value })}
+                        placeholder="Lead Engineer"
+                        className="h-9"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <Label className="text-xs font-semibold text-foreground">Drawing Status</Label>
+                      <Select
+                        value={formValues.drawingStatus}
+                        onValueChange={(val) => setFormValues({ ...formValues, drawingStatus: val })}
+                      >
+                        <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Pending">Pending</SelectItem>
+                          <SelectItem value="In Process">In Process</SelectItem>
+                          <SelectItem value="Approved">Approved</SelectItem>
+                          <SelectItem value="Rejected">Rejected</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <Label className="text-xs font-semibold text-foreground">Drawing Approved Date</Label>
+                      <Input
+                        type="date"
+                        value={formValues.drawingApprovedDate}
+                        onChange={(e) => setFormValues({ ...formValues, drawingApprovedDate: e.target.value })}
+                        className="h-9 text-xs"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <Label className="text-xs font-semibold text-foreground">Drawing Remarks</Label>
+                      <Input
+                        value={formValues.drawingRemarks}
+                        onChange={(e) => setFormValues({ ...formValues, drawingRemarks: e.target.value })}
+                        placeholder="Revisions or sign-off notes"
+                        className="h-9"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Inspection & Notes */}
+                <div className="rounded-xl border border-border/80 bg-card p-4 space-y-4 shadow-sm">
+                  <div className="flex items-center gap-2 border-b pb-2">
+                    <AlertCircle className="size-4 text-primary" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-primary">Inspection Notes</h3>
+                  </div>
                   <div className="flex flex-col gap-1.5">
-                    <Label className="text-xs font-semibold">DVEPL Code *</Label>
-                    <Input
-                      value={formValues.companyCode}
-                      onChange={(e) => setFormValues({ ...formValues, companyCode: e.target.value })}
-                      placeholder="DVEPL-001"
+                    <Label className="text-xs font-semibold text-foreground">Inspection Fields</Label>
+                    <Textarea
+                      placeholder="Enter inspection criteria, third party inspector details, or clearance notes..."
+                      value={formValues.inspectionField}
+                      onChange={(e) => setFormValues({ ...formValues, inspectionField: e.target.value })}
+                      className="min-h-[80px]"
                     />
-                    {errors.companyCode && <p className="text-xs text-destructive">{errors.companyCode}</p>}
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-xs font-semibold">Status</Label>
-                    <Select
-                      value={formValues.status}
-                      onValueChange={(val) => setFormValues({ ...formValues, status: val })}
-                    >
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="in-progress">In Progress</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
-                        <SelectItem value="on-hold">On Hold</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-xs font-semibold">Order Taken By</Label>
-                    <Select
-                      value={formValues.orderTakenById}
-                      onValueChange={(val) => setFormValues({ ...formValues, orderTakenById: val })}
-                    >
-                      <SelectTrigger><SelectValue placeholder="— Select user —" /></SelectTrigger>
-                      <SelectContent>
-                        {users.map((u) => (
-                          <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
                   </div>
                 </div>
               </div>
 
-              {/* Order Information Section */}
-              <div className="space-y-3 border-t pt-4">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
-                  <Info className="size-4" /> Order Details
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-xs font-semibold">Party Name *</Label>
-                    <Input
-                      value={formValues.customerName}
-                      onChange={(e) => setFormValues({ ...formValues, customerName: e.target.value })}
-                      placeholder="Client Name"
-                    />
-                    {errors.customerName && <p className="text-xs text-destructive">{errors.customerName}</p>}
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-xs font-semibold">CA No</Label>
-                    <Input
-                      value={formValues.caNo}
-                      onChange={(e) => setFormValues({ ...formValues, caNo: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-xs font-semibold">Contact Details</Label>
-                    <Input
-                      value={formValues.contact}
-                      onChange={(e) => setFormValues({ ...formValues, contact: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-xs font-semibold">Order Confirm Date</Label>
-                    <Input
-                      type="date"
-                      value={formValues.orderTakenDate}
-                      onChange={(e) => setFormValues({ ...formValues, orderTakenDate: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-xs font-semibold">Delivery Month Target</Label>
-                    <Input
-                      placeholder="e.g. June 2026"
-                      value={formValues.deliveryTarget}
-                      onChange={(e) => setFormValues({ ...formValues, deliveryTarget: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-xs font-semibold">PO Date</Label>
-                    <Input
-                      type="date"
-                      value={formValues.poDate}
-                      onChange={(e) => setFormValues({ ...formValues, poDate: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                {/* Concerned Persons Tag Input */}
-                <div className="flex flex-col gap-1.5">
-                  <Label className="text-xs font-semibold">Concerned Persons</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Type name and press Add..."
-                      value={cpInput}
-                      onChange={(e) => setCpInput(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCP(); } }}
-                    />
-                    <Button type="button" onClick={handleAddCP} variant="secondary">Add</Button>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {concernedPeople.map((cp, idx) => (
-                      <span key={idx} className="inline-flex items-center gap-1 bg-muted px-2.5 py-1 rounded-md text-xs font-medium border">
-                        {cp}
-                        <X className="size-3 cursor-pointer text-muted-foreground hover:text-destructive" onClick={() => handleRemoveCP(idx)} />
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Drawing Section */}
-              <div className="space-y-3 border-t pt-4">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-primary">Drawing Details</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-xs font-semibold">Drawing Person</Label>
-                    <Input
-                      value={formValues.drawingConcernedPerson}
-                      onChange={(e) => setFormValues({ ...formValues, drawingConcernedPerson: e.target.value })}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-xs font-semibold">Drawing Approved Date</Label>
-                    <Input
-                      type="date"
-                      value={formValues.drawingApprovedDate}
-                      onChange={(e) => setFormValues({ ...formValues, drawingApprovedDate: e.target.value })}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-xs font-semibold">Drawing Status</Label>
-                    <Select
-                      value={formValues.drawingStatus}
-                      onValueChange={(val) => setFormValues({ ...formValues, drawingStatus: val })}
-                    >
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Pending">Pending</SelectItem>
-                        <SelectItem value="In Process">In Process</SelectItem>
-                        <SelectItem value="Approved">Approved</SelectItem>
-                        <SelectItem value="Rejected">Rejected</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-xs font-semibold">Drawing Remarks</Label>
-                    <Input
-                      value={formValues.drawingRemarks}
-                      onChange={(e) => setFormValues({ ...formValues, drawingRemarks: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Inspection Field Section */}
-              <div className="space-y-3 border-t pt-4">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-primary">Inspection & Notes</h3>
-                <div className="flex flex-col gap-1.5">
-                  <Label className="text-xs font-semibold">Inspection Field</Label>
-                  <Textarea
-                    placeholder="Enter inspection criteria, third party inspector details, or clearance notes..."
-                    value={formValues.inspectionField}
-                    onChange={(e) => setFormValues({ ...formValues, inspectionField: e.target.value })}
-                    className="min-h-[80px]"
-                  />
-                </div>
-              </div>
-
-              {/* Line Items & Pricing Section */}
-              <div className="space-y-3 border-t pt-4">
+              {/* Right Column: Line Items & Pricing Panel */}
+              <div className="w-full lg:w-[55%] p-6 space-y-4 flex flex-col bg-muted/10 overflow-hidden">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-primary">Line Items & Pricing</h3>
-                  <Button type="button" size="sm" onClick={addLineItemRow} className="gap-1">
-                    <Plus className="size-3.5" /> Add Item Row
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                      <Sparkles className="size-4 text-amber-500" /> Line Items Table
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">Manage quantities, unit rates, and dynamic GST pricing.</p>
+                  </div>
+                  <Button type="button" size="sm" onClick={addLineItemRow} className="gap-1 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold">
+                    <Plus className="size-3.5" /> Add Row
                   </Button>
                 </div>
 
-                <div className="border rounded-lg overflow-x-auto">
+                {/* Lines Container */}
+                <div className="flex-1 min-h-[250px] border border-border rounded-xl bg-card overflow-auto shadow-inner p-1">
                   <table className="w-full text-xs">
-                    <thead className="bg-muted text-muted-foreground uppercase border-b">
+                    <thead className="bg-muted/70 text-muted-foreground font-bold uppercase border-b sticky top-0 bg-background z-10">
                       <tr>
-                        <th className="p-2 text-center w-10">#</th>
-                        <th className="p-2 text-left">Item Description</th>
-                        <th className="p-2 text-right w-20">Qty</th>
-                        <th className="p-2 text-right w-28">Rate (₹)</th>
-                        <th className="p-2 text-right w-20">GST %</th>
-                        <th className="p-2 text-right w-32">Total (₹)</th>
-                        <th className="p-2 text-center w-12">Del</th>
+                        <th className="p-2.5 text-center w-10">#</th>
+                        <th className="p-2.5 text-left w-24">Item Code</th>
+                        <th className="p-2.5 text-left">Item Description</th>
+                        <th className="p-2.5 text-left w-16">Unit</th>
+                        <th className="p-2.5 text-right w-16">Qty</th>
+                        <th className="p-2.5 text-right w-24">Rate (₹)</th>
+                        <th className="p-2.5 text-right w-16">GST %</th>
+                        <th className="p-2.5 text-left w-24">Remarks</th>
+                        <th className="p-2.5 text-right w-28">Total (₹)</th>
+                        <th className="p-2.5 text-center w-12">Action</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y">
+                    <tbody className="divide-y divide-border">
                       {lineItems.map((item, idx) => (
-                        <tr key={item.id}>
-                          <td className="p-2 text-center font-bold text-muted-foreground">{idx + 1}</td>
+                        <tr key={item.id} className="hover:bg-muted/30 transition-colors duration-150">
+                          <td className="p-2.5 text-center font-bold text-muted-foreground">{idx + 1}</td>
+                          <td className="p-1">
+                            <Input
+                              value={item.itemCode}
+                              onChange={(e) => updateLineItem(item.id, 'itemCode', e.target.value)}
+                              placeholder="Code"
+                              className="h-8 text-xs bg-transparent border-border/60 focus-visible:border-primary"
+                            />
+                          </td>
                           <td className="p-1">
                             <Input
                               value={item.description}
                               onChange={(e) => updateLineItem(item.id, 'description', e.target.value)}
-                              placeholder="Item description"
-                              className="h-8 text-xs"
+                              placeholder="Item description or spec"
+                              className="h-8 text-xs bg-transparent border-border/60 focus-visible:border-primary"
+                            />
+                          </td>
+                          <td className="p-1">
+                            <Input
+                              value={item.unit}
+                              onChange={(e) => updateLineItem(item.id, 'unit', e.target.value)}
+                              placeholder="Nos"
+                              className="h-8 text-xs bg-transparent border-border/60 focus-visible:border-primary"
                             />
                           </td>
                           <td className="p-1">
@@ -952,7 +1106,7 @@ export function OrdersPage() {
                               type="number"
                               value={item.qty}
                               onChange={(e) => updateLineItem(item.id, 'qty', e.target.value)}
-                              className="h-8 text-xs text-right"
+                              className="h-8 text-xs text-right bg-transparent border-border/60 focus-visible:border-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
                           </td>
                           <td className="p-1">
@@ -960,7 +1114,7 @@ export function OrdersPage() {
                               type="number"
                               value={item.rate}
                               onChange={(e) => updateLineItem(item.id, 'rate', e.target.value)}
-                              className="h-8 text-xs text-right"
+                              className="h-8 text-xs text-right bg-transparent border-border/60 focus-visible:border-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
                           </td>
                           <td className="p-1">
@@ -968,10 +1122,18 @@ export function OrdersPage() {
                               type="number"
                               value={item.gstPercent}
                               onChange={(e) => updateLineItem(item.id, 'gstPercent', e.target.value)}
-                              className="h-8 text-xs text-right"
+                              className="h-8 text-xs text-right bg-transparent border-border/60 focus-visible:border-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
                           </td>
-                          <td className="p-2 text-right font-bold text-emerald-600">
+                          <td className="p-1">
+                            <Input
+                              value={item.remarks || ''}
+                              onChange={(e) => updateLineItem(item.id, 'remarks', e.target.value)}
+                              placeholder="Remarks"
+                              className="h-8 text-xs bg-transparent border-border/60 focus-visible:border-primary"
+                            />
+                          </td>
+                          <td className="p-2.5 text-right font-bold text-emerald-600 dark:text-emerald-400">
                             ₹{item.total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </td>
                           <td className="p-1 text-center">
@@ -980,44 +1142,60 @@ export function OrdersPage() {
                               variant="ghost"
                               size="icon"
                               onClick={() => deleteLineItemRow(item.id)}
-                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                             >
                               <Trash2 className="size-3.5" />
                             </Button>
                           </td>
                         </tr>
                       ))}
+                      {lineItems.length === 0 && (
+                        <tr>
+                          <td colSpan={7} className="p-8 text-center text-muted-foreground font-medium italic">
+                            No line items added yet. Click "Add Row" to start adding items.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
 
-                {/* Line Item Totals Bar */}
-                <div className="flex justify-end gap-6 bg-muted/40 p-3 rounded-lg border text-xs font-semibold">
-                  <div>Subtotal: <span className="text-foreground">₹{totals.subtotal.toLocaleString('en-IN')}</span></div>
-                  <div>GST Total: <span className="text-foreground">₹{totals.gstTotal.toLocaleString('en-IN')}</span></div>
-                  <div className="text-sm font-bold text-primary">Grand Total: ₹{totals.grandTotal.toLocaleString('en-IN')}</div>
+                {/* Line Item Totals Card */}
+                <div className="bg-card rounded-xl border border-border p-4 shadow-sm space-y-2">
+                  <div className="flex justify-between text-xs text-muted-foreground border-b pb-2">
+                    <span>Subtotal</span>
+                    <span className="font-semibold text-foreground">₹{totals.subtotal.toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-muted-foreground border-b pb-2">
+                    <span>Total GST Value</span>
+                    <span className="font-semibold text-foreground">₹{totals.gstTotal.toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-bold text-primary pt-1">
+                    <span>Grand Total Payable</span>
+                    <span className="text-emerald-600 dark:text-emerald-400">₹{totals.grandTotal.toLocaleString('en-IN')}</span>
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Modal Footer Notifications & Actions */}
-            <div className="bg-muted/30 border-t p-4 px-6 flex items-center justify-between sticky bottom-0 bg-background">
-              <div className="flex items-center gap-4 text-xs font-medium">
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input type="checkbox" checked={sendWaNotif} onChange={(e) => setSendWaNotif(e.target.checked)} />
-                  <MessageSquare className="size-3.5 text-emerald-500" /> WhatsApp
+            <div className="bg-muted/30 border-t p-4 px-6 flex items-center justify-between bg-background shrink-0">
+              <div className="flex items-center gap-4 text-xs font-semibold text-muted-foreground">
+                <label className="flex items-center gap-1.5 cursor-pointer hover:text-foreground select-none">
+                  <input type="checkbox" checked={sendWaNotif} onChange={(e) => setSendWaNotif(e.target.checked)} className="rounded border-border text-primary focus:ring-primary size-3.5" />
+                  <MessageSquare className="size-3.5 text-emerald-500" /> WhatsApp Notification
                 </label>
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input type="checkbox" checked={sendEmailNotif} onChange={(e) => setSendEmailNotif(e.target.checked)} />
-                  <Mail className="size-3.5 text-blue-500" /> Email
+                <label className="flex items-center gap-1.5 cursor-pointer hover:text-foreground select-none">
+                  <input type="checkbox" checked={sendEmailNotif} onChange={(e) => setSendEmailNotif(e.target.checked)} className="rounded border-border text-primary focus:ring-primary size-3.5" />
+                  <Mail className="size-3.5 text-blue-500" /> Email Alert
                 </label>
               </div>
 
               <div className="flex items-center gap-3">
-                <Button type="button" variant="ghost" onClick={() => setIsFormOpen(false)}>Cancel</Button>
-                <Button type="submit" disabled={isSubmitting}>
+                <Button type="button" variant="ghost" onClick={() => setIsFormOpen(false)} className="h-9 text-xs">Cancel</Button>
+                <Button type="submit" disabled={isSubmitting} className="h-9 text-xs font-semibold px-4">
                   {isSubmitting ? <Loader2 className="animate-spin size-4 mr-2" /> : null}
-                  {editingOrder ? 'Save Order' : 'Create Order'}
+                  {editingOrder ? 'Save Changes' : 'Create Order'}
                 </Button>
               </div>
             </div>
