@@ -225,8 +225,9 @@ model User {
   approvalRequestsAssigned  ApprovalRequest[] @relation("ApprovalRequestAssignedTo")
   approvalHistories         ApprovalHistory[]
 
-  salesOrderAttachments       SalesOrderAttachment[]
-  engineeringProjectsCreated  EngineeringProject[]   @relation("EngineeringProjectCreatedBy")
+  salesOrderAttachments      SalesOrderAttachment[]
+  engineeringProjectsCreated EngineeringProject[]   @relation("EngineeringProjectCreatedBy")
+
   engineeringProjectsApproved EngineeringProject[]   @relation("EngineeringProjectApprovedBy")
   approvedDrawings            EngineeringDrawing[]   @relation("DrawingApprovedBy")
   createdDrawings             EngineeringDrawing[]   @relation("DrawingCreatedBy")
@@ -271,11 +272,6 @@ model User {
   reportSchedules         ReportSchedule[]
   dashboardWidgets        DashboardWidget[]
 
-  // Vendor
-  vendorsCreated  Vendor[]         @relation("VendorCreatedBy")
-  vendorRevisions VendorRevision[] @relation("VendorRevisionCreatedBy")
-
-  // Sales Order
   orderAssignments   SalesOrderAssignment[]
   salesOrdersTaken   SalesOrder[]           @relation("OrderTakenBy")
   salesOrdersCreated SalesOrder[]           @relation("OrderCreatedBy")
@@ -1846,10 +1842,12 @@ enum DrawingType {
 }
 
 enum DrawingStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  OBSOLETE
   PENDING
-  IN_PROGRESS
-  COMPLETED
-  ON_HOLD
 }
 
 model DrawingRevision {
