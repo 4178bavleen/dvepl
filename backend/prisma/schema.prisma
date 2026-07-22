@@ -225,9 +225,8 @@ model User {
   approvalRequestsAssigned  ApprovalRequest[] @relation("ApprovalRequestAssignedTo")
   approvalHistories         ApprovalHistory[]
 
-  salesOrderAttachments      SalesOrderAttachment[]
-  engineeringProjectsCreated EngineeringProject[]   @relation("EngineeringProjectCreatedBy")
-
+  salesOrderAttachments       SalesOrderAttachment[]
+  engineeringProjectsCreated  EngineeringProject[]   @relation("EngineeringProjectCreatedBy")
   engineeringProjectsApproved EngineeringProject[]   @relation("EngineeringProjectApprovedBy")
   approvedDrawings            EngineeringDrawing[]   @relation("DrawingApprovedBy")
   createdDrawings             EngineeringDrawing[]   @relation("DrawingCreatedBy")
@@ -272,6 +271,11 @@ model User {
   reportSchedules         ReportSchedule[]
   dashboardWidgets        DashboardWidget[]
 
+  // Vendor
+  vendorsCreated  Vendor[]         @relation("VendorCreatedBy")
+  vendorRevisions VendorRevision[] @relation("VendorRevisionCreatedBy")
+
+  // Sales Order
   orderAssignments   SalesOrderAssignment[]
   salesOrdersTaken   SalesOrder[]           @relation("OrderTakenBy")
   salesOrdersCreated SalesOrder[]           @relation("OrderCreatedBy")
@@ -1842,12 +1846,10 @@ enum DrawingType {
 }
 
 enum DrawingStatus {
-  DRAFT
-  IN_REVIEW
-  APPROVED
-  REJECTED
-  OBSOLETE
   PENDING
+  IN_PROGRESS
+  COMPLETED
+  ON_HOLD
 }
 
 model DrawingRevision {
@@ -3179,4 +3181,61 @@ enum Priority {
   MEDIUM
   HIGH
   CRITICAL
+}
+
+model Vendor {
+  id String @id @default(uuid())
+
+  companyId String
+
+  name     String
+  category String?
+
+  contactPerson String?
+  phone         String?
+  email         String?
+  gstNumber     String?
+
+  address String?
+  notes   String?
+
+  revisionCount Int @default(0)
+
+  createdById String
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  company   Company @relation(fields: [companyId], references: [id])
+  createdBy User    @relation("VendorCreatedBy", fields: [createdById], references: [id])
+
+  revisions VendorRevision[]
+
+  @@index([companyId])
+  @@index([name])
+  @@index([category])
+  @@map("vendors")
+}
+
+model VendorRevision {
+  id String @id @default(uuid())
+
+  vendorId String
+
+  action String
+
+  oldData Json?
+  newData Json?
+
+  createdById String
+
+  createdAt DateTime @default(now())
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  createdBy User @relation("VendorRevisionCreatedBy", fields: [createdById], references: [id])
+
+  @@index([vendorId])
+  @@map("vendor_revisions")
 }
