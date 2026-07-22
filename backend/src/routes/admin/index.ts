@@ -39,10 +39,38 @@ import adminDivisionRouteGroup from "./division/index";
 import adminSubDivisionRouteGroup from "./subDivision/index";
 import adminDeptRouteGroup from "./department/index";
 import adminTeamRouteGroup from "./team/index";
+import adminEmployeeRouteGroup from "./employee";
+import adminEmployeeContactRouteGroup from "./employeeContact";
+import adminEmployeeEmergencyContactRouteGroup from "./employeeEmergencyContact";
+import adminEmployeeEducationRouteGroup from "./employeeEducation";
+import adminEmployeeExperienceRouteGroup from "./employeeExperience";
+import adminEmployeeDocumentRouteGroup from "./employeeDocument";
+import adminShiftRouteGroup from "./shift";
+import adminEmployeeShiftRouteGroup from "./employeeShift";
+import adminHolidayRouteGroup from "./employeeHoliday";
+import adminAttendanceRouteGroup from "./employeeAttendance";
+import adminLeaveRouteGroup from "./employeeLeave";
+import adminSalaryRouteGroup from "./salary";
+import adminCustomerRouteGroup from "./customer/index";
+import adminContactRouteGroup from "./contact/index";
+import adminCommunicationRouteGroup from "./communication/index";
+import adminTenderRequestRouteGroup from "./tenderRequest/index";
+import adminTenderRequestActivityRouteGroup from "./tenderRequestActivity/index";
+import adminTenderRouteGroup from "./tender/index";
+import adminReferenceCodeRouteGroup from "./referenceCode/index";
+import adminReferenceCodeCounterRouteGroup from "./referenceCodeCounter/index";
+import adminTenderFileRouteGroup from "./tenderFile/index";
+import adminTenderRemarkRouteGroup from "./tenderRemark/index";
+import adminTenderActivityRouteGroup from "./tenderActivity/index";
+import adminGovernmentDepartmentRouteGroup from "./governmentDepartment/index";
+import adminSectionRouteGroup from "./section/index";
+import adminDivisionRouteGroup from "./division/index";
+import adminSubDivisionRouteGroup from "./subDivision/index";
+import adminDeptRouteGroup from "./department/index";
+import adminTeamRouteGroup from "./team/index";
 import adminTechnicalClarificationRouteGroup from "./technicalClarification/index";
 
 import adminOrderRouteGroup from "./salesOrder/index";
-import adminVendorRouteGroup from "./vendor/index"
 
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 
@@ -65,6 +93,7 @@ async function adminRoutes(
     instance.register(adminDeptRouteGroup, { prefix: "/department" });
     instance.register(adminTeamRouteGroup, { prefix: "/team" });
     instance.register(adminUserRouteGroup, { prefix: "/user" });
+    instance.register(permissionGroupRoutes, {
     instance.register(permissionGroupRoutes, {
       prefix: "/permission-group",
     });
@@ -158,9 +187,6 @@ async function adminRoutes(
     });
     fastify.register(adminOrderRouteGroup, {
       prefix: "/order",
-    });
-    fastify.register(adminVendorRouteGroup, {
-      prefix: "/vendor",
     });
   });
 }

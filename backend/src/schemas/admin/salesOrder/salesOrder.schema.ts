@@ -1,45 +1,20 @@
 import { z } from "zod";
 
 export const salesOrderItemSchema = z.object({
-  itemCode: z
-    .string()
-    .min(1, "Item code is required"),
+  itemCode: z.string().min(1, "Item code is required"),
 
-  description: z
-    .string()
-    .min(1, "Description is required"),
+  description: z.string().min(1, "Description is required"),
 
-  quantity: z
-    .number({
-      error: "Quantity must be a number",
-    })
-    .positive(),
+  unit: z.string().optional().default("Nos"),
 
-  rate: z
-    .number({
-      error: "Rate must be a number",
-    })
-    .nonnegative(),
+  quantity: z.number().positive(),
 
-  gstPercentage: z
-    .number({
-      error: "GST Percentage must be a number",
-    })
-    .min(0)
-    .max(100),
+  rate: z.number().nonnegative(),
 
-  total: z
-    .number({
-      error: "Total must be a number",
-    })
-    .nonnegative(),
+  gstPercentage: z.number().min(0).max(100),
 
-  remarks: z
-    .string()
-    .optional()
-    .nullable(),
+  remarks: z.string().optional().nullable(),
 });
-
 export const salesOrderSchema = z.object({
   companyId: z.string().uuid(),
 
@@ -71,15 +46,9 @@ export const salesOrderSchema = z.object({
     .string()
     .min(1, "Party name is required"),
 
-  caNo: z
-    .string()
-    .optional()
-    .nullable(),
+  caNo: z.string().optional().nullable(),
 
-  contactDetails: z
-    .string()
-    .optional()
-    .nullable(),
+  contactDetails: z.string().optional().nullable(),
 
   orderConfirmDate: z
     .string()
@@ -96,6 +65,11 @@ export const salesOrderSchema = z.object({
     .optional()
     .nullable(),
 
+  concernedPersons: z
+    .array(z.string())
+    .optional()
+    .default([]),
+
   drawingConcernedPerson: z
     .string()
     .optional()
@@ -110,11 +84,10 @@ export const salesOrderSchema = z.object({
     .enum([
       "PENDING",
       "IN_PROGRESS",
-      "COMPLETED",
-      "ON_HOLD",
+      "APPROVED",
+      "REJECTED",
     ])
-    .optional()
-    .nullable(),
+    .optional(),
 
   drawingRemarks: z
     .string()
