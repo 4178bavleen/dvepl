@@ -1,5 +1,4 @@
 import Fastify from "fastify";
-import fastifyView from "@fastify/view";
 import cors from "@fastify/cors";
 import fastifyEnv from "@fastify/env";
 import fastifyJwt from "@fastify/jwt";
@@ -48,17 +47,14 @@ async function buildApp() {
     credentials: true,
   });
 
-  fastify.register(fastifyView, {
-    engine: { pug: require("pug") },
-    root: path.join(__dirname, "views"),
-    includeViewExtension: true,
-  });
-
-  fastify.get("/", async (req, reply) => {
-    return reply.view("index", {
-      title: "DVEPL SERVER",
-      message: "An ERP portal for DVEPL",
-    });
+  
+  fastify.get("/", async () => {
+    return {
+      success: true,
+      status: "healthy",
+      message: "DVEPL Backend API is running",
+      timestamp: new Date().toISOString(),
+    };
   });
 
   fastify.addHook("onRequest", async (req, reply) => {
