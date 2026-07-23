@@ -8,7 +8,7 @@ import {
   AlertCircle,
   Sparkles
 } from 'lucide-react';
-import { GenericTable, sortableHeader } from '@/components/tables/GenericTable';
+import { GenericTable, sortableHeader } from '@/components/tables/genericTable';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
