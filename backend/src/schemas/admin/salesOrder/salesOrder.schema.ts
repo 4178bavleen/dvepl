@@ -1,143 +1,85 @@
 import { z } from "zod";
 
 export const salesOrderItemSchema = z.object({
-  itemCode: z
-    .string()
-    .min(1, "Item code is required"),
+  itemCode: z.string().min(1, "Item code is required"),
 
-  description: z
-    .string()
-    .min(1, "Description is required"),
+  description: z.string().min(1, "Description is required"),
 
-  quantity: z
-    .number({
-      error: "Quantity must be a number",
-    })
-    .positive(),
+  unit: z.string().min(1, "Unit is required"),
 
-  rate: z
-    .number({
-      error: "Rate must be a number",
-    })
-    .nonnegative(),
+  quantity: z.number().positive(),
 
-  gstPercentage: z
-    .number({
-      error: "GST Percentage must be a number",
-    })
-    .min(0)
-    .max(100),
+  rate: z.number().nonnegative(),
 
-  total: z
-    .number({
-      error: "Total must be a number",
-    })
-    .nonnegative(),
+  gstPercentage: z.number().min(0).max(100),
 
-  remarks: z
-    .string()
-    .optional()
-    .nullable(),
+  
+
+  remarks: z.string().optional().nullable(),
 });
 
 export const salesOrderSchema = z.object({
   companyId: z.string().uuid(),
 
-  dveplCode: z
-    .string()
-    .min(1, "DVEPL Code is required"),
+  dveplCode: z.string().min(1, "DVEPL Code is required"),
 
-  status: z
-    .enum([
-      "PENDING",
-      "IN_PROGRESS",
-      "COMPLETED",
-      "ON_HOLD",
-    ])
-    .default("PENDING"),
+  status: z.enum([
+    "PENDING",
+    "IN_PROGRESS",
+    "COMPLETED",
+    "ON_HOLD",
+  ]),
 
-  orderTakenById: z
-    .string()
-    .uuid()
-    .optional()
-    .nullable(),
+  orderTakenById: z.string().uuid().nullable().optional(),
 
+  // Allow nulls for now because frontend is sending [null]
   assignedToIds: z
-    .array(z.string().uuid())
+    .array(z.string().uuid().nullable())
     .optional()
     .default([]),
 
-  partyName: z
-    .string()
-    .min(1, "Party name is required"),
+  partyName: z.string().min(1, "Party name is required"),
 
-  caNo: z
-    .string()
-    .optional()
-    .nullable(),
+  caNo: z.string().nullable().optional(),
 
-  contactDetails: z
-    .string()
-    .optional()
-    .nullable(),
+  contactDetails: z.string().nullable().optional(),
 
-  orderConfirmDate: z
-    .string()
-    .optional()
-    .nullable(),
+  concernedPersons: z.array(z.string()).optional().default([]),
 
-  deliveryMonthTarget: z
-    .string()
-    .optional()
-    .nullable(),
+  orderConfirmDate: z.string().nullable().optional(),
 
-  poDate: z
-    .string()
-    .optional()
-    .nullable(),
+  deliveryMonthTarget: z.string().nullable().optional(),
 
-  drawingConcernedPerson: z
-    .string()
-    .optional()
-    .nullable(),
+  poDate: z.string().nullable().optional(),
 
-  drawingApprovedDate: z
-    .string()
-    .optional()
-    .nullable(),
+  drawingConcernedPerson: z.string().nullable().optional(),
 
+  drawingApprovedDate: z.string().nullable().optional(),
+
+  // Matches frontend value "APPROVED"
   drawingStatus: z
     .enum([
       "PENDING",
+      "APPROVED",
+      "REJECTED",
       "IN_PROGRESS",
-      "COMPLETED",
-      "ON_HOLD",
     ])
-    .optional()
-    .nullable(),
+    .nullable()
+    .optional(),
 
-  drawingRemarks: z
-    .string()
-    .optional()
-    .nullable(),
+  drawingRemarks: z.string().nullable().optional(),
 
-  inspectionField: z
-    .string()
-    .optional()
-    .nullable(),
+  inspectionField: z.string().nullable().optional(),
 
-  sendNotification: z
-    .boolean()
-    .default(true),
+  sendNotification: z.boolean().default(true),
 
-  remarks: z
-    .string()
-    .optional()
-    .nullable(),
+  notifyEmail: z.boolean().default(false),
 
-  items: z
-    .array(salesOrderItemSchema)
-    .min(1, "At least one item is required"),
+  notifyWhatsApp: z.boolean().default(false),
+
+  remarks: z.string().nullable().optional(),
+
+  items: z.array(salesOrderItemSchema).min(1),
 });
 
 export type SalesOrderInput = z.infer<typeof salesOrderSchema>;
