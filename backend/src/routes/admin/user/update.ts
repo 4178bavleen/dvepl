@@ -58,7 +58,7 @@ async function updateUserRoute(
 
         const { id } = request.params as { id: string };
 
-        const { email, phone, isActive, roleIds } =
+        const { name, email, phone, isActive, roleIds } =
           validationResult.data;
 
         //----------------------------------------
@@ -125,24 +125,25 @@ async function updateUserRoute(
         }
 
         //----------------------------------------
-        // Validate Roles
+        // Validate Roles (Optional)
         //----------------------------------------
-
-        const roles = await fastify.prisma.role.findMany({
-          where: {
-            id: {
-              in: roleIds,
+        if (roleIds) {
+          const roles = await fastify.prisma.role.findMany({
+            where: {
+              id: {
+                in: roleIds,
+              },
+              companyId,
+              deletedAt: null,
             },
-            companyId,
-            deletedAt: null,
-          },
-        });
-
-        if (roles.length !== roleIds.length) {
-          return reply.status(400).send({
-            success: false,
-            message: "One or more selected roles are invalid.",
           });
+
+          if (roles.length !== roleIds.length) {
+            return reply.status(400).send({
+              success: false,
+              message: "One or more selected roles are invalid.",
+            });
+          }
         }
 
         //----------------------------------------
@@ -155,24 +156,27 @@ async function updateUserRoute(
               id,
             },
             data: {
+              name: name || undefined,
               email,
-              phone,
+              phone: phone || null,
               isActive,
             },
           });
 
-          await tx.userRole.deleteMany({
-            where: {
-              userId: id,
-            },
-          });
+          if (roleIds) {
+            await tx.userRole.deleteMany({
+              where: {
+                userId: id,
+              },
+            });
 
-          await tx.userRole.createMany({
-            data: roleIds.map((roleId) => ({
-              userId: id,
-              roleId,
-            })),
-          });
+            await tx.userRole.createMany({
+              data: roleIds.map((roleId) => ({
+                userId: id,
+                roleId,
+              })),
+            });
+          }
         });
 
         return reply.status(200).send({

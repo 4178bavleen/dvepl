@@ -18,7 +18,6 @@ export const createUserSchema = z.object({
 
   password: z
     .string()
-    .min(1, "Password is required")
     .min(8, "Password must be at least 8 characters")
     .max(32, "Password cannot exceed 32 characters")
     .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
@@ -27,11 +26,13 @@ export const createUserSchema = z.object({
     .regex(
       /[@$!%*?&#^()_\-+=]/,
       "Password must contain at least one special character"
-    ),
+    )
+    .optional(),
 
   roleIds: z
     .array(z.string().uuid("Invalid Role ID"))
-    .min(1, "At least one role must be assigned"),
+    .optional()
+    .default([]),
 });
 
 export type CreateUserInput = z.infer<typeof createUserSchema>;

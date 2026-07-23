@@ -11,10 +11,10 @@ async function adminUserRouteGroup(
   options: FastifyPluginOptions
 ) {
   fastify.register(createUserRoute, { prefix: "/create" });
-  fastify.register(readUsersRoute, { prefix: "/" });
-  fastify.register(readUserbyId, { prefix: "/" });
-  fastify.register(updateUserRoute, { prefix: "/" });
-  fastify.register(deleteUserRoute, { prefix: "/" });
+  fastify.register(readUsersRoute, { prefix: "/read" });
+  fastify.register(readUserbyId, { prefix: "/read" });
+  fastify.register(updateUserRoute, { prefix: "/update" });
+  fastify.register(deleteUserRoute, { prefix: "/delete" });
 }
 
 export default adminUserRouteGroup;

@@ -42,7 +42,7 @@ async function buildApp() {
 
   // Register plugins
   fastify.register(cors, {
-    origin: "*",
+    origin: true,
     methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE"],
     credentials: true,
   });

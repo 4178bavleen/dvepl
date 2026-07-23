@@ -37,6 +37,13 @@ export const createEmployeeSchema = z.object({
 
     dateOfExit: z.coerce.date().optional().nullable(),
 
+    email: z
+        .string()
+        .email("Invalid email address")
+        .optional()
+        .nullable()
+        .or(z.literal("")),
+
     status: z.nativeEnum(EmployeeStatus).default(EmployeeStatus.ACTIVE),
 });
 

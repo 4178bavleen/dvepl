@@ -68,9 +68,7 @@ async function createUserRoute(
         // ======================================================
         const existingEmail = await fastify.prisma.user.findFirst({
           where: {
-            companyId,
             email,
-            deletedAt: null,
           },
         });
 
@@ -87,9 +85,7 @@ async function createUserRoute(
         if (phone) {
           const existingPhone = await fastify.prisma.user.findFirst({
             where: {
-              companyId,
               phone,
-              deletedAt: null,
             },
           });
 
@@ -104,17 +100,28 @@ async function createUserRoute(
         // ======================================================
         // Validate Roles
         // ======================================================
+        let activeRoleIds = roleIds || [];
+        if (activeRoleIds.length === 0) {
+          const fallbackRole = await fastify.prisma.role.findFirst({
+            where: {
+              deletedAt: null,
+            },
+          });
+          if (fallbackRole) {
+            activeRoleIds = [fallbackRole.id];
+          }
+        }
+
         const roles = await fastify.prisma.role.findMany({
           where: {
             id: {
-              in: roleIds,
+              in: activeRoleIds,
             },
-            companyId,
             deletedAt: null,
           },
         });
 
-        if (roles.length !== roleIds.length) {
+        if (roles.length !== activeRoleIds.length) {
           return reply.status(400).send({
             success: false,
             message: "One or more selected roles are invalid.",
@@ -124,7 +131,8 @@ async function createUserRoute(
         // ======================================================
         // Hash Password
         // ======================================================
-        const passwordHash = await hashPassword(password);
+        const passwordToHash = password || "Dvepl@2026";
+        const passwordHash = await hashPassword(passwordToHash);
 
         // ======================================================
         // Create User + Assign Roles (Transaction)
@@ -136,7 +144,7 @@ async function createUserRoute(
                 companyId,
                 name: name || "",
                 email,
-                phone,
+                phone: phone || null,
                 passwordHash,
                 isActive: true,
                 isEmailVerified: false,
@@ -145,11 +153,33 @@ async function createUserRoute(
             });
 
             await tx.userRole.createMany({
-              data: roleIds.map((roleId: string) => ({
+              data: activeRoleIds.map((roleId: string) => ({
                 userId: user.id,
                 roleId,
               })),
             });
+
+            // Auto-link to existing Employee if their primary/contact email matches
+            const employeeContact = await tx.employeeContact.findFirst({
+              where: {
+                type: "EMAIL",
+                value: {
+                  equals: email,
+                  mode: "insensitive",
+                },
+              },
+            });
+
+            if (employeeContact) {
+              await tx.employee.update({
+                where: {
+                  id: employeeContact.employeeId,
+                },
+                data: {
+                  userId: user.id,
+                },
+              });
+            }
 
             return user;
           }
