@@ -125,16 +125,18 @@ async function adminSalesOrderCreateRoutes(
         // Assigned Users Validation
         // ===================================
 
-        if (assignedToIds && assignedToIds.length > 0) {
+        const assignedToId = (assignedToIds || []).filter((id): id is string => id !== null);
+
+        if (assignedToId.length > 0) {
           const users = await fastify.prisma.user.findMany({
             where: {
               id: {
-                in: assignedToIds,
+                in: assignedToId,
               },
             },
           });
 
-          if (users.length !== assignedToIds.length) {
+          if (users.length !== assignedToId.length) {
             return reply.status(404).send({
               success: false,
               message: "One or more assigned users not found.",
@@ -196,7 +198,11 @@ async function adminSalesOrderCreateRoutes(
                 ? new Date(drawingApprovedDate)
                 : null,
 
-              drawingStatus: drawingStatus ?? null,
+              drawingStatus: drawingStatus === "APPROVED"
+                ? "COMPLETED"
+                : drawingStatus === "REJECTED"
+                ? "ON_HOLD"
+                : drawingStatus as any,
 
               drawingRemarks: drawingRemarks ?? null,
 
@@ -253,15 +259,31 @@ async function adminSalesOrderCreateRoutes(
           // Create Assignments
           // ===================================
 
-          if (assignedToIds && assignedToIds.length > 0) {
-            await tx.salesOrderAssignment.createMany({
-              data: assignedToIds.map((userId) => ({
-                salesOrderId: salesOrder.id,
-                userId,
-              })),
-
-              skipDuplicates: true,
+          if (assignedToId.length > 0) {
+            const employees = await tx.employee.findMany({
+              where: {
+                userId: {
+                  in: assignedToId,
+                },
+              },
+              select: {
+                id: true,
+                userId: true,
+              },
             });
+
+            const assignments = employees.map((emp) => ({
+              salesOrderId: salesOrder.id,
+              employeeId: emp.id,
+              userId: emp.userId,
+            }));
+
+            if (assignments.length > 0) {
+              await tx.salesOrderAssignment.createMany({
+                data: assignments,
+                skipDuplicates: true,
+              });
+            }
           }
           return salesOrder;
         });
