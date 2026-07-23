@@ -159,11 +159,50 @@ async function createEmployeeRoutes(
           });
         }
 
-        const employee = await fastify.prisma.employee.create({
-          data: {
-            ...data,
-            companyId,
-          },
+        const { email, ...employeeData } = data as any;
+
+        const employee = await fastify.prisma.$transaction(async (tx) => {
+          const emp = await tx.employee.create({
+            data: {
+              ...employeeData,
+              companyId,
+            },
+          });
+
+          if (email) {
+            await tx.employeeContact.create({
+              data: {
+                employeeId: emp.id,
+                type: "EMAIL",
+                value: email,
+                isPrimary: true,
+              },
+            });
+
+            // Check if user exists with this email and link
+            const existingUser = await tx.user.findFirst({
+              where: {
+                email: {
+                  equals: email,
+                  mode: "insensitive",
+                },
+                deletedAt: null,
+              },
+            });
+
+            if (existingUser) {
+              await tx.employee.update({
+                where: {
+                  id: emp.id,
+                },
+                data: {
+                  userId: existingUser.id,
+                },
+              });
+            }
+          }
+
+          return emp;
         });
 
         adminLogs.info("Employee created successfully", {

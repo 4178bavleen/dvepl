@@ -170,11 +170,78 @@ async function updateEmployeeRoutes(
           }
         }
 
-        const updatedEmployee = await fastify.prisma.employee.update({
-          where: {
-            id,
-          },
-          data,
+        const { email, ...employeeData } = data as any;
+
+        const updatedEmployee = await fastify.prisma.$transaction(async (tx) => {
+          const emp = await tx.employee.update({
+            where: {
+              id,
+            },
+            data: employeeData,
+          });
+
+          if (email !== undefined) {
+            const existingEmail = await tx.employeeContact.findFirst({
+              where: {
+                employeeId: id,
+                type: "EMAIL",
+              },
+            });
+
+            if (existingEmail) {
+              if (email === null || email === "") {
+                await tx.employeeContact.delete({
+                  where: {
+                    id: existingEmail.id,
+                  },
+                });
+              } else {
+                await tx.employeeContact.update({
+                  where: {
+                    id: existingEmail.id,
+                  },
+                  data: {
+                    value: email,
+                  },
+                });
+              }
+            } else if (email !== null && email !== "") {
+              await tx.employeeContact.create({
+                data: {
+                  employeeId: id,
+                  type: "EMAIL",
+                  value: email,
+                  isPrimary: true,
+                },
+              });
+            }
+
+            // Auto-link to existing User
+            if (email !== null && email !== "") {
+              const existingUser = await tx.user.findFirst({
+                where: {
+                  email: {
+                    equals: email,
+                    mode: "insensitive",
+                  },
+                  deletedAt: null,
+                },
+              });
+
+              if (existingUser) {
+                await tx.employee.update({
+                  where: {
+                    id,
+                  },
+                  data: {
+                    userId: existingUser.id,
+                  },
+                });
+              }
+            }
+          }
+
+          return emp;
         });
 
         adminLogs.info("Employee updated successfully", {

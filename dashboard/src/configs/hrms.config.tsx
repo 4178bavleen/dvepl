@@ -33,6 +33,12 @@ export const employeesConfig = {
     departmentId: z.string().optional().nullable(),
     teamId: z.string().optional().nullable(),
     designationId: z.string().optional().nullable(),
+    email: z
+      .string()
+      .email("Invalid email address")
+      .optional()
+      .nullable()
+      .or(z.literal("")),
     status: z.nativeEnum(EmployeeStatus).default(EmployeeStatus.ACTIVE),
   }),
   defaultFormValues: {
@@ -43,6 +49,7 @@ export const employeesConfig = {
     branchId: "",
     departmentId: "",
     designationId: "",
+    email: "",
     status: "ACTIVE",
   },
   breadcrumbs: [{ label: "Dashboard", href: "/" }, { label: "Employees" }],
@@ -169,6 +176,12 @@ export const employeesConfig = {
         { label: "Suspended", value: "SUSPENDED" },
         { label: "Resigned", value: "RESIGNED" },
       ],
+    },
+    {
+      name: "email",
+      label: "Official Email Address",
+      type: "text",
+      placeholder: "employee@company.com",
     },
   ] as any[],
   statsCards: (data: Employee[]) => [

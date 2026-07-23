@@ -180,7 +180,9 @@ export function OrdersPage() {
   ]);
 
   // Options Data
-  const [users, setUsers] = useState<Array<{ id: string; userId?: string; name: string }>>([]);
+  const [users, setUsers] = useState<
+    Array<{ id: string; userId?: string; name: string }>
+  >([]);
 
   const orders = useCRMStore((state) => state.salesOrders || EMPTY_ARRAY);
   const setSalesOrders = useCRMStore((state) => state.setSalesOrders);
@@ -207,7 +209,9 @@ export function OrdersPage() {
           poDate: o.poDate ? o.poDate.split("T")[0] : "",
           orderTakenById: o.orderTakenById || "",
           orderTakenByName: o.orderTakenBy?.name || "",
-          assignedUserIds: (o.assignments || []).map((a: any) => a.userId).filter(Boolean),
+          assignedUserIds: (o.assignments || [])
+            .map((a: any) => a.userId)
+            .filter(Boolean),
           drawingConcernedPerson: o.drawingConcernedPerson || "",
           drawingApprovedDate: o.drawingApprovedDate
             ? o.drawingApprovedDate.split("T")[0]
@@ -246,7 +250,7 @@ export function OrdersPage() {
   }, [loadOrders]);
 
   // Load Companies & Users/Employees
- // Load Companies & Users/Employees
+  // Load Companies & Users/Employees
   useEffect(() => {
     apiClient
       .get("/company/read/")
@@ -655,7 +659,7 @@ export function OrdersPage() {
         header: "ORDER TAKEN BY",
         cell: ({ row }) => {
           const item = row.original as any;
-          const u = users.find((usr) => usr.id === item.orderTakenById);
+          const u = users.find((usr) => usr.userId === item.orderTakenById);
           return u?.name || item.orderTakenBy || "—";
         },
       },
@@ -667,7 +671,10 @@ export function OrdersPage() {
           const ids: string[] = item.assignedUserIds || [];
           if (ids.length === 0) return "—";
           const names = ids
-            .map((id) => users.find((u) => u.userId === id || u.id === id)?.name || id)
+            .map(
+              (id) =>
+                users.find((u) => u.userId === id || u.id === id)?.name || id,
+            )
             .join(", ");
           return (
             <span className="truncate max-w-[150px] inline-block" title={names}>
@@ -1137,7 +1144,7 @@ export function OrdersPage() {
                     <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
                       Order Taken By
                     </Label>
-                    <Select
+                    {/* <Select
                       value={formValues.orderTakenById}
                       onValueChange={(val) =>
                         setFormValues({ ...formValues, orderTakenById: val })
@@ -1148,10 +1155,29 @@ export function OrdersPage() {
                       </SelectTrigger>
                       <SelectContent>
                         {users.map((u) => (
-                          <SelectItem key={u.id} value={u.id}>
+                          <SelectItem key={u.id} value={u.userId}>
                             {u.name}
                           </SelectItem>
                         ))}
+                      </SelectContent>
+                    </Select> */}
+                    <Select
+                      value={formValues.orderTakenById}
+                      onValueChange={(val) =>
+                        setFormValues({ ...formValues, orderTakenById: val })
+                      }
+                    >
+                      <SelectTrigger className="h-10 bg-muted/40">
+                        <SelectValue placeholder="— Select user —" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {users
+                          .filter((u) => u.userId)
+                          .map((u) => (
+                            <SelectItem key={u.id} value={u.userId!}>
+                              {u.name}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1176,18 +1202,22 @@ export function OrdersPage() {
                         align="start"
                         className="w-64 p-2 space-y-1 max-h-64 overflow-y-auto"
                       >
-                        {users.filter((u) => u.userId).map((u) => (
-                          <label
-                            key={u.id}
-                            className="flex items-center gap-2 text-xs font-medium cursor-pointer hover:bg-muted/50 p-1.5 rounded"
-                          >
-                            <Checkbox
-                              checked={assignedUserIds.includes(u.userId!)}
-                              onCheckedChange={() => toggleAssignedUser(u.userId!)}
-                            />
-                            <span>{u.name}</span>
-                          </label>
-                        ))}
+                        {users
+                          .filter((u) => u.userId)
+                          .map((u) => (
+                            <label
+                              key={u.id}
+                              className="flex items-center gap-2 text-xs font-medium cursor-pointer hover:bg-muted/50 p-1.5 rounded"
+                            >
+                              <Checkbox
+                                checked={assignedUserIds.includes(u.userId!)}
+                                onCheckedChange={() =>
+                                  toggleAssignedUser(u.userId!)
+                                }
+                              />
+                              <span>{u.name}</span>
+                            </label>
+                          ))}
                         {users.filter((u) => u.userId).length === 0 && (
                           <p className="text-xs text-muted-foreground p-1.5">
                             No users found.
