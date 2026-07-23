@@ -187,6 +187,12 @@ export const API_ENDPOINTS = {
       update: (id: string) => `/boq/update/${id}`,
       remove: (id: string) => `/boq/delete/${id}`
     },
+    vendors: {
+      list: "/vendor/read/",
+      create: "/vendor/create/",
+      update: (id: string) => `/vendor/update/${id}`,
+      remove: (id: string) => `/vendor/delete/${id}`,
+    },
   },
   quotation: {
     quotations: {
