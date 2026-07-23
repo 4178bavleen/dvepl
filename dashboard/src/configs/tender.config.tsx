@@ -1,6 +1,6 @@
 import { ColumnDef } from '@tanstack/react-table';
 import * as z from 'zod';
-import { sortableHeader } from '@/components/tables/GenericTable';
+import { sortableHeader } from '@/components/tables/genericTable';
 import { crmApi, tenderApi, hrmsApi, securityApi } from '@/services/modules';
 import { Link } from 'react-router-dom';
 import { HelpCircle } from 'lucide-react';

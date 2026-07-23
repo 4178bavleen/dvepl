@@ -3,9 +3,9 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './queryClient';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from 'react-hot-toast';
-import { ThemeProvider } from '@/contexts/ThemeContext';
-import { AuthProvider } from '@/contexts/AuthContext';
-import { PermissionProvider } from '@/contexts/PermissionContext';
+import { ThemeProvider } from '@/contexts/themeContext';
+import { AuthProvider } from '@/contexts/authContext';
+import { PermissionProvider } from '@/contexts/permissionContext';
 
 interface ProvidersProps {
   children: React.ReactNode;

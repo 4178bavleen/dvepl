@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
-import { usePermissions } from '@/contexts/PermissionContext';
+import { usePermissions } from '@/contexts/permissionContext';
 
 interface PermissionGateProps {
   allowedPermissions: string[];

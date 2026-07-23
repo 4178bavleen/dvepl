@@ -1,1 +1,1 @@
-export { BlankLayout } from './BlankLayout';
+export { BlankLayout } from './blankLayout';

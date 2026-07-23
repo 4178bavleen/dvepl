@@ -27,6 +27,7 @@ import {
   ShoppingCart,
   CheckSquare,
   Truck,
+  Package,
 } from 'lucide-react';
 import { ROUTES } from './routes';
 
@@ -63,6 +64,7 @@ export const sidebarItems: SidebarItem[] = [
   { name: 'Communication History', icon: MessageSquare, path: ROUTES.CRM_COMMUNICATION, section: 'CRM' },
   { name: 'Orders', icon: ShoppingCart, path: ROUTES.TENDER_ORDERS, section: 'CRM' },
   { name: 'Vendors', icon: Truck, path: ROUTES.PURCHASE_VENDORS, section: 'CRM' },
+  { name: 'Inventory', icon: Package, path: ROUTES.INVENTORY_STOCKS, section: 'CRM' },
 
   // Lead Management & Tenders
   { name: 'Tender Requests', icon: FolderOpen, path: ROUTES.TENDER_REQUESTS, section: 'Lead Management' },
