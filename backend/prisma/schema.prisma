@@ -494,9 +494,10 @@ model Employee {
   salaries              Salary[]
   tenderRequestsCreated TenderRequest[]            @relation("TenderRequestCreatedBy")
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  deletedAt             DateTime?
+  salesOrderAssignments SalesOrderAssignment[]
 
   @@index([companyId])
   @@map("employees")
@@ -1690,18 +1691,15 @@ model SalesOrderAssignment {
   id String @id @default(uuid())
 
   salesOrderId String
-
-  userId String
-
-  assignedAt DateTime @default(now())
+  employeeId   String
 
   salesOrder SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
 
-  user User @relation(fields: [userId], references: [id])
+  employee Employee @relation(fields: [employeeId], references: [id])
+  user     User?    @relation(fields: [userId], references: [id])
+  userId   String?
 
-  @@unique([salesOrderId, userId])
-  @@index([userId])
-  @@map("sales_order_assignments")
+  @@unique([salesOrderId, employeeId])
 }
 
 // enum SalesOrderStatus {

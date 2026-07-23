@@ -41,10 +41,8 @@ async function adminSalesOrderCreateRoutes(
           return reply.status(400).send({
             success: false,
             message: "Invalid Sales Order data.",
-            error:
-              process.env.NODE_ENV === "development"
-                ? validationResult.error.issues
-                : "Validation failed",
+        
+              error: validationResult.error.issues,
           });
         }
 
