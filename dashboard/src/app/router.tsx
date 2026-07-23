@@ -45,7 +45,7 @@ const ReferenceCodesPage = lazy(() => import('@/pages/tenders/referenceCodesPage
 const TechnicalClarificationsPage = lazy(() => import('@/pages/tenders/technicalClarificationsPage'));
 const QuotationsPage = lazy(() => import('@/pages/tenders/quotationsPage'));
 const OrdersPage = lazy(() => import('@/pages/tenders/ordersPage'));
-const VendorsPage = lazy(() => import('@/pages/tenders/vendorsPage'));
+const VendorsPage = lazy(() => import('@/pages/vendors/vendorsPage'));
 const BoqsPage = lazy(() => import('@/pages/tenders/boqsPage'));
 
 // Engineering & Manufacturing

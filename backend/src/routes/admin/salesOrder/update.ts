@@ -122,7 +122,7 @@ async function adminSalesOrderUpdateRoutes(
         // ==========================
         // Order Taken By Validation
         // ==========================
-
+console.log("orderTakenById:", orderTakenById);
         if (orderTakenById) {
           const user = await fastify.prisma.user.findUnique({
             where: {
@@ -136,7 +136,8 @@ async function adminSalesOrderUpdateRoutes(
               message: "Order Taken By user not found.",
             });
           }
-        } // ==========================
+        } 
+        // ==========================
         // Assigned Users Validation
         // ==========================
 

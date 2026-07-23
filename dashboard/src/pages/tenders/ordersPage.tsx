@@ -180,7 +180,7 @@ export function OrdersPage() {
   ]);
 
   // Options Data
-  const [users, setUsers] = useState<Array<{ id: string; name: string }>>([]);
+  const [users, setUsers] = useState<Array<{ id: string; userId?: string; name: string }>>([]);
 
   const orders = useCRMStore((state) => state.salesOrders || EMPTY_ARRAY);
   const setSalesOrders = useCRMStore((state) => state.setSalesOrders);
@@ -207,7 +207,7 @@ export function OrdersPage() {
           poDate: o.poDate ? o.poDate.split("T")[0] : "",
           orderTakenById: o.orderTakenById || "",
           orderTakenByName: o.orderTakenBy?.name || "",
-          assignedUserIds: o.assignedToIds || o.assignedUserIds || [],
+          assignedUserIds: (o.assignments || []).map((a: any) => a.userId).filter(Boolean),
           drawingConcernedPerson: o.drawingConcernedPerson || "",
           drawingApprovedDate: o.drawingApprovedDate
             ? o.drawingApprovedDate.split("T")[0]
@@ -246,6 +246,7 @@ export function OrdersPage() {
   }, [loadOrders]);
 
   // Load Companies & Users/Employees
+ // Load Companies & Users/Employees
   useEffect(() => {
     apiClient
       .get("/company/read/")
@@ -254,7 +255,10 @@ export function OrdersPage() {
           setCompanies(res.data.data || []);
         }
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.error("Failed to load companies:", err);
+        toast.error("Unable to load companies.");
+      });
 
     hrmsApi.employees
       .list()
@@ -262,13 +266,15 @@ export function OrdersPage() {
         setUsers(
           items.map((i) => ({
             id: i.id, // ✅ Employee ID
+            userId: i.userId || "", // ✅ User ID
             name: `${i.firstName ?? ""} ${i.lastName ?? ""}`.trim() || i.name,
           })),
         ),
       )
-
-      .catch(() => {});
-    // console.log("users array",users)
+      .catch((err) => {
+        console.error("Failed to load employees:", err);
+        toast.error("Unable to load users.");
+      });
   }, []);
 
   // Column Picker helper
@@ -302,7 +308,7 @@ export function OrdersPage() {
     if (assignedUserIds.length === 0) return "— Add user —";
     if (assignedUserIds.length === 1) {
       return (
-        users.find((u) => u.id === assignedUserIds[0])?.name ||
+        users.find((u) => u.userId === assignedUserIds[0])?.name ||
         "1 user selected"
       );
     }
@@ -661,7 +667,7 @@ export function OrdersPage() {
           const ids: string[] = item.assignedUserIds || [];
           if (ids.length === 0) return "—";
           const names = ids
-            .map((id) => users.find((u) => u.id === id)?.name || id)
+            .map((id) => users.find((u) => u.userId === id || u.id === id)?.name || id)
             .join(", ");
           return (
             <span className="truncate max-w-[150px] inline-block" title={names}>
@@ -1170,19 +1176,19 @@ export function OrdersPage() {
                         align="start"
                         className="w-64 p-2 space-y-1 max-h-64 overflow-y-auto"
                       >
-                        {users.map((u) => (
+                        {users.filter((u) => u.userId).map((u) => (
                           <label
                             key={u.id}
                             className="flex items-center gap-2 text-xs font-medium cursor-pointer hover:bg-muted/50 p-1.5 rounded"
                           >
                             <Checkbox
-                              checked={assignedUserIds.includes(u.id)}
-                              onCheckedChange={() => toggleAssignedUser(u.id)}
+                              checked={assignedUserIds.includes(u.userId!)}
+                              onCheckedChange={() => toggleAssignedUser(u.userId!)}
                             />
                             <span>{u.name}</span>
                           </label>
                         ))}
-                        {users.length === 0 && (
+                        {users.filter((u) => u.userId).length === 0 && (
                           <p className="text-xs text-muted-foreground p-1.5">
                             No users found.
                           </p>

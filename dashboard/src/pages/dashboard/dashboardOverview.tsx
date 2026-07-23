@@ -52,21 +52,21 @@ export function DashboardOverview() {
       organizationApi.costCenters.list(),
     ]).then(([employeeData, attendanceData, customerData, tenderData, costCenterData]) => {
       if (!isMounted) return;
-      setEmployees(employeeData);
-      setAttendances(attendanceData);
-      setCustomers(customerData);
-      setTenders(tenderData);
-      setCostCenters(costCenterData);
+      setEmployees(employeeData || []);
+      setAttendances(attendanceData || []);
+      setCustomers(customerData || []);
+      setTenders(tenderData || []);
+      setCostCenters(costCenterData || []);
     }).catch(() => toast.error('Unable to load live dashboard data.'))
       .finally(() => { if (isMounted) setIsLoading(false); });
     return () => { isMounted = false; };
   }, []);
   // ── data derived directly from backend response ──
-  const rawEmployees = employees.filter((employee) => !employee.deletedAt);
-  const activeEmployees = rawEmployees.filter(e => e.status === 'ACTIVE').length;
-  const rawTenders = tenders.filter((tender) => !tender.deletedAt);
-  const activeTenders = rawTenders.filter(t => t.status === 'OPEN' || t.status === 'IN_PROGRESS').length;
-  const rawCustomers = customers.filter((customer) => !customer.deletedAt);
+  const rawEmployees = (employees || []).filter((employee) => employee && !employee.deletedAt);
+  const activeEmployees = rawEmployees.filter(e => e && e.status === 'ACTIVE').length;
+  const rawTenders = (tenders || []).filter((tender) => tender && !tender.deletedAt);
+  const activeTenders = rawTenders.filter(t => t && (t.status === 'OPEN' || t.status === 'IN_PROGRESS')).length;
+  const rawCustomers = (customers || []).filter((customer) => customer && !customer.deletedAt);
 
   // Calculate dynamic monthly revenue and growth
   const { currentMonthRevenue, momGrowth, hasGrowth } = useMemo(() => {
@@ -151,9 +151,9 @@ export function DashboardOverview() {
   }, [rawCustomers]);
 
   // Chart data – from constants
-  const departmentBudgetData = costCenters.map(cc => ({
-    name: cc.name.replace(' Cost Center', '').replace(' Overhead', '').slice(0, 15),
-    Budget: Number(cc.budget || 0) / 100000 // In Lakhs
+  const departmentBudgetData = (costCenters || []).map(cc => ({
+    name: cc?.name ? cc.name.replace(' Cost Center', '').replace(' Overhead', '').slice(0, 15) : 'N/A',
+    Budget: Number(cc?.budget || 0) / 100000 // In Lakhs
   }));
 
   const tenderPieData = [
@@ -189,11 +189,11 @@ export function DashboardOverview() {
       const date = new Date();
       date.setDate(date.getDate() - (6 - index));
       const key = date.toISOString().slice(0, 10);
-      const dailyRecords = attendances.filter((attendance) => String(attendance.date).slice(0, 10) === key);
+      const dailyRecords = (attendances || []).filter((attendance) => attendance && String(attendance.date).slice(0, 10) === key);
       return {
         name: date.toLocaleDateString('en-US', { weekday: 'short' }),
-        Present: dailyRecords.filter((attendance) => attendance.status === 'PRESENT').length,
-        Absent: dailyRecords.filter((attendance) => attendance.status === 'ABSENT').length,
+        Present: dailyRecords.filter((attendance) => attendance && attendance.status === 'PRESENT').length,
+        Absent: dailyRecords.filter((attendance) => attendance && attendance.status === 'ABSENT').length,
       };
     });
   }, [attendances]);
