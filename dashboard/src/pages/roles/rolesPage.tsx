@@ -1,0 +1,9 @@
+import React from 'react';
+import { GenericCrudPage } from '@/components/shared/genericCrudPage';
+import { rolesConfig } from '@/configs';
+
+export function RolesPage() {
+  return <GenericCrudPage {...rolesConfig} />;
+}
+
+export default RolesPage;

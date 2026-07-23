@@ -2,94 +2,94 @@ import React, { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ProtectedRoute } from './routes/protected';
 import { PublicRoute } from '@/app/routes/public';
-import { UiConfigProvider } from '@/contexts/ui/UiConfigContext';
-import NotFound from '@/pages/NotFound';
-import PageLoader from '@/components/ui/PageLoader';
+import { UiConfigProvider } from '@/contexts/ui/uiConfigContext';
+import NotFound from '@/pages/notFound';
+import PageLoader from '@/components/ui/pageLoader';
 
 // Auth
-const LoginPage = lazy(() => import('@/pages/auth/LoginPage'));
+const LoginPage = lazy(() => import('@/pages/auth/loginPage'));
 
 // Dashboard
-const DashboardOverview = lazy(() => import('@/pages/dashboard/DashboardOverview'));
+const DashboardOverview = lazy(() => import('@/pages/dashboard/dashboardOverview'));
 
 // Organization
-const CompanyPage = lazy(() => import('@/pages/organization/CompanyPage'));
-const BranchPage = lazy(() => import('@/pages/organization/BranchPage'));
-const DepartmentPage = lazy(() => import('@/pages/organization/DepartmentPage'));
-const TeamPage = lazy(() => import('@/pages/organization/TeamPage'));
-const DesignationPage = lazy(() => import('@/pages/organization/DesignationPage'));
-const CostCenterPage = lazy(() => import('@/pages/organization/CostCenterPage'));
+const CompanyPage = lazy(() => import('@/pages/organization/companyPage'));
+const BranchPage = lazy(() => import('@/pages/organization/branchPage'));
+const DepartmentPage = lazy(() => import('@/pages/organization/departmentPage'));
+const TeamPage = lazy(() => import('@/pages/organization/teamPage'));
+const DesignationPage = lazy(() => import('@/pages/organization/designationPage'));
+const CostCenterPage = lazy(() => import('@/pages/organization/costCenterPage'));
 
 // Employee
-const EmployeePage = lazy(() => import('@/pages/employee/EmployeePage'));
-const AttendancePage = lazy(() => import('@/pages/attendance/AttendancePage'));
-const LeavePage = lazy(() => import('@/pages/leave/LeavePage'));
-const HolidaysPage = lazy(() => import('@/pages/holidays/HolidaysPage'));
-const ShiftsPage = lazy(() => import('@/pages/shifts/ShiftsPage'));
-const PayrollPage = lazy(() => import('@/pages/payroll/PayrollPage'));
-const DocumentsPage = lazy(() => import('@/pages/documents/DocumentsPage'));
+const EmployeePage = lazy(() => import('@/pages/employee/employeePage'));
+const AttendancePage = lazy(() => import('@/pages/attendance/attendancePage'));
+const LeavePage = lazy(() => import('@/pages/leave/leavePage'));
+const HolidaysPage = lazy(() => import('@/pages/holidays/holidaysPage'));
+const ShiftsPage = lazy(() => import('@/pages/shifts/shiftsPage'));
+const PayrollPage = lazy(() => import('@/pages/payroll/payrollPage'));
+const DocumentsPage = lazy(() => import('@/pages/documents/documentsPage'));
 
 // CRM
-const CustomersPage = lazy(() => import('@/pages/customers/CustomersPage'));
-const ContactPersonsPage = lazy(() => import('@/pages/contacts/ContactPersonsPage'));
-const CommunicationHistoryPage = lazy(() => import('@/pages/communication/CommunicationHistoryPage'));
+const CustomersPage = lazy(() => import('@/pages/customers/customersPage'));
+const ContactPersonsPage = lazy(() => import('@/pages/contacts/contactPersonsPage'));
+const CommunicationHistoryPage = lazy(() => import('@/pages/communication/communicationHistoryPage'));
 
 // Tender
-const TenderRequestsPage = lazy(() => import('@/pages/tender-requests/TenderRequestsPage'));
-const TendersPage = lazy(() => import('@/pages/tenders/TendersPage'));
-const GovernmentDepartmentsPage = lazy(() => import('@/pages/government/GovernmentDepartmentsPage'));
-const SectionsPage = lazy(() => import('@/pages/tenders/SectionsPage'));
-const DivisionsPage = lazy(() => import('@/pages/tenders/DivisionsPage'));
-const SubDivisionsPage = lazy(() => import('@/pages/tenders/SubDivisionsPage'));
-const ReferenceCodesPage = lazy(() => import('@/pages/tenders/ReferenceCodesPage'));
-const TechnicalClarificationsPage = lazy(() => import('@/pages/tenders/TechnicalClarificationsPage'));
-const QuotationsPage = lazy(() => import('@/pages/tenders/QuotationsPage'));
-const OrdersPage = lazy(() => import('@/pages/tenders/OrdersPage'));
-const VendorsPage = lazy(() => import('@/pages/tenders/VendorsPage'));
-const BoqsPage = lazy(() => import('@/pages/tenders/BoqsPage'));
+const TenderRequestsPage = lazy(() => import('@/pages/tender-requests/tenderRequestsPage'));
+const TendersPage = lazy(() => import('@/pages/tenders/tendersPage'));
+const GovernmentDepartmentsPage = lazy(() => import('@/pages/government/governmentDepartmentsPage'));
+const SectionsPage = lazy(() => import('@/pages/tenders/sectionsPage'));
+const DivisionsPage = lazy(() => import('@/pages/tenders/divisionsPage'));
+const SubDivisionsPage = lazy(() => import('@/pages/tenders/subDivisionsPage'));
+const ReferenceCodesPage = lazy(() => import('@/pages/tenders/referenceCodesPage'));
+const TechnicalClarificationsPage = lazy(() => import('@/pages/tenders/technicalClarificationsPage'));
+const QuotationsPage = lazy(() => import('@/pages/tenders/quotationsPage'));
+const OrdersPage = lazy(() => import('@/pages/tenders/ordersPage'));
+const VendorsPage = lazy(() => import('@/pages/tenders/vendorsPage'));
+const BoqsPage = lazy(() => import('@/pages/tenders/boqsPage'));
 
 // Engineering & Manufacturing
-const EngineeringProjectsPage = lazy(() => import('@/pages/engineering/EngineeringProjectsPage'));
-const EngineeringDrawingsPage = lazy(() => import('@/pages/engineering/EngineeringDrawingsPage'));
-const BomsPage = lazy(() => import('@/pages/engineering/BomsPage'));
+const EngineeringProjectsPage = lazy(() => import('@/pages/engineering/engineeringProjectsPage'));
+const EngineeringDrawingsPage = lazy(() => import('@/pages/engineering/engineeringDrawingsPage'));
+const BomsPage = lazy(() => import('@/pages/engineering/bomsPage'));
 
 // Security & Audit
-const UsersPage = lazy(() => import('@/pages/roles/UsersPage'));
-const RolesPage = lazy(() => import('@/pages/roles/RolesPage'));
-const PermissionsPage = lazy(() => import('@/pages/permissions/PermissionsPage'));
-const PermissionGroupsPage = lazy(() => import('@/pages/permissions/PermissionGroupsPage'));
-const ApprovalRequestsPage = lazy(() => import('@/pages/roles/ApprovalRequestsPage'));
-const AuditLogsPage = lazy(() => import('@/pages/audit/AuditLogsPage'));
+const UsersPage = lazy(() => import('@/pages/roles/usersPage'));
+const RolesPage = lazy(() => import('@/pages/roles/rolesPage'));
+const PermissionsPage = lazy(() => import('@/pages/permissions/permissionsPage'));
+const PermissionGroupsPage = lazy(() => import('@/pages/permissions/permissionGroupsPage'));
+const ApprovalRequestsPage = lazy(() => import('@/pages/roles/approvalRequestsPage'));
+const AuditLogsPage = lazy(() => import('@/pages/audit/auditLogsPage'));
 
-const SettingsPage = lazy(() => import('@/pages/settings/SettingsPage'));
-const ProfilePage = lazy(() => import('@/pages/profile/ProfilePage'));
+const SettingsPage = lazy(() => import('@/pages/settings/settingsPage'));
+const ProfilePage = lazy(() => import('@/pages/profile/profilePage'));
 
 // Materials & Master Catalog
-const MaterialsPage = lazy(() => import('@/pages/material/MaterialsPage'));
-const MaterialCategoriesPage = lazy(() => import('@/pages/material/MaterialCategoriesPage'));
+const MaterialsPage = lazy(() => import('@/pages/material/materialsPage'));
+const MaterialCategoriesPage = lazy(() => import('@/pages/material/materialCategoriesPage'));
 
 // Procurement & Purchase
-const PurchaseRequestsPage = lazy(() => import('@/pages/purchase/PurchaseRequestsPage'));
-const PurchaseOrdersPage = lazy(() => import('@/pages/purchase/PurchaseOrdersPage'));
+const PurchaseRequestsPage = lazy(() => import('@/pages/purchase/purchaseRequestsPage'));
+const PurchaseOrdersPage = lazy(() => import('@/pages/purchase/purchaseOrdersPage'));
 
 // Inventory & Warehousing
-const WarehousesPage = lazy(() => import('@/pages/inventory/WarehousesPage'));
-const InventoryStocksPage = lazy(() => import('@/pages/inventory/InventoryStocksPage'));
-const StockTransfersPage = lazy(() => import('@/pages/inventory/StockTransfersPage'));
-const LogisticsDispatchesPage = lazy(() => import('@/pages/inventory/LogisticsDispatchesPage'));
+const WarehousesPage = lazy(() => import('@/pages/inventory/inventoryPage'));
+const InventoryStocksPage = lazy(() => import('@/pages/inventory/inventoryPage'));
+const StockTransfersPage = lazy(() => import('@/pages/inventory/inventoryPage'));
+const LogisticsDispatchesPage = lazy(() => import('@/pages/inventory/inventoryPage'));
 
 // Production
-const ProductionPlansPage = lazy(() => import('@/pages/production/ProductionPlansPage'));
-const WorkOrdersPage = lazy(() => import('@/pages/production/WorkOrdersPage'));
+const ProductionPlansPage = lazy(() => import('@/pages/production/productionPlansPage'));
+const WorkOrdersPage = lazy(() => import('@/pages/production/workOrdersPage'));
 
 // Quality Assurance
-const InspectionsPage = lazy(() => import('@/pages/qc/InspectionsPage'));
+const InspectionsPage = lazy(() => import('@/pages/qc/inspectionsPage'));
 
 // Finance & Accounts
-const InvoicesPage = lazy(() => import('@/pages/finance/InvoicesPage'));
-const PaymentsPage = lazy(() => import('@/pages/finance/PaymentsPage'));
-const ExpensesPage = lazy(() => import('@/pages/finance/ExpensesPage'));
-const NotificationsPage = lazy(() => import('@/pages/notifications/NotificationsPage'));
+const InvoicesPage = lazy(() => import('@/pages/finance/invoicesPage'));
+const PaymentsPage = lazy(() => import('@/pages/finance/paymentsPage'));
+const ExpensesPage = lazy(() => import('@/pages/finance/expensesPage'));
+const NotificationsPage = lazy(() => import('@/pages/notifications/notificationsPage'));
 
 
 

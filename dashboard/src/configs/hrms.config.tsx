@@ -1,6 +1,6 @@
 import { ColumnDef } from "@tanstack/react-table";
 import * as z from "zod";
-import { sortableHeader } from "@/components/tables/GenericTable";
+import { sortableHeader } from "@/components/tables/genericTable";
 import { hrmsApi } from "@/services/modules";
 import { organizationApi } from "@/services/organization";
 import { EmployeeStatus } from "@/types/erp";
