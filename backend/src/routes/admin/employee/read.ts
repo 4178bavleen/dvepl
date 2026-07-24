@@ -73,13 +73,22 @@ async function readEmployeeRoutes(
                 name: true,
               },
             },
+            contacts: true,
           },
+        });
+
+        const mappedEmployees = employees.map((emp) => {
+          const emailContact = emp.contacts.find((c) => c.type === "EMAIL");
+          return {
+            ...emp,
+            email: emailContact ? emailContact.value : "",
+          };
         });
 
         return reply.status(200).send({
           success: true,
           message: "Employees fetched successfully.",
-          data: employees,
+          data: mappedEmployees,
         });
       } catch (error: any) {
         adminLogs.error("Read Employees failed", { error });
@@ -126,6 +135,9 @@ async function readEmployeeRoutes(
             companyId,
             deletedAt: null,
           },
+          include: {
+            contacts: true,
+          },
         });
 
         if (!employee) {
@@ -135,9 +147,15 @@ async function readEmployeeRoutes(
           });
         }
 
+        const emailContact = employee.contacts.find((c) => c.type === "EMAIL");
+        const mappedEmployee = {
+          ...employee,
+          email: emailContact ? emailContact.value : "",
+        };
+
         return reply.send({
           success: true,
-          data: employee,
+          data: mappedEmployee,
         });
       } catch (error: any) {
         adminLogs.error("Read Employee By Id Failed", { error });

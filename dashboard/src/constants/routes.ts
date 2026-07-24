@@ -18,6 +18,7 @@ export const ROUTES = {
   HRMS_SHIFTS: '/hrms/shifts',
   HRMS_PAYROLL: '/hrms/payroll',
   HRMS_DOCUMENTS: '/hrms/documents',
+  HRMS_TASKS: '/hrms/tasks',
 
   // CRM
   CRM_CUSTOMERS: '/crm/customers',
@@ -77,6 +78,7 @@ export const ROUTES = {
   FINANCE_EXPENSES: '/finance/expenses',
   
   AUDIT_LOGS: '/audit-logs',
+  REPORTS: '/reports',
   SETTINGS: '/settings',
   SETTINGS_APPROVAL_RULES: '/settings/approval-rules',
 };

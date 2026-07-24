@@ -412,7 +412,7 @@ export function GenericTable<TData extends { id: string }>({
                       key={cell.id}
                       className={cn(
                         "py-3.5 px-4 text-sm font-normal align-middle",
-                        cell.column.id === "actions" && "text-center sticky right-0 bg-card group-hover/row:bg-muted/40 group-data-[state=selected]/row:bg-muted border-l border-l-border shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)] z-10",
+                        cell.column.id === "actions" && "text-center sticky right-0 bg-card group-hover/row:bg-muted group-data-[state=selected]/row:bg-muted border-l border-l-border shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)] z-10",
                       )}
                     >
                       {flexRender(

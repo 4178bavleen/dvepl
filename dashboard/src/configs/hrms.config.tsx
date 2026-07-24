@@ -1,7 +1,7 @@
 import { ColumnDef } from "@tanstack/react-table";
 import * as z from "zod";
 import { sortableHeader } from "@/components/tables/genericTable";
-import { hrmsApi } from "@/services/modules";
+import { hrmsApi, securityApi } from "@/services/modules";
 import { organizationApi } from "@/services/organization";
 import { EmployeeStatus } from "@/types/erp";
 import { Employee, Attendance, Leave, Salary } from "@/types/erp";
@@ -139,32 +139,19 @@ export const employeesConfig = {
       name: "branchId",
       label: "Work Branch",
       type: "select",
-      options: [
-        { label: "Mumbai HQ", value: "branch-1" },
-        { label: "Pune Plant", value: "branch-2" },
-        { label: "Delhi Office", value: "branch-3" },
-      ],
+      options: [],
     },
     {
       name: "departmentId",
       label: "Department",
       type: "select",
-      options: [
-        { label: "Sales & Marketing", value: "dept-1" },
-        { label: "Human Resources", value: "dept-2" },
-        { label: "Finance & Accounts", value: "dept-3" },
-      ],
+      options: [],
     },
     {
       name: "designationId",
       label: "Designation",
       type: "select",
-      options: [
-        { label: "Managing Director", value: "desg-1" },
-        { label: "Operations Manager", value: "desg-2" },
-        { label: "HR Manager", value: "desg-3" },
-        { label: "Senior Proposal Engineer", value: "desg-4" },
-      ],
+      options: [],
     },
     {
       name: "status",

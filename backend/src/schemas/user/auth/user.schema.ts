@@ -13,8 +13,13 @@ export const createUserSchema = z.object({
 
   phone: z
     .string()
-    .regex(/^[6-9]\d{9}$/, "Invalid phone number")
-    .optional(),
+    .trim()
+    .optional()
+    .nullable()
+    .or(z.literal(""))
+    .refine((val) => !val || /^\+?[\d\s-]{10,15}$/.test(val), {
+      message: "Invalid phone number",
+    }),
 
   password: z
     .string()
