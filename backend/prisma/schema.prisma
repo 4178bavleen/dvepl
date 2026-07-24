@@ -1252,6 +1252,7 @@ model SalesOrder {
   quotation              Quotation?             @relation(fields: [quotationId], references: [id])
   tender                 Tender?                @relation(fields: [tenderId], references: [id])
   workOrders             WorkOrder[]
+  payments               Payment[]
 
   @@index([companyId])
   @@index([status])
@@ -2249,7 +2250,8 @@ model Payment {
   id            String        @id @default(uuid())
   companyId     String
   paymentNo     String        @unique
-  invoiceId     String
+  invoiceId     String?
+  salesOrderId  String?
   amount        Decimal       @db.Decimal(15, 2)
   paymentDate   DateTime      @default(now())
   paymentMethod PaymentMethod @default(CASH)
@@ -2260,11 +2262,13 @@ model Payment {
   updatedAt     DateTime      @updatedAt
   deletedAt     DateTime?
   company       Company       @relation(fields: [companyId], references: [id])
-  invoice       Invoice       @relation(fields: [invoiceId], references: [id])
+  invoice       Invoice?      @relation(fields: [invoiceId], references: [id])
+  salesOrder    SalesOrder?   @relation(fields: [salesOrderId], references: [id])
   receivedBy    User          @relation(fields: [receivedById], references: [id])
 
   @@index([companyId])
   @@index([invoiceId])
+  @@index([salesOrderId])
   @@map("payments")
 }
 
@@ -2771,15 +2775,11 @@ enum InvoiceStatus {
 
 enum PaymentMethod {
   CASH
-  BANK_TRANSFER
-  CHEQUE
-  DD
-  CREDIT_CARD
-  DEBIT_CARD
-  UPI
   NEFT
   RTGS
-  IMPS
+  CHEQUE
+  UPI
+  OTHER
 }
 
 enum ScheduleFrequency {

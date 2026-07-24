@@ -67,6 +67,9 @@ export const sidebarItems: SidebarItem[] = [
   { name: 'Vendors', icon: Truck, path: ROUTES.PURCHASE_VENDORS, section: 'CRM' },
   { name: 'Inventory', icon: Package, path: ROUTES.INVENTORY_STOCKS, section: 'CRM' },
 
+  // Finance
+  { name: 'Finance', icon: DollarSign, path: ROUTES.FINANCE, section: 'Finance' },
+
   // Lead Management & Tenders
   { name: 'Tender Requests', icon: FolderOpen, path: ROUTES.TENDER_REQUESTS, section: 'Lead Management' },
   { name: 'Tenders', icon: FolderGit2, path: ROUTES.TENDER_TENDERS, section: 'Lead Management' },
