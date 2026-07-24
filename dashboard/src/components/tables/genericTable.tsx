@@ -132,6 +132,7 @@ interface GenericTableProps<TData> {
   bulkActions?: (selectedRows: TData[]) => React.ReactNode;
   isLoading?: boolean;
   showColumnVisibility?: boolean;
+  freezeActions?: boolean;
 }
 
 export function GenericTable<TData extends { id: string }>({
@@ -143,6 +144,7 @@ export function GenericTable<TData extends { id: string }>({
   bulkActions,
   isLoading = false,
   showColumnVisibility = true,
+  freezeActions = true,
 }: GenericTableProps<TData>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
@@ -364,7 +366,8 @@ export function GenericTable<TData extends { id: string }>({
                       key={header.id}
                       className={cn(
                         "text-xs font-semibold py-3.5 px-4 text-muted-foreground whitespace-nowrap",
-                        header.id === "actions" && "text-center sticky right-0 bg-muted border-l border-l-border shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)] z-10",
+                        header.id === "actions" && "text-center",
+                        header.id === "actions" && freezeActions && "sticky right-0 bg-muted border-l border-l-border z-10",
                       )}
                     >
                       {header.isPlaceholder
@@ -392,7 +395,7 @@ export function GenericTable<TData extends { id: string }>({
                       key={colIndex} 
                       className={cn(
                         "py-4 px-4",
-                        col.id === "actions" && "sticky right-0 bg-card border-l border-l-border z-10"
+                        col.id === "actions" && freezeActions && "sticky right-0 bg-card border-l border-l-border z-10"
                       )}
                     >
                       <div className="h-4 bg-muted rounded-md w-full" />
@@ -412,7 +415,8 @@ export function GenericTable<TData extends { id: string }>({
                       key={cell.id}
                       className={cn(
                         "py-3.5 px-4 text-sm font-normal align-middle",
-                        cell.column.id === "actions" && "text-center sticky right-0 bg-card group-hover/row:bg-muted group-data-[state=selected]/row:bg-muted border-l border-l-border shadow-[-4px_0_8px_rgba(0,0,0,0.03)] dark:shadow-[-4px_0_8px_rgba(0,0,0,0.2)] z-10",
+                        cell.column.id === "actions" && "text-center",
+                        cell.column.id === "actions" && freezeActions && "sticky right-0 bg-card group-hover/row:bg-muted group-data-[state=selected]/row:bg-muted border-l border-l-border z-10",
                       )}
                     >
                       {flexRender(

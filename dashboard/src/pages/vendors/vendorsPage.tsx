@@ -1,13 +1,25 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
 import {
-  Building2, Search, Plus, Trash2, Edit, Eye, Clock, FileText, X, Check, Copy, Trash, Maximize2, Minimize2, Save, Sparkles, AlertCircle
+  Building2, Search, Plus, Trash2, Edit, Eye, Clock, FileText, X, Check, Copy, Trash, Maximize2, Minimize2, Save, Sparkles, AlertCircle, SlidersHorizontal, RefreshCw
 } from 'lucide-react';
 import { GenericTable, sortableHeader } from '@/components/tables/genericTable';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { toast } from 'react-hot-toast';
 import { tenderApi } from '@/services/modules';
 import { useERPStore } from '@/store/erpStore';
@@ -166,6 +178,7 @@ export function VendorsPage() {
   const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
+  const [overviewVendor, setOverviewVendor] = useState<Vendor | null>(null);
 
   // Revisions Modal States
   const [selectedVendorForRevisions, setSelectedVendorForRevisions] = useState<Vendor | null>(null);
@@ -187,6 +200,27 @@ export function VendorsPage() {
   const [vGst, setVGst] = useState('');
   const [vAddress, setVAddress] = useState('');
   const [vNotes, setVNotes] = useState('');
+
+  // Vendor Form Errors
+  const [vErrors, setVErrors] = useState<Record<string, string>>({});
+
+  const validateVendorForm = (): boolean => {
+    const errs: Record<string, string> = {};
+    if (!vName.trim() || vName.trim().length < 2) {
+      errs.name = 'Vendor name must be at least 2 characters';
+    }
+    if (vEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(vEmail.trim())) {
+      errs.email = 'Enter a valid email address';
+    }
+    if (vPhone.trim() && !/^[6-9]\d{9}$/.test(vPhone.trim())) {
+      errs.phone = 'Enter a valid 10-digit Indian mobile number';
+    }
+    if (vGst.trim() && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(vGst.trim().toUpperCase())) {
+      errs.gst = 'Enter a valid 15-character GSTIN (e.g. 22AAAAA0000A1Z5)';
+    }
+    setVErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
 
   // PO Form Fields
   const [companyDetails, setCompanyDetails] = useState(DEFAULT_COMPANY_DETAILS);
@@ -216,9 +250,43 @@ export function VendorsPage() {
     );
   }, [vendors, search]);
 
+  // Column Visibility State
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
+    name: true,
+    category: true,
+    contactPerson: true,
+    phone: true,
+    email: true,
+    gstNumber: true,
+    revisions: true,
+    dataEntry: true,
+  });
+
+  const ALL_VENDOR_COLUMNS = [
+    { id: 'name', label: 'Vendor Name' },
+    { id: 'category', label: 'Category' },
+    { id: 'contactPerson', label: 'Contact Person' },
+    { id: 'phone', label: 'Phone' },
+    { id: 'email', label: 'Email' },
+    { id: 'gstNumber', label: 'GSTIN' },
+    { id: 'revisions', label: 'Revision History' },
+    { id: 'dataEntry', label: 'Data Entry' },
+  ];
+
+  const toggleColumn = (key: string) => {
+    setVisibleColumns(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const toggleAllColumns = (val: boolean) => {
+    const next: Record<string, boolean> = {};
+    ALL_VENDOR_COLUMNS.forEach(c => { next[c.id] = val; });
+    setVisibleColumns(next);
+  };
+
   // Column definitions for GenericTable
-  const tableColumns = useMemo<ColumnDef<Vendor>[]>(() => [
+  const allTableColumns = useMemo<ColumnDef<Vendor>[]>(() => [
     {
+      id: 'name',
       accessorKey: 'name',
       header: sortableHeader('Vendor Name'),
       cell: ({ row }) => (
@@ -226,26 +294,31 @@ export function VendorsPage() {
       ),
     },
     {
+      id: 'category',
       accessorKey: 'category',
       header: 'Category',
       cell: ({ getValue }) => (getValue() as string) || '—',
     },
     {
+      id: 'contactPerson',
       accessorKey: 'contactPerson',
       header: 'Contact Person',
       cell: ({ getValue }) => (getValue() as string) || '—',
     },
     {
+      id: 'phone',
       accessorKey: 'phone',
       header: 'Phone',
       cell: ({ getValue }) => (getValue() as string) || '—',
     },
     {
+      id: 'email',
       accessorKey: 'email',
       header: 'Email',
       cell: ({ getValue }) => (getValue() as string) || '—',
     },
     {
+      id: 'gstNumber',
       accessorKey: 'gstNumber',
       header: 'GSTIN',
       cell: ({ getValue }) => (getValue() as string) || '—',
@@ -283,6 +356,10 @@ export function VendorsPage() {
     }
   ], [revisions]);
 
+  const activeColumns = useMemo(() => {
+    return allTableColumns.filter(col => visibleColumns[col.id || (col as any).accessorKey]);
+  }, [allTableColumns, visibleColumns]);
+
   // Form operations
   const resetVendorForm = () => {
     setEditingVendor(null);
@@ -294,6 +371,7 @@ export function VendorsPage() {
     setVGst('');
     setVAddress('');
     setVNotes('');
+    setVErrors({});
     setIsFormOpen(false);
   };
 
@@ -312,8 +390,8 @@ export function VendorsPage() {
 
   const handleSaveVendor = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!vName.trim()) {
-      toast.error('Vendor name is required');
+    if (!validateVendorForm()) {
+      toast.error('Please fix the validation errors before saving');
       return;
     }
 
@@ -490,8 +568,41 @@ export function VendorsPage() {
   // Save revision
   const handleSavePoRevision = async () => {
     if (!activePoVendor) return;
+
+    // PO header validations
     if (!poNumber.trim()) {
       toast.error('PO Number is required');
+      return;
+    }
+    if (!poDate) {
+      toast.error('PO Date is required');
+      return;
+    }
+
+    // Line item validations
+    if (poItems.length === 0) {
+      toast.error('Add at least one line item before saving');
+      return;
+    }
+    const invalidItems = poItems.filter(item => 
+      !item.description.trim() || 
+      !item.hsnCode.trim() || 
+      !item.catNo.trim() || 
+      item.qty <= 0 || 
+      item.rate <= 0
+    );
+    if (invalidItems.length > 0) {
+      toast.error(`${invalidItems.length} line item(s) have missing details (description, HSN, CAT No.) or invalid qty/rate (must be > 0)`);
+      return;
+    }
+
+    // Financial validations
+    if (advance < 0) {
+      toast.error('Advance amount cannot be negative');
+      return;
+    }
+    if (advance > totals.grandTotal && totals.grandTotal > 0) {
+      toast.error('Advance cannot exceed the grand total');
       return;
     }
 
@@ -808,7 +919,7 @@ export function VendorsPage() {
 
       {/* ── Add/Edit Vendor Form Section ── */}
       {isFormOpen && (
-        <div className="rounded-2xl border bg-card p-6 shadow-sm space-y-4 max-w-4xl animate-in fade-in-50 duration-200">
+        <div className="rounded-2xl border bg-card p-6 shadow-sm space-y-4 w-full animate-in fade-in-50 duration-200">
           <div className="border-b pb-3 flex items-center justify-between">
             <div>
               <h2 className="text-sm font-bold uppercase tracking-wider text-primary">
@@ -821,15 +932,16 @@ export function VendorsPage() {
             </Button>
           </div>
 
-          <form onSubmit={handleSaveVendor} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <form onSubmit={handleSaveVendor} className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
             <div className="flex flex-col gap-1.5 sm:col-span-2">
               <Label className="text-xs font-semibold">Vendor / Company Name *</Label>
               <Input
                 value={vName}
-                onChange={e => setVName(e.target.value)}
+                onChange={e => { setVName(e.target.value); if (vErrors.name) setVErrors(p => ({ ...p, name: '' })); }}
                 placeholder="e.g. Acme Pvt. Ltd."
-                required
+                className={vErrors.name ? 'border-destructive focus-visible:ring-destructive' : ''}
               />
+              {vErrors.name && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="size-3" />{vErrors.name}</p>}
             </div>
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs font-semibold">Category</Label>
@@ -851,28 +963,39 @@ export function VendorsPage() {
               <Label className="text-xs font-semibold">Phone</Label>
               <Input
                 value={vPhone}
-                onChange={e => setVPhone(e.target.value)}
+                onChange={e => {
+                  const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                  setVPhone(digits);
+                  if (vErrors.phone) setVErrors(p => ({ ...p, phone: '' }));
+                }}
                 placeholder="9876543210"
-                maxLength={12}
+                maxLength={10}
+                inputMode="numeric"
+                className={vErrors.phone ? 'border-destructive focus-visible:ring-destructive' : ''}
               />
+              {vErrors.phone && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="size-3" />{vErrors.phone}</p>}
             </div>
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs font-semibold">Email</Label>
               <Input
-                type="email"
+                type="text"
                 value={vEmail}
-                onChange={e => setVEmail(e.target.value)}
+                onChange={e => { setVEmail(e.target.value); if (vErrors.email) setVErrors(p => ({ ...p, email: '' })); }}
                 placeholder="vendor@company.com"
+                className={vErrors.email ? 'border-destructive focus-visible:ring-destructive' : ''}
               />
+              {vErrors.email && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="size-3" />{vErrors.email}</p>}
             </div>
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-1.5 sm:col-span-2">
               <Label className="text-xs font-semibold">GST Number</Label>
               <Input
                 value={vGst}
-                onChange={e => setVGst(e.target.value)}
+                onChange={e => { setVGst(e.target.value.toUpperCase()); if (vErrors.gst) setVErrors(p => ({ ...p, gst: '' })); }}
                 placeholder="22AAAAA0000A1Z5"
                 maxLength={15}
+                className={vErrors.gst ? 'border-destructive focus-visible:ring-destructive' : ''}
               />
+              {vErrors.gst && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="size-3" />{vErrors.gst}</p>}
             </div>
             <div className="flex flex-col gap-1.5 sm:col-span-2">
               <Label className="text-xs font-semibold">Address</Label>
@@ -900,25 +1023,156 @@ export function VendorsPage() {
         </div>
       )}
 
-      {/* ── Search Bar ── */}
-      <div className="flex items-center gap-2 max-w-md border rounded-xl px-3 bg-card shadow-xs focus-within:ring-1 focus-within:ring-primary">
-        <Search className="size-4 text-muted-foreground" />
-        <Input
-          placeholder="Search vendors by name, category, GST..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="h-9 border-none shadow-none focus-visible:ring-0 px-0"
-        />
+      {/* ── Search Bar & Column Visibility ── */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2 max-w-md w-full border rounded-xl px-3 bg-card shadow-xs focus-within:ring-1 focus-within:ring-primary">
+          <Search className="size-4 text-muted-foreground" />
+          <Input
+            placeholder="Search vendors by name, category, GST..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="h-9 border-none shadow-none focus-visible:ring-0 px-0"
+          />
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void fetchAllData()}
+            className="gap-2 font-medium"
+            title="Refresh Vendors"
+          >
+            <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+
+          <Popover>
+            <PopoverTrigger
+              render={
+                <Button variant="outline" size="sm" className="gap-2 font-medium">
+                  <SlidersHorizontal className="size-4" />
+                  Customize Columns
+                </Button>
+              }
+            />
+          <PopoverContent align="end" className="w-56 p-3">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between border-b pb-2">
+                <span className="text-xs font-semibold text-foreground">
+                  Toggle Columns
+                </span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      const allSelected = ALL_VENDOR_COLUMNS.every(c => visibleColumns[c.id]);
+                      toggleAllColumns(!allSelected);
+                    }}
+                    className="h-6 px-1.5 text-[11px] font-medium text-primary hover:text-primary hover:bg-primary/10 gap-1.5"
+                  >
+                    <Checkbox
+                      checked={ALL_VENDOR_COLUMNS.every(c => visibleColumns[c.id])}
+                      className="pointer-events-none size-3.5"
+                    />
+                    Select All
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleAllColumns(false)}
+                    className="h-6 px-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+                  >
+                    Clear
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                {ALL_VENDOR_COLUMNS.map((col) => {
+                  const isChecked = !!visibleColumns[col.id];
+                  return (
+                    <label
+                      key={col.id}
+                      className="flex items-center gap-2.5 px-1 py-1 rounded hover:bg-muted/50 text-xs font-medium cursor-pointer transition-colors"
+                    >
+                      <Checkbox
+                        checked={isChecked}
+                        onCheckedChange={() => toggleColumn(col.id)}
+                      />
+                      <span>{col.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
+    </div>
 
       {/* ── Vendor Table ── */}
       <GenericTable
-        columns={tableColumns}
+        columns={activeColumns}
         data={filteredVendors}
+        onView={(row) => setOverviewVendor(row)}
         onEdit={openEditVendor}
         onDelete={(row) => handleDeleteVendor(row.id)}
         showColumnVisibility={false}
       />
+
+      {/* ── OVERVIEW MODAL ── */}
+      <Dialog open={!!overviewVendor} onOpenChange={(open) => !open && setOverviewVendor(null)}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg font-bold text-primary">
+              <Building2 className="size-5" />
+              Vendor Overview
+            </DialogTitle>
+          </DialogHeader>
+
+          {overviewVendor && (
+            <div className="space-y-4 pt-2 text-sm">
+              <div className="bg-muted/40 p-4 rounded-xl space-y-1">
+                <h3 className="text-base font-bold text-foreground">{overviewVendor.name}</h3>
+                <p className="text-xs text-muted-foreground">Category: {overviewVendor.category || '—'}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <span className="text-xs font-medium text-muted-foreground">Contact Person</span>
+                  <p className="font-semibold">{overviewVendor.contactPerson || '—'}</p>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-xs font-medium text-muted-foreground">Phone</span>
+                  <p className="font-semibold">{overviewVendor.phone || '—'}</p>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-xs font-medium text-muted-foreground">Email</span>
+                  <p className="font-semibold break-all">{overviewVendor.email || '—'}</p>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-xs font-medium text-muted-foreground">GSTIN</span>
+                  <p className="font-semibold">{overviewVendor.gstNumber || '—'}</p>
+                </div>
+              </div>
+
+              <div className="space-y-1 border-t pt-3">
+                <span className="text-xs font-medium text-muted-foreground">Address</span>
+                <p className="text-sm">{overviewVendor.address || '—'}</p>
+              </div>
+
+              <div className="space-y-1 border-t pt-3">
+                <span className="text-xs font-medium text-muted-foreground">Notes</span>
+                <p className="text-sm whitespace-pre-wrap text-muted-foreground">{overviewVendor.notes || '—'}</p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* ── REVISIONS PANEL MODAL ── */}
       {selectedVendorForRevisions && (
@@ -1145,12 +1399,29 @@ export function VendorsPage() {
                           <input type="text" value={activePoVendor.name} disabled style={{ background: '#f1f5f9', border: '1px solid #cbd5e1' }} />
                         </div>
                         <div className="de-po-field">
-                          <label>PO Number</label>
-                          <input type="text" value={poNumber} onChange={e => setPoNumber(e.target.value)} placeholder="e.g. PO-2025-001" />
+                          <label>PO Number *</label>
+                          <input
+                            type="text"
+                            value={poNumber}
+                            onChange={e => setPoNumber(e.target.value)}
+                            placeholder="e.g. PO-2025-001"
+                            style={!poNumber.trim() ? { borderColor: '#f59e0b' } : undefined}
+                          />
+                          {!poNumber.trim() && (
+                            <span style={{ color: '#f59e0b', fontSize: '11px', marginTop: '2px' }}>PO Number is required</span>
+                          )}
                         </div>
                         <div className="de-po-field">
-                          <label>PO Date</label>
-                          <input type="date" value={poDate} onChange={e => setPoDate(e.target.value)} />
+                          <label>PO Date *</label>
+                          <input
+                            type="date"
+                            value={poDate}
+                            onChange={e => setPoDate(e.target.value)}
+                            style={!poDate ? { borderColor: '#f59e0b' } : undefined}
+                          />
+                          {!poDate && (
+                            <span style={{ color: '#f59e0b', fontSize: '11px', marginTop: '2px' }}>PO Date is required</span>
+                          )}
                         </div>
                         <div className="de-po-field">
                           <label>PO Status</label>
@@ -1177,7 +1448,20 @@ export function VendorsPage() {
                         </div>
                         <div className="de-po-field">
                           <label>Advance (₹)</label>
-                          <input type="number" value={advance} onChange={e => setAdvance(Number(e.target.value) || 0)} placeholder="0.00" />
+                          <input
+                            type="number"
+                            min={0}
+                            value={advance}
+                            onChange={e => {
+                              const val = Math.max(0, Number(e.target.value) || 0);
+                              setAdvance(val);
+                            }}
+                            placeholder="0.00"
+                            style={advance > totals.grandTotal && totals.grandTotal > 0 ? { borderColor: '#ef4444' } : undefined}
+                          />
+                          {advance > totals.grandTotal && totals.grandTotal > 0 && (
+                            <span style={{ color: '#ef4444', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>⚠ Advance exceeds grand total</span>
+                          )}
                         </div>
                         <div className="de-po-field">
                           <label>Remarks</label>
@@ -1190,15 +1474,15 @@ export function VendorsPage() {
                         <span className="de-tax-label">📊 TAX:</span>
                         <div className="de-tax-field">
                           <label>CGST %</label>
-                          <input type="number" value={cgstPercent} onChange={e => setCgstPercent(Number(e.target.value) || 0)} />
+                          <input type="number" min={0} max={100} value={cgstPercent} onChange={e => setCgstPercent(Math.min(100, Math.max(0, Number(e.target.value) || 0)))} />
                         </div>
                         <div className="de-tax-field">
                           <label>SGST %</label>
-                          <input type="number" value={sgstPercent} onChange={e => setSgstPercent(Number(e.target.value) || 0)} />
+                          <input type="number" min={0} max={100} value={sgstPercent} onChange={e => setSgstPercent(Math.min(100, Math.max(0, Number(e.target.value) || 0)))} />
                         </div>
                         <div className="de-tax-field">
                           <label>IGST %</label>
-                          <input type="number" value={igstPercent} onChange={e => setIgstPercent(Number(e.target.value) || 0)} />
+                          <input type="number" min={0} max={100} value={igstPercent} onChange={e => setIgstPercent(Math.min(100, Math.max(0, Number(e.target.value) || 0)))} />
                         </div>
                         <div className="de-fin-sep"></div>
                         <div className="de-fin-item"><span>Subtotal:</span> <strong>₹{totals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></div>
@@ -1282,8 +1566,8 @@ export function VendorsPage() {
                             {poItems.map((item, idx) => (
                               <tr key={item.id}>
                                 <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{idx + 1}</td>
-                                <td><input type="text" value={item.description} onChange={e => updatePoItemField(item.id, 'description', e.target.value)} placeholder="Item description..." /></td>
-                                <td><input type="number" value={item.qty} onChange={e => updatePoItemField(item.id, 'qty', Number(e.target.value) || 0)} /></td>
+                                <td><input type="text" value={item.description} onChange={e => updatePoItemField(item.id, 'description', e.target.value)} placeholder="Item description..." style={!item.description.trim() ? { borderColor: '#f59e0b' } : undefined} /></td>
+                                <td><input type="number" min={0.01} step="any" value={item.qty} onChange={e => updatePoItemField(item.id, 'qty', Number(e.target.value) || 0)} style={item.qty <= 0 ? { borderColor: '#f59e0b' } : undefined} /></td>
                                 <td><input type="text" value={item.unit} onChange={e => updatePoItemField(item.id, 'unit', e.target.value)} placeholder="PCS" /></td>
                                 <td><input type="text" value={item.hsnCode} onChange={e => updatePoItemField(item.id, 'hsnCode', e.target.value)} placeholder="HSN" /></td>
                                 <td><input type="text" value={item.catNo} onChange={e => updatePoItemField(item.id, 'catNo', e.target.value)} placeholder="CAT no." /></td>

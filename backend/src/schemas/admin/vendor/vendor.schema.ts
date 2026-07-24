@@ -24,6 +24,7 @@ export const vendorSchema = z.object({
 
   phone:
     z.string()
+    .max(10, "Phone number cannot exceed 10 digits")
     .optional(),
 
 
