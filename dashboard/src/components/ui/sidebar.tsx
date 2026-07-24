@@ -41,7 +41,7 @@ export default function Sidebar() {
     <>
       {/* Desktop Sidebar */}
       <motion.aside
-        className={`hidden md:flex flex-col h-full bg-card border-r border-border shrink-0 transition-all duration-300 ease-in-out relative ${isSidebarCollapsed ? 'w-16' : 'w-64'
+        className={`hidden md:flex flex-col h-full bg-card border-r border-border shrink-0 transition-all duration-300 ease-in-out relative ${isSidebarCollapsed ? 'w-16' : 'w-80'
           }`}
         layout
         transition={{ type: 'spring', stiffness: 250, damping: 30 }}>
@@ -129,7 +129,7 @@ export default function Sidebar() {
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 20, stiffness: 350, mass: 0.5 }}
-              className="fixed top-0 bottom-0 left-0 w-64 bg-card border-r border-border z-50 p-4 flex flex-col justify-between md:hidden"
+              className="fixed top-0 bottom-0 left-0 w-80 bg-card border-r border-border z-50 p-4 flex flex-col justify-between md:hidden"
             >
               <div className="space-y-6 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                 <div className="flex items-center justify-between border-b border-border pb-4">

@@ -91,7 +91,20 @@ const orderSchema = z.object({
   companyCode: z.string().min(1, "DVEPL Code is required"),
   customerName: z.string().min(1, "Party Name is required"),
   caNo: z.string().optional(),
-  contact: z.string().optional(),
+  contact: z
+    .string()
+    .optional()
+    .nullable()
+    .refine(
+      (v) => {
+        if (!v || !v.trim()) return true;
+        const val = v.trim();
+        const isPhone = /^[6-9]\d{9}$/.test(val);
+        const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+        return isPhone || isEmail;
+      },
+      { message: "Enter a valid 10-digit mobile number or email address" }
+    ),
   orderTakenDate: z.string().optional(),
   deliveryTarget: z.string().optional(),
   poDate: z.string().optional(),
@@ -632,6 +645,22 @@ export function OrdersPage() {
         errs[String(issue.path[0])] = issue.message;
       });
       setErrors(errs);
+      toast.error("Please fix form validation errors");
+      return;
+    }
+
+    if (lineItems.length === 0) {
+      toast.error("Add at least one line item");
+      return;
+    }
+
+    const invalidLineItems = lineItems.filter(
+      (item) => !item.itemNo.trim() || item.qty <= 0 || item.amount <= 0
+    );
+    if (invalidLineItems.length > 0) {
+      toast.error(
+        `${invalidLineItems.length} line item(s) have missing item no. or invalid qty/rate (must be > 0)`
+      );
       return;
     }
 
@@ -1337,19 +1366,27 @@ export function OrdersPage() {
 
                   <div className="flex flex-col gap-1.5">
                     <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
-                      Contact Details
+                      Contact Details (Phone / Email)
                     </Label>
                     <Input
                       value={formValues.contact}
-                      onChange={(e) =>
+                      onChange={(e) => {
                         setFormValues({
                           ...formValues,
                           contact: e.target.value,
-                        })
-                      }
-                      placeholder="Email or phone"
+                        });
+                        if (errors.contact) {
+                          setErrors((prev) => ({ ...prev, contact: "" }));
+                        }
+                      }}
+                      placeholder="9876543210 or user@company.com"
                       className="h-10 bg-muted/40"
                     />
+                    {errors.contact && (
+                      <p className="text-xs text-destructive mt-0.5">
+                        {errors.contact}
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex flex-col gap-1.5">

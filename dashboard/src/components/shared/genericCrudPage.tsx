@@ -52,6 +52,7 @@ interface GenericCrudPageProps<TRecord extends { id: string } = { id: string }> 
   api?: ResourceApi<any>;
   selectOptions?: Record<string, () => Promise<Array<{ id: string; name?: string; title?: string; code?: string }>>>;
   readOnly?: boolean;
+  freezeActions?: boolean;
 }
 
 const asInputValue = (value: unknown) => value == null ? '' : String(value);
@@ -385,6 +386,7 @@ export function GenericCrudPage<TRecord extends { id: string }>({
   api,
   selectOptions,
   readOnly = false,
+  freezeActions = true,
 }: GenericCrudPageProps<TRecord>) {
   const [searchParams] = useSearchParams();
   const localRecords = useERPStore((state) => (state as unknown as Record<string, unknown>)[tableName] as TRecord[] ?? EMPTY_ARRAY);
@@ -607,6 +609,7 @@ export function GenericCrudPage<TRecord extends { id: string }>({
           }
         }}
         isLoading={isLoading}
+        freezeActions={freezeActions}
       />
 
       <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>

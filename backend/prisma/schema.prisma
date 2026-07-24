@@ -1221,7 +1221,7 @@ model SalesOrder {
   createdAt              DateTime               @default(now())
   updatedAt              DateTime               @updatedAt
   deletedAt              DateTime?
-  assignedToId           String?
+  assignedToIds          String[]               @default([])
   caNo                   String?
   contactDetails         String?
   deliveryMonthTarget    String?
@@ -1263,13 +1263,11 @@ model SalesOrder {
 model SalesOrderAssignment {
   id           String     @id @default(uuid())
   salesOrderId String
-  employeeId   String
+  employeeId   String?
   userId       String?
-  employee     Employee   @relation(fields: [employeeId], references: [id])
+  employee     Employee?  @relation(fields: [employeeId], references: [id])
   salesOrder   SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
   user         User?      @relation(fields: [userId], references: [id])
-
-  @@unique([salesOrderId, employeeId])
 }
 
 model Task {
