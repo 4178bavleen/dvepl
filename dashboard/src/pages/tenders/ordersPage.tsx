@@ -219,10 +219,15 @@ export function OrdersPage() {
           drawingStatus: o.drawingStatus || "Pending",
           drawingRemarks: o.drawingRemarks || "",
           concernedPeople: o.concernedPersons || [],
-          total: o.total ?? o.totalAmount ?? 0,
+          // FIX: backend returns the order total as `grandTotal`
+          // (Prisma field), not `total` / `totalAmount`. Reading the
+          // wrong key here silently fell back to 0 every time.
+          total: o.grandTotal ?? o.total ?? o.totalAmount ?? 0,
+          subtotal: o.subtotal ?? 0,
+          gstTotal: o.gstTotal ?? 0,
           lineItems: (o.items || []).map((item: any) => {
             const qty = Number(item.quantity || 0);
-            const amount = Number(item.rate || 0);
+            const amount = Number(item.rate ?? item.unitPrice ?? 0);
             const gstPercent = Number(item.gstPercentage || 0);
             const unitTotal = amount + amount * (gstPercent / 100);
             return {
@@ -249,7 +254,6 @@ export function OrdersPage() {
     void loadOrders();
   }, [loadOrders]);
 
-  // Load Companies & Users/Employees
   // Load Companies & Users/Employees
   useEffect(() => {
     apiClient
@@ -300,9 +304,6 @@ export function OrdersPage() {
       const next = prev.includes(userId)
         ? prev.filter((id) => id !== userId)
         : [...prev, userId];
-
-      console.log("Clicked:", userId);
-      console.log("Next:", next);
 
       return next;
     });
@@ -445,7 +446,8 @@ export function OrdersPage() {
   const revenueTotal = useMemo(
     () =>
       orders.reduce(
-        (sum, item: any) => sum + Number(item.total || item.totalAmount || 0),
+        (sum, item: any) =>
+          sum + Number(item.total ?? item.grandTotal ?? item.totalAmount ?? 0),
         0,
       ),
     [orders],
@@ -572,7 +574,6 @@ export function OrdersPage() {
     } else if (ds === "REJECTED") {
       mappedDrawingStatus = "REJECTED";
     }
-    console.log("assignedUserIds state:", assignedUserIds);
 
     const payload = {
       companyId: formValues.companyId,
@@ -605,7 +606,7 @@ export function OrdersPage() {
         remarks: "",
       })),
     };
-    console.log("Payload:", payload);
+
     setIsSubmitting(true);
     try {
       if (editingOrder) {
@@ -785,7 +786,9 @@ export function OrdersPage() {
         header: "TOTAL AMT (₹)",
         cell: ({ row }) => {
           const item = row.original as any;
-          const val = Number(item.total || item.totalAmount || 0);
+          // FIX: fall back to `grandTotal` (the actual backend field)
+          // in addition to `total` / `totalAmount`.
+          const val = Number(item.total ?? item.grandTotal ?? item.totalAmount ?? 0);
           return (
             <span className="font-bold text-emerald-600 dark:text-emerald-400">
               ₹{val.toLocaleString("en-IN")}
@@ -1144,23 +1147,6 @@ export function OrdersPage() {
                     <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
                       Order Taken By
                     </Label>
-                    {/* <Select
-                      value={formValues.orderTakenById}
-                      onValueChange={(val) =>
-                        setFormValues({ ...formValues, orderTakenById: val })
-                      }
-                    >
-                      <SelectTrigger className="h-10 bg-muted/40">
-                        <SelectValue placeholder="— Select user —" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {users.map((u) => (
-                          <SelectItem key={u.id} value={u.userId}>
-                            {u.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select> */}
                     <Select
                       value={formValues.orderTakenById}
                       onValueChange={(val) =>
@@ -1753,8 +1739,9 @@ export function OrdersPage() {
                 <div className="text-sm font-bold text-emerald-600">
                   Total Order Value: ₹
                   {Number(
-                    viewingOrder.total ||
-                      (viewingOrder as any).totalAmount ||
+                    (viewingOrder as any).total ??
+                      (viewingOrder as any).grandTotal ??
+                      (viewingOrder as any).totalAmount ??
                       0,
                   ).toLocaleString("en-IN")}
                 </div>
