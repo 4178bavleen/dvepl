@@ -1292,8 +1292,8 @@ export function VendorsPage() {
                                     <input type="text" value={item[c] || ''} onChange={e => updatePoItemField(item.id, c, e.target.value)} />
                                   </td>
                                 ))}
-                                <td><input type="number" value={item.rate} onChange={e => updatePoItemField(item.id, 'rate', Number(e.target.value) || 0)} /></td>
-                                <td><input type="number" value={item.discountPercent} onChange={e => updatePoItemField(item.id, 'discountPercent', Number(e.target.value) || 0)} /></td>
+                                <td><input type="number" value={item.rate === 0 ? '' : item.rate} onChange={e => updatePoItemField(item.id, 'rate', Number(e.target.value) || 0)} placeholder="0" /></td>
+                                <td><input type="number" value={item.discountPercent === 0 ? '' : item.discountPercent} onChange={e => updatePoItemField(item.id, 'discountPercent', Number(e.target.value) || 0)} placeholder="0" /></td>
                                 <td className="td-net">₹{(item.net || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                                 <td className="td-total">₹{(item.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                                 <td style={{ textAlign: 'center' }}>

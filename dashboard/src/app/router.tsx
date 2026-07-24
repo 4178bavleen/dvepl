@@ -28,6 +28,8 @@ const HolidaysPage = lazy(() => import('@/pages/holidays/holidaysPage'));
 const ShiftsPage = lazy(() => import('@/pages/shifts/shiftsPage'));
 const PayrollPage = lazy(() => import('@/pages/payroll/payrollPage'));
 const DocumentsPage = lazy(() => import('@/pages/documents/documentsPage'));
+const TasksPage = lazy(() => import('@/pages/tasks/tasksPage'));
+const ReportsPage = lazy(() => import('@/pages/reports/reportsPage'));
 
 // CRM
 const CustomersPage = lazy(() => import('@/pages/customers/customersPage'));
@@ -122,6 +124,7 @@ export function AppRouter() {
               <Route path="/hrms/shifts" element={<ShiftsPage />} />
               <Route path="/hrms/payroll" element={<PayrollPage />} />
               <Route path="/hrms/documents" element={<DocumentsPage />} />
+              <Route path="/hrms/tasks" element={<TasksPage />} />
               {/* CRM */}
               <Route path="/crm/customers" element={<CustomersPage />} />
               <Route path="/crm/contacts" element={<ContactPersonsPage />} />
@@ -178,6 +181,7 @@ export function AppRouter() {
               <Route path="/finance/expenses" element={<ExpensesPage />} />
               
               <Route path="/audit-logs" element={<AuditLogsPage />} />
+              <Route path="/reports" element={<ReportsPage />} />
               {/* Settings */}
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/settings/profile" element={<ProfilePage />} />

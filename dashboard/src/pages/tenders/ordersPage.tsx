@@ -179,6 +179,77 @@ export function OrdersPage() {
     emptyLineItem("1"),
   ]);
 
+  // Bulk Upload States & Methods
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [previewResult, setPreviewResult] = useState<any>(null);
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const response = await apiClient.get("/order/download-template", {
+        responseType: "blob",
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "sales_orders_bulk_template.xlsx");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err: any) {
+      toast.error("Failed to download template.");
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files[0]) {
+      setSelectedFile(files[0]);
+      setPreviewResult(null);
+    }
+  };
+
+  const handleUploadAndProcess = async () => {
+    if (!selectedFile) {
+      toast.error("Please select a file first.");
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+
+      const previewResponse = await apiClient.post("/order/preview", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      if (previewResponse.data && previewResponse.data.success) {
+        const preview = previewResponse.data.data;
+        setPreviewResult(preview);
+
+        if (preview.invalidRows > 0) {
+          toast.error(`Found ${preview.invalidRows} invalid orders. Please review.`);
+        } else {
+          const uploadResponse = await apiClient.post("/order/bulk-upload", formData, {
+            headers: { "Content-Type": "multipart/form-data" },
+          });
+          if (uploadResponse.data && uploadResponse.data.success) {
+            toast.success("Bulk upload processed successfully!");
+            await loadOrders();
+            setIsBulkModalOpen(false);
+            setSelectedFile(null);
+            setPreviewResult(null);
+          }
+        }
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message ?? "Bulk upload failed.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   // Options Data
   const [users, setUsers] = useState<
     Array<{ id: string; userId?: string; name: string }>
@@ -199,7 +270,7 @@ export function OrdersPage() {
           companyCode: o.dveplCode,
           customerName: o.partyName,
           companyId: o.companyId || "",
-          status: o.status ? o.status.toLowerCase() : "pending",
+          status: o.status ? o.status.toLowerCase().replace("_", "-") : "pending",
           caNo: o.caNo || "",
           contact: o.contactDetails || "",
           orderTakenDate: o.orderConfirmDate
@@ -216,13 +287,22 @@ export function OrdersPage() {
           drawingApprovedDate: o.drawingApprovedDate
             ? o.drawingApprovedDate.split("T")[0]
             : "",
-          drawingStatus: o.drawingStatus || "Pending",
+          drawingStatus: o.drawingStatus === "IN_PROGRESS"
+            ? "In Process"
+            : o.drawingStatus
+            ? o.drawingStatus.charAt(0) + o.drawingStatus.slice(1).toLowerCase()
+            : "Pending",
           drawingRemarks: o.drawingRemarks || "",
           concernedPeople: o.concernedPersons || [],
-          total: o.total ?? o.totalAmount ?? 0,
+          // FIX: backend returns the order total as `grandTotal`
+          // (Prisma field), not `total` / `totalAmount`. Reading the
+          // wrong key here silently fell back to 0 every time.
+          total: o.grandTotal ?? o.total ?? o.totalAmount ?? 0,
+          subtotal: o.subtotal ?? 0,
+          gstTotal: o.gstTotal ?? 0,
           lineItems: (o.items || []).map((item: any) => {
             const qty = Number(item.quantity || 0);
-            const amount = Number(item.rate || 0);
+            const amount = Number(item.rate ?? item.unitPrice ?? 0);
             const gstPercent = Number(item.gstPercentage || 0);
             const unitTotal = amount + amount * (gstPercent / 100);
             return {
@@ -249,7 +329,6 @@ export function OrdersPage() {
     void loadOrders();
   }, [loadOrders]);
 
-  // Load Companies & Users/Employees
   // Load Companies & Users/Employees
   useEffect(() => {
     apiClient
@@ -300,9 +379,6 @@ export function OrdersPage() {
       const next = prev.includes(userId)
         ? prev.filter((id) => id !== userId)
         : [...prev, userId];
-
-      console.log("Clicked:", userId);
-      console.log("Next:", next);
 
       return next;
     });
@@ -445,7 +521,8 @@ export function OrdersPage() {
   const revenueTotal = useMemo(
     () =>
       orders.reduce(
-        (sum, item: any) => sum + Number(item.total || item.totalAmount || 0),
+        (sum, item: any) =>
+          sum + Number(item.total ?? item.grandTotal ?? item.totalAmount ?? 0),
         0,
       ),
     [orders],
@@ -572,7 +649,6 @@ export function OrdersPage() {
     } else if (ds === "REJECTED") {
       mappedDrawingStatus = "REJECTED";
     }
-    console.log("assignedUserIds state:", assignedUserIds);
 
     const payload = {
       companyId: formValues.companyId,
@@ -605,7 +681,7 @@ export function OrdersPage() {
         remarks: "",
       })),
     };
-    console.log("Payload:", payload);
+
     setIsSubmitting(true);
     try {
       if (editingOrder) {
@@ -785,7 +861,9 @@ export function OrdersPage() {
         header: "TOTAL AMT (₹)",
         cell: ({ row }) => {
           const item = row.original as any;
-          const val = Number(item.total || item.totalAmount || 0);
+          // FIX: fall back to `grandTotal` (the actual backend field)
+          // in addition to `total` / `totalAmount`.
+          const val = Number(item.total ?? item.grandTotal ?? item.totalAmount ?? 0);
           return (
             <span className="font-bold text-emerald-600 dark:text-emerald-400">
               ₹{val.toLocaleString("en-IN")}
@@ -1144,23 +1222,6 @@ export function OrdersPage() {
                     <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
                       Order Taken By
                     </Label>
-                    {/* <Select
-                      value={formValues.orderTakenById}
-                      onValueChange={(val) =>
-                        setFormValues({ ...formValues, orderTakenById: val })
-                      }
-                    >
-                      <SelectTrigger className="h-10 bg-muted/40">
-                        <SelectValue placeholder="— Select user —" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {users.map((u) => (
-                          <SelectItem key={u.id} value={u.userId}>
-                            {u.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select> */}
                     <Select
                       value={formValues.orderTakenById}
                       onValueChange={(val) =>
@@ -1534,7 +1595,7 @@ export function OrdersPage() {
                           <td className="p-1">
                             <Input
                               type="number"
-                              value={item.amount}
+                              value={item.amount === 0 ? "" : item.amount}
                               onChange={(e) =>
                                 updateLineItem(
                                   item.id,
@@ -1542,7 +1603,7 @@ export function OrdersPage() {
                                   e.target.value,
                                 )
                               }
-                              placeholder="Base price/unit"
+                              placeholder="0"
                               className="h-8 text-xs text-right bg-transparent border-border/60 focus-visible:border-primary [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
                           </td>
@@ -1673,19 +1734,85 @@ export function OrdersPage() {
       </Dialog>
 
       {/* Bulk Upload Modal */}
-      <Sheet open={isBulkModalOpen} onOpenChange={setIsBulkModalOpen}>
-        <SheetContent side="right" className="max-w-md p-6">
+      <Sheet open={isBulkModalOpen} onOpenChange={(open) => {
+        setIsBulkModalOpen(open);
+        if (!open) {
+          setSelectedFile(null);
+          setPreviewResult(null);
+        }
+      }}>
+        <SheetContent side="right" className="max-w-md p-6 overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>Bulk Upload Orders (.xlsx / .csv)</SheetTitle>
+            <SheetTitle>Bulk Upload Orders (.xlsx / .xls)</SheetTitle>
           </SheetHeader>
-          <div className="space-y-4 py-6">
+          <div className="space-y-6 py-6">
             <p className="text-xs text-muted-foreground">
-              Upload an Excel or CSV file containing DVEPL code, party name,
+              Upload an Excel file containing DVEPL code, party name,
               item details, qty, rate, and GST.
             </p>
-            <Input type="file" accept=".xlsx,.xls,.csv" />
-            <Button className="w-full gap-2">
-              <Upload className="size-4" /> Upload & Process
+            
+            <div className="flex flex-col gap-2">
+              <Label className="text-xs font-semibold text-muted-foreground">
+                1. DOWNLOAD REFERENCE TEMPLATE
+              </Label>
+              <Button variant="outline" size="sm" onClick={handleDownloadTemplate} className="w-full gap-2">
+                <FileText className="size-4 text-primary" /> Download Sample Excel Template
+              </Button>
+            </div>
+
+            <div className="flex flex-col gap-2 border-t pt-4">
+              <Label className="text-xs font-semibold text-muted-foreground">
+                2. SELECT DATA FILE
+              </Label>
+              <Input type="file" accept=".xlsx,.xls" onChange={handleFileChange} className="h-10 text-xs" />
+            </div>
+
+            {previewResult && (
+              <div className="rounded-lg border bg-muted/40 p-4 space-y-3">
+                <h4 className="text-xs font-bold text-foreground">Validation Summary</h4>
+                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                  <div className="border rounded p-2">
+                    <p className="font-semibold text-muted-foreground">Total</p>
+                    <p className="text-base font-bold text-foreground">{previewResult.totalRows}</p>
+                  </div>
+                  <div className="border rounded p-2 bg-emerald-500/5 border-emerald-500/10">
+                    <p className="font-semibold text-emerald-600">Valid</p>
+                    <p className="text-base font-bold text-emerald-600">{previewResult.validRows}</p>
+                  </div>
+                  <div className="border rounded p-2 bg-rose-500/5 border-rose-500/10">
+                    <p className="font-semibold text-rose-600">Errors</p>
+                    <p className="text-base font-bold text-rose-600">{previewResult.invalidRows}</p>
+                  </div>
+                </div>
+
+                {previewResult.invalidRows > 0 && (
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    {previewResult.rows
+                      .filter((r: any) => !r.isValid)
+                      .map((r: any, idx: number) => (
+                        <div key={idx} className="text-[11px] text-rose-500 bg-rose-500/10 p-2 rounded border border-rose-500/20">
+                          <span className="font-semibold">{r.dveplCode}</span>: {r.errors.join(", ")}
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <Button 
+              className="w-full gap-2" 
+              onClick={handleUploadAndProcess}
+              disabled={isUploading || !selectedFile}
+            >
+              {isUploading ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" /> Processing...
+                </>
+              ) : (
+                <>
+                  <Upload className="size-4" /> Upload & Process
+                </>
+              )}
             </Button>
           </div>
         </SheetContent>
@@ -1753,8 +1880,9 @@ export function OrdersPage() {
                 <div className="text-sm font-bold text-emerald-600">
                   Total Order Value: ₹
                   {Number(
-                    viewingOrder.total ||
-                      (viewingOrder as any).totalAmount ||
+                    (viewingOrder as any).total ??
+                      (viewingOrder as any).grandTotal ??
+                      (viewingOrder as any).totalAmount ??
                       0,
                   ).toLocaleString("en-IN")}
                 </div>
