@@ -24,6 +24,11 @@ export const hrmsApi = {
   employees: crud(API_ENDPOINTS.hrms.employees), attendance: crud(API_ENDPOINTS.hrms.attendance), leave: crud(API_ENDPOINTS.hrms.leave),
   salary: crud(API_ENDPOINTS.hrms.salary), holidays: crud(API_ENDPOINTS.hrms.holidays), shifts: crud(API_ENDPOINTS.hrms.shifts),
   documents: crud(API_ENDPOINTS.hrms.documents),
+  tasks: {
+    ...crud((API_ENDPOINTS.hrms as any).tasks, { updateMethod: 'patch' }),
+    updateNotification: (id: string, data: any) => apiClient.patch(`/task/notification/settings/${id}`, data).then(res => res.data),
+    sendReminders: () => apiClient.post("/task/notification/send-reminders").then(res => res.data)
+  }
 };
 
 export const crmApi = {
@@ -133,6 +138,11 @@ export const qualityApi = {
 export const logisticsApi = {
   dispatches: crud((API_ENDPOINTS as any).logistics.dispatches),
   vehicles: crud((API_ENDPOINTS as any).logistics.vehicles),
+};
+
+export const reportsApi = {
+  getReport: (type: string, fromDate?: string, toDate?: string) => 
+    apiClient.get(`/reports/read/`, { params: { type, fromDate, toDate } }).then(res => res.data)
 };
 
 export const financeApi = {
