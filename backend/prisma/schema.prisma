@@ -1461,46 +1461,68 @@ model BOMRevision {
 }
 
 model Material {
-  id                    String                 @id @default(uuid())
-  companyId             String
-  categoryId            String?
-  brandId               String?
-  specificationId       String?
-  materialCode          String                 @unique
-  name                  String
-  description           String?
-  hsnCode               String?
-  gst                   Decimal                @db.Decimal(5, 2)
-  unit                  String
-  weight                Decimal?               @db.Decimal(10, 3)
-  color                 String?
+  id        String @id @default(uuid())
+  companyId String
+
+  category String
+
+  brandId         String?
+  specificationId String?
+
+  materialCode String   @unique
+  name         String
+  description  String?
+  hsnCode      String?
+  gst          Decimal  @db.Decimal(5, 2)
+  unit         String
+  weight       Decimal? @db.Decimal(10, 3)
+  color        String?
+
   alternativeMaterialId String?
-  preferredVendorId     String?
-  isActive              Boolean                @default(true)
-  createdById           String
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-  deletedAt             DateTime?
-  stockTransfers        StockTransfer[]
-  bomItems              BOMItem[]
-  goodsReceiptItems     GoodsReceiptItem[]
-  inspections           Inspection[]
-  inventories           Inventory[]
-  alternative           Material?              @relation("MaterialAlternative", fields: [alternativeMaterialId], references: [id])
-  alternatives          Material[]             @relation("MaterialAlternative")
-  brand                 MaterialBrand?         @relation(fields: [brandId], references: [id])
-  category              MaterialCategory?      @relation(fields: [categoryId], references: [id])
-  company               Company                @relation(fields: [companyId], references: [id])
-  createdBy             User                   @relation(fields: [createdById], references: [id])
-  specification         MaterialSpecification? @relation(fields: [specificationId], references: [id])
-  purchaseOrderItems    PurchaseOrderItem[]
-  purchaseRequestItems  PurchaseRequestItem[]
-  workOrderItems        WorkOrderItem[]
-  workOrders            WorkOrder[]
+
+  preferredVendorId String?
+
+  isActive Boolean @default(true)
+
+  createdById String
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  type         MaterialType @default(RAW)
+  reorderLevel Decimal?     @db.Decimal(15, 3)
+  reorderQty   Decimal?     @db.Decimal(15, 3)
+  leadDays     Int?
+
+  preferredVendor Vendor? @relation(fields: [preferredVendorId], references: [id])
+
+  stockTransfers    StockTransfer[]
+  bomItems          BOMItem[]
+  goodsReceiptItems GoodsReceiptItem[]
+  inspections       Inspection[]
+  inventories       Inventory[]
+
+  alternative  Material?  @relation("MaterialAlternative", fields: [alternativeMaterialId], references: [id])
+  alternatives Material[] @relation("MaterialAlternative")
+
+  brand MaterialBrand? @relation(fields: [brandId], references: [id])
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  createdBy User @relation(fields: [createdById], references: [id])
+
+  specification MaterialSpecification? @relation(fields: [specificationId], references: [id])
+
+  purchaseOrderItems   PurchaseOrderItem[]
+  purchaseRequestItems PurchaseRequestItem[]
+  workOrderItems       WorkOrderItem[]
+  workOrders           WorkOrder[]
 
   @@index([companyId])
   @@index([materialCode])
-  @@index([categoryId])
+  @@index([category])
+  @@index([preferredVendorId])
   @@map("materials")
 }
 
@@ -1518,7 +1540,7 @@ model MaterialCategory {
   company     Company            @relation(fields: [companyId], references: [id])
   parent      MaterialCategory?  @relation("MaterialCategoryHierarchy", fields: [parentId], references: [id])
   children    MaterialCategory[] @relation("MaterialCategoryHierarchy")
-  materials   Material[]
+  // materials   Material[]
 
   @@unique([companyId, code])
   @@index([companyId])
@@ -1787,7 +1809,7 @@ model Inventory {
   id                 String                 @id @default(uuid())
   companyId          String
   materialId         String
-  warehouseId        String
+  warehouseId        String?
   binId              String?
   batchNo            String?
   serialNo           String?
@@ -1811,8 +1833,9 @@ model Inventory {
   company            Company                @relation(fields: [companyId], references: [id])
   goodsReceiptItem   GoodsReceiptItem?      @relation(fields: [goodsReceiptItemId], references: [id])
   material           Material               @relation(fields: [materialId], references: [id])
-  warehouse          Warehouse              @relation(fields: [warehouseId], references: [id])
+  warehouse          Warehouse?             @relation(fields: [warehouseId], references: [id])
   transactions       InventoryTransaction[]
+  location           String?
 
   @@unique([materialId, warehouseId, batchNo, serialNo])
   @@index([companyId])
@@ -1822,18 +1845,20 @@ model Inventory {
 }
 
 model InventoryTransaction {
-  id              String          @id @default(uuid())
+  id              String                   @id @default(uuid())
   inventoryId     String
-  transactionType TransactionType
-  quantity        Decimal         @db.Decimal(15, 3)
+  transactionType InventoryTransactionType
+  quantity        Decimal                  @db.Decimal(15, 3)
   referenceType   String
   referenceId     String
   remarks         String?
   createdById     String
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  createdBy       User            @relation(fields: [createdById], references: [id])
-  inventory       Inventory       @relation(fields: [inventoryId], references: [id])
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  createdBy       User                     @relation(fields: [createdById], references: [id])
+  inventory       Inventory                @relation(fields: [inventoryId], references: [id])
+  stockBefore     Decimal                  @db.Decimal(15, 3)
+  stockAfter      Decimal                  @db.Decimal(15, 3)
 
   @@index([inventoryId])
   @@index([referenceType, referenceId])
@@ -2411,24 +2436,43 @@ model DashboardWidget {
 }
 
 model Vendor {
-  id            String           @id @default(uuid())
-  companyId     String
-  name          String
-  category      String?
+  id String @id @default(uuid())
+
+  companyId String
+
+  name String
+
+  category String?
+
   contactPerson String?
-  phone         String?
-  email         String?
-  gstNumber     String?
-  address       String?
-  notes         String?
-  revisionCount Int              @default(0)
-  createdById   String
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  deletedAt     DateTime?
-  revisions     VendorRevision[]
-  company       Company          @relation(fields: [companyId], references: [id])
-  createdBy     User             @relation("VendorCreatedBy", fields: [createdById], references: [id])
+
+  phone String?
+
+  email String?
+
+  gstNumber String?
+
+  address String?
+
+  notes String?
+
+  revisionCount Int @default(0)
+
+  createdById String
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  deletedAt DateTime?
+
+  revisions VendorRevision[]
+
+  materials Material[] // <-- ADD THIS
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  createdBy User @relation("VendorCreatedBy", fields: [createdById], references: [id])
 
   @@index([companyId])
   @@index([name])
@@ -2651,14 +2695,11 @@ enum StockType {
   TRANSIT
 }
 
-enum TransactionType {
-  IN
-  OUT
+enum InventoryTransactionType {
+  STOCK_IN
+  STOCK_OUT
   ADJUSTMENT
-  TRANSFER_IN
-  TRANSFER_OUT
-  RESERVED
-  UNRESERVED
+  RETURN
 }
 
 enum StockTransferStatus {
@@ -2764,4 +2805,11 @@ enum Priority {
   MEDIUM
   HIGH
   CRITICAL
+}
+
+enum MaterialType {
+  RAW
+  FINISHED
+  SEMI_FINISHED
+  CONSUMABLE
 }

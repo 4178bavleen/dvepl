@@ -336,32 +336,6 @@ export const API_ENDPOINTS = {
       remove: (id: string) => `/goods-receipt/delete/${id}`,
     },
   },
-  inventory: {
-    warehouses: {
-      list: '/warehouse/read/',
-      create: '/warehouse/create/',
-      update: (id: string) => `/warehouse/update/${id}`,
-      remove: (id: string) => `/warehouse/delete/${id}`,
-    },
-    bins: {
-      list: '/bin/read/',
-      create: '/bin/create/',
-      update: (id: string) => `/bin/update/${id}`,
-      remove: (id: string) => `/bin/delete/${id}`,
-    },
-    stocks: {
-      list: '/inventory/read/',
-      create: '/inventory/create/',
-      update: (id: string) => `/inventory/update/${id}`,
-      remove: (id: string) => `/inventory/delete/${id}`,
-    },
-    transfers: {
-      list: '/stock-transfer/read/',
-      create: '/stock-transfer/create/',
-      update: (id: string) => `/stock-transfer/update/${id}`,
-      remove: (id: string) => `/stock-transfer/delete/${id}`,
-    },
-  },
   production: {
     plans: {
       list: '/production-plan/read/',
@@ -430,4 +404,33 @@ export const API_ENDPOINTS = {
       remove: (id: string) => `/expense/delete/${id}`,
     },
   },
+  inventory: {
+  warehouses: {
+    list: "/warehouse/read",
+    create: "/warehouse/create",
+    update: (id: string) => `/warehouse/update/${id}`,
+    remove: (id: string) => `/warehouse/delete/${id}`,
+  },
+
+  bins: {
+    list: "/bin/read",
+    create: "/bin/create",
+    update: (id: string) => `/bin/update/${id}`,
+    remove: (id: string) => `/bin/delete/${id}`,
+  },
+
+  stocks: {
+    list: "/inventory/read",
+    create: "/inventory/create",
+    update: (id: string) => `/inventory/update/${id}`,
+    remove: (id: string) => `/inventory/delete/${id}`,
+  },
+
+  transfers: {
+    list: "/stock-transfer/read",
+    create: "/stock-transfer/create",
+    update: (id: string) => `/stock-transfer/update/${id}`,
+    remove: (id: string) => `/stock-transfer/delete/${id}`,
+  },
+},
 } as const;

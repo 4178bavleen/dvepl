@@ -8,6 +8,28 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { apiClient } from '@/services/axios';
+
+// ---------------------------------------------------------------------------
+// NOTE (routes assumed — verify against your actual backend route files):
+//   Items:      GET /inventory/read | POST /inventory/create
+//               PATCH /inventory/update/:id | DELETE /inventory/delete/:id
+//   Movements:  GET /stock-movement/read | POST /stock-movement/create
+//   Summary:    GET /inventory/summary
+// If your backend uses different resource names (e.g. /inventory-movement),
+// just change the constants below — nothing else needs to change.
+// ---------------------------------------------------------------------------
+const ITEM_ENDPOINTS = {
+  list: '/inventory/read',
+  create: '/inventory/create',
+  update: (id: string) => `/inventory/update/${id}`,
+  remove: (id: string) => `/inventory/delete/${id}`,
+};
+const MOVEMENT_ENDPOINTS = {
+  list: '/inventory/stock-movement/read',
+  create: '/inventory/stock-movement/create',
+};
+const SUMMARY_ENDPOINT = '/inventory/summary';
 
 // Types
 export interface PrimaryVendor {
@@ -56,47 +78,182 @@ export interface Movement {
   date: string;
 }
 
-// Clean API service interface structure for easy backend integration later
+// Helper to pull the useful error message out of an axios error, same
+// convention used in OrdersPage.
+const errMsg = (err: any, fallback: string) =>
+  err?.response?.data?.message ?? err?.message ?? fallback;
+
+// ---------------------------------------------------------------------------
+// Backend <-> Frontend mapping (defensive fallbacks, since field names on
+// the Prisma side may not match 1:1 with the frontend shape — same issue we
+// hit with `grandTotal` vs `total` on Sales Orders).
+// ---------------------------------------------------------------------------
+const mapItemFromBackend = (o: any): InventoryItem => ({
+  id: o.id,
+
+  // Material
+  name: o.material?.name ?? "",
+  code: o.material?.materialCode ?? "",
+  type: String(o.material?.type ?? "RAW").toLowerCase() as "raw" | "finished",
+  category: o.material?.category ?? "",
+  unit: o.material?.unit ?? "Nos",
+  hsnCode: o.material?.hsnCode ?? "",
+
+  // Inventory
+  openingStock: Number(o.quantity ?? 0),
+  currentStock: Number(o.quantity ?? 0),
+
+  reorderLevel: Number(o.material?.reorderLevel ?? 0),
+  reorderQty: Number(o.material?.reorderQty ?? 0),
+
+  unitRate: Number(o.unitPrice ?? 0),
+
+  gstPercent: Number(o.material?.gst ?? 0),
+
+  // Warehouse / Bin
+  location:
+    o.bin?.name ??
+    o.warehouse?.name ??
+    "",
+
+  // Vendor (currently not stored)
+  primaryVendor: {
+    vendorName: "",
+    contactNo: "",
+    leadDays: Number(o.material?.leadDays ?? 0),
+  },
+
+  notes: o.material?.description ?? "",
+
+  createdAt: o.createdAt,
+});
+
+const mapMovementFromBackend = (m: any): Movement => ({
+  id: m.id,
+  itemId: m.itemId ?? m.inventoryItemId ?? '',
+  itemName: m.itemName ?? m.item?.name ?? '',
+  itemType: (String(m.itemType ?? m.item?.type ?? 'raw').toLowerCase() as 'raw' | 'finished'),
+  movementType: (m.movementType ?? m.type ?? 'IN') as Movement['movementType'],
+  qty: Number(m.qty ?? m.quantity ?? 0),
+  rate: Number(m.rate ?? 0),
+  totalValue: Number(m.totalValue ?? (Number(m.qty ?? 0) * Number(m.rate ?? 0))),
+  stockBefore: Number(m.stockBefore ?? 0),
+  stockAfter: Number(m.stockAfter ?? 0),
+  vendorName: m.vendorName ?? '',
+  poNumber: m.poNumber ?? '',
+  invoiceNo: m.invoiceNo ?? '',
+  orderCode: m.orderCode ?? '',
+  reason: m.reason ?? '',
+  addedBy: m.addedBy ?? m.createdBy?.name ?? m.user?.name ?? '—',
+  date: m.date ? String(m.date).split('T')[0] : (m.createdAt ? String(m.createdAt).split('T')[0] : ''),
+});
+
+// Live API service — wired to backend via apiClient
 export const apiService = {
   stocks: {
     list: async (): Promise<InventoryItem[]> => {
-      // TODO: Connect real API backend call later:
-      // return inventoryApi.stocks.list() as unknown as InventoryItem[];
-      return [];
+      const response = await apiClient.get(ITEM_ENDPOINTS.list);
+      console.log(response)
+      const raw = response.data?.data ?? response.data ?? [];
+      console.log(raw)
+      return (Array.isArray(raw) ? raw : []).map(mapItemFromBackend);
     },
     create: async (item: Omit<InventoryItem, 'id' | 'createdAt'>): Promise<InventoryItem> => {
-      // TODO: Connect real API backend call later
-      return { ...item, id: `item-${Date.now()}`, createdAt: new Date().toISOString() } as InventoryItem;
+      const payload = {
+        name: item.name,
+        materialCode: item.code || undefined,
+        type: item.type.toUpperCase(),
+        category: item.category,
+        unit: item.unit,
+        hsnCode: item.hsnCode,
+        openingStock: item.openingStock,
+        reorderLevel: item.reorderLevel,
+        reorderQty: item.reorderQty,
+        unitRate: item.unitRate,
+        gst: item.gstPercent,
+        location: item.location,
+        vendorName: item.primaryVendor?.vendorName,
+        vendorContact: item.primaryVendor?.contactNo,
+        vendorLeadDays: item.primaryVendor?.leadDays,
+        notes: item.notes,
+      };
+      const response = await apiClient.post(ITEM_ENDPOINTS.create, payload);
+      return mapItemFromBackend(response.data?.data ?? response.data);
     },
     update: async (id: string, item: Partial<InventoryItem>): Promise<InventoryItem> => {
-      // TODO: Connect real API backend call later
-      return { ...item, id } as InventoryItem;
+      const payload: Record<string, any> = {
+        name: item.name,
+        code: item.code,
+        type: item.type ? item.type.toUpperCase() : undefined,
+        category: item.category,
+        unit: item.unit,
+        hsnCode: item.hsnCode,
+        reorderLevel: item.reorderLevel,
+        reorderQty: item.reorderQty,
+        unitRate: item.unitRate,
+        gstPercent: item.gstPercent,
+        location: item.location,
+        vendorName: item.primaryVendor?.vendorName,
+        vendorContact: item.primaryVendor?.contactNo,
+        vendorLeadDays: item.primaryVendor?.leadDays,
+        notes: item.notes,
+      };
+      // Strip undefined keys so we don't overwrite fields we didn't touch
+      Object.keys(payload).forEach((k) => payload[k] === undefined && delete payload[k]);
+      const response = await apiClient.patch(ITEM_ENDPOINTS.update(id), payload);
+      return mapItemFromBackend(response.data?.data ?? response.data);
     },
     delete: async (id: string): Promise<void> => {
-      // TODO: Connect real API backend call later
+      await apiClient.delete(ITEM_ENDPOINTS.remove(id));
     }
   },
   movements: {
     list: async (filters?: { from?: string; to?: string; type?: string; movementType?: string }): Promise<Movement[]> => {
-      // TODO: Connect real API backend call later
-      return [];
+      const response = await apiClient.get(MOVEMENT_ENDPOINTS.list, {
+        params: {
+          from: filters?.from || undefined,
+          to: filters?.to || undefined,
+          itemType: filters?.type || undefined,
+          movementType: filters?.movementType || undefined,
+        },
+      });
+      const raw = response.data?.data ?? response.data ?? [];
+      return (Array.isArray(raw) ? raw : []).map(mapMovementFromBackend);
     },
     create: async (id: string, transactionType: 'IN' | 'OUT' | 'ADJUST' | 'RETURN', body: any): Promise<any> => {
-      // TODO: Connect real API backend call later
-      return { stockBefore: 0, stockAfter: 0 };
+      const payload = {
+        itemId: id,
+        movementType: transactionType,
+        quantity: body.qty,
+        date: body.date,
+        reason: body.reason,
+        rate: body.rate,
+        vendorName: body.vendorName,
+        poNumber: body.poNumber,
+        invoiceNo: body.invoiceNo,
+        orderCode: body.orderCode,
+      };
+      const response = await apiClient.post(MOVEMENT_ENDPOINTS.create, payload);
+      return response.data?.data ?? response.data ?? { stockBefore: 0, stockAfter: 0 };
     }
   },
   summary: {
     get: async (): Promise<any> => {
-      // TODO: Connect real API backend call later
-      return {
-        totalItems: 0,
-        totalRawItems: 0,
-        totalFinishedItems: 0,
-        lowStockCount: 0,
-        outOfStockCount: 0,
-        totalInventoryValue: 0
-      };
+      try {
+        const response = await apiClient.get(SUMMARY_ENDPOINT);
+        return response.data?.data ?? response.data;
+      } catch {
+        // Summary endpoint is optional — page computes its own KPIs from
+        // the items list anyway, so failure here is non-fatal.
+        return {
+          totalItems: 0,
+          totalRawItems: 0,
+          totalFinishedItems: 0,
+          lowStockCount: 0,
+          outOfStockCount: 0,
+          totalInventoryValue: 0
+        };
+      }
     }
   }
 };
@@ -135,7 +292,7 @@ export function InventoryPage() {
 
   // Form Fields - Item
   const [itemName, setItemName] = useState('');
-  const [itemCode, setItemCode] = useState('');
+  const [materialCode, setmaterialCode] = useState('');
   const [itemType, setItemType] = useState<'raw' | 'finished'>('raw');
   const [itemCategory, setItemCategory] = useState('');
   const [itemUnit, setItemUnit] = useState('Nos');
@@ -167,13 +324,13 @@ export function InventoryPage() {
     try {
       const fetchedItems = await apiService.stocks.list();
       setItems(fetchedItems);
-      
+
       if (activeTab === 'movements') {
         const fetchedMovs = await apiService.movements.list({ from: movFrom, to: movTo, type: movType, movementType: movMovType });
         setMovements(fetchedMovs);
       }
     } catch (err: any) {
-      toast.error(err.message || 'Failed to sync data');
+      toast.error(errMsg(err, 'Failed to sync data'));
     } finally {
       setLoading(false);
     }
@@ -181,6 +338,7 @@ export function InventoryPage() {
 
   useEffect(() => {
     refreshAllData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
   // Load movements on demands
@@ -191,7 +349,7 @@ export function InventoryPage() {
       setMovements(fetchedMovs);
       toast.success('Movement ledger loaded');
     } catch (err: any) {
-      toast.error(err.message || 'Failed to load movements');
+      toast.error(errMsg(err, 'Failed to load movements'));
     } finally {
       setLoading(false);
     }
@@ -254,7 +412,7 @@ export function InventoryPage() {
   // Form Reset
   const resetItemForm = () => {
     setItemName('');
-    setItemCode('');
+    setmaterialCode('');
     setItemType('raw');
     setItemCategory('');
     setItemUnit('Nos');
@@ -281,7 +439,7 @@ export function InventoryPage() {
   const handleOpenEdit = (item: InventoryItem) => {
     setSelectedItemId(item.id);
     setItemName(item.name);
-    setItemCode(item.code);
+    setmaterialCode(item.code);
     setItemType(item.type);
     setItemCategory(item.category || '');
     setItemUnit(item.unit);
@@ -331,7 +489,7 @@ export function InventoryPage() {
 
     const payload: Omit<InventoryItem, 'id' | 'createdAt'> = {
       name: itemName,
-      code: itemCode || `CODE-${Math.floor(1000 + Math.random() * 9000)}`,
+      code: materialCode || `CODE-${Math.floor(1000 + Math.random() * 9000)}`,
       type: itemType,
       category: itemCategory,
       unit: itemUnit,
@@ -363,7 +521,7 @@ export function InventoryPage() {
       setIsItemModalOpen(false);
       await refreshAllData();
     } catch (err: any) {
-      toast.error(err.message || 'Error saving item');
+      toast.error(errMsg(err, 'Error saving item'));
     } finally {
       setLoading(false);
     }
@@ -413,7 +571,7 @@ export function InventoryPage() {
       setIsStockModalOpen(false);
       await refreshAllData();
     } catch (err: any) {
-      toast.error(err.message || 'Transaction submission failed');
+      toast.error(errMsg(err, 'Transaction submission failed'));
     } finally {
       setLoading(false);
     }
@@ -429,7 +587,7 @@ export function InventoryPage() {
       setIsConfirmOpen(false);
       await refreshAllData();
     } catch (err: any) {
-      toast.error(err.message || 'Failed to delete item');
+      toast.error(errMsg(err, 'Failed to delete item'));
     } finally {
       setLoading(false);
     }
@@ -965,11 +1123,11 @@ export function InventoryPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Name *</label>
-                  <Input required placeholder="Copper Wire" value={itemName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setItemName(e.target.value)} />
+                  <Input required placeholder="Item Name" value={itemName} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setItemName(e.target.value)} />
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Code</label>
-                  <Input placeholder="CW-001" value={itemCode} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setItemCode(e.target.value)} />
+                  <Input placeholder="Internal Code" value={materialCode} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setmaterialCode(e.target.value)} />
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Type *</label>
@@ -983,7 +1141,7 @@ export function InventoryPage() {
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Category</label>
-                  <Input placeholder="Electrical" value={itemCategory} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setItemCategory(e.target.value)} />
+                  <Input placeholder="eg : Electrical,Sheet Metal" value={itemCategory} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setItemCategory(e.target.value)} />
                 </div>
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Unit</label>
@@ -1000,7 +1158,7 @@ export function InventoryPage() {
                   </Select>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">HSN Code</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">HSN/SAC Code</label>
                   <Input placeholder="8544" value={itemHsnCode} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setItemHsnCode(e.target.value)} />
                 </div>
                 <div className="flex flex-col gap-2">
