@@ -40,6 +40,7 @@ import adminSubDivisionRouteGroup from "./subDivision/index";
 import adminDeptRouteGroup from "./department/index";
 import adminTeamRouteGroup from "./team/index";
 import adminTechnicalClarificationRouteGroup from "./technicalClarification/index";
+import adminInventoryRouteGroup from "./inventory/index"
 
 import adminOrderRouteGroup from "./salesOrder/index";
 import adminVendorRouteGroup from "./vendor/index"
@@ -171,15 +172,9 @@ async function adminRoutes(
     fastify.register(adminVendorRouteGroup, {
       prefix: "/vendor",
     });
-    fastify.register(adminTaskRouteGroup, {
-      prefix: "/task",
-    });
-    fastify.register(adminReportsRouteGroup, {
-      prefix: "/reports",
-    });
-    fastify.register(adminPaymentRouteGroup, {
-      prefix: "/payment",
-    });
+    fastify.register(adminInventoryRouteGroup,{
+      prefix: "/inventory"
+    })
   });
 }
 
