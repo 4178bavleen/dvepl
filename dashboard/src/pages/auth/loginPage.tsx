@@ -188,7 +188,7 @@ export function LoginPage() {
             </div>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-5" autoComplet="off">
+          <form onSubmit={handleLogin} className="space-y-5" >
             <div className="space-y-2">
               <label htmlFor="email" className="text-xs font-semibold text-slate-700 block">
                 Email Address
