@@ -658,7 +658,7 @@ export function OrdersPage() {
         });
       }
       setErrors(errs);
-      toast.error("Please complete all required fields before submitting.");
+      toast.error("Please fix form validation errors");
       return;
     }
 

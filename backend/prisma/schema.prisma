@@ -1301,37 +1301,6 @@ model TaskAssignment {
   @@map("task_assignments")
 }
 
-model Task {
-  id             String           @id @default(uuid())
-  title          String
-  description    String?
-  priority       String           @default("medium")
-  dueDate        DateTime
-  status         String           @default("pending")
-  notifEnabled   Boolean          @default(true)
-  notifType      String           @default("automatic")
-  notifDays      Int              @default(1)
-  notifUnit      String           @default("days")
-  notifFrequency String           @default("once")
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  deletedAt      DateTime?
-  assignments    TaskAssignment[]
-
-  @@map("tasks")
-}
-
-model TaskAssignment {
-  id         String   @id @default(uuid())
-  taskId     String
-  employeeId String
-  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  employee   Employee @relation(fields: [employeeId], references: [id])
-
-  @@unique([taskId, employeeId])
-  @@map("task_assignments")
-}
-
 model SalesOrderItem {
   id            String         @id @default(uuid())
   salesOrderId  String
