@@ -145,8 +145,36 @@ export const reportsApi = {
     apiClient.get(`/reports/read/`, { params: { type, fromDate, toDate } }).then(res => res.data)
 };
 
-export const financeApi = {
-  invoices: crud((API_ENDPOINTS as any).finance.invoices),
-  payments: crud((API_ENDPOINTS as any).finance.payments),
-  expenses: crud((API_ENDPOINTS as any).finance.expenses),
+// Finance Payment API (used by Finance Manager pages)
+export const financePaymentApi = {
+  // Fetch all orders with received/balance totals for the main table
+  getOrders: (params?: { search?: string; status?: string; page?: number; limit?: number }) =>
+    apiClient.get("/payment/read/orders", { params }).then(res => res.data),
+
+  // Fetch payment history for a specific sales order
+  getPayments: (salesOrderId: string) =>
+    apiClient.get("/payment/read/", { params: { salesOrderId } }).then(res => res.data),
+
+  // Record a new installment payment
+  createPayment: (data: {
+    salesOrderId: string;
+    amount: number;
+    paymentMethod: string;
+    referenceNo?: string;
+    paymentDate?: string;
+    remarks?: string;
+  }) => apiClient.post("/payment/create/", data).then(res => res.data),
+
+  // Update an existing payment
+  updatePayment: (id: string, data: {
+    amount?: number;
+    paymentMethod?: string;
+    referenceNo?: string;
+    paymentDate?: string;
+    remarks?: string;
+  }) => apiClient.put(`/payment/update/${id}`, data).then(res => res.data),
+
+  // Delete (soft-revert) a payment
+  deletePayment: (id: string) =>
+    apiClient.delete(`/payment/delete/${id}`).then(res => res.data),
 };

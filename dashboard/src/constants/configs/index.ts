@@ -15,5 +15,4 @@ export * from "../../configs/inventory.config";
 export * from "../../configs/production.config";
 export * from "../../configs/qc.config";
 export * from "../../configs/logistics.config";
-export * from "../../configs/finance.config";
 export * from "../../configs/leads.config";
