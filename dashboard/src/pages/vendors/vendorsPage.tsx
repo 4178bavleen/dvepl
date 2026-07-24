@@ -235,11 +235,8 @@ export function VendorsPage() {
     if (vGst.trim() && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(vGst.trim().toUpperCase())) {
       errs.gst = 'Enter a valid 15-character GSTIN (e.g. 22AAAAA0000A1Z5)';
     }
-
-    const cfErrs = validateCustomFields(vendorCustomFields, vCustomFields);
-    const combinedErrs = { ...errs, ...cfErrs };
-    setVErrors(combinedErrs);
-    return Object.keys(combinedErrs).length === 0;
+    setVErrors(errs);
+    return Object.keys(errs).length === 0;
   };
 
   // PO Form Fields
@@ -270,37 +267,28 @@ export function VendorsPage() {
     );
   }, [vendors, search]);
 
-  const ALL_VENDOR_COLUMNS = useMemo(() => {
-    const base = [
-      { id: 'name', label: 'Vendor Name' },
-      { id: 'category', label: 'Category' },
-      { id: 'contactPerson', label: 'Contact Person' },
-      { id: 'phone', label: 'Phone' },
-      { id: 'email', label: 'Email' },
-      { id: 'gstNumber', label: 'GSTIN' },
-      { id: 'revisions', label: 'Revision History' },
-      { id: 'dataEntry', label: 'Data Entry' },
-    ];
-    const cfCols = vendorCustomFields
-      .filter((f) => f.isActive && f.showInTable)
-      .map((f) => ({ id: `cf_${f.key}`, label: f.name }));
-    return [...base, ...cfCols];
-  }, [vendorCustomFields]);
-
   // Column Visibility State
-  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({});
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
+    name: true,
+    category: true,
+    contactPerson: true,
+    phone: true,
+    email: true,
+    gstNumber: true,
+    revisions: true,
+    dataEntry: true,
+  });
 
-  useEffect(() => {
-    setVisibleColumns((prev) => {
-      const next = { ...prev };
-      ALL_VENDOR_COLUMNS.forEach((col) => {
-        if (next[col.id] === undefined) {
-          next[col.id] = true;
-        }
-      });
-      return next;
-    });
-  }, [ALL_VENDOR_COLUMNS]);
+  const ALL_VENDOR_COLUMNS = [
+    { id: 'name', label: 'Vendor Name' },
+    { id: 'category', label: 'Category' },
+    { id: 'contactPerson', label: 'Contact Person' },
+    { id: 'phone', label: 'Phone' },
+    { id: 'email', label: 'Email' },
+    { id: 'gstNumber', label: 'GSTIN' },
+    { id: 'revisions', label: 'Revision History' },
+    { id: 'dataEntry', label: 'Data Entry' },
+  ];
 
   const toggleColumn = (key: string) => {
     setVisibleColumns(prev => ({ ...prev, [key]: !prev[key] }));
@@ -385,11 +373,9 @@ export function VendorsPage() {
     }
   ], [revisions]);
 
-  const activeColumns = useMemo<ColumnDef<Vendor>[]>(() => {
-    const baseCols = allTableColumns.filter(col => visibleColumns[col.id || (col as any).accessorKey]);
-    const cfCols = (vendorTableCustomCols as any[]).filter(col => visibleColumns[col.id]);
-    return [...baseCols, ...cfCols] as ColumnDef<Vendor>[];
-  }, [allTableColumns, visibleColumns, vendorTableCustomCols]);
+  const activeColumns = useMemo(() => {
+    return allTableColumns.filter(col => visibleColumns[col.id || (col as any).accessorKey]);
+  }, [allTableColumns, visibleColumns]);
 
   // Form operations
   const resetVendorForm = () => {
@@ -402,7 +388,6 @@ export function VendorsPage() {
     setVGst('');
     setVAddress('');
     setVNotes('');
-    setVCustomFields({});
     setVErrors({});
     setIsFormOpen(false);
   };
@@ -424,7 +409,7 @@ export function VendorsPage() {
   const handleSaveVendor = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateVendorForm()) {
-      toast.error('Please review highlighted fields and correct required details.');
+      toast.error('Please fix the validation errors before saving');
       return;
     }
 
@@ -1073,21 +1058,6 @@ export function VendorsPage() {
               />
               {vErrors.email && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="size-3" />{vErrors.email}</p>}
             </div>
-            {vendorCustomFields.some(f => f.afterField === 'email') && (
-              <div className="sm:col-span-2">
-                <DynamicFormRenderer
-                  fields={vendorCustomFields}
-                  values={vCustomFields}
-                  onChange={(key, val) => {
-                    setVCustomFields(prev => ({ ...prev, [key]: val }));
-                    if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
-                  }}
-                  errors={vErrors}
-                  afterFieldPosition="email"
-                />
-              </div>
-            )}
-
             <div className="flex flex-col gap-1.5 sm:col-span-2">
               <Label className="text-xs font-semibold">GST Number</Label>
               <Input

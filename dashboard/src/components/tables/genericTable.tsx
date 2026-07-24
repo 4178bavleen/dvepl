@@ -187,6 +187,7 @@ interface GenericTableProps<TData> {
   isLoading?: boolean;
   showColumnVisibility?: boolean;
   freezeActions?: boolean;
+<<<<<<< HEAD
   /**
    * Unique key identifying this table instance (e.g. "organizations", "invoices").
    * When provided, the user's dragged column order is saved to localStorage
@@ -194,6 +195,8 @@ interface GenericTableProps<TData> {
    * Omit to disable persistence (order resets each session).
    */
   storageKey?: string;
+=======
+>>>>>>> 07b0e37 (fix)
 }
 
 export function GenericTable<TData extends { id: string }>({
@@ -206,7 +209,10 @@ export function GenericTable<TData extends { id: string }>({
   isLoading = false,
   showColumnVisibility = true,
   freezeActions = true,
+<<<<<<< HEAD
   storageKey,
+=======
+>>>>>>> 07b0e37 (fix)
 }: GenericTableProps<TData>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
@@ -523,6 +529,7 @@ export function GenericTable<TData extends { id: string }>({
 
       {/* Actual Data Table */}
       <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+<<<<<<< HEAD
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -539,10 +546,28 @@ export function GenericTable<TData extends { id: string }>({
                   <TableRow className="hover:bg-transparent">
                     {headerGroup.headers.map((header) => {
                       const label = header.isPlaceholder
+=======
+        <Table>
+          <TableHeader className="bg-muted/50 border-b border-border">
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id} className="hover:bg-transparent">
+                {headerGroup.headers.map((header) => {
+                  return (
+                    <TableHead
+                      key={header.id}
+                      className={cn(
+                        "text-xs font-semibold py-3.5 px-4 text-muted-foreground whitespace-nowrap",
+                        header.id === "actions" && "text-center",
+                        header.id === "actions" && freezeActions && "sticky right-0 bg-muted border-l border-l-border z-10",
+                      )}
+                    >
+                      {header.isPlaceholder
+>>>>>>> 07b0e37 (fix)
                         ? null
                         : flexRender(
                             header.column.columnDef.header,
                             header.getContext(),
+<<<<<<< HEAD
                           );
 
                       // "select" and "actions" stay exactly as before — not draggable
@@ -645,6 +670,73 @@ export function GenericTable<TData extends { id: string }>({
             </TableBody>
           </Table>
         </DndContext>
+=======
+                          )}
+                    </TableHead>
+                  );
+                })}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              // Skeletons for Loading State
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow
+                  key={i}
+                  className="animate-pulse border-b border-border/50"
+                >
+                  {tableColumns.map((col, colIndex) => (
+                    <TableCell 
+                      key={colIndex} 
+                      className={cn(
+                        "py-4 px-4",
+                        col.id === "actions" && freezeActions && "sticky right-0 bg-card border-l border-l-border z-10"
+                      )}
+                    >
+                      <div className="h-4 bg-muted rounded-md w-full" />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && "selected"}
+                  className="hover:bg-muted/30 border-b border-border/40 transition-colors duration-150"
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell
+                      key={cell.id}
+                      className={cn(
+                        "py-3.5 px-4 text-sm font-normal align-middle",
+                        cell.column.id === "actions" && "text-center",
+                        cell.column.id === "actions" && freezeActions && "sticky right-0 bg-card group-hover/row:bg-muted group-data-[state=selected]/row:bg-muted border-l border-l-border z-10",
+                      )}
+                    >
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext(),
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              // Empty State
+              <TableRow>
+                <TableCell
+                  colSpan={tableColumns.length}
+                  className="h-32 text-center text-muted-foreground text-xs py-8"
+                >
+                  No records found matching your filters.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+>>>>>>> 07b0e37 (fix)
       </div>
 
       {/* Pagination controls */}
