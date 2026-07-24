@@ -59,6 +59,7 @@ async function adminSalesOrderUpdateRoutes(
 
         const {
           companyId,
+          dveplCode,
           status,
 
           orderTakenById,
@@ -195,6 +196,7 @@ console.log("orderTakenById:", orderTakenById);
 
             data: {
               companyId,
+              dveplCode,
 
               status,
 

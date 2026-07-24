@@ -45,6 +45,8 @@ export const createEmployeeSchema = z.object({
         .or(z.literal("")),
 
     status: z.nativeEnum(EmployeeStatus).default(EmployeeStatus.ACTIVE),
+
+    userId: z.string().uuid().optional().nullable(),
 });
 
 export const updateEmployeeSchema = createEmployeeSchema.partial();

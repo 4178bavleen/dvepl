@@ -4,6 +4,7 @@ import fastifyEnv from "@fastify/env";
 import fastifyJwt from "@fastify/jwt";
 import formbody from "@fastify/formbody";
 import path from "path";
+import multipart from "@fastify/multipart";
 
 
 //Logger
@@ -35,6 +36,7 @@ async function buildApp() {
   fastify.register(authPlugin);
   fastify.register(prismaPlugin);
   fastify.register(utilsPlugin);
+  fastify.register(multipart);
 
   fastify.register(fastifyJwt, {
     secret: process.env.JWT_SECRET || "SecretKey",

@@ -57,6 +57,7 @@ export const sidebarItems: SidebarItem[] = [
   { name: 'Shift Management', icon: Clock, path: ROUTES.HRMS_SHIFTS, section: 'HRMS' },
   { name: 'Payroll', icon: DollarSign, path: ROUTES.HRMS_PAYROLL, section: 'HRMS' },
   { name: 'Documents', icon: FileText, path: ROUTES.HRMS_DOCUMENTS, section: 'HRMS' },
+  { name: 'Tasks', icon: CheckSquare, path: ROUTES.HRMS_TASKS, section: 'HRMS' },
 
   // CRM
   { name: 'Customers', icon: Handshake, path: ROUTES.CRM_CUSTOMERS, section: 'CRM' },
@@ -84,6 +85,7 @@ export const sidebarItems: SidebarItem[] = [
   { name: 'Approval Requests', icon: CheckSquare, path: ROUTES.SECURITY_APPROVAL_REQUESTS, section: 'Security' },
 
  
+  { name: 'Reports', icon: FileSpreadsheet, path: ROUTES.REPORTS },
   { name: 'Audit Logs', icon: AuditIcon, path: ROUTES.AUDIT_LOGS },
   { name: 'Settings', icon: Settings2, path: ROUTES.SETTINGS }
 ];
