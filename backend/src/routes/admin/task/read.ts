@@ -50,12 +50,6 @@ async function adminTaskReadRoutes(
           },
         });
 
-        // Attach EAV Custom Field Values
-        const { CustomFieldService } = await import("../../../services/customFieldService");
-        const cfService = new CustomFieldService(fastify.prisma);
-        const entityIds = tasks.map(t => t.id);
-        const cfValuesMap = await cfService.getValuesForEntities("task", entityIds);
-
         // Format assignments to match tasksPage UI interface: { id, name }
         const formattedTasks = tasks.map((t) => ({
           ...t,
@@ -64,7 +58,6 @@ async function adminTaskReadRoutes(
             id: a.employee.user?.id || a.employee.id,
             name: a.employee.user?.name || `${a.employee.firstName} ${a.employee.lastName}`,
           })),
-          customFields: cfValuesMap[t.id] || {}
         }));
 
         return reply.status(200).send({

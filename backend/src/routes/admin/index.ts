@@ -46,7 +46,6 @@ import adminOrderRouteGroup from "./salesOrder/index";
 import adminVendorRouteGroup from "./vendor/index"
 import adminTaskRouteGroup from "./task/index";
 import adminReportsRouteGroup from "./reports/index";
-import adminPaymentRouteGroup from "./payment/index";
 
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 
@@ -172,9 +171,12 @@ async function adminRoutes(
     fastify.register(adminVendorRouteGroup, {
       prefix: "/vendor",
     });
-    fastify.register(adminInventoryRouteGroup,{
-      prefix: "/inventory"
-    })
+    fastify.register(adminTaskRouteGroup, {
+      prefix: "/task",
+    });
+    fastify.register(adminReportsRouteGroup, {
+      prefix: "/reports",
+    });
   });
 }
 
