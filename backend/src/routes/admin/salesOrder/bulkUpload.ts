@@ -68,6 +68,8 @@ async function adminSalesOrderBulkUploadRoutes(
           "delivery month target": "deliveryMonthTarget",
           "po date": "poDate",
           "drawing concerned person": "drawingConcernedPerson",
+          "concerned person": "drawingConcernedPerson",
+          "concerned persons": "drawingConcernedPerson",
           "drawing approved date": "drawingApprovedDate",
           "drawing status": "drawingStatus",
           "drawing remarks": "drawingRemarks",
@@ -79,7 +81,9 @@ async function adminSalesOrderBulkUploadRoutes(
           "item quantity": "itemQuantity",
           "item rate": "itemRate",
           "item gst percentage": "itemGstPercentage",
-          "item remarks": "itemRemarks"
+          "item remarks": "itemRemarks",
+          "order taken by": "orderTakenBy",
+          "assigned to": "assignedTo"
         };
 
         const ordersMap = new Map<string, any>();
@@ -106,13 +110,15 @@ async function adminSalesOrderBulkUploadRoutes(
               orderConfirmDate: row.orderConfirmDate ? String(row.orderConfirmDate) : null,
               deliveryMonthTarget: row.deliveryMonthTarget ? String(row.deliveryMonthTarget) : null,
               poDate: row.poDate ? String(row.poDate) : null,
-              drawingConcernedPerson: row.drawingConcernedPerson ? String(row.drawingConcernedPerson) : null,
+              drawingConcernedPerson: row.drawingConcernedPerson ? String(row.drawingConcernedPerson).trim() : null,
               drawingApprovedDate: row.drawingApprovedDate ? String(row.drawingApprovedDate) : null,
               drawingStatus: String(row.drawingStatus || "PENDING").toUpperCase(),
               drawingRemarks: row.drawingRemarks ? String(row.drawingRemarks) : null,
               inspectionField: row.inspectionField ? String(row.inspectionField) : null,
               remarks: row.remarks ? String(row.remarks) : null,
               sendNotification: row.sendNotification === "true" || row.sendNotification === 1 || row.sendNotification === "1",
+              orderTakenBy: row.orderTakenBy ? String(row.orderTakenBy).trim() : null,
+              assignedTo: row.assignedTo ? String(row.assignedTo).trim() : null,
               items: [],
             });
           }
@@ -200,6 +206,21 @@ async function adminSalesOrderBulkUploadRoutes(
                 }
               }
 
+              let orderTakenById: string | null = null;
+              if (orderData.orderTakenBy) {
+                const user = await tx.user.findFirst({
+                  where: {
+                    OR: [
+                      { name: { equals: orderData.orderTakenBy, mode: "insensitive" } },
+                      { email: { equals: orderData.orderTakenBy, mode: "insensitive" } }
+                    ]
+                  }
+                });
+                if (user) {
+                  orderTakenById = user.id;
+                }
+              }
+
               const salesOrder = await tx.salesOrder.create({
                 data: {
                   companyId,
@@ -219,11 +240,48 @@ async function adminSalesOrderBulkUploadRoutes(
                   sendNotification: orderData.sendNotification,
                   remarks: orderData.remarks ?? null,
                   createdById,
+                  orderTakenById,
                   subtotal: new Prisma.Decimal(subtotal),
                   gstTotal: new Prisma.Decimal(gstTotal),
                   grandTotal: new Prisma.Decimal(grandTotal),
                 },
               });
+
+              if (orderData.assignedTo) {
+                const assignees = String(orderData.assignedTo).split(",").map(s => s.trim()).filter(Boolean);
+                if (assignees.length > 0) {
+                  const employees = await tx.employee.findMany({
+                    where: {
+                      OR: [
+                        { user: { name: { in: assignees, mode: "insensitive" } } },
+                        { user: { email: { in: assignees, mode: "insensitive" } } },
+                        { firstName: { in: assignees, mode: "insensitive" } },
+                        { lastName: { in: assignees, mode: "insensitive" } },
+                        {
+                          contacts: {
+                            some: {
+                              value: { in: assignees, mode: "insensitive" }
+                            }
+                          }
+                        }
+                      ],
+                      deletedAt: null
+                    },
+                    select: { id: true, userId: true }
+                  });
+
+                  if (employees.length > 0) {
+                    await tx.salesOrderAssignment.createMany({
+                      data: employees.map(emp => ({
+                        salesOrderId: salesOrder.id,
+                        employeeId: emp.id,
+                        userId: emp.userId
+                      })),
+                      skipDuplicates: true
+                    });
+                  }
+                }
+              }
 
               if (orderData.items.length > 0) {
                 await tx.salesOrderItem.createMany({

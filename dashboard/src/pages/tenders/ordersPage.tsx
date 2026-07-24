@@ -1748,7 +1748,7 @@ export function OrdersPage() {
           <div className="space-y-6 py-6">
             <p className="text-xs text-muted-foreground">
               Upload an Excel file containing DVEPL code, party name,
-              item details, qty, rate, and GST.
+              order taken by, assigned to, concerned person, item details, quantity, rate, and GST.
             </p>
             
             <div className="flex flex-col gap-2">

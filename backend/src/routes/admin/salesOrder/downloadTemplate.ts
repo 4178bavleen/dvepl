@@ -49,7 +49,9 @@ async function adminSalesOrderDownloadTemplateRoutes(
         "Item Quantity",
         "Item Rate",
         "Item Gst Percentage",
-        "Item Remarks"
+        "Item Remarks",
+        "Order Taken By",
+        "Assigned To"
       ];
 
       // Sample data demonstrating multiple line items under the same DVEPL order code
@@ -76,7 +78,9 @@ async function adminSalesOrderDownloadTemplateRoutes(
           "15",
           "2450.00",
           "18",
-          "Main line valve"
+          "Main line valve",
+          "Admin",
+          "Amit Sharma"
         ],
         [
           companyName,
@@ -100,12 +104,14 @@ async function adminSalesOrderDownloadTemplateRoutes(
           "30",
           "480.00",
           "18",
-          "Connector seals"
+          "Connector seals",
+          "Admin",
+          "Amit Sharma"
         ]
       ];
 
       const worksheet = XLSX.utils.aoa_to_sheet([headers, ...dataRows]);
-      const range = XLSX.utils.decode_range(worksheet["!ref"] || "A1:V3");
+      const range = XLSX.utils.decode_range(worksheet["!ref"] || "A1:X3");
 
       // Style Header Cells (Row 0)
       for (let col = range.s.c; col <= range.e.c; col++) {

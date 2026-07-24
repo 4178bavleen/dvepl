@@ -43,6 +43,8 @@ import adminTechnicalClarificationRouteGroup from "./technicalClarification/inde
 
 import adminOrderRouteGroup from "./salesOrder/index";
 import adminVendorRouteGroup from "./vendor/index"
+import adminTaskRouteGroup from "./task/index";
+import adminReportsRouteGroup from "./reports/index";
 
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 
@@ -161,6 +163,12 @@ async function adminRoutes(
     });
     fastify.register(adminVendorRouteGroup, {
       prefix: "/vendor",
+    });
+    fastify.register(adminTaskRouteGroup, {
+      prefix: "/task",
+    });
+    fastify.register(adminReportsRouteGroup, {
+      prefix: "/reports",
     });
   });
 }

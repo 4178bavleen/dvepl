@@ -97,7 +97,12 @@ export const API_ENDPOINTS = {
       update: (id: string) => `/employee-document/update/${id}`,
       remove: (id: string) => `/employee-document/delete/${id}`
     },
-
+    tasks: {
+      list: "/task/read",
+      create: "/task/create",
+      update: (id: string) => `/task/update/${id}`,
+      remove: (id: string) => `/task/delete/${id}`
+    },
   },
   crm: {
     customers: {
