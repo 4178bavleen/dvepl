@@ -64,6 +64,7 @@ export const ROUTES = {
   INVENTORY_STOCKS: '/inventory/stocks',
   INVENTORY_TRANSFERS: '/inventory/transfers',
   LOGISTICS_DISPATCHES: '/logistics/dispatches',
+  LOGISTICS_DELIVERY: '/logistics/delivery',
 
   // Production Control
   PRODUCTION_PLANS: '/production/plans',
