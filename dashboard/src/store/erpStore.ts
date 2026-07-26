@@ -6,7 +6,7 @@ import {
   CostCenter, User, Role, PermissionGroup, Permission, Employee, 
   Attendance, Leave, Salary, Customer, ContactPerson, CommunicationHistory,
   Tender, TenderRequest, GovernmentDepartment, Section, Division,
-  SubDivision, ReferenceCode, AuditLog, Shift, Holiday
+  SubDivision, ReferenceCode, AuditLog, Shift, Holiday, DeliveryOrder, DeliveryStatus
 } from '../types/erp';
 
 interface ERPStore {
@@ -34,6 +34,7 @@ interface ERPStore {
   auditLogs: AuditLog[];
   shifts: Shift[];
   holidays: Holiday[];
+  deliveryOrders: DeliveryOrder[];
 
   // Session settings
   currentCompanyId: string;
@@ -48,6 +49,8 @@ interface ERPStore {
   setWorkspace: (ws: string) => void;
   toggleTheme: () => void;
   setLanguage: (lang: string) => void;
+  setDeliveryOrders: (orders: DeliveryOrder[]) => void;
+  updateDeliveryOrder: (id: string, payload: Partial<DeliveryOrder>) => void;
 
   // CRUD Actions
   addRecord: (table: string, data: any) => any;
@@ -112,6 +115,7 @@ export const useERPStore = create<ERPStore>((set) => ({
   auditLogs: initialAuditLogs,
   shifts: initialShifts,
   holidays: initialHolidays,
+  deliveryOrders: [],
 
   // Selected states
   currentCompanyId: 'comp-1',
@@ -125,6 +129,13 @@ export const useERPStore = create<ERPStore>((set) => ({
   setWorkspace: (ws) => set({ currentWorkspace: ws }),
   toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
   setLanguage: (lang) => set({ language: lang }),
+  setDeliveryOrders: (orders) => set({ deliveryOrders: orders }),
+  updateDeliveryOrder: (id, payload) =>
+    set((state) => ({
+      deliveryOrders: state.deliveryOrders.map((order) =>
+        order.id === id ? { ...order, ...payload } : order
+      ),
+    })),
 
   addAuditLog: (module, recordId, action, oldValue = null, newValue = null) => {
     const newLog: AuditLog = {

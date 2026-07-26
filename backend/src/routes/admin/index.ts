@@ -49,12 +49,18 @@ import adminPaymentRouteGroup from "./payment/index";
 
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 
+import adminCustomFieldRouteGroup from "./customField/index";
+import recycleBinRoutes from "./recycleBin/index";
+
 async function adminRoutes(
   fastify: FastifyInstance,
   options: FastifyPluginOptions,
 ) {
   // Public routes
   fastify.register(adminAuthRouteGroup, { prefix: "/auth" });
+  fastify.register(adminCustomFieldRouteGroup, { prefix: "/custom-fields" });
+  fastify.register(recycleBinRoutes, { prefix: "/recycle-bin" });
+
 
   fastify.register(async function rolesGroup(instance, opts) {
     //runs automatically before every req

@@ -28,27 +28,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useERPStore } from '@/store/erpStore';
+import { apiClient } from '@/services/axios';
+import { DeliveryOrder, DeliveryStatus } from '@/types/erp';
 
-export interface DeliveryOrder {
-  id: string;
-  companyCode: string;
-  customerName: string;
-  itemName: string;
-  assignedTo: string;
-  deliveryTarget: string;
-  dispatchDate?: string;
-  actualDeliveryDate?: string;
-  deliveryStatus: 'planned' | 'in-progress' | 'dispatched' | 'delivered';
-  orderStatus: string;
-  remarks?: string;
-  targetMonth?: string;
-  history?: Array<{
-    date: string;
-    status: string;
-    remarks?: string;
-    updatedBy?: string;
-  }>;
-}
+export type { DeliveryOrder };
 
 // Clean API service interface structure for easy backend integration later
 export const deliveryApiService = {
@@ -68,6 +51,8 @@ export const deliveryApiService = {
 
 export function DeliveryPage() {
   const store = useERPStore();
+  const setDeliveryOrdersInStore = useERPStore((s) => s.setDeliveryOrders);
+  const updateDeliveryOrderInStore = useERPStore((s) => s.updateDeliveryOrder);
   const [activeView, setActiveView] = useState<'table' | 'calendar' | 'timeline'>('table');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -88,45 +73,77 @@ export function DeliveryPage() {
   const [selectedOrder, setSelectedOrder] = useState<DeliveryOrder | null>(null);
 
   // Form State
-  const [editStatus, setEditStatus] = useState<DeliveryOrder['deliveryStatus']>('planned');
+  const [editStatus, setEditStatus] = useState<DeliveryStatus>(DeliveryStatus.PLANNED);
   const [editDispatchDate, setEditDispatchDate] = useState('');
   const [editTargetMonth, setEditTargetMonth] = useState('');
   const [editActualDate, setEditActualDate] = useState('');
   const [editRemarks, setEditRemarks] = useState('');
 
-  // Map ERP sales orders to Delivery Orders format
+  // Fetch real Sales Orders from Backend API
+  const [salesOrders, setSalesOrders] = useState<any[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+
+  const fetchOrders = async () => {
+    setLoadingOrders(true);
+    try {
+      const res = await apiClient.get('/order/read');
+      const list = Array.isArray(res.data?.data) ? res.data.data : Array.isArray(res.data) ? res.data : [];
+      setSalesOrders(list);
+    } catch (err: any) {
+      console.error('Failed to load orders for delivery page', err);
+    } finally {
+      setLoadingOrders(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
+  // Map backend sales orders to Delivery Orders format and store in Zustand store
   const deliveryOrders: DeliveryOrder[] = useMemo(() => {
-    const ordersList = (store as any).salesOrders;
-    if (ordersList && ordersList.length > 0) {
-      return ordersList.map((so: any, index: number) => {
-        const targetDate = so.deliveryTarget || so.deliveryDate || '2026-06-30';
-        const mappedStatus: DeliveryOrder['deliveryStatus'] =
-          so.status === 'DELIVERED'
-            ? 'delivered'
-            : so.status === 'DISPATCHED'
-            ? 'dispatched'
-            : so.status === 'IN_PROGRESS'
-            ? 'in-progress'
-            : 'planned';
+    if (salesOrders && salesOrders.length > 0) {
+      return salesOrders.map((so: any, index: number): DeliveryOrder => {
+        // Target Delivery Date set from Order page (deliveryMonthTarget / deliveryTarget)
+        const rawTargetDate = so.deliveryMonthTarget || so.deliveryTarget || '';
+        const rawConfirmDate = so.orderConfirmDate ? (typeof so.orderConfirmDate === 'string' && so.orderConfirmDate.includes('T') ? so.orderConfirmDate.split('T')[0] : so.orderConfirmDate) : '';
+        const rawPoDate = so.poDate ? (typeof so.poDate === 'string' && so.poDate.includes('T') ? so.poDate.split('T')[0] : so.poDate) : '';
+
+        // Delivery Target Priority: Order Target Delivery Date > PO Date > Confirm Date
+        const deliveryTarget = rawTargetDate || rawPoDate || rawConfirmDate || '';
+
+        const itemsText = Array.isArray(so.items) && so.items.length > 0
+          ? so.items.map((i: any) => `${i.description || i.itemCode || 'Item'} (x${i.quantity || 1})`).join(', ')
+          : so.partyName ? `Order for ${so.partyName}` : 'Industrial Equipment & Panel Assemblies';
+
+        let mappedStatus: DeliveryStatus = DeliveryStatus.PLANNED;
+        const s = (so.status || '').toLowerCase();
+        if (s === 'completed' || s === 'delivered') {
+          mappedStatus = DeliveryStatus.DELIVERED;
+        } else if (s === 'dispatched' || s === 'shipped') {
+          mappedStatus = DeliveryStatus.DISPATCHED;
+        } else if (s === 'in-progress' || s === 'in_progress' || s === 'processing') {
+          mappedStatus = DeliveryStatus.IN_PROGRESS;
+        }
 
         return {
-          id: so.id || `DEL-${1000 + index}`,
-          companyCode: so.companyCode || so.orderNo || `DVEPL/26-27/${100 + index}`,
-          customerName: so.customerName || so.customer?.name || 'Standard Client',
-          itemName: so.items || so.remarks || 'Industrial Equipment & Panel Assemblies',
-          assignedTo: so.assignedTo || so.createdByName || 'Unassigned',
-          deliveryTarget: targetDate,
-          dispatchDate: so.dispatchDate || '',
-          actualDeliveryDate: so.actualDeliveryDate || '',
+          id: so.id,
+          companyCode: so.dveplCode || so.companyCode || `DVEPL/26-27/${100 + index}`,
+          customerName: so.partyName || so.customerName || so.company?.name || 'Standard Client',
+          itemName: itemsText,
+          assignedTo: so.orderTakenBy?.name || so.assignedTo || 'Unassigned',
+          deliveryTarget: deliveryTarget,
+          dispatchDate: rawPoDate || '',
+          actualDeliveryDate: rawConfirmDate || '',
           deliveryStatus: mappedStatus,
-          orderStatus: so.status || 'Active',
+          orderStatus: so.status || 'Pending',
           remarks: so.remarks || '',
-          targetMonth: so.targetMonth || 'June 2026',
+          targetMonth: so.deliveryMonthTarget || 'August 2026',
           history: so.history || [
             {
               date: new Date().toISOString().split('T')[0],
               status: mappedStatus.toUpperCase(),
-              remarks: 'Order scheduled for delivery pipeline.',
+              remarks: 'Order scheduled in delivery pipeline.',
               updatedBy: 'System',
             },
           ],
@@ -134,61 +151,14 @@ export function DeliveryPage() {
       });
     }
 
-    // Default mock data when store is empty
-    return [
-      {
-        id: 'DEL-101',
-        companyCode: 'DVEPL/26-27/0101',
-        customerName: 'Reliance Industries Ltd',
-        itemName: '11KV HT Control Panel',
-        assignedTo: 'Rajesh Kumar',
-        deliveryTarget: '2026-06-15',
-        dispatchDate: '2026-06-12',
-        deliveryStatus: 'dispatched',
-        orderStatus: 'Approved',
-        targetMonth: 'June 2026',
-        history: [{ date: '2026-06-12', status: 'DISPATCHED', remarks: 'Dispatched via Transporter LR #45821', updatedBy: 'Rajesh' }],
-      },
-      {
-        id: 'DEL-102',
-        companyCode: 'DVEPL/26-27/0102',
-        customerName: 'Tata Steel Corp',
-        itemName: 'LT Switchgear Board',
-        assignedTo: 'Amit Sharma',
-        deliveryTarget: '2026-06-25',
-        deliveryStatus: 'in-progress',
-        orderStatus: 'Production',
-        targetMonth: 'June 2026',
-        history: [{ date: '2026-06-01', status: 'IN_PROGRESS', remarks: 'Wiring assembly under testing phase.', updatedBy: 'Amit' }],
-      },
-      {
-        id: 'DEL-103',
-        companyCode: 'DVEPL/26-27/0103',
-        customerName: 'L&T Construction',
-        itemName: '33KV Substation Feeder',
-        assignedTo: 'Priya Patel',
-        deliveryTarget: '2026-05-30',
-        deliveryStatus: 'planned',
-        orderStatus: 'Delayed',
-        targetMonth: 'May 2026',
-        history: [{ date: '2026-05-15', status: 'PLANNED', remarks: 'Material procurement pending.', updatedBy: 'Priya' }],
-      },
-      {
-        id: 'DEL-104',
-        companyCode: 'DVEPL/26-27/0104',
-        customerName: 'Adani Power Systems',
-        itemName: 'PLC Automation Panel',
-        assignedTo: 'Vikram Singh',
-        deliveryTarget: '2026-06-10',
-        dispatchDate: '2026-06-08',
-        actualDeliveryDate: '2026-06-10',
-        deliveryStatus: 'delivered',
-        orderStatus: 'Completed',
-        targetMonth: 'June 2026',
-        history: [{ date: '2026-06-10', status: 'DELIVERED', remarks: 'Received at site with signed POD.', updatedBy: 'Vikram' }],
-      },
-    ];
-  }, [(store as any).salesOrders]);
+    return store.deliveryOrders || [];
+  }, [salesOrders]);
+
+  useEffect(() => {
+    if (salesOrders && salesOrders.length > 0) {
+      setDeliveryOrdersInStore(deliveryOrders);
+    }
+  }, [salesOrders]);
 
   // Unique Months and Users for filters
   const uniqueMonths = useMemo(() => {
@@ -207,13 +177,79 @@ export function DeliveryPage() {
     return Array.from(set);
   }, [deliveryOrders]);
 
-  // Helper for Days Left
-  const calculateDaysLeft = (targetDateStr: string, status: string) => {
+  // Helper for Days Left calculation with robust multi-format date parsing
+  const calculateDaysLeft = (targetDateStr: string, status: string, actualDeliveryDateStr?: string, dispatchDateStr?: string) => {
     if (status === 'delivered') return { text: 'Delivered', color: 'text-emerald-600 bg-emerald-50 border-emerald-200' };
-    const target = new Date(targetDateStr);
+    
+    // Prioritize specific exact dates (Actual Delivery Date or Dispatch Date or Target Date)
+    // Avoid evaluating month-only strings (e.g. "july 2026") when an exact YYYY-MM-DD date is available
+    const isExactDate = (str?: string) => str && (str.includes('-') || str.includes('/')) && /\d{4}/.test(str) && !/^[a-zA-Z]+\s+\d{4}$/.test(str.trim());
+
+    let dateToEvaluate = '';
+    if (isExactDate(actualDeliveryDateStr)) {
+      dateToEvaluate = actualDeliveryDateStr!;
+    } else if (isExactDate(dispatchDateStr)) {
+      dateToEvaluate = dispatchDateStr!;
+    } else if (isExactDate(targetDateStr)) {
+      dateToEvaluate = targetDateStr!;
+    } else {
+      dateToEvaluate = targetDateStr || dispatchDateStr || actualDeliveryDateStr || '';
+    }
+
+    if (!dateToEvaluate) return { text: 'No Date Set', color: 'text-slate-500 bg-slate-100 border-slate-200' };
+
+    const parseFlexibleDate = (input: string): Date | null => {
+      if (!input) return null;
+      const str = input.trim();
+
+      // Format: YYYY-MM-DD or YYYY/MM/DD (e.g. 2026-07-29)
+      const yyyymmddMatch = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+      if (yyyymmddMatch) {
+        const year = parseInt(yyyymmddMatch[1], 10);
+        const month = parseInt(yyyymmddMatch[2], 10) - 1;
+        const day = parseInt(yyyymmddMatch[3], 10);
+        return new Date(year, month, day);
+      }
+
+      // Format: DD-MM-YYYY or DD/MM/YYYY (e.g. 29-07-2026 or 29/07/2026)
+      const ddmmyyyyMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+      if (ddmmyyyyMatch) {
+        const day = parseInt(ddmmyyyyMatch[1], 10);
+        const month = parseInt(ddmmyyyyMatch[2], 10) - 1;
+        const year = parseInt(ddmmyyyyMatch[3], 10);
+        return new Date(year, month, day);
+      }
+
+      // Try native parse (ISO strings)
+      const nativeDate = new Date(str);
+      if (!isNaN(nativeDate.getTime())) {
+        return nativeDate;
+      }
+
+      // Format: Month Year (e.g. "August 2026" or "july 2026") -> Defaults to 1st of Month
+      const monthYearParts = str.split(/\s+/);
+      if (monthYearParts.length === 2) {
+        const parsedMonthYear = new Date(`1 ${monthYearParts[0]} ${monthYearParts[1]}`);
+        if (!isNaN(parsedMonthYear.getTime())) {
+          return parsedMonthYear;
+        }
+      }
+
+      return null;
+    };
+
+    const target = parseFlexibleDate(dateToEvaluate);
+
+    if (!target || isNaN(target.getTime())) {
+      return { text: 'Target Pending', color: 'text-slate-500 bg-slate-100 border-slate-200' };
+    }
+
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    target.setHours(0, 0, 0, 0);
+
     const diffTime = target.getTime() - today.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
     if (diffDays < 0) {
       return { text: `${Math.abs(diffDays)}d Overdue`, color: 'text-rose-600 bg-rose-50 border-rose-200 font-bold' };
@@ -295,10 +331,38 @@ export function DeliveryPage() {
     setDetailModalOpen(true);
   };
 
-  const handleSaveDelivery = () => {
+  const handleSaveDelivery = async () => {
     if (!selectedOrder) return;
-    toast.success(`Delivery for ${selectedOrder.companyCode} updated successfully`);
-    setUpdateModalOpen(false);
+    try {
+      const backendStatusMap: Record<string, string> = {
+        'planned': 'PENDING',
+        'in-progress': 'IN_PROGRESS',
+        'dispatched': 'DISPATCHED',
+        'delivered': 'COMPLETED'
+      };
+
+      await apiClient.patch(`/order/update/${selectedOrder.id}`, {
+        status: backendStatusMap[editStatus] || 'PENDING',
+        deliveryMonthTarget: editTargetMonth || undefined,
+        poDate: editDispatchDate || undefined,
+        orderConfirmDate: editActualDate || undefined,
+        remarks: editRemarks || undefined
+      });
+
+      updateDeliveryOrderInStore(selectedOrder.id, {
+        deliveryStatus: editStatus,
+        targetMonth: editTargetMonth || selectedOrder.targetMonth,
+        dispatchDate: editDispatchDate || selectedOrder.dispatchDate,
+        actualDeliveryDate: editActualDate || selectedOrder.actualDeliveryDate,
+        remarks: editRemarks || selectedOrder.remarks,
+      });
+
+      toast.success(`Delivery for ${selectedOrder.companyCode} updated successfully`);
+      setUpdateModalOpen(false);
+      fetchOrders();
+    } catch (err: any) {
+      toast.error('Failed to update delivery status');
+    }
   };
 
   const renderStatusBadge = (status: DeliveryOrder['deliveryStatus']) => {
@@ -490,6 +554,7 @@ export function DeliveryPage() {
                   <th className="py-3.5 px-3">ASSIGNED TO</th>
                   <th className="py-3.5 px-3">DELIVERY TARGET</th>
                   <th className="py-3.5 px-3">DISPATCH DATE</th>
+                  <th className="py-3.5 px-3">DELIVERY DATE</th>
                   <th className="py-3.5 px-3">DELIVERY STATUS</th>
                   <th className="py-3.5 px-3">ORDER STATUS</th>
                   <th className="py-3.5 px-3">DAYS LEFT</th>
@@ -499,13 +564,13 @@ export function DeliveryPage() {
               <tbody className="divide-y divide-slate-100">
                 {paginatedOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="py-10 text-center text-slate-400">
+                    <td colSpan={12} className="py-10 text-center text-slate-400">
                       No delivery orders found.
                     </td>
                   </tr>
                 ) : (
                   paginatedOrders.map((order, idx) => {
-                    const daysLeft = calculateDaysLeft(order.deliveryTarget, order.deliveryStatus);
+                    const daysLeft = calculateDaysLeft(order.deliveryTarget, order.deliveryStatus, order.actualDeliveryDate, order.dispatchDate);
                     return (
                       <tr key={order.id} className="hover:bg-slate-50/90 transition-all duration-150">
                         <td className="py-3.5 px-3 text-center text-slate-400 font-mono text-[11px]">{(currentPage - 1) * rowsPerPage + idx + 1}</td>
@@ -517,6 +582,7 @@ export function DeliveryPage() {
                         <td className="py-3.5 px-3 text-slate-600 font-medium">{order.assignedTo}</td>
                         <td className="py-3.5 px-3 text-slate-800 font-semibold">{order.deliveryTarget}</td>
                         <td className="py-3.5 px-3 text-slate-500 font-mono text-[11px]">{order.dispatchDate || '—'}</td>
+                        <td className="py-3.5 px-3 text-slate-800 font-mono font-semibold text-[11px]">{order.actualDeliveryDate || '—'}</td>
                         <td className="py-3.5 px-3">{renderStatusBadge(order.deliveryStatus)}</td>
                         <td className="py-3.5 px-3">
                           <span className="inline-block px-2.5 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-[11px]">

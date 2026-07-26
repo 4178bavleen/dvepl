@@ -125,14 +125,25 @@ async function adminSalesOrderReadRoutes(
             },
           });
 
+        // ==========================
+        // Attach Custom Field Values
+        // ==========================
+        const { CustomFieldService } = await import("../../../services/customFieldService");
+        const cfService = new CustomFieldService(fastify.prisma);
+        const entityIds = salesOrders.map(o => o.id);
+        const cfValuesMap = await cfService.getValuesForEntities("order", entityIds);
+
+        const salesOrdersWithCF = salesOrders.map(o => ({
+          ...o,
+          customFields: cfValuesMap[o.id] || {}
+        }));
+
         adminLogs.info("Sales Orders fetched successfully");
 
         return reply.send({
           success: true,
           message: "Sales Orders fetched successfully.",
-
-          data: salesOrders,
-
+          data: salesOrdersWithCF,
           pagination: {
             page: pageNumber,
             limit: pageSize,

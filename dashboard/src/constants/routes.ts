@@ -79,5 +79,7 @@ export const ROUTES = {
   AUDIT_LOGS: '/audit-logs',
   REPORTS: '/reports',
   SETTINGS: '/settings',
+  CUSTOM_FIELDS: '/settings/custom-fields',
+  RECYCLE_BIN: '/settings/recycle-bin',
   SETTINGS_APPROVAL_RULES: '/settings/approval-rules',
 };

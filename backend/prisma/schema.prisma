@@ -2795,3 +2795,69 @@ enum Priority {
   HIGH
   CRITICAL
 }
+
+model CustomField {
+  id           String              @id @default(uuid())
+  module       String              // 'vendor', 'order', 'task', etc.
+  name         String              // Field Name / Label (e.g. 'Inspection Date')
+  key          String              // Unique Field Key (e.g. 'inspectionDate')
+  type         String              // text, textarea, number, decimal, email, phone, url, date, datetime, time, checkbox, switch, dropdown, multiselect, radio, file, image
+  required     Boolean             @default(false)
+  defaultValue String?
+  placeholder  String?
+  helpText     String?
+  displayOrder Int                 @default(0)
+  showInForm   Boolean             @default(true)
+  showInTable  Boolean             @default(true)
+  isActive     Boolean             @default(true)
+  afterField   String?             // For placement ordering relative to built-in fields
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  deletedAt    DateTime?
+
+  options      CustomFieldOption[]
+  values       CustomFieldValue[]
+
+  @@unique([module, key])
+  @@index([module, isActive, displayOrder])
+  @@map("custom_fields")
+}
+
+model CustomFieldOption {
+  id            String      @id @default(uuid())
+  customFieldId String
+  label         String
+  value         String
+  displayOrder  Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  customField   CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+
+  @@index([customFieldId, displayOrder])
+  @@map("custom_field_options")
+}
+
+model CustomFieldValue {
+  id            String      @id @default(uuid())
+  customFieldId String
+  entityId      String      // Foreign record ID (Vendor ID, Order ID, Task ID)
+  
+  // Typed storage columns for EAV
+  stringValue   String?
+  textValue     String?     @db.Text
+  numberValue   Decimal?    @db.Decimal(18, 4)
+  booleanValue  Boolean?
+  dateValue     DateTime?
+  jsonValue     String?     // For multi-select array strings or complex metadata if needed
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  customField   CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+
+  @@unique([customFieldId, entityId])
+  @@index([entityId])
+  @@index([customFieldId])
+  @@map("custom_field_values")
+}
+
