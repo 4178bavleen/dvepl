@@ -64,6 +64,7 @@ export const sidebarItems: SidebarItem[] = [
   { name: 'Contact Persons', icon: Contact, path: ROUTES.CRM_CONTACTS, section: 'CRM' },
   { name: 'Communication History', icon: MessageSquare, path: ROUTES.CRM_COMMUNICATION, section: 'CRM' },
   { name: 'Orders', icon: ShoppingCart, path: ROUTES.TENDER_ORDERS, section: 'CRM' },
+  { name: 'Delivery', icon: Truck, path: ROUTES.LOGISTICS_DELIVERY, section: 'CRM' },
   { name: 'Vendors', icon: Truck, path: ROUTES.PURCHASE_VENDORS, section: 'CRM' },
   { name: 'Inventory', icon: Package, path: ROUTES.INVENTORY_STOCKS, section: 'CRM' },
 

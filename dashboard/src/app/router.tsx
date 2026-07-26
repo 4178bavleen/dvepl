@@ -91,6 +91,7 @@ const InspectionsPage = lazy(() => import('@/pages/qc/inspectionsPage'));
 const PaymentsPage = lazy(() => import('@/pages/finance/paymentsPage'));
 const PaymentHistoryPage = lazy(() => import('@/pages/finance/paymentHistoryPage'));
 const NotificationsPage = lazy(() => import('@/pages/notifications/notificationsPage'));
+const DeliveryPage = lazy(() => import('@/pages/delivery/deliveryPage'));
 
 
 
@@ -166,6 +167,7 @@ export function AppRouter() {
               <Route path="/inventory/stocks" element={<InventoryStocksPage />} />
               <Route path="/inventory/transfers" element={<StockTransfersPage />} />
               <Route path="/logistics/dispatches" element={<LogisticsDispatchesPage />} />
+              <Route path="/logistics/delivery" element={<DeliveryPage />} />
 
               {/* Production */}
               <Route path="/production/plans" element={<ProductionPlansPage />} />
