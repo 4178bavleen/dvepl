@@ -21,6 +21,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useERPStore } from '@/store/erpStore';
 import { toast } from 'react-hot-toast';
 import type { ResourceApi } from '@/services/organization';
+import { ConfirmDialog } from '@/components/shared/confirmDialog';
 
 type FieldType = 'text' | 'number' | 'date' | 'textarea' | 'select' | 'checkbox';
 
@@ -403,6 +404,8 @@ export function GenericCrudPage<TRecord extends { id: string }>({
   const [isLoading, setIsLoading] = useState(Boolean(api));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [optionValues, setOptionValues] = useState<Record<string, CrudField['options']>>({});
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [recordToDelete, setRecordToDelete] = useState<TRecord | null>(null);
   const records = api ? remoteRecords : localRecords;
 
   const loadRecords = useCallback(async () => {
@@ -595,18 +598,9 @@ export function GenericCrudPage<TRecord extends { id: string }>({
         data={filteredRecords}
         onView={setViewingRecord}
         onEdit={!readOnly && (!api || api.update) ? openEdit : undefined}
-        onDelete={api && !api.remove ? undefined : async (record) => {
-          if (!window.confirm(`Delete this ${moduleName.toLowerCase()}?`)) return;
-          setIsLoading(true);
-          try {
-            if (api?.remove) { await api.remove(record.id); await loadRecords(); }
-            else deleteRecord(tableName, record.id);
-            toast.success(`${moduleName} deleted successfully.`);
-          } catch (error: any) { 
-            toast.error(error.response?.data?.message ?? `Unable to delete ${moduleName.toLowerCase()}.`); 
-          } finally {
-            setIsLoading(false);
-          }
+        onDelete={api && !api.remove ? undefined : (record) => {
+          setRecordToDelete(record);
+          setDeleteConfirmOpen(true);
         }}
         isLoading={isLoading}
         freezeActions={freezeActions}
@@ -724,6 +718,28 @@ export function GenericCrudPage<TRecord extends { id: string }>({
           )}
         </SheetContent>
       </Sheet>
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title={`Move ${moduleName} to Recycle Bin?`}
+        description={`This ${moduleName.toLowerCase()} will be moved to the Recycle Bin. You can restore it anytime from Settings → Recycle Bin.`}
+        confirmText="Move to Bin"
+        onConfirm={async () => {
+          if (!recordToDelete) return;
+          setIsLoading(true);
+          try {
+            if (api?.remove) { await api.remove(recordToDelete.id); await loadRecords(); }
+            else deleteRecord(tableName, recordToDelete.id);
+            toast.success(`${moduleName} deleted successfully.`);
+          } catch (error: any) {
+            toast.error(error.response?.data?.message ?? `Unable to delete ${moduleName.toLowerCase()}.`);
+          } finally {
+            setIsLoading(false);
+            setRecordToDelete(null);
+          }
+        }}
+      />
     </div>
   );
 }

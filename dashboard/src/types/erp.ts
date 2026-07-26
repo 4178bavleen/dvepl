@@ -79,6 +79,36 @@ export enum OtpPurpose {
   PHONE_VERIFICATION = 'PHONE_VERIFICATION',
   PASSWORD_RESET = 'PASSWORD_RESET'
 }
+export enum DeliveryStatus {
+  PLANNED = 'planned',
+  IN_PROGRESS = 'in-progress',
+  DISPATCHED = 'dispatched',
+  DELIVERED = 'delivered'
+}
+
+export interface DeliveryHistoryItem {
+  date: string;
+  status: string;
+  remarks?: string;
+  updatedBy?: string;
+}
+
+export interface DeliveryOrder {
+  id: string;
+  companyCode: string;
+  customerName: string;
+  itemName: string;
+  assignedTo: string;
+  deliveryTarget: string;
+  dispatchDate?: string;
+  actualDeliveryDate?: string;
+  deliveryStatus: DeliveryStatus;
+  orderStatus: string;
+  remarks?: string;
+  targetMonth?: string;
+  history?: DeliveryHistoryItem[];
+}
+
 export enum LeadStatus {
   NEW = "NEW",
   CONTACTED = "CONTACTED",

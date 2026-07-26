@@ -23,6 +23,7 @@ import { toast } from "react-hot-toast";
 import { financePaymentApi } from "@/services/modules";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { ConfirmDialog } from "@/components/shared/confirmDialog";
 
 interface PaymentEntry {
   id: string;
@@ -296,14 +297,21 @@ export default function PaymentHistoryPage() {
   };
 
   // Revert/Delete Payment via API
-  const handleDeletePayment = async (entryId: string) => {
-    if (!window.confirm("Are you sure you want to permanently revert this payment receipt?")) return;
+  const [revertConfirmOpen, setRevertConfirmOpen] = useState(false);
+  const [paymentToRevert, setPaymentToRevert] = useState<string | null>(null);
 
+  const handleDeletePayment = (entryId: string) => {
+    setPaymentToRevert(entryId);
+    setRevertConfirmOpen(true);
+  };
+
+  const confirmRevertPayment = async () => {
+    if (!paymentToRevert) return;
     setIsSaving(true);
     try {
-      const res = await financePaymentApi.deletePayment(entryId);
+      const res = await financePaymentApi.deletePayment(paymentToRevert);
       if (res?.success) {
-        toast.success("Payment receipt reverted.");
+        toast.success("Payment receipt reverted successfully.");
         await loadData();
       } else {
         toast.error(res?.message || "Failed to revert payment.");
@@ -312,6 +320,7 @@ export default function PaymentHistoryPage() {
       toast.error(err?.response?.data?.message || "Error reverting payment.");
     } finally {
       setIsSaving(false);
+      setPaymentToRevert(null);
     }
   };
 
@@ -334,6 +343,7 @@ export default function PaymentHistoryPage() {
   const isFullyPaid = orderInfo.balance === 0;
 
   return (
+    <>
     <div className="flex-1 flex flex-col p-6 space-y-6 bg-background overflow-y-auto">
       {/* Back Header */}
       <div className="flex items-center gap-4 border-b pb-4">
@@ -723,5 +733,16 @@ export default function PaymentHistoryPage() {
         </div>
       )}
     </div>
+
+      <ConfirmDialog
+        open={revertConfirmOpen}
+        onOpenChange={setRevertConfirmOpen}
+        title="Revert Payment Receipt"
+        description="This payment record will be reverted and removed from the payment history. The order balance will be recalculated."
+        confirmText="Revert Payment"
+        variant="warning"
+        onConfirm={confirmRevertPayment}
+      />
+    </>
   );
 }

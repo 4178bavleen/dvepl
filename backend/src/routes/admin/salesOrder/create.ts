@@ -285,6 +285,13 @@ async function adminSalesOrderCreateRoutes(
               data: assignments,
             });
           }
+          // Save EAV Custom Field Values if provided
+          if ((request.body as any)?.customFields) {
+            const { CustomFieldService } = await import("../../../services/customFieldService");
+            const cfService = new CustomFieldService(tx as any);
+            await cfService.saveValues("order", salesOrder.id, (request.body as any).customFields);
+          }
+
           return salesOrder;
         });
         const createdOrder = await fastify.prisma.salesOrder.findUnique({

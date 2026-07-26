@@ -64,6 +64,8 @@ const ApprovalRequestsPage = lazy(() => import('@/pages/roles/approvalRequestsPa
 const AuditLogsPage = lazy(() => import('@/pages/audit/auditLogsPage'));
 
 const SettingsPage = lazy(() => import('@/pages/settings/settingsPage'));
+const CustomFieldsPage = lazy(() => import('@/pages/settings/customFieldsPage'));
+const RecycleBinPage = lazy(() => import('@/pages/settings/recycleBinPage'));
 const ProfilePage = lazy(() => import('@/pages/profile/profilePage'));
 
 // Materials & Master Catalog
@@ -184,6 +186,8 @@ export function AppRouter() {
               <Route path="/reports" element={<ReportsPage />} />
               {/* Settings */}
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/settings/custom-fields" element={<CustomFieldsPage />} />
+              <Route path="/settings/recycle-bin" element={<RecycleBinPage />} />
               <Route path="/settings/profile" element={<ProfilePage />} />
               <Route path="/settings/notifications" element={<NotificationsPage />} />
             </Route>

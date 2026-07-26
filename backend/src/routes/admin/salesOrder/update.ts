@@ -40,7 +40,7 @@ async function adminSalesOrderUpdateRoutes(
         // Validate Body
         // ==========================
 
-        const validationResult = salesOrderSchema.safeParse(request.body);
+        const validationResult = salesOrderSchema.partial().safeParse(request.body);
 
         if (!validationResult.success) {
           adminLogs.error("Invalid Sales Order update data", {
@@ -104,26 +104,27 @@ async function adminSalesOrderUpdateRoutes(
         }
 
         // ==========================
-        // Company Validation
+        // Company Validation (If provided)
         // ==========================
 
-        const company = await fastify.prisma.company.findUnique({
-          where: {
-            id: companyId,
-          },
-        });
-
-        if (!company) {
-          return reply.status(404).send({
-            success: false,
-            message: "Company not found.",
+        if (companyId) {
+          const company = await fastify.prisma.company.findUnique({
+            where: {
+              id: companyId,
+            },
           });
+
+          if (!company) {
+            return reply.status(404).send({
+              success: false,
+              message: "Company not found.",
+            });
+          }
         }
 
         // ==========================
         // Order Taken By Validation
         // ==========================
-console.log("orderTakenById:", orderTakenById);
         if (orderTakenById) {
           const user = await fastify.prisma.user.findUnique({
             where: {
@@ -138,6 +139,7 @@ console.log("orderTakenById:", orderTakenById);
             });
           }
         } 
+
         // ==========================
         // Assigned Users Validation
         // ==========================
@@ -162,23 +164,26 @@ console.log("orderTakenById:", orderTakenById);
         }
 
         // ==========================
-        // Calculate Totals
+        // Calculate Totals (If items provided)
         // ==========================
 
-        let subtotal = 0;
-        let gstTotal = 0;
+        let subtotal: number | undefined;
+        let gstTotal: number | undefined;
+        let grandTotal: number | undefined;
 
-        for (const item of items) {
-          const itemAmount = Number(item.quantity) * Number(item.rate);
+        if (items && items.length > 0) {
+          subtotal = 0;
+          gstTotal = 0;
 
-          const itemGST = (itemAmount * Number(item.gstPercentage)) / 100;
+          for (const item of items) {
+            const itemAmount = Number(item.quantity) * Number(item.rate);
+            const itemGST = (itemAmount * Number(item.gstPercentage)) / 100;
+            subtotal += itemAmount;
+            gstTotal += itemGST;
+          }
 
-          subtotal += itemAmount;
-
-          gstTotal += itemGST;
+          grandTotal = subtotal + gstTotal;
         }
-
-        const grandTotal = subtotal + gstTotal;
 
         // ==========================
         // Update Transaction
@@ -189,80 +194,61 @@ console.log("orderTakenById:", orderTakenById);
           // Update Sales Order
           // ==========================
 
+          const updateData: any = {};
+          if (companyId !== undefined) updateData.companyId = companyId;
+          if (dveplCode !== undefined) updateData.dveplCode = dveplCode;
+          if (status !== undefined) updateData.status = status;
+          if (orderTakenById !== undefined) updateData.orderTakenById = orderTakenById;
+          if (assignedToIds !== undefined) updateData.assignedToIds = assignedToId;
+          if (partyName !== undefined) updateData.partyName = partyName;
+          if (caNo !== undefined) updateData.caNo = caNo;
+          if (contactDetails !== undefined) updateData.contactDetails = contactDetails;
+          if (orderConfirmDate !== undefined) updateData.orderConfirmDate = orderConfirmDate ? new Date(orderConfirmDate) : null;
+          if (deliveryMonthTarget !== undefined) updateData.deliveryMonthTarget = deliveryMonthTarget;
+          if (poDate !== undefined) updateData.poDate = poDate ? new Date(poDate) : null;
+          if (drawingConcernedPerson !== undefined) updateData.drawingConcernedPerson = drawingConcernedPerson;
+          if (drawingApprovedDate !== undefined) updateData.drawingApprovedDate = drawingApprovedDate ? new Date(drawingApprovedDate) : null;
+          if (drawingStatus !== undefined) {
+            updateData.drawingStatus = drawingStatus === "APPROVED"
+              ? "COMPLETED"
+              : drawingStatus === "REJECTED"
+              ? "ON_HOLD"
+              : drawingStatus;
+          }
+          if (drawingRemarks !== undefined) updateData.drawingRemarks = drawingRemarks;
+          if (subtotal !== undefined) updateData.subtotal = new Prisma.Decimal(subtotal);
+          if (gstTotal !== undefined) updateData.gstTotal = new Prisma.Decimal(gstTotal);
+          if (grandTotal !== undefined) updateData.grandTotal = new Prisma.Decimal(grandTotal);
+          if (inspectionField !== undefined) updateData.inspectionField = inspectionField;
+          if (sendNotification !== undefined) updateData.sendNotification = sendNotification;
+          if (remarks !== undefined) updateData.remarks = remarks;
+
           const updatedOrder = await tx.salesOrder.update({
             where: {
               id,
             },
-
-            data: {
-              companyId,
-              dveplCode,
-
-              status,
-
-              orderTakenById: orderTakenById ?? null,
-              assignedToIds: assignedToId,
-
-              partyName,
-
-              caNo: caNo ?? null,
-
-              contactDetails: contactDetails ?? null,
-
-              orderConfirmDate: orderConfirmDate
-                ? new Date(orderConfirmDate)
-                : null,
-
-              deliveryMonthTarget: deliveryMonthTarget ?? null,
-
-              poDate: poDate ? new Date(poDate) : null,
-
-              drawingConcernedPerson: drawingConcernedPerson ?? null,
-
-              drawingApprovedDate: drawingApprovedDate
-                ? new Date(drawingApprovedDate)
-                : null,
-
-              drawingStatus: drawingStatus === "APPROVED"
-                ? "COMPLETED"
-                : drawingStatus === "REJECTED"
-                ? "ON_HOLD"
-                : drawingStatus as any,
-
-              drawingRemarks: drawingRemarks ?? null,
-
-              subtotal: new Prisma.Decimal(subtotal),
-
-              gstTotal: new Prisma.Decimal(gstTotal),
-
-              grandTotal: new Prisma.Decimal(grandTotal),
-
-              inspectionField: inspectionField ?? null,
-
-              sendNotification,
-
-              remarks: remarks ?? null,
-            },
+            data: updateData,
           });
 
           // ==========================
-          // Replace Items
+          // Replace Items (Only if items provided)
           // ==========================
 
-          await tx.salesOrderItem.deleteMany({
-            where: {
-              salesOrderId: id,
-            },
-          });
+          if (items !== undefined) {
+            await tx.salesOrderItem.deleteMany({
+              where: {
+                salesOrderId: id,
+              },
+            });
 
-          if (items.length > 0) {
-            await tx.salesOrderItem.createMany({
-              data: items.map((item) => ({
-                salesOrderId: updatedOrder.id,
+            if (items.length > 0) {
+              await tx.salesOrderItem.createMany({
+                data: items.map((item) => ({
+                  salesOrderId: updatedOrder.id,
 
-                itemCode: item.itemCode,
+                  itemCode: item.itemCode,
 
-                description: item.description,
+                  description: item.description,
 
                 unit: "Nos",
 
@@ -280,6 +266,7 @@ console.log("orderTakenById:", orderTakenById);
               })),
             });
           }
+        }
 
           // ==========================
           // Replace Assignments
@@ -315,6 +302,13 @@ console.log("orderTakenById:", orderTakenById);
             await tx.salesOrderAssignment.createMany({
               data: assignments,
             });
+          }
+
+          // Save EAV Custom Field Values if provided
+          if ((request.body as any)?.customFields) {
+            const { CustomFieldService } = await import("../../../services/customFieldService");
+            const cfService = new CustomFieldService(tx as any);
+            await cfService.saveValues("order", id, (request.body as any).customFields);
           }
 
           return updatedOrder.id;

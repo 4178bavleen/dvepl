@@ -28,6 +28,7 @@ import {
   CheckSquare,
   Truck,
   Package,
+  Trash2,
 } from 'lucide-react';
 import { ROUTES } from './routes';
 
@@ -91,5 +92,7 @@ export const sidebarItems: SidebarItem[] = [
  
   { name: 'Reports', icon: FileSpreadsheet, path: ROUTES.REPORTS },
   { name: 'Audit Logs', icon: AuditIcon, path: ROUTES.AUDIT_LOGS },
-  { name: 'Settings', icon: Settings2, path: ROUTES.SETTINGS }
+  { name: 'Custom Fields', icon: Settings2, path: ROUTES.CUSTOM_FIELDS, section: 'Settings' },
+  { name: 'Recycle Bin', icon: Trash2, path: ROUTES.RECYCLE_BIN, section: 'Settings' },
+  { name: 'Settings', icon: Settings2, path: ROUTES.SETTINGS, section: 'Settings' }
 ];
