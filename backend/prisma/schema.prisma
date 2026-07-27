@@ -1494,7 +1494,7 @@ model BOMRevision {
 model Material {
   id                    String                 @id @default(uuid())
   companyId             String
-  categoryId            String?
+  category              String?
   brandId               String?
   specificationId       String?
   materialCode          String                 @unique
@@ -1507,6 +1507,8 @@ model Material {
   color                 String?
   alternativeMaterialId String?
   preferredVendorId     String?
+  reorderLevel          Decimal?               @db.Decimal(15, 3)
+  reorderQty            Decimal?               @db.Decimal(15, 3)
   isActive              Boolean                @default(true)
   createdById           String
   createdAt             DateTime               @default(now())
@@ -1518,15 +1520,16 @@ model Material {
   type                  MaterialType           @default(RAW)
   inspections           Inspection[]
   inventories           Inventory[]
+  leadDays              Int?
   alternative           Material?              @relation("MaterialAlternative", fields: [alternativeMaterialId], references: [id])
   alternatives          Material[]             @relation("MaterialAlternative")
   brand                 MaterialBrand?         @relation(fields: [brandId], references: [id])
-  category              MaterialCategory?      @relation(fields: [categoryId], references: [id])
   company               Company                @relation(fields: [companyId], references: [id])
   createdBy             User                   @relation(fields: [createdById], references: [id])
   specification         MaterialSpecification? @relation(fields: [specificationId], references: [id])
   vendorId              String?
   vendor                Vendor?                @relation(fields: [vendorId], references: [id])
+  preferredVendor       Vendor?                @relation("MaterialPreferredVendor", fields: [preferredVendorId], references: [id])
   purchaseOrderItems    PurchaseOrderItem[]
   purchaseRequestItems  PurchaseRequestItem[]
   workOrderItems        WorkOrderItem[]
@@ -1534,7 +1537,6 @@ model Material {
 
   @@index([companyId])
   @@index([materialCode])
-  @@index([categoryId])
   @@map("materials")
 }
 
@@ -1552,7 +1554,9 @@ model MaterialCategory {
   company     Company            @relation(fields: [companyId], references: [id])
   parent      MaterialCategory?  @relation("MaterialCategoryHierarchy", fields: [parentId], references: [id])
   children    MaterialCategory[] @relation("MaterialCategoryHierarchy")
-  materials   Material[]
+  // materials   Material[]
+  // preferredVendorId String?
+  // preferredVendor   Vendor?            @relation("MaterialPreferredVendor", fields: [preferredVendorId], references: [id])
 
   @@unique([companyId, code])
   @@index([companyId])
@@ -2487,7 +2491,8 @@ model Vendor {
 
   company Company @relation(fields: [companyId], references: [id])
 
-  createdBy User @relation("VendorCreatedBy", fields: [createdById], references: [id])
+  createdBy             User       @relation("VendorCreatedBy", fields: [createdById], references: [id])
+  preferredForMaterials Material[] @relation("MaterialPreferredVendor")
 
   @@index([companyId])
   @@index([name])
@@ -2818,9 +2823,74 @@ enum Priority {
   CRITICAL
 }
 
+model CustomField {
+  id           String    @id @default(uuid())
+  module       String // 'vendor', 'order', 'task', etc.
+  name         String // Field Name / Label (e.g. 'Inspection Date')
+  key          String // Unique Field Key (e.g. 'inspectionDate')
+  type         String // text, textarea, number, decimal, email, phone, url, date, datetime, time, checkbox, switch, dropdown, multiselect, radio, file, image
+  required     Boolean   @default(false)
+  defaultValue String?
+  placeholder  String?
+  helpText     String?
+  displayOrder Int       @default(0)
+  showInForm   Boolean   @default(true)
+  showInTable  Boolean   @default(true)
+  isActive     Boolean   @default(true)
+  afterField   String? // For placement ordering relative to built-in fields
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  options CustomFieldOption[]
+  values  CustomFieldValue[]
+
+  @@unique([module, key])
+  @@index([module, isActive, displayOrder])
+  @@map("custom_fields")
+}
+
+model CustomFieldOption {
+  id            String      @id @default(uuid())
+  customFieldId String
+  label         String
+  value         String
+  displayOrder  Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  customField   CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+
+  @@index([customFieldId, displayOrder])
+  @@map("custom_field_options")
+}
+
+model CustomFieldValue {
+  id            String @id @default(uuid())
+  customFieldId String
+  entityId      String // Foreign record ID (Vendor ID, Order ID, Task ID)
+
+  // Typed storage columns for EAV
+  stringValue  String?
+  textValue    String?   @db.Text
+  numberValue  Decimal?  @db.Decimal(18, 4)
+  booleanValue Boolean?
+  dateValue    DateTime?
+  jsonValue    String? // For multi-select array strings or complex metadata if needed
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customField CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+
+  @@unique([customFieldId, entityId])
+  @@index([entityId])
+  @@index([customFieldId])
+  @@map("custom_field_values")
+}
+
 enum MaterialType {
   RAW
-  FINISHED
   SEMI_FINISHED
+  FINISHED
   CONSUMABLE
 }
