@@ -24,6 +24,11 @@ export const hrmsApi = {
   employees: crud(API_ENDPOINTS.hrms.employees), attendance: crud(API_ENDPOINTS.hrms.attendance), leave: crud(API_ENDPOINTS.hrms.leave),
   salary: crud(API_ENDPOINTS.hrms.salary), holidays: crud(API_ENDPOINTS.hrms.holidays), shifts: crud(API_ENDPOINTS.hrms.shifts),
   documents: crud(API_ENDPOINTS.hrms.documents),
+  tasks: {
+    ...crud((API_ENDPOINTS.hrms as any).tasks, { updateMethod: 'patch' }),
+    updateNotification: (id: string, data: any) => apiClient.patch(`/task/notification/settings/${id}`, data).then(res => res.data),
+    sendReminders: () => apiClient.post("/task/notification/send-reminders").then(res => res.data)
+  }
 };
 
 export const crmApi = {
@@ -135,8 +140,41 @@ export const logisticsApi = {
   vehicles: crud((API_ENDPOINTS as any).logistics.vehicles),
 };
 
-export const financeApi = {
-  invoices: crud((API_ENDPOINTS as any).finance.invoices),
-  payments: crud((API_ENDPOINTS as any).finance.payments),
-  expenses: crud((API_ENDPOINTS as any).finance.expenses),
+export const reportsApi = {
+  getReport: (type: string, fromDate?: string, toDate?: string) => 
+    apiClient.get(`/reports/read/`, { params: { type, fromDate, toDate } }).then(res => res.data)
+};
+
+// Finance Payment API (used by Finance Manager pages)
+export const financePaymentApi = {
+  // Fetch all orders with received/balance totals for the main table
+  getOrders: (params?: { search?: string; status?: string; page?: number; limit?: number }) =>
+    apiClient.get("/payment/read/orders", { params }).then(res => res.data),
+
+  // Fetch payment history for a specific sales order
+  getPayments: (salesOrderId: string) =>
+    apiClient.get("/payment/read/", { params: { salesOrderId } }).then(res => res.data),
+
+  // Record a new installment payment
+  createPayment: (data: {
+    salesOrderId: string;
+    amount: number;
+    paymentMethod: string;
+    referenceNo?: string;
+    paymentDate?: string;
+    remarks?: string;
+  }) => apiClient.post("/payment/create/", data).then(res => res.data),
+
+  // Update an existing payment
+  updatePayment: (id: string, data: {
+    amount?: number;
+    paymentMethod?: string;
+    referenceNo?: string;
+    paymentDate?: string;
+    remarks?: string;
+  }) => apiClient.put(`/payment/update/${id}`, data).then(res => res.data),
+
+  // Delete (soft-revert) a payment
+  deletePayment: (id: string) =>
+    apiClient.delete(`/payment/delete/${id}`).then(res => res.data),
 };

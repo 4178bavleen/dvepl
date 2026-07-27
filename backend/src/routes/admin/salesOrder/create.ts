@@ -179,6 +179,7 @@ async function adminSalesOrderCreateRoutes(
               status,
 
               orderTakenById: orderTakenById ?? null,
+              assignedToIds: assignedToId,
 
               partyName,
               caNo: caNo ?? null,
@@ -272,18 +273,17 @@ async function adminSalesOrderCreateRoutes(
               },
             });
 
-            const assignments = employees.map((emp) => ({
+            const employeeMap = new Map(employees.map((e) => [e.userId, e.id]));
+
+            const assignments = assignedToId.map((userId) => ({
               salesOrderId: salesOrder.id,
-              employeeId: emp.id,
-              userId: emp.userId,
+              userId,
+              employeeId: employeeMap.get(userId) ?? null,
             }));
 
-            if (assignments.length > 0) {
-              await tx.salesOrderAssignment.createMany({
-                data: assignments,
-                skipDuplicates: true,
-              });
-            }
+            await tx.salesOrderAssignment.createMany({
+              data: assignments,
+            });
           }
           return salesOrder;
         });

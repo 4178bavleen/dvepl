@@ -88,9 +88,8 @@ const WorkOrdersPage = lazy(() => import('@/pages/production/workOrdersPage'));
 const InspectionsPage = lazy(() => import('@/pages/qc/inspectionsPage'));
 
 // Finance & Accounts
-const InvoicesPage = lazy(() => import('@/pages/finance/invoicesPage'));
 const PaymentsPage = lazy(() => import('@/pages/finance/paymentsPage'));
-const ExpensesPage = lazy(() => import('@/pages/finance/expensesPage'));
+const PaymentHistoryPage = lazy(() => import('@/pages/finance/paymentHistoryPage'));
 const NotificationsPage = lazy(() => import('@/pages/notifications/notificationsPage'));
 
 
@@ -176,9 +175,8 @@ export function AppRouter() {
               <Route path="/quality/inspections" element={<InspectionsPage />} />
 
               {/* Finance & Accounts */}
-              <Route path="/finance/invoices" element={<InvoicesPage />} />
-              <Route path="/finance/payments" element={<PaymentsPage />} />
-              <Route path="/finance/expenses" element={<ExpensesPage />} />
+              <Route path="/finance" element={<PaymentsPage />} />
+              <Route path="/finance/history/:orderId" element={<PaymentHistoryPage />} />
               
               <Route path="/audit-logs" element={<AuditLogsPage />} />
               <Route path="/reports" element={<ReportsPage />} />

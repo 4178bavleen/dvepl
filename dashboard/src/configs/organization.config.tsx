@@ -344,8 +344,25 @@ export const designationsConfig = {
   defaultFormValues: { title: "", level: "1" },
   breadcrumbs: [{ label: "Dashboard", href: "/" }, { label: "Designations" }],
   columns: [
-    { accessorKey: "title", header: sortableHeader("Title") },
-    { accessorKey: "level", header: sortableHeader("Seniority Level") },
+    {
+      accessorKey: "title",
+      header: sortableHeader("Title"),
+      cell: ({ row }) => (
+        <span className="font-semibold text-foreground">{row.original.title}</span>
+      ),
+    },
+    {
+      accessorKey: "level",
+      header: sortableHeader("Seniority Level"),
+      cell: ({ getValue }) => {
+        const lvl = Number(getValue() || 0);
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
+            Level {lvl}
+          </span>
+        );
+      },
+    },
   ] as ColumnDef<Designation>[],
   fields: [
     {

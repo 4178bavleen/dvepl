@@ -73,9 +73,7 @@ export const ROUTES = {
   QUALITY_INSPECTIONS: '/quality/inspections',
 
   // Finance & Accounts
-  FINANCE_INVOICES: '/finance/invoices',
-  FINANCE_PAYMENTS: '/finance/payments',
-  FINANCE_EXPENSES: '/finance/expenses',
+  FINANCE: '/finance',
   
   AUDIT_LOGS: '/audit-logs',
   REPORTS: '/reports',

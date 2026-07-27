@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogTitle, DialogHeader } from "@/components/ui/dialog";
+import { hrmsApi } from "@/services/modules";
 
 // Definitions
 interface Task {
@@ -39,6 +40,41 @@ interface Task {
   notifFrequency: "once" | "daily" | "every-12h";
   createdAt: string;
 }
+
+// ==========================================
+// API ADAPTERS (EASILY REPLACE WITH AXIOS/FETCH LATER)
+// ==========================================
+export const apiService = {
+  tasks: {
+    list: async (): Promise<Task[]> => {
+      return hrmsApi.tasks.list() as unknown as Task[];
+    },
+    create: async (task: any): Promise<any> => {
+      return hrmsApi.tasks.create(task);
+    },
+    update: async (id: string, task: any): Promise<any> => {
+      return hrmsApi.tasks.update!(id, task);
+    },
+    delete: async (id: string): Promise<void> => {
+      return hrmsApi.tasks.remove!(id);
+    },
+    updateNotification: async (id: string, config: any): Promise<any> => {
+      return hrmsApi.tasks.updateNotification(id, config);
+    },
+    sendReminders: async (): Promise<any> => {
+      return hrmsApi.tasks.sendReminders();
+    }
+  },
+  employees: {
+    list: async (): Promise<Array<{ id: string; name: string }>> => {
+      const employees = await hrmsApi.employees.list();
+      return employees.map((emp: any) => ({
+        id: emp.userId || emp.id,
+        name: emp.user?.name || `${emp.firstName} ${emp.lastName}`
+      }));
+    }
+  }
+};
 
 export default function TasksPage() {
   // Empty Database States (Mock data removed)
@@ -86,21 +122,35 @@ export default function TasksPage() {
 
   const loadData = async () => {
     setIsLoading(true);
-    setTimeout(() => {
-      setTasks([]);
-      setUsers([]);
-      setIsLoading(false);
+    try {
+      const [tList, uList] = await Promise.all([
+        apiService.tasks.list(),
+        apiService.employees.list()
+      ]);
+      setTasks(tList);
+      setUsers(uList);
       setLastRefreshTime(new Date().toLocaleTimeString());
-    }, 300);
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Failed to load tasks data from server.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    setTimeout(() => {
-      setIsRefreshing(false);
-      setLastRefreshTime(new Date().toLocaleTimeString());
+    try {
+      const tList = await apiService.tasks.list();
+      setTasks(tList);
       toast.success("Tasks list reloaded.");
-    }, 300);
+      setLastRefreshTime(new Date().toLocaleTimeString());
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Failed to refresh tasks.");
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   // Create or Update Task in state
@@ -115,78 +165,76 @@ export default function TasksPage() {
       return;
     }
 
-    const assigned = users.filter((u) => selectedUserIds.includes(u.id));
-
-    if (editingTask) {
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.id === editingTask.id
-            ? {
-                ...t,
-                ...formValues,
-                assignedUsers: assigned
-              }
-            : t
-        )
-      );
-      toast.success("Task updated successfully.");
-    } else {
-      const newTask: Task = {
-        id: `task-${Date.now()}`,
+    try {
+      const payload = {
         ...formValues,
-        assignedUsers: assigned,
-        notifEnabled: true,
-        notifType: "automatic",
-        notifDays: 1,
-        notifUnit: "days",
-        notifFrequency: "once",
-        createdAt: new Date().toISOString()
+        assignedUserIds: selectedUserIds
       };
-      setTasks((prev) => [newTask, ...prev]);
-      toast.success("Task created successfully.");
-    }
 
-    setIsFormOpen(false);
-    resetForm();
+      if (editingTask) {
+        await apiService.tasks.update(editingTask.id, payload);
+        toast.success("Task updated successfully.");
+      } else {
+        await apiService.tasks.create(payload);
+        toast.success("Task created successfully.");
+      }
+      loadData();
+      setIsFormOpen(false);
+      resetForm();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.response?.data?.message || "Failed to save task.");
+    }
   };
 
   // Delete Task in state
   const handleDeleteTask = async (id: string) => {
     if (!window.confirm("Are you sure you want to delete this task?")) return;
-    setTasks((prev) => prev.filter((t) => t.id !== id));
-    toast.success("Task deleted successfully.");
+    try {
+      await apiService.tasks.delete(id);
+      toast.success("Task deleted successfully.");
+      loadData();
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Failed to delete task.");
+    }
   };
 
   // Trigger Overdue Reminders
   const handleSendOverdueReminders = async () => {
     setIsSendingReminders(true);
-    setTimeout(() => {
+    try {
+      const res = await apiService.tasks.sendReminders();
+      toast.success(res.message || "Overdue notifications dispatched via WhatsApp & Email.");
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Failed to trigger overdue reminders.");
+    } finally {
       setIsSendingReminders(false);
-      toast.success("Overdue notifications dispatched via WhatsApp & Email.");
-    }, 500);
+    }
   };
 
   // Save Notification Settings in state
-  const handleSaveNotifSettings = () => {
+  const handleSaveNotifSettings = async () => {
     if (!notifTaskId) return;
 
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === notifTaskId
-          ? {
-              ...t,
-              notifEnabled: notifValues.enabled,
-              notifType: notifValues.type,
-              notifDays: notifValues.days,
-              notifUnit: notifValues.unit,
-              notifFrequency: notifValues.frequency
-            }
-          : t
-      )
-    );
+    try {
+      const payload = {
+        notifEnabled: notifValues.enabled,
+        notifType: notifValues.type,
+        notifDays: notifValues.days,
+        notifUnit: notifValues.unit,
+        notifFrequency: notifValues.frequency
+      };
 
-    setIsNotifOpen(false);
-    toast.success("Notification settings saved.");
+      await apiService.tasks.updateNotification(notifTaskId, payload);
+      toast.success("Notification settings saved.");
+      loadData();
+      setIsNotifOpen(false);
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Failed to save notification settings.");
+    }
   };
 
   // Helper: Open Edit Modal
@@ -521,29 +569,29 @@ export default function TasksPage() {
                     task.dueDate < new Date().toISOString().split("T")[0];
 
                   return (
-                    <tr key={task.id} className="hover:bg-muted/20 transition-colors text-xs">
+                    <tr key={task.id} className="hover:bg-muted/20 transition-colors text-sm">
                       <td className="py-3.5 px-4 text-center text-muted-foreground font-medium">
                         {idx + 1}
                       </td>
                       <td className="py-3.5 px-4 max-w-sm">
                         <p className="font-semibold text-foreground leading-relaxed">{task.title}</p>
                         {task.description && (
-                          <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">
+                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
                             {task.description}
                           </p>
                         )}
                       </td>
                       <td className="py-3.5 px-4">
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap gap-1.5">
                           {task.assignedUsers.length === 0 ? (
-                            <span className="text-muted-foreground">Unassigned</span>
+                            <span className="text-muted-foreground text-xs italic">Unassigned</span>
                           ) : (
                             task.assignedUsers.map((u) => (
                               <span
                                 key={u.id}
-                                className="inline-flex items-center gap-1 bg-muted px-2 py-0.5 rounded-full text-[10px] text-muted-foreground font-semibold"
+                                className="inline-flex items-center gap-1.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900/50 px-2.5 py-0.5 rounded-full text-[11.5px] font-semibold transition-all hover:scale-105"
                               >
-                                <User className="size-2.5" /> {u.name}
+                                <User className="size-3 text-indigo-500/70" /> {u.name}
                               </span>
                             ))
                           )}
@@ -551,7 +599,7 @@ export default function TasksPage() {
                       </td>
                       <td className="py-3.5 px-4 text-center">
                         <span
-                          className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                          className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${
                             task.priority === "high"
                               ? "bg-rose-500/10 text-rose-600 dark:text-rose-400"
                               : task.priority === "medium"
@@ -570,7 +618,7 @@ export default function TasksPage() {
                         >
                           <Calendar className="size-3.5" />
                           {task.dueDate}
-                          {isOverdue && <span className="text-[9px] uppercase tracking-wider px-1 bg-rose-500/10 rounded">Overdue</span>}
+                          {isOverdue && <span className="text-[10px] uppercase tracking-wider px-1 bg-rose-500/10 rounded">Overdue</span>}
                         </span>
                       </td>
                       <td className="py-3.5 px-4">
@@ -599,7 +647,7 @@ export default function TasksPage() {
                       </td>
                       <td className="py-3.5 px-4 text-center">
                         <span
-                          className={`text-[10px] font-semibold ${
+                          className={`text-[11px] font-semibold ${
                             task.notifEnabled ? "text-emerald-600" : "text-muted-foreground"
                           }`}
                         >
@@ -607,33 +655,33 @@ export default function TasksPage() {
                         </span>
                       </td>
                       <td className="py-3.5 px-4">
-                        <div className="flex items-center justify-center gap-1.5">
+                        <div className="flex items-center justify-center gap-2">
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            className="h-8.5 w-8.5 text-muted-foreground hover:text-foreground border border-transparent hover:border-border hover:bg-muted/50 transition-all"
                             onClick={() => openEdit(task)}
                             title="Edit Task"
                           >
-                            <Edit className="size-3.5" />
+                            <Edit className="size-4" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-primary"
+                            className="h-8.5 w-8.5 text-muted-foreground hover:text-primary border border-transparent hover:border-border hover:bg-muted/50 transition-all"
                             onClick={() => openNotifSettings(task)}
                             title="Notification Settings"
                           >
-                            <Settings className="size-3.5" />
+                            <Settings className="size-4" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 text-muted-foreground hover:text-rose-500"
+                            className="h-8.5 w-8.5 text-muted-foreground hover:text-rose-500 border border-transparent hover:border-rose-500/10 hover:bg-rose-500/5 transition-all"
                             onClick={() => handleDeleteTask(task.id)}
                             title="Delete Task"
                           >
-                            <Trash2 className="size-3.5" />
+                            <Trash2 className="size-4" />
                           </Button>
                         </div>
                       </td>

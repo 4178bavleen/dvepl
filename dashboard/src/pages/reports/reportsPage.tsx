@@ -16,6 +16,7 @@ import {
 import { toast } from "react-hot-toast";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import { reportsApi } from "@/services/modules";
 import { apiClient } from "@/services/axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,7 +40,6 @@ const reportTabs: ReportTab[] = [
 ];
 
 export default function ReportsPage() {
-  const [orders, setOrders] = useState<any[]>([]);
   const [userRole, setUserRole] = useState<string>("admin");
   const [currentReport, setCurrentReport] = useState<string>("customer");
   const [isLoading, setIsLoading] = useState(true);
@@ -49,7 +49,7 @@ export default function ReportsPage() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
-  // Report Results States (computed when Run Report is clicked)
+  // Report Results States
   const [reportRan, setReportRan] = useState(false);
   const [reportData, setReportData] = useState<any[]>([]);
   const [summaryStats, setSummaryStats] = useState({
@@ -59,26 +59,18 @@ export default function ReportsPage() {
     pending: 0
   });
 
-  // Fetch orders and active user profile
+  // Fetch active user profile
   useEffect(() => {
     const initPage = async () => {
       setIsLoading(true);
       try {
-        const [ordersRes, profileRes] = await Promise.all([
-          apiClient.get("/order/read"),
-          apiClient.get("/auth/profile").catch(() => null)
-        ]);
-
-        if (ordersRes.data && ordersRes.data.success) {
-          setOrders(ordersRes.data.data || []);
-        }
-
+        const profileRes = await apiClient.get("/auth/profile").catch(() => null);
         if (profileRes?.data?.success) {
           const role = profileRes.data.data?.role?.name?.toLowerCase() || "admin";
           setUserRole(role);
         }
       } catch (err: any) {
-        toast.error("Failed to load initial reports data.");
+        toast.error("Failed to load initial reports configuration.");
       } finally {
         setIsLoading(false);
       }
@@ -118,146 +110,30 @@ export default function ReportsPage() {
     return formatCurrency(amount);
   };
 
-  // Safe Total Calculator
-  const getOrderTotal = (o: any): number => {
-    if (o.grandTotal) return Number(o.grandTotal);
-    if (o.totalAmount) return Number(o.totalAmount);
-    if (Array.isArray(o.items) && o.items.length) {
-      return o.items.reduce((sum: number, it: any) => {
-        const rate = Number(it.rate || it.unitPrice || 0);
-        const gst = Number(it.gst || it.gstPercentage || 0);
-        const qty = Number(it.qty || it.quantity || 0);
-        return sum + (rate + (rate * gst) / 100) * qty;
-      }, 0);
-    }
-    const rate = Number(o.rate || 0);
-    const gst = Number(o.gst || 0);
-    const qty = Number(o.qty || 0);
-    return (rate + (rate * gst) / 100) * qty;
-  };
-
-  // Run Report Logic
-  const handleRunReport = () => {
+  // Run Report Logic (Delegated to Backend API)
+  const handleRunReport = async () => {
     setIsRunning(true);
-    setReportRan(true);
+    try {
+      const res = await reportsApi.getReport(
+        currentReport, 
+        fromDate || undefined, 
+        toDate || undefined
+      );
 
-    setTimeout(() => {
-      // 1. Filter Orders by Date
-      const filtered = orders.filter(o => {
-        const oDate = o.orderConfirmDate || o.orderTakenDate || o.createdAt?.split("T")[0];
-        if (!oDate) return true;
-        if (fromDate && oDate < fromDate) return false;
-        if (toDate && oDate > toDate) return false;
-        return true;
-      });
-
-      // 2. Compute Summary Statistics
-      const total = filtered.length;
-      const revenue = filtered.reduce((sum, o) => sum + getOrderTotal(o), 0);
-      const completed = filtered.filter(o => o.status === "COMPLETED" || o.status === "completed").length;
-      const pending = filtered.filter(o => o.status === "PENDING" || o.status === "pending").length;
-
-      setSummaryStats({ total, revenue, completed, pending });
-
-      // 3. Populate Report Row Data based on type
-      let dataRows: any[] = [];
-      const type = currentReport;
-
-      if (type === "customer") {
-        const map: Record<string, any> = {};
-        filtered.forEach(o => {
-          const name = o.company?.name || o.customerName || "Unknown Customer";
-          if (!map[name]) {
-            map[name] = { name, count: 0, revenue: 0, pending: 0, completed: 0 };
-          }
-          map[name].count++;
-          map[name].revenue += getOrderTotal(o);
-          if (o.status === "PENDING" || o.status === "pending") map[name].pending++;
-          if (o.status === "COMPLETED" || o.status === "completed") map[name].completed++;
-        });
-        dataRows = Object.values(map).sort((a, b) => b.revenue - a.revenue);
+      if (res && res.success) {
+        setSummaryStats(res.summary);
+        setReportData(res.data || []);
+        setReportRan(true);
+        toast.success(res.message || "Report updated successfully from server.");
+      } else {
+        toast.error(res?.message || "Failed to process report.");
       }
-
-      else if (type === "datewise") {
-        const map: Record<string, any> = {};
-        filtered.forEach(o => {
-          const date = o.orderConfirmDate || o.orderTakenDate || o.createdAt?.split("T")[0] || "Unknown Date";
-          if (!map[date]) {
-            map[date] = { date, count: 0, revenue: 0 };
-          }
-          map[date].count++;
-          map[date].revenue += getOrderTotal(o);
-        });
-        dataRows = Object.values(map).sort((a, b) => b.date.localeCompare(a.date));
-      }
-
-      else if (type === "salesperson") {
-        const map: Record<string, any> = {};
-        filtered.forEach(o => {
-          const name = o.orderTakenBy?.name || o.concernedPerson || o.takenBy || "Unassigned";
-          if (!map[name]) {
-            map[name] = { name, count: 0, revenue: 0, completed: 0 };
-          }
-          map[name].count++;
-          map[name].revenue += getOrderTotal(o);
-          if (o.status === "COMPLETED" || o.status === "completed") map[name].completed++;
-        });
-        dataRows = Object.values(map).sort((a, b) => b.revenue - a.revenue);
-      }
-
-      else if (type === "finance") {
-        dataRows = filtered.map(o => {
-          const total = getOrderTotal(o);
-          const paid = (o.paymentHistory || []).reduce((sum: number, p: any) => sum + Number(p.amount), 0) || Number(o.advance) || 0;
-          const balance = Math.max(0, total - paid);
-          const itemNames = Array.isArray(o.items) && o.items.length
-            ? o.items.map((it: any) => it.description || it.itemName || "—").join(", ")
-            : (o.itemName || "—");
-
-          return {
-            dveplCode: o.dveplCode || o.companyCode || "—",
-            customerName: o.company?.name || o.customerName || "—",
-            items: itemNames,
-            total,
-            paid,
-            balance,
-            status: o.status || "—"
-          };
-        });
-      }
-
-      else if (type === "procurement") {
-        dataRows = filtered.map(o => ({
-          dveplCode: o.dveplCode || o.companyCode || "—",
-          customerName: o.company?.name || o.customerName || "—",
-          orderPlaceTo: o.orderPlaceTo || "—",
-          poNumber: o.poNumber || "—",
-          materialStatus: o.materialStatus || "—",
-          poDate: o.poDate ? String(o.poDate).split("T")[0] : "—"
-        }));
-      }
-
-      else if (type === "delivery") {
-        dataRows = filtered.map(o => {
-          const item = Array.isArray(o.items) && o.items.length
-            ? o.items[0].description || o.items[0].itemName
-            : (o.itemName || "—");
-          return {
-            dveplCode: o.dveplCode || o.companyCode || "—",
-            customerName: o.company?.name || o.customerName || "—",
-            item,
-            orderDate: o.orderConfirmDate || o.orderTakenDate || "—",
-            deliveryTarget: o.deliveryMonthTarget || o.deliveryTarget || "—",
-            completeDate: o.orderCompleteDate || o.actualDeliveryDate || "—",
-            status: o.status || "—"
-          };
-        });
-      }
-
-      setReportData(dataRows);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.response?.data?.message || "Error computing report calculations.");
+    } finally {
       setIsRunning(false);
-      toast.success("Report processed successfully.");
-    }, 400);
+    }
   };
 
   // Export PDF Logic

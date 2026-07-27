@@ -67,6 +67,8 @@ async function adminSalesOrderPreviewRoutes(
           "delivery month target": "deliveryMonthTarget",
           "po date": "poDate",
           "drawing concerned person": "drawingConcernedPerson",
+          "concerned person": "drawingConcernedPerson",
+          "concerned persons": "drawingConcernedPerson",
           "drawing approved date": "drawingApprovedDate",
           "drawing status": "drawingStatus",
           "drawing remarks": "drawingRemarks",
@@ -78,7 +80,9 @@ async function adminSalesOrderPreviewRoutes(
           "item quantity": "itemQuantity",
           "item rate": "itemRate",
           "item gst percentage": "itemGstPercentage",
-          "item remarks": "itemRemarks"
+          "item remarks": "itemRemarks",
+          "order taken by": "orderTakenBy",
+          "assigned to": "assignedTo"
         };
 
         const ordersMap = new Map<string, any>();
@@ -104,13 +108,15 @@ async function adminSalesOrderPreviewRoutes(
               orderConfirmDate: row.orderConfirmDate ? String(row.orderConfirmDate) : null,
               deliveryMonthTarget: row.deliveryMonthTarget ? String(row.deliveryMonthTarget) : null,
               poDate: row.poDate ? String(row.poDate) : null,
-              drawingConcernedPerson: row.drawingConcernedPerson ? String(row.drawingConcernedPerson) : null,
+              drawingConcernedPerson: row.drawingConcernedPerson ? String(row.drawingConcernedPerson).trim() : null,
               drawingApprovedDate: row.drawingApprovedDate ? String(row.drawingApprovedDate) : null,
               drawingStatus: String(row.drawingStatus || "PENDING").toUpperCase(),
               drawingRemarks: row.drawingRemarks ? String(row.drawingRemarks) : null,
               inspectionField: row.inspectionField ? String(row.inspectionField) : null,
               remarks: row.remarks ? String(row.remarks) : null,
               sendNotification: row.sendNotification === "true" || row.sendNotification === 1 || row.sendNotification === "1",
+              orderTakenBy: row.orderTakenBy ? String(row.orderTakenBy).trim() : null,
+              assignedTo: row.assignedTo ? String(row.assignedTo).trim() : null,
               items: [],
             });
           }
