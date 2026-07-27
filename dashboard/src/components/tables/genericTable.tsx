@@ -13,28 +13,34 @@ import {
 } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
-import {
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  MoreHorizontal,
   Eye,
   Edit,
   Trash2,
   SlidersHorizontal,
   ArrowUpDown,
+  GripVertical,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useERPStore } from "@/store/erpStore";
 import { translations } from "@/constants/translations";
 import { cn } from "@/utils/helpers";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  horizontalListSortingStrategy,
+  arrayMove,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 // =========================================================
 // STYLED PRESENTATIONAL TABLE COMPONENTS
@@ -120,6 +126,54 @@ const TableCell = React.forwardRef<
 TableCell.displayName = "TableCell";
 
 // =========================================================
+// DRAGGABLE HEADER CELL (used for reorderable columns only)
+// =========================================================
+function SortableHeaderCell({
+  id,
+  children,
+  className,
+  width,
+}: {
+  id: string;
+  children: React.ReactNode;
+  className?: string;
+  width?: number;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Translate.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+    zIndex: isDragging ? 20 : undefined,
+    width,
+    minWidth: width,
+  };
+
+  return (
+    <TableHead ref={setNodeRef} style={style} className={className}>
+      <div className="flex items-center gap-1.5">
+        <span
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing touch-none text-muted-foreground/50 hover:text-muted-foreground shrink-0"
+        >
+          <GripVertical className="h-3.5 w-3.5" />
+        </span>
+        <span>{children}</span>
+      </div>
+    </TableHead>
+  );
+}
+
+// =========================================================
 // MAIN GENERIC TABLE COMPONENT
 // =========================================================
 
@@ -133,6 +187,13 @@ interface GenericTableProps<TData> {
   isLoading?: boolean;
   showColumnVisibility?: boolean;
   freezeActions?: boolean;
+  /**
+   * Unique key identifying this table instance (e.g. "organizations", "invoices").
+   * When provided, the user's dragged column order is saved to localStorage
+   * under `generic-table-column-order:<storageKey>` and restored on reload.
+   * Omit to disable persistence (order resets each session).
+   */
+  storageKey?: string;
 }
 
 export function GenericTable<TData extends { id: string }>({
@@ -145,10 +206,36 @@ export function GenericTable<TData extends { id: string }>({
   isLoading = false,
   showColumnVisibility = true,
   freezeActions = true,
+  storageKey,
 }: GenericTableProps<TData>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+
+  // Auto-derive a stable key from the column ids/accessorKeys so persistence
+  // works even if the caller never passes storageKey. If two tables on the
+  // page share the exact same columns, pass storageKey explicitly to
+  // disambiguate them.
+  const autoKey = React.useMemo(
+    () =>
+      columns
+        .map((c: any) => c.id ?? c.accessorKey ?? "")
+        .join("|"),
+    [columns],
+  );
+  const localStorageKey = `generic-table-column-order:${storageKey ?? autoKey}`;
+
+  // Load any previously saved column order (lazy init, runs once)
+  const [columnOrder, setColumnOrder] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const saved = window.localStorage.getItem(localStorageKey);
+      return saved ? (JSON.parse(saved) as string[]) : [];
+    } catch {
+      return [];
+    }
+  });
+
   const [isColumnsOpen, setIsColumnsOpen] = useState(false);
   const store = useERPStore();
 
@@ -264,6 +351,46 @@ export function GenericTable<TData extends { id: string }>({
     return cols;
   }, [columns, onView, onEdit, onDelete, bulkActions, store.language]);
 
+  // Columns that must never be dragged or reordered (checkbox + actions)
+  const nonDraggableIds = React.useMemo(() => {
+    const ids = new Set<string>();
+    if (bulkActions) ids.add("select");
+    if (onView || onEdit || onDelete) ids.add("actions");
+    return ids;
+  }, [bulkActions, onView, onEdit, onDelete]);
+
+  // Initialize / sync column order whenever the column set changes,
+  // always keeping "select" first and "actions" last.
+  React.useEffect(() => {
+    const ids = tableColumns.map((column: any) => column.id ?? column.accessorKey);
+    setColumnOrder((prev) => {
+      const kept = prev.filter((id) => ids.includes(id));
+      const missing = ids.filter((id) => !kept.includes(id));
+      const merged = kept.length ? [...kept, ...missing] : ids;
+
+      const hasSelect = merged.includes("select");
+      const hasActions = merged.includes("actions");
+      const rest = merged.filter((id) => id !== "select" && id !== "actions");
+
+      return [
+        ...(hasSelect ? ["select"] : []),
+        ...rest,
+        ...(hasActions ? ["actions"] : []),
+      ];
+    });
+  }, [tableColumns]);
+
+  // Persist column order to localStorage whenever it changes
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (columnOrder.length === 0) return;
+    try {
+      window.localStorage.setItem(localStorageKey, JSON.stringify(columnOrder));
+    } catch {
+      // localStorage may be unavailable (private browsing, quota, etc.) — fail silently
+    }
+  }, [columnOrder, localStorageKey]);
+
   const table = useReactTable({
     data,
     columns: tableColumns,
@@ -271,15 +398,55 @@ export function GenericTable<TData extends { id: string }>({
       sorting,
       columnVisibility,
       rowSelection,
+      columnOrder,
+    },
+    defaultColumn: {
+      size: 180,
+      minSize: 80,
+      maxSize: 600,
     },
     onSortingChange: setSorting,
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
+    onColumnOrderChange: setColumnOrder,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
   });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 5 },
+    }),
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    // "select" and "actions" can never be dragged or dropped onto
+    if (nonDraggableIds.has(active.id as string) || nonDraggableIds.has(over.id as string)) {
+      return;
+    }
+
+    setColumnOrder((current) => {
+      const hasSelect = current.includes("select");
+      const hasActions = current.includes("actions");
+      const draggableIds = current.filter((id) => !nonDraggableIds.has(id));
+
+      const oldIndex = draggableIds.indexOf(active.id as string);
+      const newIndex = draggableIds.indexOf(over.id as string);
+      if (oldIndex === -1 || newIndex === -1) return current;
+
+      const reordered = arrayMove(draggableIds, oldIndex, newIndex);
+
+      return [
+        ...(hasSelect ? ["select"] : []),
+        ...reordered,
+        ...(hasActions ? ["actions"] : []),
+      ];
+    });
+  };
 
   const selectedRows = table
     .getFilteredSelectedRowModel()
@@ -356,90 +523,128 @@ export function GenericTable<TData extends { id: string }>({
 
       {/* Actual Data Table */}
       <div className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
-        <Table>
-          <TableHeader className="bg-muted/50 border-b border-border">
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="hover:bg-transparent">
-                {headerGroup.headers.map((header) => {
-                  return (
-                    <TableHead
-                      key={header.id}
-                      className={cn(
-                        "text-xs font-semibold py-3.5 px-4 text-muted-foreground whitespace-nowrap",
-                        header.id === "actions" && "text-center",
-                        header.id === "actions" && freezeActions && "sticky right-0 bg-muted border-l border-l-border z-10",
-                      )}
-                    >
-                      {header.isPlaceholder
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <Table>
+            <TableHeader className="bg-muted/50 border-b border-border">
+              {table.getHeaderGroups().map((headerGroup) => (
+                <SortableContext
+                  key={headerGroup.id}
+                  items={columnOrder.filter((id) => !nonDraggableIds.has(id))}
+                  strategy={horizontalListSortingStrategy}
+                >
+                  <TableRow className="hover:bg-transparent">
+                    {headerGroup.headers.map((header) => {
+                      const label = header.isPlaceholder
                         ? null
                         : flexRender(
                             header.column.columnDef.header,
                             header.getContext(),
-                          )}
-                    </TableHead>
-                  );
-                })}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              // Skeletons for Loading State
-              Array.from({ length: 5 }).map((_, i) => (
-                <TableRow
-                  key={i}
-                  className="animate-pulse border-b border-border/50"
-                >
-                  {tableColumns.map((col, colIndex) => (
-                    <TableCell 
-                      key={colIndex} 
-                      className={cn(
-                        "py-4 px-4",
-                        col.id === "actions" && freezeActions && "sticky right-0 bg-card border-l border-l-border z-10"
-                      )}
-                    >
-                      <div className="h-4 bg-muted rounded-md w-full" />
-                    </TableCell>
-                  ))}
+                          );
+
+                      // "select" and "actions" stay exactly as before — not draggable
+                      if (nonDraggableIds.has(header.column.id)) {
+                        return (
+                          <TableHead
+                            key={header.id}
+                            style={{
+                              width: header.getSize(),
+                              minWidth: header.getSize(),
+                            }}
+                            className={cn(
+                              "text-xs font-semibold py-3.5 px-4 text-muted-foreground whitespace-nowrap",
+                              header.id === "actions" && "text-center",
+                              header.id === "actions" &&
+                                freezeActions &&
+                                "sticky right-0 bg-muted border-l border-l-border z-10",
+                            )}
+                          >
+                            {label}
+                          </TableHead>
+                        );
+                      }
+
+                      return (
+                        <SortableHeaderCell
+                          key={header.id}
+                          id={header.column.id}
+                          width={header.getSize()}
+                          className="text-xs font-semibold py-3.5 px-4 text-muted-foreground whitespace-nowrap select-none"
+                        >
+                          {label}
+                        </SortableHeaderCell>
+                      );
+                    })}
+                  </TableRow>
+                </SortableContext>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                // Skeletons for Loading State
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow
+                    key={i}
+                    className="animate-pulse border-b border-border/50"
+                  >
+                    {tableColumns.map((col, colIndex) => (
+                      <TableCell
+                        key={colIndex}
+                        className={cn(
+                          "py-4 px-4",
+                          col.id === "actions" && freezeActions && "sticky right-0 bg-card border-l border-l-border z-10"
+                        )}
+                      >
+                        <div className="h-4 bg-muted rounded-md w-full" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() && "selected"}
+                    className="hover:bg-muted/30 border-b border-border/40 transition-colors duration-150"
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell
+                        key={cell.id}
+                        style={{
+                          width: cell.column.getSize(),
+                          minWidth: cell.column.getSize(),
+                        }}
+                        className={cn(
+                          "py-3.5 px-4 text-sm font-normal align-middle",
+                          cell.column.id === "actions" && "text-center",
+                          cell.column.id === "actions" && freezeActions && "sticky right-0 bg-card group-hover/row:bg-muted group-data-[state=selected]/row:bg-muted border-l border-l-border z-10",
+                        )}
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : (
+                // Empty State
+                <TableRow>
+                  <TableCell
+                    colSpan={tableColumns.length}
+                    className="h-32 text-center text-muted-foreground text-xs py-8"
+                  >
+                    No records found matching your filters.
+                  </TableCell>
                 </TableRow>
-              ))
-            ) : table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
-                  className="hover:bg-muted/30 border-b border-border/40 transition-colors duration-150"
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell
-                      key={cell.id}
-                      className={cn(
-                        "py-3.5 px-4 text-sm font-normal align-middle",
-                        cell.column.id === "actions" && "text-center",
-                        cell.column.id === "actions" && freezeActions && "sticky right-0 bg-card group-hover/row:bg-muted group-data-[state=selected]/row:bg-muted border-l border-l-border z-10",
-                      )}
-                    >
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              // Empty State
-              <TableRow>
-                <TableCell
-                  colSpan={tableColumns.length}
-                  className="h-32 text-center text-muted-foreground text-xs py-8"
-                >
-                  No records found matching your filters.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+              )}
+            </TableBody>
+          </Table>
+        </DndContext>
       </div>
 
       {/* Pagination controls */}
@@ -471,6 +676,9 @@ export function GenericTable<TData extends { id: string }>({
                   {size} per page
                 </option>
               ))}
+              <option value={data.length || Number.MAX_SAFE_INTEGER}>
+                Show All
+              </option>
             </select>
             <div className="flex items-center gap-1">
               <Button

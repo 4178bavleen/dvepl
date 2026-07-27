@@ -581,20 +581,23 @@ export default function TasksPage() {
                 <th className="py-3 px-4 w-36">Due Date</th>
                 <th className="py-3 px-4 w-32">Status</th>
                 <th className="py-3 px-4 w-32 text-center">Reminders</th>
+                {taskTableCustomCols.map((col: any) => (
+                  <th key={col.id} className="py-3 px-4 whitespace-nowrap">{col.header}</th>
+                ))}
                 <th className="py-3 px-4 w-28 text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
               {isLoading ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-xs text-muted-foreground">
+                  <td colSpan={8 + taskTableCustomCols.length} className="py-12 text-center text-xs text-muted-foreground">
                     <Loader2 className="size-6 animate-spin mx-auto mb-2 text-primary" />
                     Loading tasks data...
                   </td>
                 </tr>
               ) : filteredTasks.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-xs text-muted-foreground">
+                  <td colSpan={8 + taskTableCustomCols.length} className="py-12 text-center text-xs text-muted-foreground">
                     No tasks found matching criteria.
                   </td>
                 </tr>
@@ -690,6 +693,14 @@ export default function TasksPage() {
                           {task.notifEnabled ? "🔔 Enabled" : "🔕 Disabled"}
                         </span>
                       </td>
+                      {taskTableCustomCols.map((col: any) => {
+                        const val = (task as any)?.customFields?.[col.id?.replace('cf_', '')];
+                        return (
+                          <td key={col.id} className="py-3.5 px-4 text-xs text-muted-foreground">
+                            {val !== undefined && val !== null && val !== '' ? String(val) : '—'}
+                          </td>
+                        );
+                      })}
                       <td className="py-3.5 px-4">
                         <div className="flex items-center justify-center gap-2">
                           <Button
