@@ -1492,68 +1492,49 @@ model BOMRevision {
 }
 
 model Material {
-  id        String @id @default(uuid())
-  companyId String
-
-  category String
-
-  brandId         String?
-  specificationId String?
-
-  materialCode String   @unique
-  name         String
-  description  String?
-  hsnCode      String?
-  gst          Decimal  @db.Decimal(5, 2)
-  unit         String
-  weight       Decimal? @db.Decimal(10, 3)
-  color        String?
-
+  id                    String                 @id @default(uuid())
+  companyId             String
+  categoryId            String?
+  brandId               String?
+  specificationId       String?
+  materialCode          String                 @unique
+  name                  String
+  description           String?
+  hsnCode               String?
+  gst                   Decimal                @db.Decimal(5, 2)
+  unit                  String
+  weight                Decimal?               @db.Decimal(10, 3)
+  color                 String?
   alternativeMaterialId String?
-
-  preferredVendorId String?
-
-  isActive Boolean @default(true)
-
-  createdById String
-
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
-
-  type         MaterialType @default(RAW)
-  reorderLevel Decimal?     @db.Decimal(15, 3)
-  reorderQty   Decimal?     @db.Decimal(15, 3)
-  leadDays     Int?
-
-  preferredVendor Vendor? @relation(fields: [preferredVendorId], references: [id])
-
-  stockTransfers    StockTransfer[]
-  bomItems          BOMItem[]
-  goodsReceiptItems GoodsReceiptItem[]
-  inspections       Inspection[]
-  inventories       Inventory[]
-
-  alternative  Material?  @relation("MaterialAlternative", fields: [alternativeMaterialId], references: [id])
-  alternatives Material[] @relation("MaterialAlternative")
-
-  brand MaterialBrand? @relation(fields: [brandId], references: [id])
-
-  company Company @relation(fields: [companyId], references: [id])
-
-  createdBy User @relation(fields: [createdById], references: [id])
-
-  specification MaterialSpecification? @relation(fields: [specificationId], references: [id])
-
-  purchaseOrderItems   PurchaseOrderItem[]
-  purchaseRequestItems PurchaseRequestItem[]
-  workOrderItems       WorkOrderItem[]
-  workOrders           WorkOrder[]
+  preferredVendorId     String?
+  isActive              Boolean                @default(true)
+  createdById           String
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  deletedAt             DateTime?
+  stockTransfers        StockTransfer[]
+  bomItems              BOMItem[]
+  goodsReceiptItems     GoodsReceiptItem[]
+  type                  MaterialType           @default(RAW)
+  inspections           Inspection[]
+  inventories           Inventory[]
+  alternative           Material?              @relation("MaterialAlternative", fields: [alternativeMaterialId], references: [id])
+  alternatives          Material[]             @relation("MaterialAlternative")
+  brand                 MaterialBrand?         @relation(fields: [brandId], references: [id])
+  category              MaterialCategory?      @relation(fields: [categoryId], references: [id])
+  company               Company                @relation(fields: [companyId], references: [id])
+  createdBy             User                   @relation(fields: [createdById], references: [id])
+  specification         MaterialSpecification? @relation(fields: [specificationId], references: [id])
+  vendorId              String?
+  vendor                Vendor?                @relation(fields: [vendorId], references: [id])
+  purchaseOrderItems    PurchaseOrderItem[]
+  purchaseRequestItems  PurchaseRequestItem[]
+  workOrderItems        WorkOrderItem[]
+  workOrders            WorkOrder[]
 
   @@index([companyId])
   @@index([materialCode])
-  @@index([category])
-  @@index([preferredVendorId])
+  @@index([categoryId])
   @@map("materials")
 }
 
@@ -1571,7 +1552,7 @@ model MaterialCategory {
   company     Company            @relation(fields: [companyId], references: [id])
   parent      MaterialCategory?  @relation("MaterialCategoryHierarchy", fields: [parentId], references: [id])
   children    MaterialCategory[] @relation("MaterialCategoryHierarchy")
-  // materials   Material[]
+  materials   Material[]
 
   @@unique([companyId, code])
   @@index([companyId])
