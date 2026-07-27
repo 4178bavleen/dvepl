@@ -28,7 +28,11 @@ async function adminInventoryReadRoutes(
         const items = await fastify.prisma.inventory.findMany({
           where: { companyId, deletedAt: null },
           include: {
-            material: true,
+            material: {
+              include: {
+                preferredVendor: true,
+              },
+            },
             warehouse: true,
             bin: true,
           },
@@ -76,7 +80,11 @@ async function adminInventoryReadRoutes(
         const item = await fastify.prisma.inventory.findFirst({
           where: { id, companyId },
           include: {
-            material: true,
+            material: {
+              include: {
+                preferredVendor: true,
+              },
+            },
             warehouse: true,
             bin: true,
           },

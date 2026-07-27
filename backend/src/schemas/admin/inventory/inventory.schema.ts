@@ -87,6 +87,7 @@ export const inventoryUpdateSchema = z.object({
   serialNo: z.string().trim().optional().nullable(),
 
   barcode: z.string().trim().optional().nullable(),
+  preferredVendorId: z.string().uuid().optional().nullable(),
 
   qrCode: z.string().trim().optional().nullable(),
 
@@ -107,6 +108,9 @@ export const inventoryStockInSchema = z.object({
 export const inventoryStockOutSchema = z.object({
   inventoryId: z.string().uuid(),
   quantity: z.coerce.number().positive(),
+  referenceType: z.string().min(1),
+
+  referenceId: z.string().min(1),
   remarks: z.string().optional(),
 });
 
