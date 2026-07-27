@@ -33,6 +33,8 @@ export const inventorySchema = z.object({
 
   vendorContact: z.string().optional(),
 
+  preferredVendorId: z.string().uuid().optional().nullable(), // 👈 ADD THIS
+
   warehouseId: z.string().uuid().optional().nullable(),
 
   binId: z.string().uuid().optional().nullable(),

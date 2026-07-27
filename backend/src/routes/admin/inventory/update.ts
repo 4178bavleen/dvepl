@@ -123,11 +123,13 @@ async function adminInventoryUpdateRoutes(
 
               hsnCode: data.hsnCode ?? undefined,
 
-              // 👇 ADD THIS
-              preferredVendorId:
+              preferredVendor:
                 data.preferredVendorId === undefined
                   ? undefined
-                  : data.preferredVendorId,
+                  : data.preferredVendorId === null ||
+                      data.preferredVendorId === ""
+                    ? { disconnect: true }
+                    : { connect: { id: data.preferredVendorId } },
 
               reorderLevel:
                 data.reorderLevel !== undefined
