@@ -211,39 +211,60 @@ export const attendanceConfig = {
     { label: "Attendance Logs" },
   ],
   columns: [
-    { accessorKey: "date", header: sortableHeader("Date") },
+    {
+      accessorKey: "date",
+      header: sortableHeader("Date"),
+      cell: ({ getValue }) => {
+        const val = getValue() as string;
+        if (!val) return "—";
+        return new Date(val).toLocaleDateString("en-IN", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        });
+      },
+    },
     {
       accessorKey: "employeeId",
-      header: "Employee Code",
-      cell: ({ getValue }) => {
-        const id = getValue();
-        if (id === "emp-1") return "Gabriel Dhillon (EMP-001)";
-        if (id === "emp-2") return "Rajesh Kumar (EMP-002)";
-        if (id === "emp-3") return "Priya Sharma (EMP-003)";
-        return String(id);
+      header: "Emp Code",
+      cell: ({ row }) =>
+        row.original.employee?.employeeCode ?? row.original.employeeId,
+    },
+    {
+      id: "employeeName",
+      header: "Employee Name",
+      cell: ({ row }) => {
+        const emp = row.original.employee;
+        return emp
+          ? `${emp.firstName} ${emp.lastName}`
+          : "—";
       },
     },
     {
       accessorKey: "checkIn",
-      header: "Check In",
-      cell: ({ getValue }) =>
-        getValue()
-          ? new Date(getValue() as string).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })
-          : "—",
+      header: "Check In Time",
+      cell: ({ getValue }) => {
+        const val = getValue() as string;
+        if (!val) return "—";
+        return new Date(val).toLocaleTimeString("en-IN", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        });
+      },
     },
     {
       accessorKey: "checkOut",
-      header: "Check Out",
-      cell: ({ getValue }) =>
-        getValue()
-          ? new Date(getValue() as string).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })
-          : "—",
+      header: "Check Out Time",
+      cell: ({ getValue }) => {
+        const val = getValue() as string;
+        if (!val) return "—";
+        return new Date(val).toLocaleTimeString("en-IN", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        });
+      },
     },
     {
       accessorKey: "status",
@@ -353,17 +374,7 @@ export const leaveConfig = {
   },
   breadcrumbs: [{ label: "Dashboard", href: "/" }, { label: "Leaves" }],
   columns: [
-    {
-      accessorKey: "employeeId",
-      header: "Employee",
-      cell: ({ getValue }) => {
-        const id = getValue();
-        if (id === "emp-1") return "Gabriel Dhillon";
-        if (id === "emp-2") return "Rajesh Kumar";
-        if (id === "emp-3") return "Priya Sharma";
-        return String(id);
-      },
-    },
+    { accessorKey: "employeeId", header: "Employee" },
     { accessorKey: "leaveType", header: "Leave Type" },
     {
       accessorKey: "fromDate",

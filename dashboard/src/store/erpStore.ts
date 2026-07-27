@@ -1,12 +1,10 @@
 import { create } from 'zustand';
 import { 
-  EmployeeStatus, AttendanceStatus, LeaveStatus, 
-  CommunicationType, TenderStatus, TenderRequestSource, TenderRequestStatus,
   ReferenceCodeAction, Company, Branch, Department, Team, Designation,
   CostCenter, User, Role, PermissionGroup, Permission, Employee, 
-  Attendance, Leave, Salary, Customer, ContactPerson, CommunicationHistory,
+  Attendance, Leave, Salary,
   Tender, TenderRequest, GovernmentDepartment, Section, Division,
-  SubDivision, ReferenceCode, AuditLog, Shift, Holiday, DeliveryOrder, DeliveryStatus
+  SubDivision, ReferenceCode, AuditLog, Shift, Holiday, DeliveryOrder, 
 } from '../types/erp';
 
 interface ERPStore {
