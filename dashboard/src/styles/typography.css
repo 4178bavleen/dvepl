@@ -1,7 +1,7 @@
 @layer base {
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+    font-family: "Inter", system-ui, sans-serif;
     transition:
       background-color .25s ease,
       color .25s ease;

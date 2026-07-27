@@ -40,14 +40,12 @@ import adminSubDivisionRouteGroup from "./subDivision/index";
 import adminDeptRouteGroup from "./department/index";
 import adminTeamRouteGroup from "./team/index";
 import adminTechnicalClarificationRouteGroup from "./technicalClarification/index";
-import adminInventoryRouteGroup from "./inventory/index"
 
 import adminOrderRouteGroup from "./salesOrder/index";
 import adminVendorRouteGroup from "./vendor/index"
 import adminTaskRouteGroup from "./task/index";
 import adminReportsRouteGroup from "./reports/index";
 import adminPaymentRouteGroup from "./payment/index";
-
 
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 
@@ -181,9 +179,6 @@ async function adminRoutes(
     });
     fastify.register(adminPaymentRouteGroup, {
       prefix: "/payment",
-    });
-       fastify.register(adminInventoryRouteGroup, {
-      prefix: "/inventory",
     });
   });
 }

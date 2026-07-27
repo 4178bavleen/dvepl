@@ -14,10 +14,8 @@ export default {
       },
     },
     extend: {
-      fontFamily: {
-        sans: ["Plus Jakarta Sans", "system-ui", "sans-serif"],
-      },
       colors: {
+        border: "shadow-sm hsl(var(--border))",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
