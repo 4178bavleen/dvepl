@@ -320,6 +320,7 @@ export function OrdersPage() {
           total: o.grandTotal ?? o.total ?? o.totalAmount ?? 0,
           subtotal: o.subtotal ?? 0,
           gstTotal: o.gstTotal ?? 0,
+          customFields: o.customFields || {},
           lineItems: (o.items || []).map((item: any) => {
             const qty = Number(item.quantity || 0);
             const amount = Number(item.rate ?? item.unitPrice ?? 0);
@@ -658,7 +659,7 @@ export function OrdersPage() {
         });
       }
       setErrors(errs);
-      toast.error("Please fix form validation errors");
+      toast.error("Please complete all required fields before submitting.");
       return;
     }
 

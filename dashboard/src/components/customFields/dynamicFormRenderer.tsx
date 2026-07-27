@@ -71,9 +71,8 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
   afterFieldPosition
 }) => {
   // Filter active & form visible fields
-  // Use !== false so that undefined/null from API still shows the field (opt-out, not opt-in)
   const filteredFields = fields
-    .filter(f => f.isActive !== false && f.showInForm !== false)
+    .filter(f => f.isActive && f.showInForm)
     .filter(f => afterFieldPosition ? f.afterField === afterFieldPosition : true)
     .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
 

@@ -28,7 +28,7 @@ export function useDynamicCustomFields(module: string) {
   // Dynamic table columns generation
   const tableCustomColumns = useMemo<ColumnDef<any, any>[]>(() => {
     return (fields
-      .filter((f) => f.isActive !== false && f.showInTable !== false)
+      .filter((f) => f.isActive && f.showInTable)
       .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
       .map((f) => ({
         id: `cf_${f.key}`,
@@ -58,7 +58,7 @@ export function validateCustomFields(
 ): Record<string, string> {
   const errors: Record<string, string> = {};
   fields.forEach((field) => {
-    if (field.isActive !== false && field.showInForm !== false && field.required) {
+    if (field.isActive && field.showInForm && field.required) {
       const val = values[field.key];
       const isBlank =
         val === undefined ||

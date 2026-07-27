@@ -835,25 +835,22 @@ export function DeliveryPage() {
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-3 border-t border-slate-100 text-xs text-slate-500">
           <div className="flex items-center gap-2">
             <span>Rows per page:</span>
-            <Select value={String(rowsPerPage)} onValueChange={(val) => { setRowsPerPage(Number(val)); setCurrentPage(1); }}>
-              <SelectTrigger className="w-24 h-8 text-xs">
+            <Select value={String(rowsPerPage)} onValueChange={(val) => setRowsPerPage(Number(val))}>
+              <SelectTrigger className="w-16 h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="10">10</SelectItem>
                 <SelectItem value="25">25</SelectItem>
                 <SelectItem value="50">50</SelectItem>
-                <SelectItem value="99999">Show All</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="flex items-center gap-3">
             <span>
-              {rowsPerPage >= 99999
-                ? `Showing all ${filteredOrders.length} records`
-                : `Showing ${filteredOrders.length === 0 ? 0 : (currentPage - 1) * rowsPerPage + 1} – ${Math.min(currentPage * rowsPerPage, filteredOrders.length)} of ${filteredOrders.length}`
-              }
+              Showing {filteredOrders.length === 0 ? 0 : (currentPage - 1) * rowsPerPage + 1} -{' '}
+              {Math.min(currentPage * rowsPerPage, filteredOrders.length)} of {filteredOrders.length}
             </span>
             <div className="flex items-center gap-1">
               <Button
