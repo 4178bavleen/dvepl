@@ -96,83 +96,87 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen w-screen flex flex-col lg:flex-row bg-[#F8FAFC] text-slate-900 font-['Poppins',sans-serif] overflow-x-hidden">
+    <div className="min-h-screen w-screen flex flex-col lg:flex-row bg-[#F8FAFC] text-slate-900 font-sans overflow-x-hidden">
       {/* LEFT PANEL - CLEAN LIGHT CORPORATE SLATE WITH ASSET BACKGROUND */}
-      <div className="relative w-full lg:w-1/2 min-h-[480px] lg:min-h-screen flex flex-col justify-between p-8 lg:p-14 overflow-hidden border-b lg:border-b-0 lg:border-r border-slate-200/80 bg-slate-100 text-slate-900">
+      <div className="relative w-full lg:w-[60%] min-h-[480px] lg:min-h-screen flex flex-col justify-between p-8 lg:p-14 overflow-hidden border-b lg:border-b-0 lg:border-r border-slate-200/80 bg-slate-100 text-slate-900">
         {/* Background Image Asset */}
         <div
           className="absolute inset-0 bg-cover bg-center"
           style={{ backgroundImage: `url(${bgImg})` }}
         />
-        {/* Light Overlay */}
-        <div className="absolute inset-0 bg-white/80 backdrop-blur-[2px]" />
+        {/* Dark Overlay */}
+        <div className="absolute inset-0 bg-slate-950/75 backdrop-blur-[2px]" />
 
         {/* Ambient Glows */}
-        <div className="absolute top-0 left-0 w-96 h-96 bg-emerald-200/30 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-200/30 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-0 left-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 space-y-10">
-          {/* Logo Row */}
+        {/* Top Logo Header */}
+        <div className="relative z-10">
           <div className="flex items-center gap-3">
-            <img src={logoImg} alt="DVEPL Logo" className="h-12 w-auto object-contain bg-white px-3 py-1.5 rounded-xl shadow-xs border border-slate-200/80" />
+            <img src={logoImg} alt="DVEPL Logo" className="h-24 w-auto object-contain px-3 py-1.5 rounded-xl shadow-xs" />
           </div>
+        </div>
 
+        {/* Bottom Content Group (Hero Text + Feature Cards + Footer) */}
+        <div className="relative z-10 mt-auto pt-12 space-y-8">
           {/* Hero Text */}
-          <div className="space-y-4 max-w-xl">
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight leading-tight">
-              <span className="text-slate-900">Powering Industrial</span>
+          <div className="space-y-4 max-w-2xl">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-tight">
+              <span className="text-white">Powering Industrial</span>
               <br />
-              <span className="text-emerald-600">Excellence</span>
+              <span className="text-emerald-400">Excellence</span>
             </h1>
-            <p className="text-slate-600 text-xs sm:text-sm leading-relaxed max-w-lg">
+            <p className="text-slate-300 text-sm sm:text-base leading-relaxed max-w-xl">
               Secure access to DVEPL Workspace for order management, production tracking, inventory monitoring and enterprise operations.
             </p>
           </div>
 
           {/* Feature Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
-            <div className="bg-white/80 backdrop-blur-md border border-slate-200/90 p-4 rounded-2xl space-y-2.5 shadow-xs hover:border-emerald-500/50 hover:shadow-md transition-all">
-              <div className="p-2.5 bg-emerald-100/70 text-emerald-700 rounded-xl w-fit">
-                <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+            <div className="bg-slate-900/60 backdrop-blur-md border border-slate-700/60 p-5 rounded-2xl space-y-3 shadow-sm hover:border-emerald-500/50 hover:shadow-md transition-all">
+              <div className="p-3 bg-emerald-500/20 text-emerald-400 rounded-xl w-fit">
+                <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6">
                   <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
                 </svg>
               </div>
-              <h3 className="text-xs font-bold text-slate-900">Real-Time Order Tracking</h3>
-              <p className="text-[11px] text-slate-500 leading-normal">Live status updates across entire supply chains.</p>
+              <h3 className="text-sm sm:text-base font-bold text-white">Real-Time Order Tracking</h3>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">Live status updates across entire supply chains.</p>
             </div>
 
-            <div className="bg-white/80 backdrop-blur-md border border-slate-200/90 p-4 rounded-2xl space-y-2.5 shadow-xs hover:border-emerald-500/50 hover:shadow-md transition-all">
-              <div className="p-2.5 bg-emerald-100/70 text-emerald-700 rounded-xl w-fit">
-                <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5">
+            <div className="bg-slate-900/60 backdrop-blur-md border border-slate-700/60 p-5 rounded-2xl space-y-3 shadow-sm hover:border-emerald-500/50 hover:shadow-md transition-all">
+              <div className="p-3 bg-emerald-500/20 text-emerald-400 rounded-xl w-fit">
+                <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6">
                   <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.8" />
                   <path d="M7 16l3-4 3 3 3-5 2 2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </div>
-              <h3 className="text-xs font-bold text-slate-900">Production Monitoring</h3>
-              <p className="text-[11px] text-slate-500 leading-normal">Granular analytics for factory output efficiency.</p>
+              <h3 className="text-sm sm:text-base font-bold text-white">Production Monitoring</h3>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">Granular analytics for factory output efficiency.</p>
             </div>
 
-            <div className="bg-white/80 backdrop-blur-md border border-slate-200/90 p-4 rounded-2xl space-y-2.5 shadow-xs hover:border-emerald-500/50 hover:shadow-md transition-all">
-              <div className="p-2.5 bg-emerald-100/70 text-emerald-700 rounded-xl w-fit">
-                <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5">
+            <div className="bg-slate-900/60 backdrop-blur-md border border-slate-700/60 p-5 rounded-2xl space-y-3 shadow-sm hover:border-emerald-500/50 hover:shadow-md transition-all">
+              <div className="p-3 bg-emerald-500/20 text-emerald-400 rounded-xl w-fit">
+                <svg viewBox="0 0 24 24" fill="none" className="w-6 h-6">
                   <rect x="5" y="11" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.8" />
                   <path d="M8 11V7a4 4 0 0 1 8 0v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
                   <circle cx="12" cy="16" r="1.2" fill="currentColor" />
                 </svg>
               </div>
-              <h3 className="text-xs font-bold text-slate-900">Secure Enterprise Access</h3>
-              <p className="text-[11px] text-slate-500 leading-normal">Encrypted multi-factor authentication protocols.</p>
+              <h3 className="text-sm sm:text-base font-bold text-white">Secure Enterprise Access</h3>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">Encrypted multi-factor authentication protocols.</p>
             </div>
           </div>
-        </div>
 
-        <div className="relative z-10 pt-8 text-[11px] text-slate-500 flex flex-wrap gap-4 items-center">
-          <span>&copy; {new Date().getFullYear()} DVEPL. All rights reserved.</span>
+          {/* Footer Text */}
+          <div className="pt-2 text-[11px] text-slate-400 flex flex-wrap gap-4 items-center">
+            <span>&copy; {new Date().getFullYear()} DVEPL. All rights reserved.</span>
+          </div>
         </div>
       </div>
 
       {/* RIGHT PANEL */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 bg-slate-50">
+      <div className="w-full lg:w-[40%] flex items-center justify-center p-6 sm:p-12 bg-slate-50">
         <div className="w-full max-w-md bg-white border border-slate-200/90 rounded-3xl p-8 sm:p-10 shadow-xl shadow-slate-200/60 space-y-6">
           {/* Shield Icon */}
           <div className="flex flex-col items-center text-center space-y-3">
@@ -188,7 +192,7 @@ export function LoginPage() {
             </div>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-5" >
+          <form onSubmit={handleLogin} className="space-y-5" autoComplete="off">
             <div className="space-y-2">
               <label htmlFor="email" className="text-xs font-semibold text-slate-700 block">
                 Email Address
@@ -206,7 +210,7 @@ export function LoginPage() {
                   name="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@dvepl.com"
+                  autoComplete="off"
                   required
                   className="w-full h-11 pl-10 pr-4 bg-slate-50/50 border border-slate-300 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
                 />
@@ -230,7 +234,7 @@ export function LoginPage() {
                   name="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  autoComplete="new-password"
                   required
                   className="w-full h-11 pl-10 pr-10 bg-slate-50/50 border border-slate-300 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
                 />

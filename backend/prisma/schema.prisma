@@ -2836,10 +2836,3 @@ enum Priority {
   HIGH
   CRITICAL
 }
-
-enum MaterialType {
-  RAW
-  FINISHED
-  SEMI_FINISHED
-  CONSUMABLE
-}

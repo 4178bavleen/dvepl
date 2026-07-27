@@ -300,13 +300,16 @@ request.user.id
 
 
 
-return vendor;
+          // Save EAV Custom Field Values if provided
+          if ((request.body as any)?.customFields) {
+            const { CustomFieldService } = await import("../../../services/customFieldService");
+            const cfService = new CustomFieldService(tx as any);
+            await cfService.saveValues("vendor", id, (request.body as any).customFields);
+          }
 
-
-
-}
-
-);
+          return vendor;
+        }
+      );
 
 
 

@@ -28,6 +28,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { ColumnDef } from '@tanstack/react-table';
+import { ConfirmDialog } from '@/components/shared/confirmDialog';
 
 interface QuotationItemInput {
   slNo: number;
@@ -53,6 +54,8 @@ export function QuotationsPage() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isResponseDialogOpen, setIsResponseDialogOpen] = useState(false);
   const [isRevisionDialogOpen, setIsRevisionDialogOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [quotationToDelete, setQuotationToDelete] = useState<any | null>(null);
 
   // Selected records
   const [editingQuotation, setEditingQuotation] = useState<any | null>(null);
@@ -448,15 +451,9 @@ export function QuotationsPage() {
           }
           openEditMode(row);
         }}
-        onDelete={async (row) => {
-          if (!window.confirm('Are you sure you want to delete this quotation?')) return;
-          try {
-            await quotationApi.quotations.remove!(row.id);
-            toast.success('Quotation deleted successfully.');
-            await loadAllData();
-          } catch (err: any) {
-            toast.error(err.response?.data?.message ?? 'Failed to delete.');
-          }
+        onDelete={(row) => {
+          setQuotationToDelete(row);
+          setDeleteConfirmOpen(true);
         }}
         isLoading={isLoading}
       />
@@ -983,6 +980,26 @@ export function QuotationsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Move Quotation to Recycle Bin?"
+        description="This quotation will be moved to the Recycle Bin. You can restore it anytime from Settings → Recycle Bin."
+        confirmText="Move to Bin"
+        onConfirm={async () => {
+          if (!quotationToDelete) return;
+          try {
+            await quotationApi.quotations.remove!(quotationToDelete.id);
+            toast.success('Quotation deleted successfully.');
+            await loadAllData();
+          } catch (err: any) {
+            toast.error(err.response?.data?.message ?? 'Failed to delete quotation.');
+          } finally {
+            setQuotationToDelete(null);
+          }
+        }}
+      />
     </div>
   );
 }

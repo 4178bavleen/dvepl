@@ -64,6 +64,8 @@ const ApprovalRequestsPage = lazy(() => import('@/pages/roles/approvalRequestsPa
 const AuditLogsPage = lazy(() => import('@/pages/audit/auditLogsPage'));
 
 const SettingsPage = lazy(() => import('@/pages/settings/settingsPage'));
+const CustomFieldsPage = lazy(() => import('@/pages/settings/customFieldsPage'));
+const RecycleBinPage = lazy(() => import('@/pages/settings/recycleBinPage'));
 const ProfilePage = lazy(() => import('@/pages/profile/profilePage'));
 
 // Materials & Master Catalog
@@ -91,6 +93,7 @@ const InspectionsPage = lazy(() => import('@/pages/qc/inspectionsPage'));
 const PaymentsPage = lazy(() => import('@/pages/finance/paymentsPage'));
 const PaymentHistoryPage = lazy(() => import('@/pages/finance/paymentHistoryPage'));
 const NotificationsPage = lazy(() => import('@/pages/notifications/notificationsPage'));
+const DeliveryPage = lazy(() => import('@/pages/delivery/deliveryPage'));
 
 
 
@@ -166,6 +169,7 @@ export function AppRouter() {
               <Route path="/inventory/stocks" element={<InventoryStocksPage />} />
               <Route path="/inventory/transfers" element={<StockTransfersPage />} />
               <Route path="/logistics/dispatches" element={<LogisticsDispatchesPage />} />
+              <Route path="/logistics/delivery" element={<DeliveryPage />} />
 
               {/* Production */}
               <Route path="/production/plans" element={<ProductionPlansPage />} />
@@ -182,6 +186,8 @@ export function AppRouter() {
               <Route path="/reports" element={<ReportsPage />} />
               {/* Settings */}
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/settings/custom-fields" element={<CustomFieldsPage />} />
+              <Route path="/settings/recycle-bin" element={<RecycleBinPage />} />
               <Route path="/settings/profile" element={<ProfilePage />} />
               <Route path="/settings/notifications" element={<NotificationsPage />} />
             </Route>

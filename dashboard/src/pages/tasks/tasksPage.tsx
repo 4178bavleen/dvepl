@@ -23,6 +23,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogTitle, DialogHeader } from "@/components/ui/dialog";
 import { hrmsApi } from "@/services/modules";
+import { apiClient } from "@/services/axios";
+import { DynamicFormRenderer } from "@/components/customFields/dynamicFormRenderer";
+import { useDynamicCustomFields, validateCustomFields } from "@/hooks/useDynamicCustomFields";
+import { ConfirmDialog } from "@/components/shared/confirmDialog";
 
 // Definitions
 interface Task {
@@ -92,6 +96,11 @@ export default function TasksPage() {
   const [filterUser, setFilterUser] = useState("");
   const [sortBy, setSortBy] = useState("due-soonest");
 
+  // Dynamic Custom Fields for Tasks
+  const { fields: taskCustomFields, tableCustomColumns: taskTableCustomCols } = useDynamicCustomFields("task");
+  const [taskCustomValues, setTaskCustomValues] = useState<Record<string, any>>({});
+  const [taskErrors, setTaskErrors] = useState<Record<string, string>>({});
+
   // Form Modal States
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -157,27 +166,42 @@ export default function TasksPage() {
   const handleSaveTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formValues.title.trim()) {
-      toast.error("Task title is required.");
+      toast.error("Please provide a task title.");
       return;
     }
     if (!formValues.dueDate) {
-      toast.error("Due date is required.");
+      toast.error("Please select a valid due date.");
+      return;
+    }
+
+    const cfErrs = validateCustomFields(taskCustomFields, taskCustomValues);
+    if (Object.keys(cfErrs).length > 0) {
+      setTaskErrors(cfErrs);
+      toast.error("Please review required custom fields before saving.");
       return;
     }
 
     try {
       const payload = {
         ...formValues,
-        assignedUserIds: selectedUserIds
+        assignedUserIds: selectedUserIds,
+        customFields: taskCustomValues
       };
 
+      let taskId = editingTask?.id;
       if (editingTask) {
         await apiService.tasks.update(editingTask.id, payload);
         toast.success("Task updated successfully.");
       } else {
-        await apiService.tasks.create(payload);
+        const res = await apiService.tasks.create(payload);
+        taskId = res.data?.id || res.id;
         toast.success("Task created successfully.");
       }
+
+      if (taskId && Object.keys(taskCustomValues).length > 0) {
+        await apiClient.post(`/custom-fields/values/task/${taskId}`, { values: taskCustomValues });
+      }
+
       loadData();
       setIsFormOpen(false);
       resetForm();
@@ -187,16 +211,26 @@ export default function TasksPage() {
     }
   };
 
-  // Delete Task in state
-  const handleDeleteTask = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this task?")) return;
+  const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
+  const handleDeleteTask = (id: string) => {
+    setTaskToDelete(id);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDeleteTask = async () => {
+    if (!taskToDelete) return;
     try {
-      await apiService.tasks.delete(id);
+      await apiService.tasks.delete(taskToDelete);
       toast.success("Task deleted successfully.");
       loadData();
     } catch (err: any) {
       console.error(err);
       toast.error("Failed to delete task.");
+    } finally {
+      setTaskToDelete(null);
+      setDeleteConfirmOpen(false);
     }
   };
 
@@ -240,6 +274,7 @@ export default function TasksPage() {
   // Helper: Open Edit Modal
   const openEdit = (task: Task) => {
     setEditingTask(task);
+    setTaskCustomValues((task as any).customFields || {});
     setFormValues({
       title: task.title,
       description: task.description,
@@ -266,6 +301,7 @@ export default function TasksPage() {
 
   const resetForm = () => {
     setEditingTask(null);
+    setTaskCustomValues({});
     setFormValues({
       title: "",
       description: "",
@@ -712,6 +748,18 @@ export default function TasksPage() {
                 className="h-9 text-xs"
               />
             </div>
+            {taskCustomFields.some(f => f.afterField === 'title') && (
+              <DynamicFormRenderer
+                fields={taskCustomFields}
+                values={taskCustomValues}
+                onChange={(key, val) => {
+                  setTaskCustomValues((prev) => ({ ...prev, [key]: val }));
+                  if (taskErrors[key]) setTaskErrors((prev) => ({ ...prev, [key]: "" }));
+                }}
+                errors={taskErrors}
+                afterFieldPosition="title"
+              />
+            )}
 
             <div className="space-y-1">
               <Label className="text-xs font-semibold text-muted-foreground">Description</Label>
@@ -723,6 +771,18 @@ export default function TasksPage() {
                 className="w-full text-xs p-2.5 rounded-lg border border-border bg-background text-foreground outline-none focus:border-primary"
               />
             </div>
+            {taskCustomFields.some(f => f.afterField === 'description') && (
+              <DynamicFormRenderer
+                fields={taskCustomFields}
+                values={taskCustomValues}
+                onChange={(key, val) => {
+                  setTaskCustomValues((prev) => ({ ...prev, [key]: val }));
+                  if (taskErrors[key]) setTaskErrors((prev) => ({ ...prev, [key]: "" }));
+                }}
+                errors={taskErrors}
+                afterFieldPosition="description"
+              />
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
@@ -750,6 +810,18 @@ export default function TasksPage() {
                 />
               </div>
             </div>
+            {taskCustomFields.some(f => f.afterField === 'priority' || f.afterField === 'dueDate') && (
+              <DynamicFormRenderer
+                fields={taskCustomFields}
+                values={taskCustomValues}
+                onChange={(key, val) => {
+                  setTaskCustomValues((prev) => ({ ...prev, [key]: val }));
+                  if (taskErrors[key]) setTaskErrors((prev) => ({ ...prev, [key]: "" }));
+                }}
+                errors={taskErrors}
+                afterFieldPosition={taskCustomFields.find(f => f.afterField === 'priority' || f.afterField === 'dueDate')?.afterField}
+              />
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
@@ -765,6 +837,31 @@ export default function TasksPage() {
                 </select>
               </div>
             </div>
+            {taskCustomFields.some(f => f.afterField === 'status') && (
+              <DynamicFormRenderer
+                fields={taskCustomFields}
+                values={taskCustomValues}
+                onChange={(key, val) => {
+                  setTaskCustomValues((prev) => ({ ...prev, [key]: val }));
+                  if (taskErrors[key]) setTaskErrors((prev) => ({ ...prev, [key]: "" }));
+                }}
+                errors={taskErrors}
+                afterFieldPosition="status"
+              />
+            )}
+
+            {/* Dynamic Custom Fields at end */}
+            {taskCustomFields.some(f => !f.afterField || f.afterField === 'end' || f.afterField === 'assignedUsers') && (
+                <DynamicFormRenderer
+                  fields={taskCustomFields.filter(f => !f.afterField || f.afterField === 'end' || f.afterField === 'assignedUsers')}
+                  values={taskCustomValues}
+                  onChange={(key, val) => {
+                    setTaskCustomValues((prev) => ({ ...prev, [key]: val }));
+                    if (taskErrors[key]) setTaskErrors((prev) => ({ ...prev, [key]: "" }));
+                  }}
+                  errors={taskErrors}
+                />
+            )}
 
             <div className="space-y-2 border-t pt-4">
               <Label className="text-xs font-semibold text-muted-foreground">Assigned To</Label>
@@ -968,6 +1065,15 @@ export default function TasksPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Move Task to Recycle Bin?"
+        description="This task will be moved to the Recycle Bin. You can restore it anytime from Settings → Recycle Bin."
+        confirmText="Move to Bin"
+        onConfirm={confirmDeleteTask}
+      />
     </div>
   );
 }

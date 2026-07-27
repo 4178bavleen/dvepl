@@ -22,7 +22,11 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from 'react-hot-toast';
 import { tenderApi } from '@/services/modules';
+import { apiClient } from '@/services/axios';
 import { useERPStore } from '@/store/erpStore';
+import { DynamicFormRenderer } from '@/components/customFields/dynamicFormRenderer';
+import { useDynamicCustomFields, validateCustomFields } from '@/hooks/useDynamicCustomFields';
+import { ConfirmDialog } from '@/components/shared/confirmDialog';
 import '@/styles/vendors.css';
 
 // Interfaces
@@ -191,6 +195,19 @@ export function VendorsPage() {
   const [newColName, setNewColName] = useState('');
   const [isAddingCol, setIsAddingCol] = useState(false);
 
+  // Confirm Dialog States
+  const [clearRowsConfirmOpen, setClearRowsConfirmOpen] = useState(false);
+  const [removeColConfirmOpen, setRemoveColConfirmOpen] = useState(false);
+  const [colToRemove, setColToRemove] = useState<string | null>(null);
+  const [deleteRevisionConfirmOpen, setDeleteRevisionConfirmOpen] = useState(false);
+  const [revisionToDelete, setRevisionToDelete] = useState<string | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [vendorToDelete, setVendorToDelete] = useState<string | null>(null);
+
+  // Dynamic EAV Custom Fields
+  const { fields: vendorCustomFields, tableCustomColumns: vendorTableCustomCols } = useDynamicCustomFields('vendor');
+  const [vCustomFields, setVCustomFields] = useState<Record<string, any>>({});
+
   // Vendor Form Fields
   const [vName, setVName] = useState('');
   const [vCategory, setVCategory] = useState('');
@@ -218,8 +235,11 @@ export function VendorsPage() {
     if (vGst.trim() && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(vGst.trim().toUpperCase())) {
       errs.gst = 'Enter a valid 15-character GSTIN (e.g. 22AAAAA0000A1Z5)';
     }
-    setVErrors(errs);
-    return Object.keys(errs).length === 0;
+
+    const cfErrs = validateCustomFields(vendorCustomFields, vCustomFields);
+    const combinedErrs = { ...errs, ...cfErrs };
+    setVErrors(combinedErrs);
+    return Object.keys(combinedErrs).length === 0;
   };
 
   // PO Form Fields
@@ -250,28 +270,37 @@ export function VendorsPage() {
     );
   }, [vendors, search]);
 
-  // Column Visibility State
-  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
-    name: true,
-    category: true,
-    contactPerson: true,
-    phone: true,
-    email: true,
-    gstNumber: true,
-    revisions: true,
-    dataEntry: true,
-  });
+  const ALL_VENDOR_COLUMNS = useMemo(() => {
+    const base = [
+      { id: 'name', label: 'Vendor Name' },
+      { id: 'category', label: 'Category' },
+      { id: 'contactPerson', label: 'Contact Person' },
+      { id: 'phone', label: 'Phone' },
+      { id: 'email', label: 'Email' },
+      { id: 'gstNumber', label: 'GSTIN' },
+      { id: 'revisions', label: 'Revision History' },
+      { id: 'dataEntry', label: 'Data Entry' },
+    ];
+    const cfCols = vendorCustomFields
+      .filter((f) => f.isActive && f.showInTable)
+      .map((f) => ({ id: `cf_${f.key}`, label: f.name }));
+    return [...base, ...cfCols];
+  }, [vendorCustomFields]);
 
-  const ALL_VENDOR_COLUMNS = [
-    { id: 'name', label: 'Vendor Name' },
-    { id: 'category', label: 'Category' },
-    { id: 'contactPerson', label: 'Contact Person' },
-    { id: 'phone', label: 'Phone' },
-    { id: 'email', label: 'Email' },
-    { id: 'gstNumber', label: 'GSTIN' },
-    { id: 'revisions', label: 'Revision History' },
-    { id: 'dataEntry', label: 'Data Entry' },
-  ];
+  // Column Visibility State
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    setVisibleColumns((prev) => {
+      const next = { ...prev };
+      ALL_VENDOR_COLUMNS.forEach((col) => {
+        if (next[col.id] === undefined) {
+          next[col.id] = true;
+        }
+      });
+      return next;
+    });
+  }, [ALL_VENDOR_COLUMNS]);
 
   const toggleColumn = (key: string) => {
     setVisibleColumns(prev => ({ ...prev, [key]: !prev[key] }));
@@ -356,9 +385,11 @@ export function VendorsPage() {
     }
   ], [revisions]);
 
-  const activeColumns = useMemo(() => {
-    return allTableColumns.filter(col => visibleColumns[col.id || (col as any).accessorKey]);
-  }, [allTableColumns, visibleColumns]);
+  const activeColumns = useMemo<ColumnDef<Vendor>[]>(() => {
+    const baseCols = allTableColumns.filter(col => visibleColumns[col.id || (col as any).accessorKey]);
+    const cfCols = (vendorTableCustomCols as any[]).filter(col => visibleColumns[col.id]);
+    return [...baseCols, ...cfCols] as ColumnDef<Vendor>[];
+  }, [allTableColumns, visibleColumns, vendorTableCustomCols]);
 
   // Form operations
   const resetVendorForm = () => {
@@ -371,6 +402,7 @@ export function VendorsPage() {
     setVGst('');
     setVAddress('');
     setVNotes('');
+    setVCustomFields({});
     setVErrors({});
     setIsFormOpen(false);
   };
@@ -385,17 +417,19 @@ export function VendorsPage() {
     setVGst(vendor.gstNumber);
     setVAddress(vendor.address);
     setVNotes(vendor.notes);
+    setVCustomFields((vendor as any).customFields || {});
     setIsFormOpen(true);
   };
 
   const handleSaveVendor = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateVendorForm()) {
-      toast.error('Please fix the validation errors before saving');
+      toast.error('Please review highlighted fields and correct required details.');
       return;
     }
 
     try {
+      let vendorId = editingVendor?.id;
       if (editingVendor) {
         await apiService.vendors.update(editingVendor.id, {
           name: vName,
@@ -409,7 +443,7 @@ export function VendorsPage() {
         });
         toast.success('Vendor updated successfully');
       } else {
-        await apiService.vendors.create({
+        const created = await apiService.vendors.create({
           name: vName,
           category: vCategory,
           contactPerson: vContact,
@@ -419,8 +453,14 @@ export function VendorsPage() {
           address: vAddress,
           notes: vNotes
         });
+        vendorId = created.id;
         toast.success('New vendor registered successfully');
       }
+
+      if (vendorId && Object.keys(vCustomFields).length > 0) {
+        await apiClient.post(`/custom-fields/values/vendor/${vendorId}`, { values: vCustomFields });
+      }
+
       const list = await apiService.vendors.list();
       setVendors(list);
       resetVendorForm();
@@ -429,24 +469,31 @@ export function VendorsPage() {
     }
   };
 
-  const handleDeleteVendor = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this vendor? All PO revisions will be deleted.')) {
-      try {
-        await apiService.vendors.delete(id);
-        const list = await apiService.vendors.list();
-        setVendors(list);
-        
-        const savedRev = localStorage.getItem('dvepl_po_revisions');
-        if (savedRev) {
-          const revList: PORevision[] = JSON.parse(savedRev);
-          const filtered = revList.filter(r => r.vendorId !== id);
-          localStorage.setItem('dvepl_po_revisions', JSON.stringify(filtered));
-          setRevisions(filtered);
-        }
-        toast.success('Vendor deleted');
-      } catch (err: any) {
-        toast.error('Failed to delete vendor');
+  const handleDeleteVendor = (id: string) => {
+    setVendorToDelete(id);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDeleteVendor = async () => {
+    if (!vendorToDelete) return;
+    try {
+      await apiService.vendors.delete(vendorToDelete);
+      const list = await apiService.vendors.list();
+      setVendors(list);
+      
+      const savedRev = localStorage.getItem('dvepl_po_revisions');
+      if (savedRev) {
+        const revList: PORevision[] = JSON.parse(savedRev);
+        const filtered = revList.filter(r => r.vendorId !== vendorToDelete);
+        localStorage.setItem('dvepl_po_revisions', JSON.stringify(filtered));
+        setRevisions(filtered);
       }
+      toast.success('Vendor deleted successfully');
+    } catch (err: any) {
+      toast.error('Failed to delete vendor');
+    } finally {
+      setVendorToDelete(null);
+      setDeleteConfirmOpen(false);
     }
   };
 
@@ -510,9 +557,7 @@ export function VendorsPage() {
   };
 
   const handleClearAllRows = () => {
-    if (window.confirm('Clear all line items?')) {
-      setPoItems([]);
-    }
+    setClearRowsConfirmOpen(true);
   };
 
   const updatePoItemField = (id: string, field: string, val: any) => {
@@ -554,15 +599,8 @@ export function VendorsPage() {
   };
 
   const handleRemoveCustomColumn = (colName: string) => {
-    if (window.confirm(`Are you sure you want to remove column "${colName}"?`)) {
-      setCustomColumns(prev => prev.filter(c => c !== colName));
-      setPoItems(prev => prev.map(item => {
-        const updated = { ...item };
-        delete updated[colName];
-        return updated;
-      }));
-      toast.success(`Column "${colName}" removed`);
-    }
+    setColToRemove(colName);
+    setRemoveColConfirmOpen(true);
   };
 
   // Save revision
@@ -688,19 +726,8 @@ export function VendorsPage() {
 
   const deleteRevision = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.confirm('Delete this revision permanently?')) {
-      try {
-        await apiService.revisions.delete(id);
-        const list = await apiService.revisions.list();
-        setRevisions(list);
-        if (selectedRevisionId === id) {
-          setSelectedRevisionId(null);
-        }
-        toast.success('Revision deleted');
-      } catch (err: any) {
-        toast.error('Failed to delete revision');
-      }
-    }
+    setRevisionToDelete(id);
+    setDeleteRevisionConfirmOpen(true);
   };
 
   const triggerExport = (format: string) => {
@@ -943,6 +970,21 @@ export function VendorsPage() {
               />
               {vErrors.name && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="size-3" />{vErrors.name}</p>}
             </div>
+            {vendorCustomFields.some(f => f.afterField === 'name') && (
+              <div className="sm:col-span-2">
+                <DynamicFormRenderer
+                  fields={vendorCustomFields}
+                  values={vCustomFields}
+                  onChange={(key, val) => {
+                    setVCustomFields(prev => ({ ...prev, [key]: val }));
+                    if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
+                  }}
+                  errors={vErrors}
+                  afterFieldPosition="name"
+                />
+              </div>
+            )}
+
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs font-semibold">Category</Label>
               <Input
@@ -951,6 +993,21 @@ export function VendorsPage() {
                 placeholder="e.g. Electrical, Mechanical"
               />
             </div>
+            {vendorCustomFields.some(f => f.afterField === 'category') && (
+              <div className="sm:col-span-2">
+                <DynamicFormRenderer
+                  fields={vendorCustomFields}
+                  values={vCustomFields}
+                  onChange={(key, val) => {
+                    setVCustomFields(prev => ({ ...prev, [key]: val }));
+                    if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
+                  }}
+                  errors={vErrors}
+                  afterFieldPosition="category"
+                />
+              </div>
+            )}
+
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs font-semibold">Contact Person</Label>
               <Input
@@ -959,6 +1016,21 @@ export function VendorsPage() {
                 placeholder="e.g. Rajesh Kumar"
               />
             </div>
+            {vendorCustomFields.some(f => f.afterField === 'contactPerson') && (
+              <div className="sm:col-span-2">
+                <DynamicFormRenderer
+                  fields={vendorCustomFields}
+                  values={vCustomFields}
+                  onChange={(key, val) => {
+                    setVCustomFields(prev => ({ ...prev, [key]: val }));
+                    if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
+                  }}
+                  errors={vErrors}
+                  afterFieldPosition="contactPerson"
+                />
+              </div>
+            )}
+
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs font-semibold">Phone</Label>
               <Input
@@ -975,6 +1047,21 @@ export function VendorsPage() {
               />
               {vErrors.phone && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="size-3" />{vErrors.phone}</p>}
             </div>
+            {vendorCustomFields.some(f => f.afterField === 'phone') && (
+              <div className="sm:col-span-2">
+                <DynamicFormRenderer
+                  fields={vendorCustomFields}
+                  values={vCustomFields}
+                  onChange={(key, val) => {
+                    setVCustomFields(prev => ({ ...prev, [key]: val }));
+                    if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
+                  }}
+                  errors={vErrors}
+                  afterFieldPosition="phone"
+                />
+              </div>
+            )}
+
             <div className="flex flex-col gap-1.5">
               <Label className="text-xs font-semibold">Email</Label>
               <Input
@@ -986,6 +1073,21 @@ export function VendorsPage() {
               />
               {vErrors.email && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="size-3" />{vErrors.email}</p>}
             </div>
+            {vendorCustomFields.some(f => f.afterField === 'email') && (
+              <div className="sm:col-span-2">
+                <DynamicFormRenderer
+                  fields={vendorCustomFields}
+                  values={vCustomFields}
+                  onChange={(key, val) => {
+                    setVCustomFields(prev => ({ ...prev, [key]: val }));
+                    if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
+                  }}
+                  errors={vErrors}
+                  afterFieldPosition="email"
+                />
+              </div>
+            )}
+
             <div className="flex flex-col gap-1.5 sm:col-span-2">
               <Label className="text-xs font-semibold">GST Number</Label>
               <Input
@@ -997,6 +1099,21 @@ export function VendorsPage() {
               />
               {vErrors.gst && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="size-3" />{vErrors.gst}</p>}
             </div>
+            {vendorCustomFields.some(f => f.afterField === 'gstNumber') && (
+              <div className="sm:col-span-2">
+                <DynamicFormRenderer
+                  fields={vendorCustomFields}
+                  values={vCustomFields}
+                  onChange={(key, val) => {
+                    setVCustomFields(prev => ({ ...prev, [key]: val }));
+                    if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
+                  }}
+                  errors={vErrors}
+                  afterFieldPosition="gstNumber"
+                />
+              </div>
+            )}
+
             <div className="flex flex-col gap-1.5 sm:col-span-2">
               <Label className="text-xs font-semibold">Address</Label>
               <Input
@@ -1005,6 +1122,21 @@ export function VendorsPage() {
                 placeholder="Full address"
               />
             </div>
+            {vendorCustomFields.some(f => f.afterField === 'address') && (
+              <div className="sm:col-span-2">
+                <DynamicFormRenderer
+                  fields={vendorCustomFields}
+                  values={vCustomFields}
+                  onChange={(key, val) => {
+                    setVCustomFields(prev => ({ ...prev, [key]: val }));
+                    if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
+                  }}
+                  errors={vErrors}
+                  afterFieldPosition="address"
+                />
+              </div>
+            )}
+
             <div className="flex flex-col gap-1.5 sm:col-span-2">
               <Label className="text-xs font-semibold">Notes</Label>
               <Textarea
@@ -1014,6 +1146,35 @@ export function VendorsPage() {
                 rows={2}
               />
             </div>
+            {vendorCustomFields.some(f => f.afterField === 'notes') && (
+              <div className="sm:col-span-2">
+                <DynamicFormRenderer
+                  fields={vendorCustomFields}
+                  values={vCustomFields}
+                  onChange={(key, val) => {
+                    setVCustomFields(prev => ({ ...prev, [key]: val }));
+                    if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
+                  }}
+                  errors={vErrors}
+                  afterFieldPosition="notes"
+                />
+              </div>
+            )}
+
+            {/* Dynamic EAV Custom Fields without specific afterField position or assigned to end */}
+            {vendorCustomFields.some(f => !f.afterField || f.afterField === 'end') && (
+              <div className="sm:col-span-2">
+                <DynamicFormRenderer
+                  fields={vendorCustomFields.filter(f => !f.afterField || f.afterField === 'end')}
+                  values={vCustomFields}
+                  onChange={(key, val) => {
+                    setVCustomFields(prev => ({ ...prev, [key]: val }));
+                    if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
+                  }}
+                  errors={vErrors}
+                />
+              </div>
+            )}
 
             <div className="sm:col-span-2 flex justify-end gap-2 border-t pt-4">
               <Button type="button" variant="outline" onClick={resetVendorForm}>Cancel</Button>
@@ -1637,9 +1798,72 @@ export function VendorsPage() {
                   </div>
                 </div>
               )}
+              <ConfirmDialog
+                open={deleteConfirmOpen}
+                onOpenChange={setDeleteConfirmOpen}
+                title="Move Vendor to Recycle Bin?"
+                description="This vendor will be moved to the Recycle Bin. You can restore it anytime from Settings → Recycle Bin."
+                confirmText="Move to Bin"
+                onConfirm={confirmDeleteVendor}
+              />
 
+              <ConfirmDialog
+                open={clearRowsConfirmOpen}
+                onOpenChange={setClearRowsConfirmOpen}
+                title="Clear All Line Items?"
+                description="All line items in this PO draft will be removed. This only affects the current draft and can be re-added before saving."
+                confirmText="Clear All"
+                variant="warning"
+                onConfirm={() => {
+                  setPoItems([]);
+                }}
+              />
+
+              <ConfirmDialog
+                open={removeColConfirmOpen}
+                onOpenChange={setRemoveColConfirmOpen}
+                title="Remove Column?"
+                description={`The column "${colToRemove}" will be removed from this PO draft. Column data in unsaved rows will be lost.`}
+                confirmText="Remove Column"
+                variant="warning"
+                onConfirm={() => {
+                  if (!colToRemove) return;
+                  setCustomColumns(prev => prev.filter(c => c !== colToRemove));
+                  setPoItems(prev => prev.map(item => {
+                    const updated = { ...item };
+                    delete updated[colToRemove];
+                    return updated;
+                  }));
+                  toast.success(`Column "${colToRemove}" removed`);
+                  setColToRemove(null);
+                }}
+              />
+
+              <ConfirmDialog
+                open={deleteRevisionConfirmOpen}
+                onOpenChange={setDeleteRevisionConfirmOpen}
+                title="Delete PO Revision?"
+                description="This saved PO revision will be removed. Only the revision record is deleted — the vendor remains in the system."
+                confirmText="Delete Revision"
+                onConfirm={async () => {
+                  if (!revisionToDelete) return;
+                  try {
+                    await apiService.revisions.delete(revisionToDelete);
+                    const list = await apiService.revisions.list();
+                    setRevisions(list);
+                    if (selectedRevisionId === revisionToDelete) {
+                      setSelectedRevisionId(null);
+                    }
+                    toast.success('Revision deleted successfully.');
+                  } catch (err: any) {
+                    toast.error('Failed to delete revision.');
+                  } finally {
+                    setRevisionToDelete(null);
+                  }
+                }}
+              />
             </div>
             );
 }
 
-            export default VendorsPage;
+export default VendorsPage;

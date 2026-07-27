@@ -53,6 +53,9 @@ import { hrmsApi } from "@/services/modules";
 import { apiClient } from "@/services/axios";
 import { SalesOrder } from "@/types/erp";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { DynamicFormRenderer } from "@/components/customFields/dynamicFormRenderer";
+import { useDynamicCustomFields, validateCustomFields } from "@/hooks/useDynamicCustomFields";
+import { ConfirmDialog } from "@/components/shared/confirmDialog";
 
 interface LineItemRow {
   id: string;
@@ -146,6 +149,10 @@ export function OrdersPage() {
       return initial;
     },
   );
+
+  // Dynamic Custom Fields for Orders
+  const { fields: orderCustomFields, tableCustomColumns: orderTableCustomCols } = useDynamicCustomFields("order");
+  const [orderCustomValues, setOrderCustomValues] = useState<Record<string, any>>({});
 
   // States
   const [search, setSearch] = useState("");
@@ -313,6 +320,7 @@ export function OrdersPage() {
           total: o.grandTotal ?? o.total ?? o.totalAmount ?? 0,
           subtotal: o.subtotal ?? 0,
           gstTotal: o.gstTotal ?? 0,
+          customFields: o.customFields || {},
           lineItems: (o.items || []).map((item: any) => {
             const qty = Number(item.quantity || 0);
             const amount = Number(item.rate ?? item.unitPrice ?? 0);
@@ -583,6 +591,7 @@ export function OrdersPage() {
     setAssignedUserIds([]);
     setConcernedPeople([]);
     setLineItems([emptyLineItem("1")]);
+    setOrderCustomValues({});
     setSendWaNotif(true);
     setSendEmailNotif(true);
     setErrors({});
@@ -592,6 +601,7 @@ export function OrdersPage() {
   const openEdit = (order: SalesOrder) => {
     const o = order as any;
     setEditingOrder(order);
+    setOrderCustomValues(o.customFields || {});
     setFormValues({
       companyId: o.companyId || "",
       companyCode: o.companyCode || o.orderNo || "",
@@ -639,13 +649,17 @@ export function OrdersPage() {
   const submitForm = async (e: React.FormEvent) => {
     e.preventDefault();
     const result = orderSchema.safeParse(formValues);
-    if (!result.success) {
-      const errs: Record<string, string> = {};
-      result.error.issues.forEach((issue) => {
-        errs[String(issue.path[0])] = issue.message;
-      });
+    const cfErrs = validateCustomFields(orderCustomFields, orderCustomValues);
+
+    if (!result.success || Object.keys(cfErrs).length > 0) {
+      const errs: Record<string, string> = { ...cfErrs };
+      if (!result.success) {
+        result.error.issues.forEach((issue) => {
+          errs[String(issue.path[0])] = issue.message;
+        });
+      }
       setErrors(errs);
-      toast.error("Please fix form validation errors");
+      toast.error("Please complete all required fields before submitting.");
       return;
     }
 
@@ -700,6 +714,7 @@ export function OrdersPage() {
       notifyWhatsApp: sendWaNotif,
       notifyEmail: sendEmailNotif,
       remarks: "",
+      customFields: orderCustomValues,
       items: lineItems.map((item, idx) => ({
         itemCode: item.itemNo || `ITEM-${idx + 1}`,
         description: item.itemNo || "No description",
@@ -730,17 +745,27 @@ export function OrdersPage() {
     }
   };
 
-  const handleDelete = async (order: SalesOrder) => {
-    if (!window.confirm("Delete this order?")) return;
+  const [orderToDelete, setOrderToDelete] = useState<SalesOrder | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
+  const handleDelete = (order: SalesOrder) => {
+    setOrderToDelete(order);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDeleteOrder = async () => {
+    if (!orderToDelete) return;
     setIsLoading(true);
     try {
-      await apiClient.delete(`/order/delete/${order.id}`);
+      await apiClient.delete(`/order/delete/${orderToDelete.id}`);
       await loadOrders();
-      toast.success("Order deleted.");
+      toast.success("Order deleted successfully.");
     } catch (err: any) {
       toast.error(err.response?.data?.message ?? "Failed to delete order.");
     } finally {
       setIsLoading(false);
+      setOrderToDelete(null);
+      setDeleteConfirmOpen(false);
     }
   };
 
@@ -923,10 +948,14 @@ export function OrdersPage() {
       },
     };
 
-    return ALL_COLUMN_KEYS.filter((col) => visibleColumns[col.id]).map(
-      (col) => allDefs[col.id],
-    );
-  }, [visibleColumns, users]);
+    const cols = (Object.keys(allDefs) as ColumnKey[])
+      .filter((key) => visibleColumns[key])
+      .map((key) => allDefs[key]);
+
+    const cfCols = (orderTableCustomCols as any[]).filter(col => visibleColumns[col.id] ?? true);
+
+    return [...cols, ...cfCols] as ColumnDef<SalesOrder>[];
+  }, [visibleColumns, users, orderTableCustomCols]);
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
@@ -1071,12 +1100,29 @@ export function OrdersPage() {
                     className="flex items-center gap-2 text-xs font-medium cursor-pointer hover:bg-muted/50 p-1 rounded"
                   >
                     <Checkbox
-                      checked={visibleColumns[col.id]}
+                      checked={visibleColumns[col.id] ?? true}
                       onCheckedChange={() => toggleColumn(col.id)}
                     />
                     <span>{col.label}</span>
                   </label>
                 ))}
+                {orderCustomFields
+                  .filter((f) => f.isActive && f.showInTable)
+                  .map((f) => {
+                    const id = `cf_${f.key}`;
+                    return (
+                      <label
+                        key={id}
+                        className="flex items-center gap-2 text-xs font-medium cursor-pointer hover:bg-muted/50 p-1 rounded"
+                      >
+                        <Checkbox
+                          checked={visibleColumns[id] ?? true}
+                          onCheckedChange={() => toggleColumn(id)}
+                        />
+                        <span>{f.name}</span>
+                      </label>
+                    );
+                  })}
               </div>
             </PopoverContent>
           </Popover>
@@ -1349,6 +1395,20 @@ export function OrdersPage() {
                       </p>
                     )}
                   </div>
+                  {orderCustomFields.some(f => f.afterField === 'customerName') && (
+                    <div className="sm:col-span-2">
+                      <DynamicFormRenderer
+                        fields={orderCustomFields}
+                        values={orderCustomValues}
+                        onChange={(key, val) => {
+                          setOrderCustomValues((prev) => ({ ...prev, [key]: val }));
+                          if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
+                        }}
+                        errors={errors}
+                        afterFieldPosition="customerName"
+                      />
+                    </div>
+                  )}
 
                   <div className="flex flex-col gap-1.5">
                     <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
@@ -1363,6 +1423,20 @@ export function OrdersPage() {
                       className="h-10 bg-muted/40"
                     />
                   </div>
+                  {orderCustomFields.some(f => f.afterField === 'caNo') && (
+                    <div className="sm:col-span-2">
+                      <DynamicFormRenderer
+                        fields={orderCustomFields}
+                        values={orderCustomValues}
+                        onChange={(key, val) => {
+                          setOrderCustomValues((prev) => ({ ...prev, [key]: val }));
+                          if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
+                        }}
+                        errors={errors}
+                        afterFieldPosition="caNo"
+                      />
+                    </div>
+                  )}
 
                   <div className="flex flex-col gap-1.5">
                     <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
@@ -1388,6 +1462,20 @@ export function OrdersPage() {
                       </p>
                     )}
                   </div>
+                  {orderCustomFields.some(f => f.afterField === 'contact') && (
+                    <div className="sm:col-span-2">
+                      <DynamicFormRenderer
+                        fields={orderCustomFields}
+                        values={orderCustomValues}
+                        onChange={(key, val) => {
+                          setOrderCustomValues((prev) => ({ ...prev, [key]: val }));
+                          if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
+                        }}
+                        errors={errors}
+                        afterFieldPosition="contact"
+                      />
+                    </div>
+                  )}
 
                   <div className="flex flex-col gap-1.5">
                     <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
@@ -1405,6 +1493,20 @@ export function OrdersPage() {
                       className="h-10 bg-muted/40 text-sm"
                     />
                   </div>
+                  {orderCustomFields.some(f => f.afterField === 'orderTakenDate') && (
+                    <div className="sm:col-span-2">
+                      <DynamicFormRenderer
+                        fields={orderCustomFields}
+                        values={orderCustomValues}
+                        onChange={(key, val) => {
+                          setOrderCustomValues((prev) => ({ ...prev, [key]: val }));
+                          if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
+                        }}
+                        errors={errors}
+                        afterFieldPosition="orderTakenDate"
+                      />
+                    </div>
+                  )}
 
                   <div className="flex flex-col gap-1.5">
                     <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
@@ -1928,6 +2030,15 @@ export function OrdersPage() {
           )}
         </SheetContent>
       </Sheet>
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Move Order to Recycle Bin?"
+        description="This order will be moved to the Recycle Bin. You can restore it anytime from Settings → Recycle Bin."
+        confirmText="Move to Bin"
+        onConfirm={confirmDeleteOrder}
+      />
     </div>
   );
 }

@@ -28,6 +28,7 @@ import {
   CheckSquare,
   Truck,
   Package,
+  Trash2,
 } from 'lucide-react';
 import { ROUTES } from './routes';
 
@@ -64,6 +65,7 @@ export const sidebarItems: SidebarItem[] = [
   { name: 'Contact Persons', icon: Contact, path: ROUTES.CRM_CONTACTS, section: 'CRM' },
   { name: 'Communication History', icon: MessageSquare, path: ROUTES.CRM_COMMUNICATION, section: 'CRM' },
   { name: 'Orders', icon: ShoppingCart, path: ROUTES.TENDER_ORDERS, section: 'CRM' },
+  { name: 'Delivery', icon: Truck, path: ROUTES.LOGISTICS_DELIVERY, section: 'CRM' },
   { name: 'Vendors', icon: Truck, path: ROUTES.PURCHASE_VENDORS, section: 'CRM' },
   { name: 'Inventory', icon: Package, path: ROUTES.INVENTORY_STOCKS, section: 'CRM' },
 
@@ -90,5 +92,7 @@ export const sidebarItems: SidebarItem[] = [
  
   { name: 'Reports', icon: FileSpreadsheet, path: ROUTES.REPORTS },
   { name: 'Audit Logs', icon: AuditIcon, path: ROUTES.AUDIT_LOGS },
-  { name: 'Settings', icon: Settings2, path: ROUTES.SETTINGS }
+  { name: 'Custom Fields', icon: Settings2, path: ROUTES.CUSTOM_FIELDS, section: 'Settings' },
+  { name: 'Recycle Bin', icon: Trash2, path: ROUTES.RECYCLE_BIN, section: 'Settings' },
+  { name: 'Settings', icon: Settings2, path: ROUTES.SETTINGS, section: 'Settings' }
 ];

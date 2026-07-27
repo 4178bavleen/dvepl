@@ -117,23 +117,27 @@ async function adminVendorReadRoutes(
 
 
         // ==========================
+        // Attach Custom Field Values
+        // ==========================
+        const { CustomFieldService } = await import("../../../services/customFieldService");
+        const cfService = new CustomFieldService(fastify.prisma);
+        const entityIds = vendors.map(v => v.id);
+        const cfValuesMap = await cfService.getValuesForEntities("vendor", entityIds);
+
+        const vendorsWithCF = vendors.map(v => ({
+          ...v,
+          customFields: cfValuesMap[v.id] || {}
+        }));
+
+        // ==========================
         // Response
         // ==========================
 
-
         return reply.status(200).send({
-
           success: true,
-
-          message:
-            "Vendors fetched successfully.",
-
-          count:
-            vendors.length,
-
-          data:
-            vendors,
-
+          message: "Vendors fetched successfully.",
+          count: vendors.length,
+          data: vendorsWithCF,
         });
 
 

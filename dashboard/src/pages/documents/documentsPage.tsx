@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'react-hot-toast';
 import { hrmsApi } from '@/services/modules';
+import { ConfirmDialog } from '@/components/shared/confirmDialog';
 
 export function DocumentsPage() {
   const [documents, setDocuments] = useState<any[]>([]);
@@ -25,8 +26,9 @@ export function DocumentsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
   
-  // Upload modal states
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [docToDelete, setDocToDelete] = useState<string | null>(null);
   const [employeeId, setEmployeeId] = useState('');
   const [documentType, setDocumentType] = useState('AADHAR');
   const [fileName, setFileName] = useState('');
@@ -57,16 +59,23 @@ export function DocumentsPage() {
     setCurrentPage(1);
   }, [search, pageSize]);
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this document?')) return;
+  const handleDelete = (id: string) => {
+    setDocToDelete(id);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!docToDelete) return;
     try {
       if (hrmsApi.documents.remove) {
-        await hrmsApi.documents.remove(id);
+        await hrmsApi.documents.remove(docToDelete);
       }
       toast.success('Document deleted successfully.');
       fetchData();
     } catch (error: any) {
       toast.error(error.response?.data?.message || 'Failed to delete document.');
+    } finally {
+      setDocToDelete(null);
     }
   };
 
@@ -351,6 +360,15 @@ export function DocumentsPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Move Document to Recycle Bin?"
+        description="This document will be moved to the Recycle Bin. You can restore it anytime from Settings → Recycle Bin."
+        confirmText="Move to Bin"
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }
