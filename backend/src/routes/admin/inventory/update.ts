@@ -123,6 +123,12 @@ async function adminInventoryUpdateRoutes(
 
               hsnCode: data.hsnCode ?? undefined,
 
+              // 👇 ADD THIS
+              preferredVendorId:
+                data.preferredVendorId === undefined
+                  ? undefined
+                  : data.preferredVendorId,
+
               reorderLevel:
                 data.reorderLevel !== undefined
                   ? new Prisma.Decimal(data.reorderLevel)
@@ -187,7 +193,11 @@ async function adminInventoryUpdateRoutes(
             id: updated.id,
           },
           include: {
-            material: true,
+            material: {
+              include: {
+                preferredVendor: true,
+              },
+            },
             warehouse: true,
             bin: true,
           },
