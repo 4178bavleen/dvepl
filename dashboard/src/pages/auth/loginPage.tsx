@@ -5,6 +5,7 @@ import { authService } from '@/services/auth';
 import { toast } from 'react-hot-toast';
 import logoImg from '@/assets/logos/image.png';
 import bgImg from '@/assets/bg-image/image.png';
+import { useERPStore } from '@/store/erpStore';
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -30,11 +31,14 @@ export function LoginPage() {
     setIsLoading(true);
 
     try {
-      await authService.login(email, password);
+      const response = await authService.login(email, password);
+
+      useERPStore.getState().setCurrentUser(response.user.id,response.user.name);
+
       markAuthenticated();
       setIsLoading(false);
-      toast.success('Access authorized! Welcome to DVEPL ERP Dashboard.');
       navigate('/', { replace: true });
+      console.log(useERPStore.getState());
     } catch (error: any) {
       setIsLoading(false);
       toast.error(error.response?.data?.message ?? 'Unable to sign in. Please check your credentials.');

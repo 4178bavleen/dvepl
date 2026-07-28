@@ -1,63 +1,10 @@
 import { create } from 'zustand';
-import { 
-  EmployeeStatus, AttendanceStatus, LeaveStatus, 
-  CommunicationType, TenderStatus, TenderRequestSource, TenderRequestStatus,
+import {
   ReferenceCodeAction, Company, Branch, Department, Team, Designation,
-  CostCenter, User, Role, PermissionGroup, Permission, Employee, 
-  Attendance, Leave, Salary, Customer, ContactPerson, CommunicationHistory,
-  Tender, TenderRequest, GovernmentDepartment, Section, Division,
-  SubDivision, ReferenceCode, AuditLog, Shift, Holiday, DeliveryOrder, DeliveryStatus
+  CostCenter, User, Role, PermissionGroup, Permission, Employee,
+  Attendance, Leave, Salary, Tender, TenderRequest, GovernmentDepartment, Section, Division,
+  SubDivision, ReferenceCode, AuditLog, Shift, Holiday, DeliveryOrder
 } from '../types/erp';
-
-interface ERPStore {
-  companies: Company[];
-  branches: Branch[];
-  departments: Department[];
-  teams: Team[];
-  designations: Designation[];
-  costCenters: CostCenter[];
-  users: User[];
-  roles: Role[];
-  permissions: Permission[];
-  permissionGroups: PermissionGroup[];
-  employees: Employee[];
-  attendances: Attendance[];
-  leaves: Leave[];
-  salaries: Salary[];
-  tenders: Tender[];
-  tenderRequests: TenderRequest[];
-  governmentDepartments: GovernmentDepartment[];
-  sections: Section[];
-  divisions: Division[];
-  subDivisions: SubDivision[];
-  referenceCodes: ReferenceCode[];
-  auditLogs: AuditLog[];
-  shifts: Shift[];
-  holidays: Holiday[];
-  deliveryOrders: DeliveryOrder[];
-
-  // Session settings
-  currentCompanyId: string;
-  currentUserId: string;
-  currentWorkspace: string;
-  theme: 'light' | 'dark';
-  language: string;
-
-  // Actions
-  setCompanyId: (id: string) => void;
-  setUserId: (id: string) => void;
-  setWorkspace: (ws: string) => void;
-  toggleTheme: () => void;
-  setLanguage: (lang: string) => void;
-  setDeliveryOrders: (orders: DeliveryOrder[]) => void;
-  updateDeliveryOrder: (id: string, payload: Partial<DeliveryOrder>) => void;
-
-  // CRUD Actions
-  addRecord: (table: string, data: any) => any;
-  updateRecord: (table: string, id: string, data: any) => void;
-  deleteRecord: (table: string, id: string) => void;
-  addAuditLog: (module: string, recordId: string, action: string, oldValue?: any, newValue?: any) => void;
-}
 
 import {
   initialCompanies,
@@ -89,6 +36,56 @@ import {
   initialAuditLogs
 } from '../constants';
 
+console.log("initialUsers:", initialUsers);
+
+interface ERPStore {
+  companies: Company[];
+  branches: Branch[];
+  departments: Department[];
+  teams: Team[];
+  designations: Designation[];
+  costCenters: CostCenter[];
+  users: User[];
+  roles: Role[];
+  permissions: Permission[];
+  permissionGroups: PermissionGroup[];
+  employees: Employee[];
+  attendances: Attendance[];
+  leaves: Leave[];
+  salaries: Salary[];
+  tenders: Tender[];
+  tenderRequests: TenderRequest[];
+  governmentDepartments: GovernmentDepartment[];
+  sections: Section[];
+  divisions: Division[];
+  subDivisions: SubDivision[];
+  referenceCodes: ReferenceCode[];
+  auditLogs: AuditLog[];
+  shifts: Shift[];
+  holidays: Holiday[];
+  deliveryOrders: DeliveryOrder[];
+
+  // Session settings
+  currentCompanyId: string;
+  currentUserId: string;
+  currentUserName: string;
+  currentWorkspace: string;
+  theme: 'light' | 'dark';
+
+  // Actions
+  setCompanyId: (id: string) => void;
+  setCurrentUser: (id: string, name: string) => void;
+  setWorkspace: (ws: string) => void;
+  toggleTheme: () => void;
+  setDeliveryOrders: (orders: DeliveryOrder[]) => void;
+  updateDeliveryOrder: (id: string, payload: Partial<DeliveryOrder>) => void;
+
+  // CRUD Actions
+  addRecord: (table: string, data: any) => any;
+  updateRecord: (table: string, id: string, data: any) => void;
+  deleteRecord: (table: string, id: string) => void;
+  addAuditLog: (module: string, recordId: string, action: string, oldValue?: any, newValue?: any) => void;
+}
 // Combine into Zustand store
 export const useERPStore = create<ERPStore>((set) => ({
   companies: initialCompanies,
@@ -119,16 +116,16 @@ export const useERPStore = create<ERPStore>((set) => ({
 
   // Selected states
   currentCompanyId: 'comp-1',
-  currentUserId: 'user-1',
+  currentUserId: '',
+  currentUserName: '',
   currentWorkspace: 'Default Workspace',
   theme: 'light',
   language: 'English',
 
   setCompanyId: (id) => set({ currentCompanyId: id }),
-  setUserId: (id) => set({ currentUserId: id }),
+  setCurrentUser: (id, name) =>set({currentUserId: id,currentUserName: name}),
   setWorkspace: (ws) => set({ currentWorkspace: ws }),
   toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
-  setLanguage: (lang) => set({ language: lang }),
   setDeliveryOrders: (orders) => set({ deliveryOrders: orders }),
   updateDeliveryOrder: (id, payload) =>
     set((state) => ({
@@ -165,7 +162,7 @@ export const useERPStore = create<ERPStore>((set) => ({
     set((state: any) => {
       const records = state[table] || [];
       const updatedList = [newRecord, ...records];
-      
+
       // Auto-trigger reference code generator if we are adding a Tender
       let updatedReferenceCodes = state.referenceCodes;
       if (table === 'tenders') {

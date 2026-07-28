@@ -29,6 +29,7 @@ import { useDynamicCustomFields, validateCustomFields } from '@/hooks/useDynamic
 import { ConfirmDialog } from '@/components/shared/confirmDialog';
 import '@/styles/vendors.css';
 
+
 // Interfaces
 interface Vendor {
   id: string;
@@ -88,6 +89,7 @@ interface PORevision {
     division: string;
   };
   createdAt: string;
+  createdBy: string;
   revisionNo: number;
   customColumns?: string[];
 }
@@ -257,6 +259,8 @@ export function VendorsPage() {
   const [terms, setTerms] = useState(DEFAULT_TERMS);
   const [poItems, setPoItems] = useState<POItem[]>([]);
   const [selectedRevisionId, setSelectedRevisionId] = useState<string | null>(null);
+  const [poCreatedBy, setPoCreatedBy] = useState('');
+  const [poCreatedAt, setPoCreatedAt] = useState(new Date().toISOString());
 
   // Filter vendors
   const filteredVendors = useMemo(() => {
@@ -480,7 +484,7 @@ export function VendorsPage() {
       await apiService.vendors.delete(vendorToDelete);
       const list = await apiService.vendors.list();
       setVendors(list);
-      
+
       const savedRev = localStorage.getItem('dvepl_po_revisions');
       if (savedRev) {
         const revList: PORevision[] = JSON.parse(savedRev);
@@ -606,9 +610,13 @@ export function VendorsPage() {
   // Save revision
   const handleSavePoRevision = async () => {
     if (!activePoVendor) return;
+    const state = useERPStore.getState();
 
+console.log("FULL ERP STORE:", state);
+console.log("currentUserId:", state.currentUserId);
+console.log("currentUserName:", state.currentUserName);
     // PO header validations
-    if (!poNumber.trim()) {
+    if (!poNumber.trim()) { 
       toast.error('PO Number is required');
       return;
     }
@@ -622,11 +630,11 @@ export function VendorsPage() {
       toast.error('Add at least one line item before saving');
       return;
     }
-    const invalidItems = poItems.filter(item => 
-      !item.description.trim() || 
-      !item.hsnCode.trim() || 
-      !item.catNo.trim() || 
-      item.qty <= 0 || 
+    const invalidItems = poItems.filter(item =>
+      !item.description.trim() ||
+      !item.hsnCode.trim() ||
+      !item.catNo.trim() ||
+      item.qty <= 0 ||
       item.rate <= 0
     );
     if (invalidItems.length > 0) {
@@ -647,6 +655,8 @@ export function VendorsPage() {
     const nextRevisionNo = revisions
       .filter(r => r.vendorId === activePoVendor.id && r.poNumber === poNumber)
       .length + 1;
+
+    const createdTimestamp = new Date().toISOString();
 
     const newRevision: PORevision = {
       id: `rev-${Date.now()}`,
@@ -669,16 +679,22 @@ export function VendorsPage() {
       termsAndConditions: terms,
       lineItems: poItems,
       companyDetails,
-      createdAt: new Date().toISOString(),
+      createdAt: createdTimestamp,
+      createdBy: state.currentUserName,
       revisionNo: nextRevisionNo,
       customColumns: [...customColumns]
     };
 
     try {
       await apiService.revisions.create(newRevision);
+      console.log("Saving Revision:", newRevision);
       const list = await apiService.revisions.list();
+
+      console.log("LIST AFTER SAVE:", list);
+      console.log("FIRST REVISION:", list[0]);
       setRevisions(list);
       setSelectedRevisionId(newRevision.id);
+      setPoCreatedAt(createdTimestamp);
       toast.success(`Revision v${newRevision.revisionNo} saved successfully`);
     } catch (err: any) {
       toast.error('Failed to save PO revision');
@@ -702,6 +718,8 @@ export function VendorsPage() {
     setCompanyDetails(rev.companyDetails);
     setSelectedRevisionId(rev.id);
     setCustomColumns(rev.customColumns || []);
+    setPoCreatedBy(rev.createdBy || '');
+    setPoCreatedAt(rev.createdAt || new Date().toISOString());
     toast.success(`Loaded PO details from revision v${rev.revisionNo}`);
   };
 
@@ -721,6 +739,10 @@ export function VendorsPage() {
     setPoItems([]);
     setCompanyDetails(DEFAULT_COMPANY_DETAILS);
     setSelectedRevisionId(null);
+    setCustomColumns([]);
+    const { currentUserName } = useERPStore.getState();
+    setPoCreatedBy(currentUserName);
+    setPoCreatedAt(new Date().toISOString());
     setIsDataEntryOpen(true);
   };
 
@@ -728,6 +750,21 @@ export function VendorsPage() {
     e.stopPropagation();
     setRevisionToDelete(id);
     setDeleteRevisionConfirmOpen(true);
+  };
+
+  const formatDateTime = (iso: string) => {
+    if (!iso) return '—';
+    try {
+      return new Date(iso).toLocaleString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return '—';
+    }
   };
 
   const triggerExport = (format: string) => {
@@ -740,15 +777,15 @@ export function VendorsPage() {
       iframe.style.height = '0px';
       iframe.style.border = 'none';
       document.body.appendChild(iframe);
-      
+
       const doc = iframe.contentWindow?.document || iframe.contentDocument;
       if (!doc) {
         toast.error('Unable to create offscreen document print context.');
         return;
       }
-      
+
       const customColsTh = customColumns.map(c => `<th>${c}</th>`).join('');
-      
+
       const itemsHtml = poItems.map((item, idx) => {
         const customColsTd = customColumns.map(c => `<td>${item[c] || '—'}</td>`).join('');
         return `
@@ -766,7 +803,7 @@ export function VendorsPage() {
           </tr>
         `;
       }).join('');
-      
+
       doc.write(`
         <html>
           <head>
@@ -808,6 +845,8 @@ export function VendorsPage() {
                 <p style="margin: 0; font-size: 12px;"><strong>PO Number:</strong> ${poNumber}</p>
                 <p style="margin: 2px 0 0 0; font-size: 12px;"><strong>Date:</strong> ${poDate}</p>
                 <p style="margin: 2px 0 0 0; font-size: 12px;"><strong>Status:</strong> ${poStatus}</p>
+                <p style="margin: 2px 0 0 0; font-size: 12px;"><strong>Created By:</strong> ${poCreatedBy || '—'}</p>
+                <p style="margin: 2px 0 0 0; font-size: 12px;"><strong>Created:</strong> ${formatDateTime(poCreatedAt)}</p>
               </div>
             </div>
             
@@ -869,7 +908,7 @@ export function VendorsPage() {
             
             <div class="sig-section">
               <div class="sig-box" style="border: none; text-align: left;">
-                <p class="sig-desc">Prepared By: DVEPL Team</p>
+                <p class="sig-desc">Prepared By: ${poCreatedBy || 'DVEPL Team'}</p>
               </div>
               <div class="sig-box">
                 <p class="sig-title">${companyDetails.signatory}</p>
@@ -880,7 +919,7 @@ export function VendorsPage() {
         </html>
       `);
       doc.close();
-      
+
       setTimeout(() => {
         iframe.contentWindow?.focus();
         iframe.contentWindow?.print();
@@ -901,12 +940,13 @@ export function VendorsPage() {
       ctx.fillText(`GSTIN: ${companyDetails.gstin} | ${companyDetails.iso}`, 40, 125);
       ctx.fillStyle = '#111827'; ctx.font = 'bold 28px sans-serif'; ctx.fillText('PURCHASE ORDER', 620, 60);
       ctx.font = '14px sans-serif'; ctx.fillText(`PO Number: ${poNumber}`, 620, 95); ctx.fillText(`Date: ${poDate}`, 620, 120);
-      ctx.strokeStyle = '#111827'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(40, 150); ctx.lineTo(960, 150); ctx.stroke();
-      ctx.fillStyle = '#2563eb'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('ORDER PLACED TO (VENDOR):', 40, 180); ctx.fillText('DELIVERY & SHIPPING TERMS:', 500, 180);
-      ctx.fillStyle = '#111827'; ctx.font = 'bold 14px sans-serif'; ctx.fillText(activePoVendor.name, 40, 205);
-      ctx.font = '13px sans-serif'; ctx.fillText(`Category: ${activePoVendor.category}`, 40, 225); ctx.fillText(`Phone: ${activePoVendor.phone} | Email: ${activePoVendor.email}`, 40, 245); ctx.fillText(`GSTIN: ${activePoVendor.gstNumber}`, 40, 265);
-      ctx.fillText(`Material Status: ${materialStatus}`, 500, 205); ctx.fillText(`Payment Terms: ${paymentTerms}`, 500, 225); ctx.fillText(`Remarks: ${remarks || 'None'}`, 500, 245);
-      let y = 300; ctx.fillStyle = '#f3f4f6'; ctx.fillRect(40, y, 920, 32); ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 1; ctx.strokeRect(40, y, 920, 32);
+      ctx.fillText(`Created By: ${poCreatedBy || '—'}`, 620, 140);
+      ctx.strokeStyle = '#111827'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(40, 160); ctx.lineTo(960, 160); ctx.stroke();
+      ctx.fillStyle = '#2563eb'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('ORDER PLACED TO (VENDOR):', 40, 190); ctx.fillText('DELIVERY & SHIPPING TERMS:', 500, 190);
+      ctx.fillStyle = '#111827'; ctx.font = 'bold 14px sans-serif'; ctx.fillText(activePoVendor.name, 40, 215);
+      ctx.font = '13px sans-serif'; ctx.fillText(`Category: ${activePoVendor.category}`, 40, 235); ctx.fillText(`Phone: ${activePoVendor.phone} | Email: ${activePoVendor.email}`, 40, 255); ctx.fillText(`GSTIN: ${activePoVendor.gstNumber}`, 40, 275);
+      ctx.fillText(`Material Status: ${materialStatus}`, 500, 215); ctx.fillText(`Payment Terms: ${paymentTerms}`, 500, 235); ctx.fillText(`Remarks: ${remarks || 'None'}`, 500, 255);
+      let y = 310; ctx.fillStyle = '#f3f4f6'; ctx.fillRect(40, y, 920, 32); ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 1; ctx.strokeRect(40, y, 920, 32);
       ctx.fillStyle = '#374151'; ctx.font = 'bold 11px sans-serif'; ctx.fillText('S.No.', 50, y + 20); ctx.fillText('Item Description', 100, y + 20); ctx.fillText('Qty', 440, y + 20); ctx.fillText('Unit', 500, y + 20); ctx.fillText('HSN Code', 560, y + 20); ctx.fillText('CAT No.', 650, y + 20); ctx.fillText('Rate', 740, y + 20); ctx.fillText('Total', 880, y + 20);
       ctx.fillStyle = '#1f2937'; ctx.font = '13px sans-serif';
       poItems.forEach((item, idx) => { y += 32; ctx.strokeRect(40, y, 920, 32); ctx.fillText(String(idx + 1), 50, y + 20); ctx.fillText(item.description || '—', 100, y + 20); ctx.fillText(String(item.qty), 440, y + 20); ctx.fillText(item.unit || 'PCS', 500, y + 20); ctx.fillText(item.hsnCode || '—', 560, y + 20); ctx.fillText(item.catNo || '—', 650, y + 20); ctx.fillText(`₹${item.rate.toFixed(2)}`, 740, y + 20); ctx.font = 'bold 13px sans-serif'; ctx.fillStyle = '#1e4620'; ctx.fillText(`₹${item.total.toFixed(2)}`, 880, y + 20); ctx.fillStyle = '#1f2937'; ctx.font = '13px sans-serif'; });
@@ -1217,63 +1257,63 @@ export function VendorsPage() {
                 </Button>
               }
             />
-          <PopoverContent align="end" className="w-56 p-3">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between border-b pb-2">
-                <span className="text-xs font-semibold text-foreground">
-                  Toggle Columns
-                </span>
-                <div className="flex items-center gap-1">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      const allSelected = ALL_VENDOR_COLUMNS.every(c => visibleColumns[c.id]);
-                      toggleAllColumns(!allSelected);
-                    }}
-                    className="h-6 px-1.5 text-[11px] font-medium text-primary hover:text-primary hover:bg-primary/10 gap-1.5"
-                  >
-                    <Checkbox
-                      checked={ALL_VENDOR_COLUMNS.every(c => visibleColumns[c.id])}
-                      className="pointer-events-none size-3.5"
-                    />
-                    Select All
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => toggleAllColumns(false)}
-                    className="h-6 px-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground"
-                  >
-                    Clear
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-1.5 max-h-60 overflow-y-auto">
-                {ALL_VENDOR_COLUMNS.map((col) => {
-                  const isChecked = !!visibleColumns[col.id];
-                  return (
-                    <label
-                      key={col.id}
-                      className="flex items-center gap-2.5 px-1 py-1 rounded hover:bg-muted/50 text-xs font-medium cursor-pointer transition-colors"
+            <PopoverContent align="end" className="w-56 p-3">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border-b pb-2">
+                  <span className="text-xs font-semibold text-foreground">
+                    Toggle Columns
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const allSelected = ALL_VENDOR_COLUMNS.every(c => visibleColumns[c.id]);
+                        toggleAllColumns(!allSelected);
+                      }}
+                      className="h-6 px-1.5 text-[11px] font-medium text-primary hover:text-primary hover:bg-primary/10 gap-1.5"
                     >
                       <Checkbox
-                        checked={isChecked}
-                        onCheckedChange={() => toggleColumn(col.id)}
+                        checked={ALL_VENDOR_COLUMNS.every(c => visibleColumns[c.id])}
+                        className="pointer-events-none size-3.5"
                       />
-                      <span>{col.label}</span>
-                    </label>
-                  );
-                })}
+                      Select All
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleAllColumns(false)}
+                      className="h-6 px-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                  {ALL_VENDOR_COLUMNS.map((col) => {
+                    const isChecked = !!visibleColumns[col.id];
+                    return (
+                      <label
+                        key={col.id}
+                        className="flex items-center gap-2.5 px-1 py-1 rounded hover:bg-muted/50 text-xs font-medium cursor-pointer transition-colors"
+                      >
+                        <Checkbox
+                          checked={isChecked}
+                          onCheckedChange={() => toggleColumn(col.id)}
+                        />
+                        <span>{col.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          </PopoverContent>
-        </Popover>
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
-    </div>
 
       {/* ── Vendor Table ── */}
       <GenericTable
@@ -1391,6 +1431,10 @@ export function VendorsPage() {
                       <span>Items: {rev.lineItems.length}</span>
                       <span>Status: {rev.poStatus}</span>
                     </div>
+                    <div className="rev-meta">
+                      <span>Created By: {rev.createdBy || '—'}</span>
+                      <span>Created: {formatDateTime(rev.createdAt)}</span>
+                    </div>
                     <div className="rev-amount">
                       ₹{rev.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </div>
@@ -1445,425 +1489,434 @@ export function VendorsPage() {
       {isDataEntryOpen && activePoVendor && (
         <div className="de-overlay" style={deMaximized ? { padding: 0 } : undefined}>
 
-                  <div 
-                    className={`de-modal ${deMaximized ? 'rounded-none' : ''}`}
-                    style={deMaximized ? { width: '100vw', height: '100vh', maxWidth: '100vw', maxHeight: '100vh' } : undefined}
+          <div
+            className={`de-modal ${deMaximized ? 'rounded-none' : ''}`}
+            style={deMaximized ? { width: '100vw', height: '100vh', maxWidth: '100vw', maxHeight: '100vh' } : undefined}
+          >
+
+            {/* Restore bar if maximized */}
+            {deMaximized && (
+              <div className="de-restore-bar">
+                <span>⛶ Table Maximized — <strong id="de-restore-vendor-name">{activePoVendor.name}</strong></span>
+                <button className="de-restore-btn" onClick={() => setDeMaximized(false)}>✕ Restore</button>
+              </div>
+            )}
+
+            {/* de-header */}
+            <div className="de-header">
+              <div className="de-header-left">
+                <div className="de-header-icon">📋</div>
+                <div>
+                  <div className="de-header-title">Data Entry — Purchase Order</div>
+                  <div className="de-header-sub">Vendor: <strong className="de-vendor-accent">{activePoVendor.name}</strong></div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="de-status-pill">Draft</span>
+                <button className="de-close-btn" onClick={() => setIsDataEntryOpen(false)}>✕</button>
+              </div>
+            </div>
+
+            {/* de-steps */}
+            <div className="de-steps">
+              <div className="de-step done"><span className="de-step-dot done-dot">✓</span><span>Vendor Saved</span></div>
+              <div className="de-step-line done-line"></div>
+              <div className="de-step active"><span className="de-step-dot active-dot">2</span><span>Data Entry</span></div>
+              <div className="de-step-line"></div>
+              <div className="de-step inactive"><span className="de-step-dot inactive-dot">3</span><span>Export</span></div>
+            </div>
+
+            {/* de-revision-bar */}
+            <div className="de-revision-bar">
+              <span className="de-rev-label">📁 REVISIONS:</span>
+              <div className="de-rev-pills">
+                {revisions.filter(r => r.vendorId === activePoVendor.id && r.poNumber === poNumber).map((rev) => (
+                  <span
+                    key={rev.id}
+                    onClick={() => loadRevision(rev)}
+                    className={`de-rev-pill ${selectedRevisionId === rev.id ? 'active' : ''}`}
                   >
+                    R{rev.revisionNo}
+                  </span>
+                ))}
+                {revisions.filter(r => r.vendorId === activePoVendor.id && r.poNumber === poNumber).length === 0 && (
+                  <span className="de-rev-pill">R1</span>
+                )}
+              </div>
+              <button
+                className="btn-view-all"
+                style={{ marginLeft: 'auto' }}
+                onClick={() => {
+                  setSelectedVendorForRevisions(activePoVendor);
+                  setIsDataEntryOpen(false);
+                }}
+              >
+                📄 View All
+              </button>
+            </div>
 
-                    {/* Restore bar if maximized */}
-                    {deMaximized && (
-                      <div className="de-restore-bar">
-                        <span>⛶ Table Maximized — <strong id="de-restore-vendor-name">{activePoVendor.name}</strong></span>
-                        <button className="de-restore-btn" onClick={() => setDeMaximized(false)}>✕ Restore</button>
-                      </div>
-                    )}
+            {/* Form body */}
+            <div className="flex-1 overflow-y-auto">
 
-                    {/* de-header */}
-                    <div className="de-header">
-                      <div className="de-header-left">
-                        <div className="de-header-icon">📋</div>
-                        <div>
-                          <div className="de-header-title">Data Entry — Purchase Order</div>
-                          <div className="de-header-sub">Vendor: <strong className="de-vendor-accent">{activePoVendor.name}</strong></div>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span className="de-status-pill">Draft</span>
-                        <button className="de-close-btn" onClick={() => setIsDataEntryOpen(false)}>✕</button>
-                      </div>
-                    </div>
-
-                    {/* de-steps */}
-                    <div className="de-steps">
-                      <div className="de-step done"><span className="de-step-dot done-dot">✓</span><span>Vendor Saved</span></div>
-                      <div className="de-step-line done-line"></div>
-                      <div className="de-step active"><span className="de-step-dot active-dot">2</span><span>Data Entry</span></div>
-                      <div className="de-step-line"></div>
-                      <div className="de-step inactive"><span className="de-step-dot inactive-dot">3</span><span>Export</span></div>
-                    </div>
-
-                    {/* de-revision-bar */}
-                    <div className="de-revision-bar">
-                      <span className="de-rev-label">📁 REVISIONS:</span>
-                      <div className="de-rev-pills">
-                        {revisions.filter(r => r.vendorId === activePoVendor.id && r.poNumber === poNumber).map((rev) => (
-                          <span
-                            key={rev.id}
-                            onClick={() => loadRevision(rev)}
-                            className={`de-rev-pill ${selectedRevisionId === rev.id ? 'active' : ''}`}
-                          >
-                            R{rev.revisionNo}
-                          </span>
-                        ))}
-                        {revisions.filter(r => r.vendorId === activePoVendor.id && r.poNumber === poNumber).length === 0 && (
-                          <span className="de-rev-pill">R1</span>
-                        )}
-                      </div>
-                      <button
-                        className="btn-view-all"
-                        style={{ marginLeft: 'auto' }}
-                        onClick={() => {
-                          setSelectedVendorForRevisions(activePoVendor);
-                          setIsDataEntryOpen(false);
-                        }}
-                      >
-                        📄 View All
-                      </button>
-                    </div>
-
-                    {/* Form body */}
-                    <div className="flex-1 overflow-y-auto">
-
-                      {/* de-company-section */}
-                      <div className="de-company-section">
-                        <div className="de-company-section-title">🏢 OUR COMPANY DETAILS (FOR PO HEADER)</div>
-                        <div className="de-company-grid">
-                          <div className="de-po-field">
-                            <label>Company Name</label>
-                            <input type="text" value={companyDetails.name} onChange={e => setCompanyDetails({ ...companyDetails, name: e.target.value })} placeholder="e.g. D.V. Electromatic Pvt. Ltd." />
-                          </div>
-                          <div className="de-po-field">
-                            <label>Company Address</label>
-                            <input type="text" value={companyDetails.address} onChange={e => setCompanyDetails({ ...companyDetails, address: e.target.value })} placeholder="F-003, Industrial Growth Centre…" />
-                          </div>
-                          <div className="de-po-field">
-                            <label>Company Phone</label>
-                            <input type="text" value={companyDetails.phone} onChange={e => setCompanyDetails({ ...companyDetails, phone: e.target.value })} placeholder="+91 92572-17609" />
-                          </div>
-                          <div className="de-po-field">
-                            <label>Company Email</label>
-                            <input type="text" value={companyDetails.email} onChange={e => setCompanyDetails({ ...companyDetails, email: e.target.value })} placeholder="office@dvepl.com" />
-                          </div>
-                          <div className="de-po-field">
-                            <label>Company GSTIN</label>
-                            <input type="text" value={companyDetails.gstin} onChange={e => setCompanyDetails({ ...companyDetails, gstin: e.target.value })} placeholder="03AABCD4308A1ZL" />
-                          </div>
-                          <div className="de-po-field">
-                            <label>ISO / Certification</label>
-                            <input type="text" value={companyDetails.iso} onChange={e => setCompanyDetails({ ...companyDetails, iso: e.target.value })} placeholder="AN ISO 9001:2008 CERTIFIED CO." />
-                          </div>
-                          <div className="de-po-field">
-                            <label>Authorized Signatory</label>
-                            <input type="text" value={companyDetails.signatory} onChange={e => setCompanyDetails({ ...companyDetails, signatory: e.target.value })} placeholder="Name of signatory" />
-                          </div>
-                          <div className="de-po-field">
-                            <label>Division / Dept</label>
-                            <input type="text" value={companyDetails.division} onChange={e => setCompanyDetails({ ...companyDetails, division: e.target.value })} placeholder="Industrial Division" />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* de-po-header */}
-                      <div className="de-po-header">
-                        <div className="de-po-field">
-                          <label>Order Place To</label>
-                          <input type="text" value={activePoVendor.name} disabled style={{ background: '#f1f5f9', border: '1px solid #cbd5e1' }} />
-                        </div>
-                        <div className="de-po-field">
-                          <label>PO Number *</label>
-                          <input
-                            type="text"
-                            value={poNumber}
-                            onChange={e => setPoNumber(e.target.value)}
-                            placeholder="e.g. PO-2025-001"
-                            style={!poNumber.trim() ? { borderColor: '#f59e0b' } : undefined}
-                          />
-                          {!poNumber.trim() && (
-                            <span style={{ color: '#f59e0b', fontSize: '11px', marginTop: '2px' }}>PO Number is required</span>
-                          )}
-                        </div>
-                        <div className="de-po-field">
-                          <label>PO Date *</label>
-                          <input
-                            type="date"
-                            value={poDate}
-                            onChange={e => setPoDate(e.target.value)}
-                            style={!poDate ? { borderColor: '#f59e0b' } : undefined}
-                          />
-                          {!poDate && (
-                            <span style={{ color: '#f59e0b', fontSize: '11px', marginTop: '2px' }}>PO Date is required</span>
-                          )}
-                        </div>
-                        <div className="de-po-field">
-                          <label>PO Status</label>
-                          <select value={poStatus} onChange={e => setPoStatus(e.target.value)}>
-                            <option value="Pending">Pending</option>
-                            <option value="Ordered">Ordered</option>
-                            <option value="Partially Received">Partially Received</option>
-                            <option value="Received">Received</option>
-                          </select>
-                        </div>
-                        <div className="de-po-field">
-                          <label>Payment Terms</label>
-                          <input type="text" value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} placeholder="e.g. 30 days net / 50% Advance" />
-                        </div>
-                        <div className="de-po-field">
-                          <label>Material Status</label>
-                          <select value={materialStatus} onChange={e => setMaterialStatus(e.target.value)}>
-                            <option value="Pending">Pending</option>
-                            <option value="Ordered">Ordered</option>
-                            <option value="In Transit">In Transit</option>
-                            <option value="Received">Received</option>
-                            <option value="Ready for Dispatch">Ready for Dispatch</option>
-                          </select>
-                        </div>
-                        <div className="de-po-field">
-                          <label>Advance (₹)</label>
-                          <input
-                            type="number"
-                            min={0}
-                            value={advance}
-                            onChange={e => {
-                              const val = Math.max(0, Number(e.target.value) || 0);
-                              setAdvance(val);
-                            }}
-                            placeholder="0.00"
-                            style={advance > totals.grandTotal && totals.grandTotal > 0 ? { borderColor: '#ef4444' } : undefined}
-                          />
-                          {advance > totals.grandTotal && totals.grandTotal > 0 && (
-                            <span style={{ color: '#ef4444', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>⚠ Advance exceeds grand total</span>
-                          )}
-                        </div>
-                        <div className="de-po-field">
-                          <label>Remarks</label>
-                          <input type="text" value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="Any remarks…" />
-                        </div>
-                      </div>
-
-                      {/* de-tax-section */}
-                      <div className="de-tax-section">
-                        <span className="de-tax-label">📊 TAX:</span>
-                        <div className="de-tax-field">
-                          <label>CGST %</label>
-                          <input type="number" min={0} max={100} value={cgstPercent} onChange={e => setCgstPercent(Math.min(100, Math.max(0, Number(e.target.value) || 0)))} />
-                        </div>
-                        <div className="de-tax-field">
-                          <label>SGST %</label>
-                          <input type="number" min={0} max={100} value={sgstPercent} onChange={e => setSgstPercent(Math.min(100, Math.max(0, Number(e.target.value) || 0)))} />
-                        </div>
-                        <div className="de-tax-field">
-                          <label>IGST %</label>
-                          <input type="number" min={0} max={100} value={igstPercent} onChange={e => setIgstPercent(Math.min(100, Math.max(0, Number(e.target.value) || 0)))} />
-                        </div>
-                        <div className="de-fin-sep"></div>
-                        <div className="de-fin-item"><span>Subtotal:</span> <strong>₹{totals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></div>
-                        <div className="de-fin-sep"></div>
-                        <div className="de-fin-item"><span>CGST:</span> <strong>₹{totals.cgstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></div>
-                        <div className="de-fin-item"><span>SGST:</span> <strong>₹{totals.sgstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></div>
-                        <div className="de-fin-item"><span>IGST:</span> <strong>₹{totals.igstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></div>
-                        <div className="de-fin-sep"></div>
-                        <div className="de-fin-item"><span>Grand Total:</span> <strong style={{ color: '#1e4620', fontSize: '15px' }}>₹{totals.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></div>
-                      </div>
-
-                      {/* de-terms-section */}
-                      <div className="de-terms-section">
-                        <div className="de-terms-title">📜 TERMS &amp; CONDITIONS (SHOWN ON PO)</div>
-                        <textarea className="de-terms-textarea" value={terms} onChange={e => setTerms(e.target.value)} placeholder="Terms..."></textarea>
-                      </div>
-
-                      {/* de-toolbar */}
-                      <div className="de-toolbar">
-                        <span className="de-toolbar-label">LINE ITEMS</span>
-                        <button className="de-tbtn" onClick={handleAddPoRow}>➕ Add Row</button>
-                        <button className="de-tbtn" onClick={handleDuplicateLastRow}>📋 Duplicate Last</button>
-                        <div className="de-tbtn-sep"></div>
-
-                        {isAddingCol ? (
-                          <div className="flex items-center gap-1 bg-white border border-border p-1 rounded-md shadow-sm">
-                            <input
-                              placeholder="Col Name..."
-                              value={newColName}
-                              onChange={e => setNewColName(e.target.value)}
-                              style={{ fontSize: '13px', width: '120px', padding: '4px 8px', border: '1px solid var(--border)', borderRadius: '6px' }}
-                            />
-                            <button className="de-tbtn bg-primary text-white" style={{ padding: '4px 10px', fontSize: '12px' }} onClick={handleAddCustomColumn}>Add</button>
-                            <button className="de-tbtn" style={{ padding: '4px 8px', fontSize: '12px' }} onClick={() => setIsAddingCol(false)}>✕</button>
-                          </div>
-                        ) : (
-                          <button className="de-tbtn" onClick={() => setIsAddingCol(true)}>➕ Add Column</button>
-                        )}
-
-                        <div className="de-tbtn-sep"></div>
-                        <button className="de-tbtn de-tbtn-danger" onClick={handleClearAllRows}>🗑️ Clear All</button>
-                        <div style={{ flex: 1 }}></div>
-                        <span className="de-row-count">{poItems.length} items</span>
-                        <div className="de-tbtn-sep"></div>
-                        <button className="de-tbtn de-maximize-btn" onClick={() => setDeMaximized(!deMaximized)}>⛶ Maximize</button>
-                      </div>
-
-                      {/* de-table-wrap */}
-                      <div className="de-table-wrap">
-                        <table className="de-table">
-                          <thead>
-                            <tr>
-                              <th className="th-sno">S.No.</th>
-                              <th className="th-desc">Item Description</th>
-                              <th className="th-qty">Qty</th>
-                              <th className="th-unit">Unit</th>
-                              <th className="th-hsn">HSN Code</th>
-                              <th className="th-catno">CAT No.</th>
-                              {customColumns.map(c => (
-                                <th key={c} style={{ minWidth: '100px' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
-                                    <span>{c}</span>
-                                    <button 
-                                      onClick={() => handleRemoveCustomColumn(c)} 
-                                      style={{ color: '#ef4444', fontStyle: 'normal', cursor: 'pointer', border: 'none', background: 'none', fontSize: '12px', fontWeight: 'bold' }}
-                                      title={`Remove column ${c}`}
-                                    >
-                                      ✕
-                                    </button>
-                                  </div>
-                                </th>
-                              ))}
-                              <th className="th-rate">Rate (₹)</th>
-                              <th className="th-dis">DIS (%)</th>
-                              <th className="th-net">Net (₹)</th>
-                              <th className="th-total">Total (₹)</th>
-                              <th className="th-del"></th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {poItems.map((item, idx) => (
-                              <tr key={item.id}>
-                                <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{idx + 1}</td>
-                                <td><input type="text" value={item.description} onChange={e => updatePoItemField(item.id, 'description', e.target.value)} placeholder="Item description..." style={!item.description.trim() ? { borderColor: '#f59e0b' } : undefined} /></td>
-                                <td><input type="number" min={0.01} step="any" value={item.qty} onChange={e => updatePoItemField(item.id, 'qty', Number(e.target.value) || 0)} style={item.qty <= 0 ? { borderColor: '#f59e0b' } : undefined} /></td>
-                                <td><input type="text" value={item.unit} onChange={e => updatePoItemField(item.id, 'unit', e.target.value)} placeholder="PCS" /></td>
-                                <td><input type="text" value={item.hsnCode} onChange={e => updatePoItemField(item.id, 'hsnCode', e.target.value)} placeholder="HSN" /></td>
-                                <td><input type="text" value={item.catNo} onChange={e => updatePoItemField(item.id, 'catNo', e.target.value)} placeholder="CAT no." /></td>
-                                {customColumns.map(c => (
-                                  <td key={c}>
-                                    <input type="text" value={item[c] || ''} onChange={e => updatePoItemField(item.id, c, e.target.value)} />
-                                  </td>
-                                ))}
-                                <td><input type="number" value={item.rate === 0 ? '' : item.rate} onChange={e => updatePoItemField(item.id, 'rate', Number(e.target.value) || 0)} placeholder="0" /></td>
-                                <td><input type="number" value={item.discountPercent === 0 ? '' : item.discountPercent} onChange={e => updatePoItemField(item.id, 'discountPercent', Number(e.target.value) || 0)} placeholder="0" /></td>
-                                <td className="td-net">₹{(item.net || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                                <td className="td-total">₹{(item.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                                <td style={{ textAlign: 'center' }}>
-                                  <button className="btn-row-del" onClick={() => handleDeletePoRow(item.id)}>🗑️</button>
-                                </td>
-                              </tr>
-                            ))}
-                            {poItems.length === 0 && (
-                              <tr>
-                                <td colSpan={12 + customColumns.length} style={{ padding: '24px', textAlign: 'center', color: 'var(--text2)' }}>
-                                  No items added. Click "+ Add Row" to begin.
-                                </td>
-                              </tr>
-                            )}
-                          </tbody>
-                          <tfoot>
-                            <tr className="de-tfoot-row">
-                              <td colSpan={2} className="tfoot-label">Total items: <span id="de-total-items">{poItems.length}</span></td>
-                              <td className="tfoot-qty" id="de-total-qty">{poItems.reduce((sum, item) => sum + (Number(item.qty) || 0), 0)}</td>
-                              <td colSpan={5 + customColumns.length} className="tfoot-grand-label">Grand Total (excl. tax):</td>
-                              <td className="tfoot-grand" colSpan={3} id="de-grand-total">₹{totals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                              <td></td>
-                            </tr>
-                          </tfoot>
-                        </table>
-                      </div>
-
-                    </div>
-
-                    {/* de-finance-bar */}
-                    <div className="de-finance-bar">
-                      <div className="de-fin-item"><span>Total Amount:</span> <strong id="de-total-amt">₹{totals.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></div>
-                      <div className="de-fin-sep"></div>
-                      <div className="de-fin-item"><span>Advance:</span> <strong id="de-adv-display" className="de-fin-adv">₹{advance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></div>
-                      <div className="de-fin-sep"></div>
-                      <div className="de-fin-item"><span>Balance:</span> <strong id="de-bal-display" className="de-fin-bal">₹{totals.balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></div>
-                    </div>
-
-                    {/* de-footer */}
-                    <div className="de-footer">
-                      <div className="de-export-section">
-                        <div className="de-export-label">EXPORT AS:</div>
-                        <div className="de-export-btns">
-                          <button className="de-exp-btn" onClick={() => triggerExport('pdf')}><span className="de-exp-icon">📕</span><span className="de-exp-name">PDF</span><span className="de-exp-ext">.pdf</span></button>
-                          <button className="de-exp-btn" onClick={() => triggerExport('png')}><span className="de-exp-icon">🖼️</span><span className="de-exp-name">PNG</span><span className="de-exp-ext">.png</span></button>
-                          <button className="de-exp-btn" onClick={() => triggerExport('jpeg')}><span className="de-exp-icon">📷</span><span className="de-exp-name">JPEG</span><span className="de-exp-ext">.jpeg</span></button>
-                        </div>
-                      </div>
-                      <div className="de-footer-actions">
-                        <button className="de-tbtn" style={{ padding: '10px 18px', fontSize: '13.5px' }} onClick={() => toast.success('Skipped')}>⏭️ Skip</button>
-                        <button className="de-tbtn" style={{ padding: '10px 18px', fontSize: '13.5px' }} onClick={() => setIsDataEntryOpen(false)}>Cancel</button>
-                        <button className="btn-save-rev" onClick={handleSavePoRevision}>💾 Save Revision</button>
-                        <button className="btn-export-pdf" onClick={() => triggerExport('pdf')}>📘 Export PDF</button>
-                      </div>
-                    </div>
-
+              {/* de-company-section */}
+              <div className="de-company-section">
+                <div className="de-company-section-title">🏢 OUR COMPANY DETAILS (FOR PO HEADER)</div>
+                <div className="de-company-grid">
+                  <div className="de-po-field">
+                    <label>Company Name</label>
+                    <input type="text" value={companyDetails.name} onChange={e => setCompanyDetails({ ...companyDetails, name: e.target.value })} placeholder="e.g. D.V. Electromatic Pvt. Ltd." />
+                  </div>
+                  <div className="de-po-field">
+                    <label>Company Address</label>
+                    <input type="text" value={companyDetails.address} onChange={e => setCompanyDetails({ ...companyDetails, address: e.target.value })} placeholder="F-003, Industrial Growth Centre…" />
+                  </div>
+                  <div className="de-po-field">
+                    <label>Company Phone</label>
+                    <input type="text" value={companyDetails.phone} onChange={e => setCompanyDetails({ ...companyDetails, phone: e.target.value })} placeholder="+91 92572-17609" />
+                  </div>
+                  <div className="de-po-field">
+                    <label>Company Email</label>
+                    <input type="text" value={companyDetails.email} onChange={e => setCompanyDetails({ ...companyDetails, email: e.target.value })} placeholder="office@dvepl.com" />
+                  </div>
+                  <div className="de-po-field">
+                    <label>Company GSTIN</label>
+                    <input type="text" value={companyDetails.gstin} onChange={e => setCompanyDetails({ ...companyDetails, gstin: e.target.value })} placeholder="03AABCD4308A1ZL" />
+                  </div>
+                  <div className="de-po-field">
+                    <label>ISO / Certification</label>
+                    <input type="text" value={companyDetails.iso} onChange={e => setCompanyDetails({ ...companyDetails, iso: e.target.value })} placeholder="AN ISO 9001:2008 CERTIFIED CO." />
+                  </div>
+                  <div className="de-po-field">
+                    <label>Authorized Signatory</label>
+                    <input type="text" value={companyDetails.signatory} onChange={e => setCompanyDetails({ ...companyDetails, signatory: e.target.value })} placeholder="Name of signatory" />
+                  </div>
+                  <div className="de-po-field">
+                    <label>Division / Dept</label>
+                    <input type="text" value={companyDetails.division} onChange={e => setCompanyDetails({ ...companyDetails, division: e.target.value })} placeholder="Industrial Division" />
                   </div>
                 </div>
-              )}
-              <ConfirmDialog
-                open={deleteConfirmOpen}
-                onOpenChange={setDeleteConfirmOpen}
-                title="Move Vendor to Recycle Bin?"
-                description="This vendor will be moved to the Recycle Bin. You can restore it anytime from Settings → Recycle Bin."
-                confirmText="Move to Bin"
-                onConfirm={confirmDeleteVendor}
-              />
+              </div>
 
-              <ConfirmDialog
-                open={clearRowsConfirmOpen}
-                onOpenChange={setClearRowsConfirmOpen}
-                title="Clear All Line Items?"
-                description="All line items in this PO draft will be removed. This only affects the current draft and can be re-added before saving."
-                confirmText="Clear All"
-                variant="warning"
-                onConfirm={() => {
-                  setPoItems([]);
-                }}
-              />
+              {/* de-po-header */}
+              <div className="de-po-header">
+                <div className="de-po-field">
+                  <label>Order Place To</label>
+                  <input type="text" value={activePoVendor.name} disabled style={{ background: '#f1f5f9', border: '1px solid #cbd5e1' }} />
+                </div>
+                <div className="de-po-field">
+                  <label>PO Number *</label>
+                  <input
+                    type="text"
+                    value={poNumber}
+                    onChange={e => setPoNumber(e.target.value)}
+                    placeholder="e.g. PO-2025-001"
+                    style={!poNumber.trim() ? { borderColor: '#f59e0b' } : undefined}
+                  />
+                  {!poNumber.trim() && (
+                    <span style={{ color: '#f59e0b', fontSize: '11px', marginTop: '2px' }}>PO Number is required</span>
+                  )}
+                </div>
+                <div className="de-po-field">
+                  <label>PO Date *</label>
+                  <input
+                    type="date"
+                    value={poDate}
+                    onChange={e => setPoDate(e.target.value)}
+                    style={!poDate ? { borderColor: '#f59e0b' } : undefined}
+                  />
+                  {!poDate && (
+                    <span style={{ color: '#f59e0b', fontSize: '11px', marginTop: '2px' }}>PO Date is required</span>
+                  )}
+                </div>
+                <div className="de-po-field">
+                  <label>PO Status</label>
+                  <select value={poStatus} onChange={e => setPoStatus(e.target.value)}>
+                    <option value="Pending">Pending</option>
+                    <option value="Ordered">Ordered</option>
+                    <option value="Partially Received">Partially Received</option>
+                    <option value="Received">Received</option>
+                  </select>
+                </div>
+                <div className="de-po-field">
+                  <label>Payment Terms</label>
+                  <input type="text" value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} placeholder="e.g. 30 days net / 50% Advance" />
+                </div>
+                <div className="de-po-field">
+                  <label>Material Status</label>
+                  <select value={materialStatus} onChange={e => setMaterialStatus(e.target.value)}>
+                    <option value="Pending">Pending</option>
+                    <option value="Ordered">Ordered</option>
+                    <option value="In Transit">In Transit</option>
+                    <option value="Received">Received</option>
+                    <option value="Ready for Dispatch">Ready for Dispatch</option>
+                  </select>
+                </div>
+                <div className="de-po-field">
+                  <label>Advance (₹)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={advance}
+                    onChange={e => {
+                      const val = Math.max(0, Number(e.target.value) || 0);
+                      setAdvance(val);
+                    }}
+                    placeholder="0.00"
+                    style={advance > totals.grandTotal && totals.grandTotal > 0 ? { borderColor: '#ef4444' } : undefined}
+                  />
+                  {advance > totals.grandTotal && totals.grandTotal > 0 && (
+                    <span style={{ color: '#ef4444', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>⚠ Advance exceeds grand total</span>
+                  )}
+                </div>
+                <div className="de-po-field">
+                  <label>Remarks</label>
+                  <input type="text" value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="Any remarks…" />
+                </div>
+                <div className="de-po-field">
+                  <label>Created Date &amp; Time</label>
+                  <input
+                    type="text"
+                    value={formatDateTime(poCreatedAt)}
+                    disabled
+                    style={{ background: '#f1f5f9', border: '1px solid #cbd5e1' }}
+                  />
+                </div>
+              </div>
 
-              <ConfirmDialog
-                open={removeColConfirmOpen}
-                onOpenChange={setRemoveColConfirmOpen}
-                title="Remove Column?"
-                description={`The column "${colToRemove}" will be removed from this PO draft. Column data in unsaved rows will be lost.`}
-                confirmText="Remove Column"
-                variant="warning"
-                onConfirm={() => {
-                  if (!colToRemove) return;
-                  setCustomColumns(prev => prev.filter(c => c !== colToRemove));
-                  setPoItems(prev => prev.map(item => {
-                    const updated = { ...item };
-                    delete updated[colToRemove];
-                    return updated;
-                  }));
-                  toast.success(`Column "${colToRemove}" removed`);
-                  setColToRemove(null);
-                }}
-              />
+              {/* de-tax-section */}
+              <div className="de-tax-section">
+                <span className="de-tax-label">📊 TAX:</span>
+                <div className="de-tax-field">
+                  <label>CGST %</label>
+                  <input type="number" min={0} max={100} value={cgstPercent} onChange={e => setCgstPercent(Math.min(100, Math.max(0, Number(e.target.value) || 0)))} />
+                </div>
+                <div className="de-tax-field">
+                  <label>SGST %</label>
+                  <input type="number" min={0} max={100} value={sgstPercent} onChange={e => setSgstPercent(Math.min(100, Math.max(0, Number(e.target.value) || 0)))} />
+                </div>
+                <div className="de-tax-field">
+                  <label>IGST %</label>
+                  <input type="number" min={0} max={100} value={igstPercent} onChange={e => setIgstPercent(Math.min(100, Math.max(0, Number(e.target.value) || 0)))} />
+                </div>
+                <div className="de-fin-sep"></div>
+                <div className="de-fin-item"><span>Subtotal:</span> <strong>₹{totals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></div>
+                <div className="de-fin-sep"></div>
+                <div className="de-fin-item"><span>CGST:</span> <strong>₹{totals.cgstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></div>
+                <div className="de-fin-item"><span>SGST:</span> <strong>₹{totals.sgstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></div>
+                <div className="de-fin-item"><span>IGST:</span> <strong>₹{totals.igstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></div>
+                <div className="de-fin-sep"></div>
+                <div className="de-fin-item"><span>Grand Total:</span> <strong style={{ color: '#1e4620', fontSize: '15px' }}>₹{totals.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></div>
+              </div>
 
-              <ConfirmDialog
-                open={deleteRevisionConfirmOpen}
-                onOpenChange={setDeleteRevisionConfirmOpen}
-                title="Delete PO Revision?"
-                description="This saved PO revision will be removed. Only the revision record is deleted — the vendor remains in the system."
-                confirmText="Delete Revision"
-                onConfirm={async () => {
-                  if (!revisionToDelete) return;
-                  try {
-                    await apiService.revisions.delete(revisionToDelete);
-                    const list = await apiService.revisions.list();
-                    setRevisions(list);
-                    if (selectedRevisionId === revisionToDelete) {
-                      setSelectedRevisionId(null);
-                    }
-                    toast.success('Revision deleted successfully.');
-                  } catch (err: any) {
-                    toast.error('Failed to delete revision.');
-                  } finally {
-                    setRevisionToDelete(null);
-                  }
-                }}
-              />
+              {/* de-terms-section */}
+              <div className="de-terms-section">
+                <div className="de-terms-title">📜 TERMS &amp; CONDITIONS (SHOWN ON PO)</div>
+                <textarea className="de-terms-textarea" value={terms} onChange={e => setTerms(e.target.value)} placeholder="Terms..."></textarea>
+              </div>
+
+              {/* de-toolbar */}
+              <div className="de-toolbar">
+                <span className="de-toolbar-label">LINE ITEMS</span>
+                <button className="de-tbtn" onClick={handleAddPoRow}>➕ Add Row</button>
+                <button className="de-tbtn" onClick={handleDuplicateLastRow}>📋 Duplicate Last</button>
+                <div className="de-tbtn-sep"></div>
+
+                {isAddingCol ? (
+                  <div className="flex items-center gap-1 bg-white border border-border p-1 rounded-md shadow-sm">
+                    <input
+                      placeholder="Col Name..."
+                      value={newColName}
+                      onChange={e => setNewColName(e.target.value)}
+                      style={{ fontSize: '13px', width: '120px', padding: '4px 8px', border: '1px solid var(--border)', borderRadius: '6px' }}
+                    />
+                    <button className="de-tbtn bg-primary text-white" style={{ padding: '4px 10px', fontSize: '12px' }} onClick={handleAddCustomColumn}>Add</button>
+                    <button className="de-tbtn" style={{ padding: '4px 8px', fontSize: '12px' }} onClick={() => setIsAddingCol(false)}>✕</button>
+                  </div>
+                ) : (
+                  <button className="de-tbtn" onClick={() => setIsAddingCol(true)}>➕ Add Column</button>
+                )}
+
+                <div className="de-tbtn-sep"></div>
+                <button className="de-tbtn de-tbtn-danger" onClick={handleClearAllRows}>🗑️ Clear All</button>
+                <div style={{ flex: 1 }}></div>
+                <span className="de-row-count">{poItems.length} items</span>
+                <div className="de-tbtn-sep"></div>
+                <button className="de-tbtn de-maximize-btn" onClick={() => setDeMaximized(!deMaximized)}>⛶ Maximize</button>
+              </div>
+
+              {/* de-table-wrap */}
+              <div className="de-table-wrap">
+                <table className="de-table">
+                  <thead>
+                    <tr>
+                      <th className="th-sno">S.No.</th>
+                      <th className="th-desc">Item Description</th>
+                      <th className="th-qty">Qty</th>
+                      <th className="th-unit">Unit</th>
+                      <th className="th-hsn">HSN Code</th>
+                      <th className="th-catno">CAT No.</th>
+                      {customColumns.map(c => (
+                        <th key={c} style={{ minWidth: '100px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
+                            <span>{c}</span>
+                            <button
+                              onClick={() => handleRemoveCustomColumn(c)}
+                              style={{ color: '#ef4444', fontStyle: 'normal', cursor: 'pointer', border: 'none', background: 'none', fontSize: '12px', fontWeight: 'bold' }}
+                              title={`Remove column ${c}`}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </th>
+                      ))}
+                      <th className="th-rate">Rate (₹)</th>
+                      <th className="th-dis">DIS (%)</th>
+                      <th className="th-net">Net (₹)</th>
+                      <th className="th-total">Total (₹)</th>
+                      <th className="th-del"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {poItems.map((item, idx) => (
+                      <tr key={item.id}>
+                        <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{idx + 1}</td>
+                        <td><input type="text" value={item.description} onChange={e => updatePoItemField(item.id, 'description', e.target.value)} placeholder="Item description..." style={!item.description.trim() ? { borderColor: '#f59e0b' } : undefined} /></td>
+                        <td><input type="number" min={0.01} step="any" value={item.qty} onChange={e => updatePoItemField(item.id, 'qty', Number(e.target.value) || 0)} style={item.qty <= 0 ? { borderColor: '#f59e0b' } : undefined} /></td>
+                        <td><input type="text" value={item.unit} onChange={e => updatePoItemField(item.id, 'unit', e.target.value)} placeholder="PCS" /></td>
+                        <td><input type="text" value={item.hsnCode} onChange={e => updatePoItemField(item.id, 'hsnCode', e.target.value)} placeholder="HSN" /></td>
+                        <td><input type="text" value={item.catNo} onChange={e => updatePoItemField(item.id, 'catNo', e.target.value)} placeholder="CAT no." /></td>
+                        {customColumns.map(c => (
+                          <td key={c}>
+                            <input type="text" value={item[c] || ''} onChange={e => updatePoItemField(item.id, c, e.target.value)} />
+                          </td>
+                        ))}
+                        <td><input type="number" value={item.rate === 0 ? '' : item.rate} onChange={e => updatePoItemField(item.id, 'rate', Number(e.target.value) || 0)} placeholder="0" /></td>
+                        <td><input type="number" value={item.discountPercent === 0 ? '' : item.discountPercent} onChange={e => updatePoItemField(item.id, 'discountPercent', Number(e.target.value) || 0)} placeholder="0" /></td>
+                        <td className="td-net">₹{(item.net || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                        <td className="td-total">₹{(item.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                        <td style={{ textAlign: 'center' }}>
+                          <button className="btn-row-del" onClick={() => handleDeletePoRow(item.id)}>🗑️</button>
+                        </td>
+                      </tr>
+                    ))}
+                    {poItems.length === 0 && (
+                      <tr>
+                        <td colSpan={12 + customColumns.length} style={{ padding: '24px', textAlign: 'center', color: 'var(--text2)' }}>
+                          No items added. Click "+ Add Row" to begin.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                  <tfoot>
+                    <tr className="de-tfoot-row">
+                      <td colSpan={2} className="tfoot-label">Total items: <span id="de-total-items">{poItems.length}</span></td>
+                      <td className="tfoot-qty" id="de-total-qty">{poItems.reduce((sum, item) => sum + (Number(item.qty) || 0), 0)}</td>
+                      <td colSpan={5 + customColumns.length} className="tfoot-grand-label">Grand Total (excl. tax):</td>
+                      <td className="tfoot-grand" colSpan={3} id="de-grand-total">₹{totals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+
             </div>
-            );
+
+            {/* de-finance-bar */}
+            <div className="de-finance-bar">
+              <div className="de-fin-item"><span>Total Amount:</span> <strong id="de-total-amt">₹{totals.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></div>
+              <div className="de-fin-sep"></div>
+              <div className="de-fin-item"><span>Advance:</span> <strong id="de-adv-display" className="de-fin-adv">₹{advance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></div>
+              <div className="de-fin-sep"></div>
+              <div className="de-fin-item"><span>Balance:</span> <strong id="de-bal-display" className="de-fin-bal">₹{totals.balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></div>
+            </div>
+
+            {/* de-footer */}
+            <div className="de-footer">
+              <div className="de-export-section">
+                <div className="de-export-label">EXPORT AS:</div>
+                <div className="de-export-btns">
+                  <button className="de-exp-btn" onClick={() => triggerExport('pdf')}><span className="de-exp-icon">📕</span><span className="de-exp-name">PDF</span><span className="de-exp-ext">.pdf</span></button>
+                  <button className="de-exp-btn" onClick={() => triggerExport('png')}><span className="de-exp-icon">🖼️</span><span className="de-exp-name">PNG</span><span className="de-exp-ext">.png</span></button>
+                  <button className="de-exp-btn" onClick={() => triggerExport('jpeg')}><span className="de-exp-icon">📷</span><span className="de-exp-name">JPEG</span><span className="de-exp-ext">.jpeg</span></button>
+                </div>
+              </div>
+              <div className="de-footer-actions">
+                <button className="de-tbtn" style={{ padding: '10px 18px', fontSize: '13.5px' }} onClick={() => toast.success('Skipped')}>⏭️ Skip</button>
+                <button className="de-tbtn" style={{ padding: '10px 18px', fontSize: '13.5px' }} onClick={() => setIsDataEntryOpen(false)}>Cancel</button>
+                <button className="btn-save-rev" onClick={handleSavePoRevision}>💾 Save Revision</button>
+                <button className="btn-export-pdf" onClick={() => triggerExport('pdf')}>📘 Export PDF</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Move Vendor to Recycle Bin?"
+        description="This vendor will be moved to the Recycle Bin. You can restore it anytime from Settings → Recycle Bin."
+        confirmText="Move to Bin"
+        onConfirm={confirmDeleteVendor}
+      />
+
+      <ConfirmDialog
+        open={clearRowsConfirmOpen}
+        onOpenChange={setClearRowsConfirmOpen}
+        title="Clear All Line Items?"
+        description="All line items in this PO draft will be removed. This only affects the current draft and can be re-added before saving."
+        confirmText="Clear All"
+        variant="warning"
+        onConfirm={() => {
+          setPoItems([]);
+        }}
+      />
+
+      <ConfirmDialog
+        open={removeColConfirmOpen}
+        onOpenChange={setRemoveColConfirmOpen}
+        title="Remove Column?"
+        description={`The column "${colToRemove}" will be removed from this PO draft. Column data in unsaved rows will be lost.`}
+        confirmText="Remove Column"
+        variant="warning"
+        onConfirm={() => {
+          if (!colToRemove) return;
+          setCustomColumns(prev => prev.filter(c => c !== colToRemove));
+          setPoItems(prev => prev.map(item => {
+            const updated = { ...item };
+            delete updated[colToRemove];
+            return updated;
+          }));
+          toast.success(`Column "${colToRemove}" removed`);
+          setColToRemove(null);
+        }}
+      />
+
+      <ConfirmDialog
+        open={deleteRevisionConfirmOpen}
+        onOpenChange={setDeleteRevisionConfirmOpen}
+        title="Delete PO Revision?"
+        description="This saved PO revision will be removed. Only the revision record is deleted — the vendor remains in the system."
+        confirmText="Delete Revision"
+        onConfirm={async () => {
+          if (!revisionToDelete) return;
+          try {
+            await apiService.revisions.delete(revisionToDelete);
+            const list = await apiService.revisions.list();
+            setRevisions(list);
+            if (selectedRevisionId === revisionToDelete) {
+              setSelectedRevisionId(null);
+            }
+            toast.success('Revision deleted successfully.');
+          } catch (err: any) {
+            toast.error('Failed to delete revision.');
+          } finally {
+            setRevisionToDelete(null);
+          }
+        }}
+      />
+    </div>
+  );
 }
 
 export default VendorsPage;
