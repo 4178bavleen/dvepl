@@ -1553,11 +1553,16 @@ model Material {
   company               Company                @relation(fields: [companyId], references: [id])
   createdBy             User                   @relation(fields: [createdById], references: [id])
   specification         MaterialSpecification? @relation(fields: [specificationId], references: [id])
-  purchaseOrderItems    PurchaseOrderItem[]
-  purchaseRequestItems  PurchaseRequestItem[]
-  workOrderItems        WorkOrderItem[]
-  workOrders            WorkOrder[]
-  vendorProducts        VendorProduct[]
+  vendorId              String?
+
+  vendor Vendor? @relation(fields: [vendorId], references: [id])
+
+  preferredVendor      Vendor?               @relation("MaterialPreferredVendor", fields: [preferredVendorId], references: [id])
+  purchaseOrderItems   PurchaseOrderItem[]
+  purchaseRequestItems PurchaseRequestItem[]
+  workOrderItems       WorkOrderItem[]
+  workOrders           WorkOrder[]
+  vendorProducts       VendorProduct[]
 
   @@index([companyId])
   @@index([materialCode])
@@ -1882,24 +1887,7 @@ model Inventory {
   @@map("inventories")
 }
 
-model InventoryTransaction {
-  id              String          @id @default(uuid())
-  inventoryId     String
-  transactionType TransactionType
-  quantity        Decimal         @db.Decimal(15, 3)
-  referenceType   String
-  referenceId     String
-  remarks         String?
-  createdById     String
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  createdBy       User            @relation(fields: [createdById], references: [id])
-  inventory       Inventory       @relation(fields: [inventoryId], references: [id])
 
-  @@index([inventoryId])
-  @@index([referenceType, referenceId])
-  @@map("inventory_transactions")
-}
 
 model StockTransfer {
   id              String     @id @default(uuid())
@@ -2475,7 +2463,7 @@ model DashboardWidget {
 }
 
 model Vendor {
-  id            String           @id @default(uuid())
+  id            String  @id @default(uuid())
   companyId     String
   name          String
   category      String?
@@ -2844,26 +2832,26 @@ enum Priority {
 }
 
 model CustomField {
-  id           String              @id @default(uuid())
-  module       String              // 'vendor', 'order', 'task', etc.
-  name         String              // Field Name / Label (e.g. 'Inspection Date')
-  key          String              // Unique Field Key (e.g. 'inspectionDate')
-  type         String              // text, textarea, number, decimal, email, phone, url, date, datetime, time, checkbox, switch, dropdown, multiselect, radio, file, image
-  required     Boolean             @default(false)
+  id           String    @id @default(uuid())
+  module       String // 'vendor', 'order', 'task', etc.
+  name         String // Field Name / Label (e.g. 'Inspection Date')
+  key          String // Unique Field Key (e.g. 'inspectionDate')
+  type         String // text, textarea, number, decimal, email, phone, url, date, datetime, time, checkbox, switch, dropdown, multiselect, radio, file, image
+  required     Boolean   @default(false)
   defaultValue String?
   placeholder  String?
   helpText     String?
-  displayOrder Int                 @default(0)
-  showInForm   Boolean             @default(true)
-  showInTable  Boolean             @default(true)
-  isActive     Boolean             @default(true)
-  afterField   String?             // For placement ordering relative to built-in fields
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
+  displayOrder Int       @default(0)
+  showInForm   Boolean   @default(true)
+  showInTable  Boolean   @default(true)
+  isActive     Boolean   @default(true)
+  afterField   String? // For placement ordering relative to built-in fields
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
-  options      CustomFieldOption[]
-  values       CustomFieldValue[]
+  options CustomFieldOption[]
+  values  CustomFieldValue[]
 
   @@unique([module, key])
   @@index([module, isActive, displayOrder])
@@ -2885,22 +2873,22 @@ model CustomFieldOption {
 }
 
 model CustomFieldValue {
-  id            String      @id @default(uuid())
+  id            String @id @default(uuid())
   customFieldId String
-  entityId      String      // Foreign record ID (Vendor ID, Order ID, Task ID)
-  
+  entityId      String // Foreign record ID (Vendor ID, Order ID, Task ID)
+
   // Typed storage columns for EAV
-  stringValue   String?
-  textValue     String?     @db.Text
-  numberValue   Decimal?    @db.Decimal(18, 4)
-  booleanValue  Boolean?
-  dateValue     DateTime?
-  jsonValue     String?     // For multi-select array strings or complex metadata if needed
+  stringValue  String?
+  textValue    String?   @db.Text
+  numberValue  Decimal?  @db.Decimal(18, 4)
+  booleanValue Boolean?
+  dateValue    DateTime?
+  jsonValue    String? // For multi-select array strings or complex metadata if needed
 
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  customField   CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+  customField CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
 
   @@unique([customFieldId, entityId])
   @@index([entityId])
