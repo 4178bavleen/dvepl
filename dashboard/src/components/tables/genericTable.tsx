@@ -129,6 +129,9 @@ interface GenericTableProps<TData> {
   onView?: (row: TData) => void;
   onEdit?: (row: TData) => void;
   onDelete?: (row: TData) => void;
+
+  onPermissions?: (row: TData) => void; // ADD THIS
+
   bulkActions?: (selectedRows: TData[]) => React.ReactNode;
   isLoading?: boolean;
   showColumnVisibility?: boolean;
@@ -141,6 +144,7 @@ export function GenericTable<TData extends { id: string }>({
   onView,
   onEdit,
   onDelete,
+  onPermissions,
   bulkActions,
   isLoading = false,
   showColumnVisibility = true,
@@ -199,7 +203,7 @@ export function GenericTable<TData extends { id: string }>({
     }
 
     // Append action column if handlers exist
-    if (onView || onEdit || onDelete) {
+    if (onView || onEdit || onDelete || onPermissions) {
       cols.push({
         id: "actions",
         header: t("Actions"),
@@ -237,6 +241,20 @@ export function GenericTable<TData extends { id: string }>({
                 >
                   <Edit className="h-3.5 w-3.5" />
                   <span className="hidden xl:inline">{t("Edit")}</span>
+                </Button>
+              )}
+              {onPermissions && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onPermissions(item);
+                  }}
+                  className="h-8 px-2.5 hover:bg-blue-500/10 hover:text-blue-600 text-xs font-semibold flex items-center gap-1.5"
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                  <span className="hidden xl:inline">Permissions</span>
                 </Button>
               )}
               {onDelete && (
@@ -367,7 +385,9 @@ export function GenericTable<TData extends { id: string }>({
                       className={cn(
                         "text-xs font-semibold py-3.5 px-4 text-muted-foreground whitespace-nowrap",
                         header.id === "actions" && "text-center",
-                        header.id === "actions" && freezeActions && "sticky right-0 bg-muted border-l border-l-border z-10",
+                        header.id === "actions" &&
+                          freezeActions &&
+                          "sticky right-0 bg-muted border-l border-l-border z-10",
                       )}
                     >
                       {header.isPlaceholder
@@ -391,11 +411,13 @@ export function GenericTable<TData extends { id: string }>({
                   className="animate-pulse border-b border-border/50"
                 >
                   {tableColumns.map((col, colIndex) => (
-                    <TableCell 
-                      key={colIndex} 
+                    <TableCell
+                      key={colIndex}
                       className={cn(
                         "py-4 px-4",
-                        col.id === "actions" && freezeActions && "sticky right-0 bg-card border-l border-l-border z-10"
+                        col.id === "actions" &&
+                          freezeActions &&
+                          "sticky right-0 bg-card border-l border-l-border z-10",
                       )}
                     >
                       <div className="h-4 bg-muted rounded-md w-full" />
@@ -416,7 +438,9 @@ export function GenericTable<TData extends { id: string }>({
                       className={cn(
                         "py-3.5 px-4 text-sm font-normal align-middle",
                         cell.column.id === "actions" && "text-center",
-                        cell.column.id === "actions" && freezeActions && "sticky right-0 bg-card group-hover/row:bg-muted group-data-[state=selected]/row:bg-muted border-l border-l-border z-10",
+                        cell.column.id === "actions" &&
+                          freezeActions &&
+                          "sticky right-0 bg-card group-hover/row:bg-muted group-data-[state=selected]/row:bg-muted border-l border-l-border z-10",
                       )}
                     >
                       {flexRender(

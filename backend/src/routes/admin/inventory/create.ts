@@ -232,11 +232,11 @@ async function adminInventoryCreateRoutes(
           },
         });
 
-   adminLogs.info("Inventory Item created successfully", {
-  inventoryId: result.id,
-  materialCode,
-  createdBy: request.user.id,   // ✅ admin → user
-});
+        adminLogs.info("Inventory Item created successfully", {
+          inventoryId: result.id,
+          materialCode,
+          createdBy: request.user.id, // ✅ admin → user
+        });
 
         return reply.status(201).send({
           success: true,
