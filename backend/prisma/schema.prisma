@@ -1523,7 +1523,7 @@ model BOMRevision {
 model Material {
   id                    String                 @id @default(uuid())
   companyId             String
-  category              String?
+  categoryId            String?
   brandId               String?
   specificationId       String?
   materialCode          String                 @unique
@@ -1536,8 +1536,6 @@ model Material {
   color                 String?
   alternativeMaterialId String?
   preferredVendorId     String?
-  reorderLevel          Decimal?               @db.Decimal(15, 3)
-  reorderQty            Decimal?               @db.Decimal(15, 3)
   isActive              Boolean                @default(true)
   createdById           String
   createdAt             DateTime               @default(now())
@@ -1546,19 +1544,15 @@ model Material {
   stockTransfers        StockTransfer[]
   bomItems              BOMItem[]
   goodsReceiptItems     GoodsReceiptItem[]
-  type                  MaterialType           @default(RAW)
   inspections           Inspection[]
   inventories           Inventory[]
-  leadDays              Int?
   alternative           Material?              @relation("MaterialAlternative", fields: [alternativeMaterialId], references: [id])
   alternatives          Material[]             @relation("MaterialAlternative")
   brand                 MaterialBrand?         @relation(fields: [brandId], references: [id])
+  category              MaterialCategory?      @relation(fields: [categoryId], references: [id])
   company               Company                @relation(fields: [companyId], references: [id])
   createdBy             User                   @relation(fields: [createdById], references: [id])
   specification         MaterialSpecification? @relation(fields: [specificationId], references: [id])
-  vendorId              String?
-  vendor                Vendor?                @relation(fields: [vendorId], references: [id])
-  preferredVendor       Vendor?                @relation("MaterialPreferredVendor", fields: [preferredVendorId], references: [id])
   purchaseOrderItems    PurchaseOrderItem[]
   purchaseRequestItems  PurchaseRequestItem[]
   workOrderItems        WorkOrderItem[]
@@ -1567,6 +1561,7 @@ model Material {
 
   @@index([companyId])
   @@index([materialCode])
+  @@index([categoryId])
   @@map("materials")
 }
 
@@ -1584,9 +1579,7 @@ model MaterialCategory {
   company     Company            @relation(fields: [companyId], references: [id])
   parent      MaterialCategory?  @relation("MaterialCategoryHierarchy", fields: [parentId], references: [id])
   children    MaterialCategory[] @relation("MaterialCategoryHierarchy")
-  // materials   Material[]
-  // preferredVendorId String?
-  // preferredVendor   Vendor?            @relation("MaterialPreferredVendor", fields: [preferredVendorId], references: [id])
+  materials   Material[]
 
   @@unique([companyId, code])
   @@index([companyId])
@@ -1855,7 +1848,7 @@ model Inventory {
   id                 String                 @id @default(uuid())
   companyId          String
   materialId         String
-  warehouseId        String?
+  warehouseId        String
   binId              String?
   batchNo            String?
   serialNo           String?
@@ -1879,9 +1872,8 @@ model Inventory {
   company            Company                @relation(fields: [companyId], references: [id])
   goodsReceiptItem   GoodsReceiptItem?      @relation(fields: [goodsReceiptItemId], references: [id])
   material           Material               @relation(fields: [materialId], references: [id])
-  warehouse          Warehouse?             @relation(fields: [warehouseId], references: [id])
+  warehouse          Warehouse              @relation(fields: [warehouseId], references: [id])
   transactions       InventoryTransaction[]
-  location           String?
 
   @@unique([materialId, warehouseId, batchNo, serialNo])
   @@index([companyId])
@@ -1891,20 +1883,18 @@ model Inventory {
 }
 
 model InventoryTransaction {
-  id              String                   @id @default(uuid())
+  id              String          @id @default(uuid())
   inventoryId     String
-  transactionType InventoryTransactionType
-  quantity        Decimal                  @db.Decimal(15, 3)
+  transactionType TransactionType
+  quantity        Decimal         @db.Decimal(15, 3)
   referenceType   String
   referenceId     String
   remarks         String?
   createdById     String
-  createdAt       DateTime                 @default(now())
-  updatedAt       DateTime                 @updatedAt
-  createdBy       User                     @relation(fields: [createdById], references: [id])
-  inventory       Inventory                @relation(fields: [inventoryId], references: [id])
-  stockBefore     Decimal                  @db.Decimal(15, 3)
-  stockAfter      Decimal                  @db.Decimal(15, 3)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  createdBy       User            @relation(fields: [createdById], references: [id])
+  inventory       Inventory       @relation(fields: [inventoryId], references: [id])
 
   @@index([inventoryId])
   @@index([referenceType, referenceId])
@@ -2485,14 +2475,10 @@ model DashboardWidget {
 }
 
 model Vendor {
-  id String @id @default(uuid())
-
-  companyId String
-
-  name String
-
-  category String?
-
+  id            String           @id @default(uuid())
+  companyId     String
+  name          String
+  category      String?
   contactPerson String?
 
   phone String?
@@ -2746,11 +2732,14 @@ enum StockType {
   TRANSIT
 }
 
-enum InventoryTransactionType {
-  STOCK_IN
-  STOCK_OUT
+enum TransactionType {
+  IN
+  OUT
   ADJUSTMENT
-  RETURN
+  TRANSFER_IN
+  TRANSFER_OUT
+  RESERVED
+  UNRESERVED
 }
 
 enum StockTransferStatus {
@@ -2855,26 +2844,26 @@ enum Priority {
 }
 
 model CustomField {
-  id           String    @id @default(uuid())
-  module       String // 'vendor', 'order', 'task', etc.
-  name         String // Field Name / Label (e.g. 'Inspection Date')
-  key          String // Unique Field Key (e.g. 'inspectionDate')
-  type         String // text, textarea, number, decimal, email, phone, url, date, datetime, time, checkbox, switch, dropdown, multiselect, radio, file, image
-  required     Boolean   @default(false)
+  id           String              @id @default(uuid())
+  module       String              // 'vendor', 'order', 'task', etc.
+  name         String              // Field Name / Label (e.g. 'Inspection Date')
+  key          String              // Unique Field Key (e.g. 'inspectionDate')
+  type         String              // text, textarea, number, decimal, email, phone, url, date, datetime, time, checkbox, switch, dropdown, multiselect, radio, file, image
+  required     Boolean             @default(false)
   defaultValue String?
   placeholder  String?
   helpText     String?
-  displayOrder Int       @default(0)
-  showInForm   Boolean   @default(true)
-  showInTable  Boolean   @default(true)
-  isActive     Boolean   @default(true)
-  afterField   String? // For placement ordering relative to built-in fields
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  displayOrder Int                 @default(0)
+  showInForm   Boolean             @default(true)
+  showInTable  Boolean             @default(true)
+  isActive     Boolean             @default(true)
+  afterField   String?             // For placement ordering relative to built-in fields
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
   deletedAt    DateTime?
 
-  options CustomFieldOption[]
-  values  CustomFieldValue[]
+  options      CustomFieldOption[]
+  values       CustomFieldValue[]
 
   @@unique([module, key])
   @@index([module, isActive, displayOrder])
@@ -2896,22 +2885,22 @@ model CustomFieldOption {
 }
 
 model CustomFieldValue {
-  id            String @id @default(uuid())
+  id            String      @id @default(uuid())
   customFieldId String
-  entityId      String // Foreign record ID (Vendor ID, Order ID, Task ID)
-
+  entityId      String      // Foreign record ID (Vendor ID, Order ID, Task ID)
+  
   // Typed storage columns for EAV
-  stringValue  String?
-  textValue    String?   @db.Text
-  numberValue  Decimal?  @db.Decimal(18, 4)
-  booleanValue Boolean?
-  dateValue    DateTime?
-  jsonValue    String? // For multi-select array strings or complex metadata if needed
+  stringValue   String?
+  textValue     String?     @db.Text
+  numberValue   Decimal?    @db.Decimal(18, 4)
+  booleanValue  Boolean?
+  dateValue     DateTime?
+  jsonValue     String?     // For multi-select array strings or complex metadata if needed
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
-  customField CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+  customField   CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
 
   @@unique([customFieldId, entityId])
   @@index([entityId])

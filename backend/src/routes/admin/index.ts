@@ -90,7 +90,7 @@ async function adminRoutes(
       prefix: "/cost-center",
     });
     instance.register(adminPermissionRouteGroup, {
-      prefix: "/user/permission",
+      prefix: "/permission",
     });
     instance.register(adminRolePermissionRouteGroup, {
       prefix: "/role-permission",

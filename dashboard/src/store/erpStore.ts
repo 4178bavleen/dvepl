@@ -1,13 +1,39 @@
 import { create } from 'zustand';
-import { 
-  EmployeeStatus, AttendanceStatus, LeaveStatus, 
-  CommunicationType, TenderStatus, TenderRequestSource, TenderRequestStatus,
+import {
   ReferenceCodeAction, Company, Branch, Department, Team, Designation,
-  CostCenter, User, Role, PermissionGroup, Permission, Employee, 
-  Attendance, Leave, Salary, Customer, ContactPerson, CommunicationHistory,
-  Tender, TenderRequest, GovernmentDepartment, Section, Division,
-  SubDivision, ReferenceCode, AuditLog, Shift, Holiday, DeliveryOrder, DeliveryStatus
+  CostCenter, User, Role, PermissionGroup, Permission, Employee,
+  Attendance, Leave, Salary, Tender, TenderRequest, GovernmentDepartment, Section, Division,
+  SubDivision, ReferenceCode, AuditLog, Shift, Holiday, DeliveryOrder
 } from '../types/erp';
+
+import {
+  initialCompanies,
+  initialBranches,
+  initialDepartments,
+  initialTeams,
+  initialDesignations,
+  initialCostCenters,
+  initialUsers,
+  initialRoles,
+  initialPermissionGroups,
+  initialPermissions,
+  initialEmployees,
+  initialAttendances,
+  initialLeaves,
+  initialSalaries,
+  initialGovernmentDepartments,
+  initialSections,
+  initialDivisions,
+  initialSubDivisions,
+  initialTenderRequests,
+  initialTenders,
+  initialShifts,
+  initialHolidays,
+  initialReferenceCodes,
+  initialAuditLogs
+} from '../constants';
+
+console.log("initialUsers:", initialUsers);
 
 interface ERPStore {
   companies: Company[];
@@ -39,16 +65,17 @@ interface ERPStore {
   // Session settings
   currentCompanyId: string;
   currentUserId: string;
+  currentUserName: string;
   currentWorkspace: string;
   theme: 'light' | 'dark';
   language: string;
 
   // Actions
   setCompanyId: (id: string) => void;
-  setUserId: (id: string) => void;
+  setCurrentUser: (id: string, name: string) => void;
   setWorkspace: (ws: string) => void;
   toggleTheme: () => void;
-  setLanguage: (lang: string) => void;
+  setLanguage: (language: string) => void;
   setDeliveryOrders: (orders: DeliveryOrder[]) => void;
   updateDeliveryOrder: (id: string, payload: Partial<DeliveryOrder>) => void;
 
@@ -58,37 +85,6 @@ interface ERPStore {
   deleteRecord: (table: string, id: string) => void;
   addAuditLog: (module: string, recordId: string, action: string, oldValue?: any, newValue?: any) => void;
 }
-
-import {
-  initialCompanies,
-  initialBranches,
-  initialDepartments,
-  initialTeams,
-  initialDesignations,
-  initialCostCenters,
-  initialUsers,
-  initialRoles,
-  initialPermissionGroups,
-  initialPermissions,
-  initialEmployees,
-  initialAttendances,
-  initialLeaves,
-  initialSalaries,
-  initialCustomers,
-  initialContactPersons,
-  initialCommunicationHistories,
-  initialGovernmentDepartments,
-  initialSections,
-  initialDivisions,
-  initialSubDivisions,
-  initialTenderRequests,
-  initialTenders,
-  initialShifts,
-  initialHolidays,
-  initialReferenceCodes,
-  initialAuditLogs
-} from '../constants';
-
 // Combine into Zustand store
 export const useERPStore = create<ERPStore>((set) => ({
   companies: initialCompanies,
@@ -119,16 +115,17 @@ export const useERPStore = create<ERPStore>((set) => ({
 
   // Selected states
   currentCompanyId: 'comp-1',
-  currentUserId: 'user-1',
+  currentUserId: '',
+  currentUserName: '',
   currentWorkspace: 'Default Workspace',
   theme: 'light',
   language: 'English',
 
   setCompanyId: (id) => set({ currentCompanyId: id }),
-  setUserId: (id) => set({ currentUserId: id }),
+  setCurrentUser: (id, name) =>set({currentUserId: id,currentUserName: name}),
   setWorkspace: (ws) => set({ currentWorkspace: ws }),
   toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
-  setLanguage: (lang) => set({ language: lang }),
+  setLanguage: (language: string) => set({ language }),
   setDeliveryOrders: (orders) => set({ deliveryOrders: orders }),
   updateDeliveryOrder: (id, payload) =>
     set((state) => ({
@@ -165,7 +162,7 @@ export const useERPStore = create<ERPStore>((set) => ({
     set((state: any) => {
       const records = state[table] || [];
       const updatedList = [newRecord, ...records];
-      
+
       // Auto-trigger reference code generator if we are adding a Tender
       let updatedReferenceCodes = state.referenceCodes;
       if (table === 'tenders') {

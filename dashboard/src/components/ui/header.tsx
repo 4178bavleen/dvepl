@@ -27,11 +27,9 @@ type CurrentUser = {
 export type HeaderProps = {
   store: {
     theme: string;
-    language: string;
     currentCompanyId: string;
     toggleTheme: () => void;
     setCompanyId: (id: string) => void;
-    setLanguage: (lang: string) => void;
   };
   companies: Company[];
   currentUser: CurrentUser;

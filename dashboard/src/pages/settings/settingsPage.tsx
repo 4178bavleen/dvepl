@@ -15,7 +15,7 @@ export function SettingsPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {/* Left Side Tab Selectors */}
         <div className="bg-card border border-border rounded-xl p-2.5 shadow-sm space-y-1 h-fit">
-          <button 
+          <button
             onClick={() => setActiveTab('PROFILE')}
             className={`w-full text-left text-xs font-semibold px-3 py-2 rounded-lg transition-all ${
               activeTab === 'PROFILE' ? 'bg-primary text-white' : 'text-muted-foreground hover:bg-muted'
@@ -23,7 +23,7 @@ export function SettingsPage() {
           >
             Enterprise Profile
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('SECURITY')}
             className={`w-full text-left text-xs font-semibold px-3 py-2 rounded-lg transition-all ${
               activeTab === 'SECURITY' ? 'bg-primary text-white' : 'text-muted-foreground hover:bg-muted'
@@ -31,7 +31,7 @@ export function SettingsPage() {
           >
             PRBAC Roles & Permissions
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('NOTIFICATIONS')}
             className={`w-full text-left text-xs font-semibold px-3 py-2 rounded-lg transition-all ${
               activeTab === 'NOTIFICATIONS' ? 'bg-primary text-white' : 'text-muted-foreground hover:bg-muted'
@@ -57,10 +57,10 @@ export function SettingsPage() {
                   <p className="text-xs font-semibold">27AAAAA1111A1Z1</p>
                 </div>
 
-                <div className="space-y-1">
+                {/*<div className="space-y-1">
                   <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Default Language</span>
-                  <p className="text-xs font-semibold">{store.language} (English)</p>
-                </div>
+                  <p className="text-xs font-semibold">{store.  language} (English)</p>
+                </div>*/}
               </div>
             </div>
           )}

@@ -68,7 +68,10 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px] max-w-[92vw] p-0 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-2xl gap-0">
+      <DialogContent
+        overlayClassName="z-[100000] bg-black/30"
+        className="z-[100001] sm:max-w-[400px] max-w-[92vw] p-0 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-2xl gap-0"
+      >
 
         {/* Top accent strip */}
         <div className={`w-full h-[3px] ${stripCls}`} />

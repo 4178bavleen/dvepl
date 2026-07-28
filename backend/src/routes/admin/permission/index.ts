@@ -1,7 +1,6 @@
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 
 import getPermissionRoute from "./getAll";
-import getUserPermissionsRoute from "./getById"
 
 async function adminPermissionRouteGroup(
     fastify: FastifyInstance,
@@ -9,9 +8,6 @@ async function adminPermissionRouteGroup(
 ) {
     fastify.register(getPermissionRoute, {
         prefix: "/read",
-    });
-    fastify.register(getUserPermissionsRoute, {
-        prefix: "/",
     });
 }
 
