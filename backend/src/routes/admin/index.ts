@@ -40,12 +40,16 @@ import adminSubDivisionRouteGroup from "./subDivision/index";
 import adminDeptRouteGroup from "./department/index";
 import adminTeamRouteGroup from "./team/index";
 import adminTechnicalClarificationRouteGroup from "./technicalClarification/index";
+import adminInventoryRouteGroup from "./inventory/index";
 
 import adminOrderRouteGroup from "./salesOrder/index";
-import adminVendorRouteGroup from "./vendor/index"
+import adminVendorRouteGroup from "./vendor/index";
 import adminTaskRouteGroup from "./task/index";
 import adminReportsRouteGroup from "./reports/index";
 import adminPaymentRouteGroup from "./payment/index";
+import adminVendorProductRouteGroup from "./vendorProduct/index";
+
+// import notificationRoutes from "./notification";
 
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 
@@ -60,7 +64,6 @@ async function adminRoutes(
   fastify.register(adminAuthRouteGroup, { prefix: "/auth" });
   fastify.register(adminCustomFieldRouteGroup, { prefix: "/custom-fields" });
   fastify.register(recycleBinRoutes, { prefix: "/recycle-bin" });
-
 
   fastify.register(async function rolesGroup(instance, opts) {
     //runs automatically before every req
@@ -180,6 +183,15 @@ async function adminRoutes(
     fastify.register(adminPaymentRouteGroup, {
       prefix: "/payment",
     });
+    fastify.register(adminInventoryRouteGroup, {
+      prefix: "/inventory",
+    });
+    fastify.register(adminVendorProductRouteGroup, {
+      prefix: "/vendor-product",
+    });
+    // fastify.register(notificationRoutes, {
+    //   prefix: "/notifications",
+    // });
   });
 }
 
