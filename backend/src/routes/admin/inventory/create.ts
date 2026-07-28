@@ -167,14 +167,20 @@ async function adminInventoryCreateRoutes(
         // Transaction
         // =========================================
 
+        // =========================================
+        // Transaction
+        // =========================================
         const result = await fastify.prisma.$transaction(async (tx) => {
           let vendorId: string | null = incomingPreferredVendorId ?? null;
 
-          // Sirf tab naya vendor dhoondo/banao jab dropdown se id na aayi ho,
-          // lekin free-text vendorName diya gaya ho (backward compatibility)
+          // Find/Create Vendor
           if (!vendorId && vendorName?.trim()) {
             let vendor = await tx.vendor.findFirst({
-              where: { companyId, name: vendorName.trim(), deletedAt: null },
+              where: {
+                companyId,
+                name: vendorName.trim(),
+                deletedAt: null,
+              },
             });
 
             if (!vendor) {
@@ -191,6 +197,7 @@ async function adminInventoryCreateRoutes(
             vendorId = vendor.id;
           }
 
+          // Create Material
           const material = await tx.material.create({
             data: {
               companyId,
@@ -214,9 +221,37 @@ async function adminInventoryCreateRoutes(
             },
           });
 
-          // ... inventory create same as before
-        });
+          // Create Inventory
+          const inventory = await tx.inventory.create({
+            data: {
+              companyId,
+              materialId: material.id,
 
+              warehouseId: warehouseId ?? null,
+              binId: binId ?? null,
+
+              batchNo: batchNo ?? null,
+              serialNo: serialNo ?? null,
+              barcode: barcode ?? null,
+              qrCode: qrCode ?? null,
+
+              quantity: new Prisma.Decimal(openingStock),
+
+              reservedQty: new Prisma.Decimal(0),
+              damagedQty: new Prisma.Decimal(0),
+              scrapQty: new Prisma.Decimal(0),
+              transitQty: new Prisma.Decimal(0),
+
+              unitPrice: new Prisma.Decimal(unitRate),
+
+              expiryDate: expiryDate ?? null,
+
+              location: location ?? null,
+            },
+          });
+
+          return inventory;
+        });
         // =========================================
         // Fetch Created Inventory
         // =========================================
