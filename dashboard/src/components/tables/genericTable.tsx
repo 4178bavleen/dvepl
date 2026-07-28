@@ -334,7 +334,7 @@ export function GenericTable<TData extends { id: string }>({
                     e.stopPropagation();
                     onDelete(item);
                   }}
-                  className="h-8 px-2.5 hover:bg-destructive/10 text-destructive hover:bg-destructive/15 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
+                  className="h-8 px-2.5 text-destructive hover:bg-destructive/15 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   <span className="hidden xl:inline">{t("Delete")}</span>
