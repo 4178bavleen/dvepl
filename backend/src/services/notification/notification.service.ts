@@ -1,191 +1,191 @@
-import {
-  NotificationChannel,
-  NotificationStatus,
-  PrismaClient,
-} from "@prisma/client";
+// import {
+//   NotificationChannel,
+//   NotificationStatus,
+//   PrismaClient,
+// } from "@prisma/client";
 
-import EmailService from "./email.service";
-import TemplateService from "./template.service";
-// import WhatsAppService from "./whatsapp.service";
+// import EmailService from "./email.service";
+// import TemplateService from "./template.service";
+// // import WhatsAppService from "./whatsapp.service";
 
-const prisma = new PrismaClient();
+// const prisma = new PrismaClient();
 
-export interface NotificationPayload {
-  eventCode: string;
+// export interface NotificationPayload {
+//   eventCode: string;
 
-  variables?: Record<string, any>;
+//   variables?: Record<string, any>;
 
-  relatedModule?: string;
+//   relatedModule?: string;
 
-  relatedRecordId?: string;
-}
+//   relatedRecordId?: string;
+// }
 
-class NotificationService {
-  static async send(payload: NotificationPayload) {
-    const event = await prisma.notificationEvent.findUnique({
-      where: {
-        code: payload.eventCode,
-      },
-    });
+// class NotificationService {
+//   static async send(payload: NotificationPayload) {
+//     const event = await prisma.notificationEvent.findUnique({
+//       where: {
+//         code: payload.eventCode,
+//       },
+//     });
 
-    if (!event) {
-      throw new Error(`Notification event '${payload.eventCode}' not found.`);
-    }
+//     if (!event) {
+//       throw new Error(`Notification event '${payload.eventCode}' not found.`);
+//     }
 
-    if (!event.isActive) {
-      return;
-    }
+//     if (!event.isActive) {
+//       return;
+//     }
 
-    const recipients = await prisma.notificationRecipient.findMany({
-      where: {
-        eventId: event.id,
-        isActive: true,
-      },
-      include: {
-        employee: true,
-      },
-    });
+//     const recipients = await prisma.notificationRecipient.findMany({
+//       where: {
+//         eventId: event.id,
+//         isActive: true,
+//       },
+//       include: {
+//         employee: true,
+//       },
+//     });
 
-    // ===============================
-    // EMAIL
-    // ===============================
+//     // ===============================
+//     // EMAIL
+//     // ===============================
 
-    if (event.emailEnabled) {
-      const template = await TemplateService.render({
-        eventCode: payload.eventCode,
-        channel: NotificationChannel.EMAIL,
-        variables: payload.variables,
-      });
+//     if (event.emailEnabled) {
+//       const template = await TemplateService.render({
+//         eventCode: payload.eventCode,
+//         channel: NotificationChannel.EMAIL,
+//         variables: payload.variables,
+//       });
 
-      for (const recipient of recipients) {
-        const email =
-          recipient.email ||
-          recipient.employee?.officialEmail ||
-          recipient.employee?.personalEmail;
+//       for (const recipient of recipients) {
+//         const email =
+//           recipient.email ||
+//           recipient.employee?.officialEmail ||
+//           recipient.employee?.personalEmail;
 
-        if (!email) continue;
+//         if (!email) continue;
 
-        try {
-          await EmailService.send({
-            to: email,
-            subject: template.subject,
-            html: template.body,
-          });
+//         try {
+//           await EmailService.send({
+//             to: email,
+//             subject: template.subject,
+//             html: template.body,
+//           });
 
-          await prisma.notificationLog.create({
-            data: {
-              eventCode: payload.eventCode,
+//           await prisma.notificationLog.create({
+//             data: {
+//               eventCode: payload.eventCode,
 
-              channel: NotificationChannel.EMAIL,
+//               channel: NotificationChannel.EMAIL,
 
-              recipient: email,
+//               recipient: email,
 
-              subject: template.subject,
+//               subject: template.subject,
 
-              message: template.body,
+//               message: template.body,
 
-              status: NotificationStatus.SENT,
+//               status: NotificationStatus.SENT,
 
-              relatedModule: payload.relatedModule,
+//               relatedModule: payload.relatedModule,
 
-              relatedRecordId: payload.relatedRecordId,
+//               relatedRecordId: payload.relatedRecordId,
 
-              sentAt: new Date(),
-            },
-          });
-        } catch (error: any) {
-          await prisma.notificationLog.create({
-            data: {
-              eventCode: payload.eventCode,
+//               sentAt: new Date(),
+//             },
+//           });
+//         } catch (error: any) {
+//           await prisma.notificationLog.create({
+//             data: {
+//               eventCode: payload.eventCode,
 
-              channel: NotificationChannel.EMAIL,
+//               channel: NotificationChannel.EMAIL,
 
-              recipient: email,
+//               recipient: email,
 
-              subject: template.subject,
+//               subject: template.subject,
 
-              message: template.body,
+//               message: template.body,
 
-              status: NotificationStatus.FAILED,
+//               status: NotificationStatus.FAILED,
 
-              error: error.message,
+//               error: error.message,
 
-              relatedModule: payload.relatedModule,
+//               relatedModule: payload.relatedModule,
 
-              relatedRecordId: payload.relatedRecordId,
-            },
-          });
-        }
-      }
-    }
+//               relatedRecordId: payload.relatedRecordId,
+//             },
+//           });
+//         }
+//       }
+//     }
 
-    // ===============================
-    // WHATSAPP
-    // ===============================
+//     // ===============================
+//     // WHATSAPP
+//     // ===============================
 
-    if (event.whatsappEnabled) {
-      const template = await TemplateService.render({
-        eventCode: payload.eventCode,
-        channel: NotificationChannel.WHATSAPP,
-        variables: payload.variables,
-      });
+//     if (event.whatsappEnabled) {
+//       const template = await TemplateService.render({
+//         eventCode: payload.eventCode,
+//         channel: NotificationChannel.WHATSAPP,
+//         variables: payload.variables,
+//       });
 
-      for (const recipient of recipients) {
-        const phone =
-          recipient.phone ||
-          recipient.employee?.phone;
+//       for (const recipient of recipients) {
+//         const phone =
+//           recipient.phone ||
+//           recipient.employee?.phone;
 
-        if (!phone) continue;
+//         if (!phone) continue;
 
-        try {
-          // await WhatsAppService.send({
-          //     phone,
-          //     message: template.body,
-          // });
+//         try {
+//           // await WhatsAppService.send({
+//           //     phone,
+//           //     message: template.body,
+//           // });
 
-          await prisma.notificationLog.create({
-            data: {
-              eventCode: payload.eventCode,
+//           await prisma.notificationLog.create({
+//             data: {
+//               eventCode: payload.eventCode,
 
-              channel: NotificationChannel.WHATSAPP,
+//               channel: NotificationChannel.WHATSAPP,
 
-              recipient: phone,
+//               recipient: phone,
 
-              message: template.body,
+//               message: template.body,
 
-              status: NotificationStatus.SENT,
+//               status: NotificationStatus.SENT,
 
-              relatedModule: payload.relatedModule,
+//               relatedModule: payload.relatedModule,
 
-              relatedRecordId: payload.relatedRecordId,
+//               relatedRecordId: payload.relatedRecordId,
 
-              sentAt: new Date(),
-            },
-          });
-        } catch (error: any) {
-          await prisma.notificationLog.create({
-            data: {
-              eventCode: payload.eventCode,
+//               sentAt: new Date(),
+//             },
+//           });
+//         } catch (error: any) {
+//           await prisma.notificationLog.create({
+//             data: {
+//               eventCode: payload.eventCode,
 
-              channel: NotificationChannel.WHATSAPP,
+//               channel: NotificationChannel.WHATSAPP,
 
-              recipient: phone,
+//               recipient: phone,
 
-              message: template.body,
+//               message: template.body,
 
-              status: NotificationStatus.FAILED,
+//               status: NotificationStatus.FAILED,
 
-              error: error.message,
+//               error: error.message,
 
-              relatedModule: payload.relatedModule,
+//               relatedModule: payload.relatedModule,
 
-              relatedRecordId: payload.relatedRecordId,
-            },
-          });
-        }
-      }
-    }
-  }
-}
+//               relatedRecordId: payload.relatedRecordId,
+//             },
+//           });
+//         }
+//       }
+//     }
+//   }
+// }
 
-export default NotificationService;
+// export default NotificationService;

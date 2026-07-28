@@ -1,79 +1,79 @@
-import Handlebars from "handlebars";
-import {
-  NotificationChannel,
-  PrismaClient,
-} from "@prisma/client";
+// import Handlebars from "handlebars";
+// import {
+//   NotificationChannel,
+//   PrismaClient,
+// } from "@prisma/client";
 
-const prisma = new PrismaClient();
+// const prisma = new PrismaClient();
 
-export interface TemplateVariables {
-  [key: string]: any;
-}
+// export interface TemplateVariables {
+//   [key: string]: any;
+// }
 
-export interface RenderTemplateOptions {
-  eventCode: string;
-  channel: NotificationChannel;
-  variables?: TemplateVariables;
-}
+// export interface RenderTemplateOptions {
+//   eventCode: string;
+//   channel: NotificationChannel;
+//   variables?: TemplateVariables;
+// }
 
-class TemplateService {
-  static async getTemplate(
-    eventCode: string,
-    channel: NotificationChannel
-  ) {
-    const event = await prisma.notificationEvent.findUnique({
-      where: {
-        code: eventCode,
-      },
-    });
+// class TemplateService {
+//   static async getTemplate(
+//     eventCode: string,
+//     channel: NotificationChannel
+//   ) {
+//     const event = await prisma.notificationEvent.findUnique({
+//       where: {
+//         code: eventCode,
+//       },
+//     });
 
-    if (!event) {
-      throw new Error(`Notification event '${eventCode}' not found.`);
-    }
+//     if (!event) {
+//       throw new Error(`Notification event '${eventCode}' not found.`);
+//     }
 
-    const template =
-      await prisma.notificationTemplate.findFirst({
-        where: {
-          eventId: event.id,
-          channel,
-          isActive: true,
-        },
-      });
+//     const template =
+//       await prisma.notificationTemplate.findFirst({
+//         where: {
+//           eventId: event.id,
+//           channel,
+//           isActive: true,
+//         },
+//       });
 
-    if (!template) {
-      throw new Error(
-        `Template not found for ${eventCode} (${channel}).`
-      );
-    }
+//     if (!template) {
+//       throw new Error(
+//         `Template not found for ${eventCode} (${channel}).`
+//       );
+//     }
 
-    return template;
-  }
+//     return template;
+//   }
 
-  static async render({
-    eventCode,
-    channel,
-    variables = {},
-  }: RenderTemplateOptions) {
-    const template = await this.getTemplate(
-      eventCode,
-      channel
-    );
+//   static async render({
+//     eventCode,
+//     channel,
+//     variables = {},
+//   }: RenderTemplateOptions) {
+//     const template = await this.getTemplate(
+//       eventCode,
+//       channel
+//     );
 
-    const subject = template.subject
-      ? Handlebars.compile(template.subject)(variables)
-      : "";
+//     const subject = template.subject
+//       ? Handlebars.compile(template.subject)(variables)
+//       : "";
 
-    const body = Handlebars.compile(template.body)(
-      variables
-    );
+//     const body = Handlebars.compile(template.body)(
+//       variables
+//     );
 
-    return {
-      eventCode,
-      subject,
-      body,
-      templateId: template.id,
-    };
-  }
-}
+//     return {
+//       eventCode,
+//       subject,
+//       body,
+//       templateId: template.id,
+//     };
+//   }
+// }
 
-export default TemplateService;
+// export default TemplateService;

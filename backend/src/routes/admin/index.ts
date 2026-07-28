@@ -49,7 +49,7 @@ import adminReportsRouteGroup from "./reports/index";
 import adminPaymentRouteGroup from "./payment/index";
 import adminVendorProductRouteGroup from "./vendorProduct/index";
 
-import notificationRoutes from "./notification";
+// import notificationRoutes from "./notification";
 
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 
@@ -189,9 +189,9 @@ async function adminRoutes(
     fastify.register(adminVendorProductRouteGroup, {
       prefix: "/vendor-product",
     });
-    fastify.register(notificationRoutes, {
-      prefix: "/notifications",
-    });
+    // fastify.register(notificationRoutes, {
+    //   prefix: "/notifications",
+    // });
   });
 }
 
