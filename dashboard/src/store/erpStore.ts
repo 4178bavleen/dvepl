@@ -21,9 +21,6 @@ import {
   initialAttendances,
   initialLeaves,
   initialSalaries,
-  initialCustomers,
-  initialContactPersons,
-  initialCommunicationHistories,
   initialGovernmentDepartments,
   initialSections,
   initialDivisions,
@@ -71,12 +68,14 @@ interface ERPStore {
   currentUserName: string;
   currentWorkspace: string;
   theme: 'light' | 'dark';
+  language: string;
 
   // Actions
   setCompanyId: (id: string) => void;
   setCurrentUser: (id: string, name: string) => void;
   setWorkspace: (ws: string) => void;
   toggleTheme: () => void;
+  setLanguage: (language: string) => void;
   setDeliveryOrders: (orders: DeliveryOrder[]) => void;
   updateDeliveryOrder: (id: string, payload: Partial<DeliveryOrder>) => void;
 
@@ -126,6 +125,7 @@ export const useERPStore = create<ERPStore>((set) => ({
   setCurrentUser: (id, name) =>set({currentUserId: id,currentUserName: name}),
   setWorkspace: (ws) => set({ currentWorkspace: ws }),
   toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
+  setLanguage: (language: string) => set({ language }),
   setDeliveryOrders: (orders) => set({ deliveryOrders: orders }),
   updateDeliveryOrder: (id, payload) =>
     set((state) => ({

@@ -349,7 +349,8 @@ export function GenericTable<TData extends { id: string }>({
     }
 
     return cols;
-  }, [columns, onView, onEdit, onDelete, bulkActions, store.language]);
+  },
+    [columns, onView, onEdit, onDelete, bulkActions]);
 
   // Columns that must never be dragged or reordered (checkbox + actions)
   const nonDraggableIds = React.useMemo(() => {

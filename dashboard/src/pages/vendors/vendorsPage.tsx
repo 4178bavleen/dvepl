@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { ColumnDef } from '@tanstack/react-table';
 import {
   Building2, Search, Plus, Trash2, Edit, Eye, Clock, FileText, X, Check, Copy, Trash, Maximize2, Minimize2, Save, Sparkles, AlertCircle, SlidersHorizontal, RefreshCw
@@ -21,7 +24,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from 'react-hot-toast';
-import { tenderApi } from '@/services/modules';
+import { inventoryApi, tenderApi } from '@/services/modules';
 import { apiClient } from '@/services/axios';
 import { useERPStore } from '@/store/erpStore';
 import { DynamicFormRenderer } from '@/components/customFields/dynamicFormRenderer';
@@ -55,8 +58,22 @@ interface POItem {
   discountPercent: number;
   net: number;
   total: number;
+  inventoryItemId?: string;
   [key: string]: any; // Custom fields
 }
+
+interface POInventoryItem {
+  id: string;
+  description: string;
+  code: string;
+  unit: string;
+  hsnCode: string;
+  rate: number;
+  stock?: number;
+}
+
+type POPlacementStatus = 'READY' | 'PLACED';
+type PONotificationChannel = 'whatsapp' | 'email';
 
 interface PORevision {
   id: string;
@@ -92,6 +109,9 @@ interface PORevision {
   createdBy: string;
   revisionNo: number;
   customColumns?: string[];
+  placementStatus?: POPlacementStatus;
+  placedAt?: string;
+  notificationChannels?: PONotificationChannel[];
 }
 
 const DEFAULT_COMPANY_DETAILS = {
@@ -110,6 +130,66 @@ const DEFAULT_TERMS = `1. Payment: 30 days net from the date of receipt and appr
 3. All items are subject to inspection and test at our warehouse.
 4. Warranty: Minimum 12 months from the date of commissioning.
 5. Subject to Gurugram jurisdiction only.`;
+
+const normalizeInventoryForPo = (items: any[]): POInventoryItem[] => {
+  return (items || []).map((item) => {
+    const material = item.material || item.materialItem || {};
+    const description = material.name || item.name || item.itemName || item.description || '';
+    const code = material.materialCode || material.code || item.code || item.itemCode || item.catNo || item.batchNo || '';
+    const unit = material.unit || material.uom || item.unit || item.uom || 'Nos';
+    const hsnCode = material.hsnCode || material.hsn || item.hsnCode || item.hsn || '';
+    const rate = Number(item.unitPrice ?? item.unitRate ?? item.rate ?? material.unitRate ?? material.unitPrice ?? 0) || 0;
+    const stock = Number(item.quantity ?? item.currentStock ?? item.stock ?? 0);
+
+    return {
+      id: String(item.id || item._id || item.inventoryId || code || description),
+      description: String(description),
+      code: String(code),
+      unit: String(unit),
+      hsnCode: String(hsnCode),
+      rate,
+      stock: Number.isFinite(stock) ? stock : undefined,
+    };
+  }).filter(item => item.id && item.description);
+};
+
+const calculatePoItemAmounts = (item: POItem): POItem => {
+  const qty = Number(item.qty) || 0;
+  const rate = Number(item.rate) || 0;
+  const disc = Number(item.discountPercent) || 0;
+  const net = rate * (1 - disc / 100);
+  return { ...item, qty, rate, discountPercent: disc, net, total: qty * net };
+};
+
+const getExcelCell = (row: Record<string, any>, aliases: string[]) => {
+  const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const normalizedAliases = aliases.map(normalize);
+  const key = Object.keys(row).find(k => normalizedAliases.includes(normalize(k)));
+  return key ? row[key] : '';
+};
+
+const resolveCurrentUserName = () => {
+  const state = useERPStore.getState();
+  const storeUser = state.users.find((u: any) => u.id === state.currentUserId);
+  const authUserRaw = localStorage.getItem('user') || localStorage.getItem('currentUser') || localStorage.getItem('profile');
+  let authUser: any = null;
+
+  try {
+    authUser = authUserRaw ? JSON.parse(authUserRaw) : null;
+  } catch {
+    authUser = null;
+  }
+
+  return (
+    state.currentUserName ||
+    storeUser?.name ||
+    authUser?.name ||
+    authUser?.fullName ||
+    authUser?.email ||
+    state.currentUserId ||
+    'System'
+  );
+};
 
 // ==========================================
 // API ADAPTERS (EASILY REPLACE WITH AXIOS/FETCH LATER)
@@ -158,17 +238,20 @@ export const apiService = {
 export function VendorsPage() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [revisions, setRevisions] = useState<PORevision[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<POInventoryItem[]>([]);
   const [loading, setLoading] = useState(false);
 
   const fetchAllData = async () => {
     setLoading(true);
     try {
-      const [vList, rList] = await Promise.all([
+      const [vList, rList, inventoryList] = await Promise.all([
         apiService.vendors.list(),
-        apiService.revisions.list()
+        apiService.revisions.list(),
+        inventoryApi.stocks.list().catch(() => [])
       ]);
       setVendors(vList);
       setRevisions(rList);
+      setInventoryItems(normalizeInventoryForPo(inventoryList));
     } catch (err: any) {
       toast.error('Failed to sync data');
     } finally {
@@ -196,6 +279,8 @@ export function VendorsPage() {
   const [customColumns, setCustomColumns] = useState<string[]>([]);
   const [newColName, setNewColName] = useState('');
   const [isAddingCol, setIsAddingCol] = useState(false);
+  const [sendPoWhatsapp, setSendPoWhatsapp] = useState(true);
+  const [sendPoEmail, setSendPoEmail] = useState(true);
 
   // Confirm Dialog States
   const [clearRowsConfirmOpen, setClearRowsConfirmOpen] = useState(false);
@@ -516,7 +601,21 @@ export function VendorsPage() {
     return { poCount, totalSpent, revisionCount: list.length };
   }, [vendorRevisions]);
 
-  // PO Calculations
+  const getNextVendorRevisionNo = (vendorId: string, source: PORevision[] = revisions) => {
+    const vendorRevisionMeta = source.reduce(
+      (meta, rev) => {
+        if (rev.vendorId !== vendorId) return meta;
+        return {
+          count: meta.count + 1,
+          maxRevisionNo: Math.max(meta.maxRevisionNo, Number(rev.revisionNo) || 0),
+        };
+      },
+      { count: 0, maxRevisionNo: 0 }
+    );
+
+    return Math.max(vendorRevisionMeta.count, vendorRevisionMeta.maxRevisionNo) + 1;
+  };
+
   const totals = useMemo(() => {
     const subtotal = poItems.reduce((sum, item) => sum + item.total, 0);
     const cgstAmt = (subtotal * cgstPercent) / 100;
@@ -570,15 +669,105 @@ export function VendorsPage() {
       const updated = { ...item, [field]: val };
 
       if (field === 'qty' || field === 'rate' || field === 'discountPercent') {
-        const qty = Number(updated.qty) || 0;
-        const rate = Number(updated.rate) || 0;
-        const disc = Number(updated.discountPercent) || 0;
-        const net = rate * (1 - disc / 100);
-        updated.net = net;
-        updated.total = qty * net;
+        return calculatePoItemAmounts(updated);
       }
       return updated;
     }));
+  };
+
+  const handleSelectInventoryItem = (rowId: string, inventoryItemId: string) => {
+    const selected = inventoryItems.find(item => item.id === inventoryItemId);
+    if (!selected) return;
+
+    setPoItems(prev => prev.map(item => {
+      if (item.id !== rowId) return item;
+      return calculatePoItemAmounts({
+        ...item,
+        inventoryItemId: selected.id,
+        description: selected.description,
+        unit: selected.unit,
+        hsnCode: selected.hsnCode,
+        catNo: selected.code,
+        rate: selected.rate,
+      });
+    }));
+  };
+
+  const handleDownloadPoItemsTemplate = () => {
+    const rows = [
+      {
+        'Item Description': 'Example item from PO',
+        Qty: 1,
+        Unit: 'Nos',
+        'HSN Code': '8536',
+        'CAT No.': 'CAT-001',
+        'Rate (INR)': 100,
+        'Discount (%)': 0,
+      }
+    ];
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'PO Items');
+    XLSX.writeFile(workbook, 'po_items_import_template.xlsx');
+  };
+
+  const handleImportPoItemsFromExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '' });
+
+      if (rows.length === 0) {
+        toast.error('Excel file does not contain any item rows');
+        return;
+      }
+
+      const importedItems = rows
+        .map((row, index) => {
+          const description = String(getExcelCell(row, ['Item Description', 'Description', 'Item', 'Item Name', 'Details']) || '').trim();
+          const qty = Number(getExcelCell(row, ['Qty', 'Quantity']) || 0);
+          const unit = String(getExcelCell(row, ['Unit', 'UOM']) || 'Nos').trim() || 'Nos';
+          const hsnCode = String(getExcelCell(row, ['HSN Code', 'HSN']) || '').trim();
+          const catNo = String(getExcelCell(row, ['CAT No.', 'CAT No', 'Catalog No', 'Item Code', 'Code']) || '').trim();
+          const rate = Number(getExcelCell(row, ['Rate (INR)', 'Rate', 'Unit Rate', 'Price']) || 0);
+          const discountPercent = Number(getExcelCell(row, ['Discount (%)', 'Discount', 'DIS (%)', 'DIS']) || 0);
+
+          if (!description && qty <= 0 && rate <= 0) return null;
+
+          return calculatePoItemAmounts({
+            id: `row-${Date.now()}-${index}`,
+            description,
+            qty: qty > 0 ? qty : 1,
+            unit,
+            hsnCode,
+            catNo,
+            rate: rate > 0 ? rate : 0,
+            discountPercent: discountPercent >= 0 ? discountPercent : 0,
+            net: 0,
+            total: 0,
+          });
+        })
+        .filter(Boolean) as POItem[];
+
+      if (importedItems.length === 0) {
+        toast.error('No valid PO items found in the Excel file');
+        return;
+      }
+
+      customColumns.forEach(col => {
+        importedItems.forEach(item => { item[col] = ''; });
+      });
+
+      setPoItems(prev => [...prev, ...importedItems]);
+      toast.success(`${importedItems.length} item(s) imported from Excel`);
+    } catch (err: any) {
+      toast.error('Failed to import Excel file. Please check the template format.');
+    }
   };
 
   const handleDeletePoRow = (id: string) => {
@@ -607,14 +796,128 @@ export function VendorsPage() {
     setRemoveColConfirmOpen(true);
   };
 
-  // Save revision
-  const handleSavePoRevision = async () => {
+  const downloadPoPdf = (revision: PORevision) => {
+    if (!activePoVendor) return null;
+
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const fileName = `${revision.poNumber || 'purchase-order'}-R${revision.revisionNo}.pdf`;
+
+    pdf.setFontSize(14);
+    pdf.text(companyDetails.name, 14, 14);
+    pdf.setFontSize(9);
+    pdf.text(companyDetails.address, 14, 20, { maxWidth: 115 });
+    pdf.text(`Phone: ${companyDetails.phone} | Email: ${companyDetails.email}`, 14, 30);
+    pdf.text(`GSTIN: ${companyDetails.gstin}`, 14, 35);
+
+    pdf.setFontSize(18);
+    pdf.text('PURCHASE ORDER', 196, 14, { align: 'right' });
+    pdf.setFontSize(10);
+    pdf.text(`PO No: ${revision.poNumber}`, 196, 22, { align: 'right' });
+    pdf.text(`Revision: R${revision.revisionNo}`, 196, 28, { align: 'right' });
+    pdf.text(`Date: ${revision.poDate}`, 196, 34, { align: 'right' });
+    pdf.text(`Status: ${revision.placementStatus === 'PLACED' ? 'PO Placed' : 'PO Ready'}`, 196, 40, { align: 'right' });
+
+    pdf.setFontSize(10);
+    pdf.text('Vendor', 14, 50);
+    pdf.setFontSize(9);
+    pdf.text(activePoVendor.name, 14, 56);
+    pdf.text(`Phone: ${activePoVendor.phone || '—'} | Email: ${activePoVendor.email || '—'}`, 14, 61);
+    pdf.text(`GSTIN: ${activePoVendor.gstNumber || '—'}`, 14, 66);
+
+    autoTable(pdf, {
+      startY: 74,
+      head: [['S.No.', 'Description', 'Qty', 'Unit', 'HSN', 'CAT No.', 'Rate', 'Disc %', 'Total']],
+      body: revision.lineItems.map((item, idx) => [
+        idx + 1,
+        item.description || '—',
+        item.qty,
+        item.unit || '—',
+        item.hsnCode || '—',
+        item.catNo || '—',
+        Number(item.rate || 0).toFixed(2),
+        Number(item.discountPercent || 0).toFixed(2),
+        Number(item.total || 0).toFixed(2),
+      ]),
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [243, 244, 246], textColor: [55, 65, 81] },
+      columnStyles: {
+        0: { halign: 'center', cellWidth: 12 },
+        1: { cellWidth: 55 },
+        2: { halign: 'right', cellWidth: 13 },
+        6: { halign: 'right' },
+        7: { halign: 'right' },
+        8: { halign: 'right' },
+      },
+    });
+
+    const finalY = (pdf as any).lastAutoTable?.finalY || 120;
+    const totalsY = finalY + 8;
+    pdf.setFontSize(9);
+    pdf.text(`Subtotal: Rs. ${revision.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 196, totalsY, { align: 'right' });
+    pdf.text(`CGST: Rs. ${revision.cgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 196, totalsY + 6, { align: 'right' });
+    pdf.text(`SGST: Rs. ${revision.sgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 196, totalsY + 12, { align: 'right' });
+    pdf.text(`IGST: Rs. ${revision.igstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 196, totalsY + 18, { align: 'right' });
+    pdf.setFontSize(11);
+    pdf.text(`Grand Total: Rs. ${revision.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 196, totalsY + 26, { align: 'right' });
+
+    pdf.setFontSize(8);
+    pdf.text('Terms & Conditions', 14, totalsY);
+    pdf.text(revision.termsAndConditions || '—', 14, totalsY + 5, { maxWidth: 115 });
+
+    pdf.save(fileName);
+    return fileName;
+  };
+
+  const openExternalLink = (url: string) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
+  const openPoPlacementNotifications = (revision: PORevision, channels: PONotificationChannel[], pdfFileName?: string | null) => {
+    if (!activePoVendor) return;
+
+    const attachmentNote = pdfFileName ? `\n\nPO PDF has been downloaded as ${pdfFileName}. Please attach it in this chat/email before sending.` : '';
+    const message = `Purchase Order ${revision.poNumber} has been placed with ${companyDetails.name}. Revision: R${revision.revisionNo}. Amount: Rs. ${revision.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}. PO Date: ${revision.poDate}.${attachmentNote}`;
+
+    if (channels.includes('whatsapp')) {
+      const phone = activePoVendor.phone.replace(/\D/g, '');
+      if (phone) {
+        openExternalLink(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`);
+      } else {
+        toast.error('Vendor phone number is missing for WhatsApp notification');
+      }
+    }
+
+    if (channels.includes('email')) {
+      if (activePoVendor.email) {
+        const subject = `Purchase Order Placed - ${revision.poNumber}`;
+        window.setTimeout(() => {
+          openExternalLink(`mailto:${activePoVendor.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`);
+        }, channels.includes('whatsapp') ? 700 : 0);
+      } else {
+        toast.error('Vendor email is missing for mail notification');
+      }
+    }
+  };
+
+  // Save PO action
+  const handleSavePoRevision = async (placementStatus: POPlacementStatus = 'READY') => {
     if (!activePoVendor) return;
     const state = useERPStore.getState();
+    const notificationChannels: PONotificationChannel[] = placementStatus === 'PLACED'
+      ? [sendPoWhatsapp ? 'whatsapp' : null, sendPoEmail ? 'email' : null].filter(Boolean) as PONotificationChannel[]
+      : [];
 
-console.log("FULL ERP STORE:", state);
-console.log("currentUserId:", state.currentUserId);
-console.log("currentUserName:", state.currentUserName);
+    if (placementStatus === 'PLACED' && notificationChannels.length === 0) {
+      toast.error('Select WhatsApp and/or Mail before placing the PO');
+      return;
+    }
+
     // PO header validations
     if (!poNumber.trim()) { 
       toast.error('PO Number is required');
@@ -652,52 +955,57 @@ console.log("currentUserName:", state.currentUserName);
       return;
     }
 
-    const nextRevisionNo = revisions
-      .filter(r => r.vendorId === activePoVendor.id && r.poNumber === poNumber)
-      .length + 1;
-
-    const createdTimestamp = new Date().toISOString();
-
-    const newRevision: PORevision = {
-      id: `rev-${Date.now()}`,
-      vendorId: activePoVendor.id,
-      poNumber,
-      poDate,
-      poStatus,
-      paymentTerms,
-      materialStatus,
-      advance,
-      remarks,
-      cgstPercent,
-      sgstPercent,
-      igstPercent,
-      subtotal: totals.subtotal,
-      cgstAmount: totals.cgstAmt,
-      sgstAmount: totals.sgstAmt,
-      igstAmount: totals.igstAmt,
-      grandTotal: totals.grandTotal,
-      termsAndConditions: terms,
-      lineItems: poItems,
-      companyDetails,
-      createdAt: createdTimestamp,
-      createdBy: state.currentUserName,
-      revisionNo: nextRevisionNo,
-      customColumns: [...customColumns]
-    };
-
     try {
+      const existingRevisions = await apiService.revisions.list();
+      const nextRevisionNo = getNextVendorRevisionNo(activePoVendor.id, existingRevisions);
+      const createdTimestamp = new Date().toISOString();
+
+      const newRevision: PORevision = {
+        id: `rev-${Date.now()}`,
+        vendorId: activePoVendor.id,
+        poNumber,
+        poDate,
+        poStatus,
+        paymentTerms,
+        materialStatus,
+        advance,
+        remarks,
+        cgstPercent,
+        sgstPercent,
+        igstPercent,
+        subtotal: totals.subtotal,
+        cgstAmount: totals.cgstAmt,
+        sgstAmount: totals.sgstAmt,
+        igstAmount: totals.igstAmt,
+        grandTotal: totals.grandTotal,
+        termsAndConditions: terms,
+        lineItems: poItems,
+        companyDetails,
+        createdAt: createdTimestamp,
+        createdBy: resolveCurrentUserName(),
+        revisionNo: nextRevisionNo,
+        customColumns: [...customColumns],
+        placementStatus,
+        placedAt: placementStatus === 'PLACED' ? createdTimestamp : undefined,
+        notificationChannels,
+      };
+
       await apiService.revisions.create(newRevision);
-      console.log("Saving Revision:", newRevision);
       const list = await apiService.revisions.list();
 
-      console.log("LIST AFTER SAVE:", list);
-      console.log("FIRST REVISION:", list[0]);
       setRevisions(list);
       setSelectedRevisionId(newRevision.id);
       setPoCreatedAt(createdTimestamp);
-      toast.success(`Revision v${newRevision.revisionNo} saved successfully`);
+
+      if (placementStatus === 'PLACED') {
+        const pdfFileName = downloadPoPdf(newRevision);
+        openPoPlacementNotifications(newRevision, notificationChannels, pdfFileName);
+        toast.success(`PO placed as revision R${newRevision.revisionNo}. PDF downloaded for attachment.`);
+      } else {
+        toast.success(`PO ready as revision R${newRevision.revisionNo}`);
+      }
     } catch (err: any) {
-      toast.error('Failed to save PO revision');
+      toast.error(placementStatus === 'PLACED' ? 'Failed to place PO' : 'Failed to mark PO ready');
     }
   };
 
@@ -718,7 +1026,7 @@ console.log("currentUserName:", state.currentUserName);
     setCompanyDetails(rev.companyDetails);
     setSelectedRevisionId(rev.id);
     setCustomColumns(rev.customColumns || []);
-    setPoCreatedBy(rev.createdBy || '');
+    setPoCreatedBy(rev.createdBy || resolveCurrentUserName());
     setPoCreatedAt(rev.createdAt || new Date().toISOString());
     toast.success(`Loaded PO details from revision v${rev.revisionNo}`);
   };
@@ -1420,10 +1728,12 @@ console.log("currentUserName:", state.currentUserName);
                   <div className="rev-info">
                     <div className="rev-label-row">
                       <span className="rev-name">{rev.poNumber}</span>
-                      {rev.revisionNo === vendorRevisions[0].revisionNo ? (
-                        <span className="rev-latest-badge">LATEST</span>
+                      {rev.placementStatus === 'PLACED' ? (
+                        <span className="rev-latest-badge">PO PLACED</span>
+                      ) : rev.revisionNo === vendorRevisions[0].revisionNo ? (
+                        <span className="rev-latest-badge">PO READY</span>
                       ) : (
-                        <span className="rev-saved-badge">SAVED REVISION</span>
+                        <span className="rev-saved-badge">SAVED READY</span>
                       )}
                     </div>
                     <div className="rev-meta">
@@ -1432,8 +1742,13 @@ console.log("currentUserName:", state.currentUserName);
                       <span>Status: {rev.poStatus}</span>
                     </div>
                     <div className="rev-meta">
-                      <span>Created By: {rev.createdBy || '—'}</span>
+                      <span>Created By: {rev.createdBy || resolveCurrentUserName()}</span>
                       <span>Created: {formatDateTime(rev.createdAt)}</span>
+                    </div>
+                    <div className="rev-meta">
+                      <span>Status: {rev.placementStatus === 'PLACED' ? 'PO Placed' : 'PO Ready'}</span>
+                      {rev.placementStatus === 'PLACED' && rev.placedAt && <span>Placed: {formatDateTime(rev.placedAt)}</span>}
+                      {rev.notificationChannels && rev.notificationChannels.length > 0 && <span>Sent Via: {rev.notificationChannels.map(c => c === 'whatsapp' ? 'WhatsApp' : 'Mail').join(', ')}</span>}
                     </div>
                     <div className="rev-amount">
                       ₹{rev.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -1540,7 +1855,7 @@ console.log("currentUserName:", state.currentUserName);
                   </span>
                 ))}
                 {revisions.filter(r => r.vendorId === activePoVendor.id && r.poNumber === poNumber).length === 0 && (
-                  <span className="de-rev-pill">R1</span>
+                  <span className="de-rev-pill">R{getNextVendorRevisionNo(activePoVendor.id)}</span>
                 )}
               </div>
               <button
@@ -1719,6 +2034,11 @@ console.log("currentUserName:", state.currentUserName);
                 <span className="de-toolbar-label">LINE ITEMS</span>
                 <button className="de-tbtn" onClick={handleAddPoRow}>➕ Add Row</button>
                 <button className="de-tbtn" onClick={handleDuplicateLastRow}>📋 Duplicate Last</button>
+                <button className="de-tbtn" onClick={handleDownloadPoItemsTemplate}>📄 Excel Template</button>
+                <label className="de-tbtn" style={{ cursor: 'pointer' }}>
+                  📥 Import Excel
+                  <input type="file" accept=".xlsx,.xls" onChange={handleImportPoItemsFromExcel} style={{ display: 'none' }} />
+                </label>
                 <div className="de-tbtn-sep"></div>
 
                 {isAddingCol ? (
@@ -1780,7 +2100,22 @@ console.log("currentUserName:", state.currentUserName);
                     {poItems.map((item, idx) => (
                       <tr key={item.id}>
                         <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{idx + 1}</td>
-                        <td><input type="text" value={item.description} onChange={e => updatePoItemField(item.id, 'description', e.target.value)} placeholder="Item description..." style={!item.description.trim() ? { borderColor: '#f59e0b' } : undefined} /></td>
+                        <td>
+                          <select
+                            value={item.inventoryItemId || ''}
+                            onChange={e => handleSelectInventoryItem(item.id, e.target.value)}
+                            title={inventoryItems.length === 0 ? 'No inventory items available' : 'Select item from inventory'}
+                            style={{ width: '100%', marginBottom: '4px', padding: '6px 8px', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '12px', background: 'var(--background)' }}
+                          >
+                            <option value="">Select from Inventory...</option>
+                            {inventoryItems.map(inv => (
+                              <option key={inv.id} value={inv.id}>
+                                {inv.description}{inv.code ? ` (${inv.code})` : ''}{typeof inv.stock === 'number' ? ` · Stock: ${inv.stock}` : ''}
+                              </option>
+                            ))}
+                          </select>
+                          <input type="text" value={item.description} onChange={e => updatePoItemField(item.id, 'description', e.target.value)} placeholder="Item description..." style={!item.description.trim() ? { borderColor: '#f59e0b' } : undefined} />
+                        </td>
                         <td><input type="number" min={0.01} step="any" value={item.qty} onChange={e => updatePoItemField(item.id, 'qty', Number(e.target.value) || 0)} style={item.qty <= 0 ? { borderColor: '#f59e0b' } : undefined} /></td>
                         <td><input type="text" value={item.unit} onChange={e => updatePoItemField(item.id, 'unit', e.target.value)} placeholder="PCS" /></td>
                         <td><input type="text" value={item.hsnCode} onChange={e => updatePoItemField(item.id, 'hsnCode', e.target.value)} placeholder="HSN" /></td>
@@ -1841,9 +2176,18 @@ console.log("currentUserName:", state.currentUserName);
                 </div>
               </div>
               <div className="de-footer-actions">
+                <label className="de-tbtn" style={{ padding: '10px 12px', fontSize: '13px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <input type="checkbox" checked={sendPoWhatsapp} onChange={e => setSendPoWhatsapp(e.target.checked)} />
+                  WhatsApp
+                </label>
+                <label className="de-tbtn" style={{ padding: '10px 12px', fontSize: '13px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <input type="checkbox" checked={sendPoEmail} onChange={e => setSendPoEmail(e.target.checked)} />
+                  Mail
+                </label>
                 <button className="de-tbtn" style={{ padding: '10px 18px', fontSize: '13.5px' }} onClick={() => toast.success('Skipped')}>⏭️ Skip</button>
                 <button className="de-tbtn" style={{ padding: '10px 18px', fontSize: '13.5px' }} onClick={() => setIsDataEntryOpen(false)}>Cancel</button>
-                <button className="btn-save-rev" onClick={handleSavePoRevision}>💾 Save Revision</button>
+                <button className="btn-save-rev" onClick={() => handleSavePoRevision('READY')}>✅ PO Ready</button>
+                <button className="btn-export-pdf" onClick={() => handleSavePoRevision('PLACED')}>📨 PO Placed</button>
                 <button className="btn-export-pdf" onClick={() => triggerExport('pdf')}>📘 Export PDF</button>
               </div>
             </div>
