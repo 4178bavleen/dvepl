@@ -83,8 +83,7 @@ async function readUserByIdRoute(
 
             permissions: user.userPermissions.map((p) => ({
               id: p.permission.id,
-              code: p.permission.code,
-              description: p.permission.description,
+              name: p.permission.name,
               allowed: p.allowed,
             })),
           },

@@ -246,7 +246,7 @@ export function PermissionsDialog({ open, onOpenChange, user }: Props) {
 
           {/* Module Permission Section */}
 
-          <Accordion className="space-y-4">
+          <Accordion type="multiple" className="space-y-4">
             {modules.map((module) => (
               <AccordionItem
                 key={module.name}

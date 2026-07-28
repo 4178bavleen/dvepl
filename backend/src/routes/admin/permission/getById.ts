@@ -78,7 +78,7 @@ async function getUserPermissionsRoute(
             id: item.permission.id,
             code: item.permission.code,
             description: item.permission.description,
-            group: item.permission.group?.name ?? null,
+            group: item.permission.group.name,
             allowed: item.allowed,
           })),
         });
