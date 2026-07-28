@@ -365,7 +365,11 @@ export const apiService = {
       const raw = response.data?.data ?? response.data ?? [];
       return (Array.isArray(raw) ? raw : []).map(mapMovementFromBackend);
     },
-    create: async (id: string, transactionType: "IN" | "OUT", body: any) => {
+    create: async (
+      id: string,
+      transactionType: "IN" | "OUT" | "ADJUST" | "RETURN",
+      body: any,
+    ) => {
       const endpoint =
         transactionType === "IN"
           ? MOVEMENT_ENDPOINTS.stockIn
@@ -395,9 +399,7 @@ export const apiService = {
         return [];
       }
     },
-    create: async (
-      vendor: Omit<Vendor, "id">,
-    ): Promise<Vendor> => {
+    create: async (vendor: Omit<Vendor, "id">): Promise<Vendor> => {
       const payload = {
         vendorName: vendor.vendorName,
         name: vendor.vendorName,
@@ -758,10 +760,7 @@ export function InventoryPage() {
     setLoading(true);
     try {
       if (selectedItemId) {
-        const updated = await apiService.stocks.update(
-          selectedItemId,
-          payload,
-        );
+        const updated = await apiService.stocks.update(selectedItemId, payload);
         setItems((prev) =>
           prev.map((i) =>
             i.id === selectedItemId
@@ -2078,7 +2077,9 @@ export function InventoryPage() {
 
                     <Select
                       value={preferredVendorId}
-                      onValueChange={setPreferredVendorId}
+                      onValueChange={(value) =>
+                        setPreferredVendorId(value ?? "")
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select Vendor" />
