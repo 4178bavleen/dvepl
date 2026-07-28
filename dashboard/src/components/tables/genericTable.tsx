@@ -183,9 +183,6 @@ interface GenericTableProps<TData> {
   onView?: (row: TData) => void;
   onEdit?: (row: TData) => void;
   onDelete?: (row: TData) => void;
-
-  onPermissions?: (row: TData) => void; // ADD THIS
-
   bulkActions?: (selectedRows: TData[]) => React.ReactNode;
   isLoading?: boolean;
   showColumnVisibility?: boolean;
@@ -205,7 +202,6 @@ export function GenericTable<TData extends { id: string }>({
   onView,
   onEdit,
   onDelete,
-  onPermissions,
   bulkActions,
   isLoading = false,
   showColumnVisibility = true,
@@ -290,7 +286,7 @@ export function GenericTable<TData extends { id: string }>({
     }
 
     // Append action column if handlers exist
-    if (onView || onEdit || onDelete || onPermissions) {
+    if (onView || onEdit || onDelete) {
       cols.push({
         id: "actions",
         header: t("Actions"),
@@ -328,20 +324,6 @@ export function GenericTable<TData extends { id: string }>({
                 >
                   <Edit className="h-3.5 w-3.5" />
                   <span className="hidden xl:inline">{t("Edit")}</span>
-                </Button>
-              )}
-              {onPermissions && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onPermissions(item);
-                  }}
-                  className="h-8 px-2.5 hover:bg-blue-500/10 hover:text-blue-600 text-xs font-semibold flex items-center gap-1.5"
-                >
-                  <Eye className="h-3.5 w-3.5" />
-                  <span className="hidden xl:inline">Permissions</span>
                 </Button>
               )}
               {onDelete && (
