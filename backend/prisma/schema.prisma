@@ -8,64 +8,65 @@ datasource db {
 }
 
 model Company {
-  id                      String                   @id @default(uuid())
-  name                    String
-  gst                     String?                  @unique
-  pan                     String?                  @unique
-  email                   String?
-  phone                   String?
-  address                 String?
-  isActive                Boolean                  @default(true)
-  createdAt               DateTime                 @default(now())
-  updatedAt               DateTime                 @updatedAt
-  deletedAt               DateTime?
-  stockTransfers          StockTransfer[]
-  approvalRequests        ApprovalRequest[]
-  approvalWorkflows       ApprovalWorkflow[]
-  boms                    BOM[]
-  boqs                    BOQ[]
-  branches                Branch[]
-  costCenters             CostCenter[]
-  creditNotes             CreditNote[]
-  customers               Customer[]
-  dashboardWidgets        DashboardWidget[]
-  debitNotes              DebitNote[]
-  dispatches              Dispatch[]
-  divisions               Division[]
-  employees               Employee[]
-  engineeringProjects     EngineeringProject[]
-  expenses                Expense[]
-  goodsReceipts           GoodsReceipt[]
-  governmentDepartments   GovernmentDepartment[]
-  inspectionChecklists    InspectionChecklist[]
-  inspections             Inspection[]
-  inventories             Inventory[]
-  invoices                Invoice[]
-  ledgerEntries           LedgerEntry[]
-  materialBrands          MaterialBrand[]
-  materialCategories      MaterialCategory[]
-  materialSpecifications  MaterialSpecification[]
-  materials               Material[]
-  payments                Payment[]
-  productionPlans         ProductionPlan[]
-  purchaseOrders          PurchaseOrder[]
-  purchaseRequests        PurchaseRequest[]
-  quotations              Quotation[]
-  referenceCodeCounters   ReferenceCodeCounter[]
-  reportDefinitions       ReportDefinition[]
-  reportSchedules         ReportSchedule[]
-  roles                   Role[]
-  salesOrders             SalesOrder[]
-  sections                Section[]
-  subDivisions            SubDivision[]
-  technicalClarifications TechnicalClarification[]
-  tenderRequests          TenderRequest[]
-  tenders                 Tender[]
-  users                   User[]
-  vehicles                Vehicle[]
-  vendors                 Vendor[]
-  warehouses              Warehouse[]
-  workOrders              WorkOrder[]
+  id                        String                     @id @default(uuid())
+  name                      String
+  gst                       String?                    @unique
+  pan                       String?                    @unique
+  email                     String?
+  phone                     String?
+  address                   String?
+  isActive                  Boolean                    @default(true)
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+  deletedAt                 DateTime?
+  stockTransfers            StockTransfer[]
+  approvalRequests          ApprovalRequest[]
+  approvalWorkflows         ApprovalWorkflow[]
+  boms                      BOM[]
+  boqs                      BOQ[]
+  branches                  Branch[]
+  costCenters               CostCenter[]
+  creditNotes               CreditNote[]
+  customers                 Customer[]
+  dashboardWidgets          DashboardWidget[]
+  debitNotes                DebitNote[]
+  dispatches                Dispatch[]
+  divisions                 Division[]
+  employees                 Employee[]
+  engineeringProjects       EngineeringProject[]
+  expenses                  Expense[]
+  goodsReceipts             GoodsReceipt[]
+  governmentDepartments     GovernmentDepartment[]
+  inspectionChecklists      InspectionChecklist[]
+  inspections               Inspection[]
+  inventories               Inventory[]
+  invoices                  Invoice[]
+  ledgerEntries             LedgerEntry[]
+  materialBrands            MaterialBrand[]
+  materialCategories        MaterialCategory[]
+  materialSpecifications    MaterialSpecification[]
+  materials                 Material[]
+  payments                  Payment[]
+  productionPlans           ProductionPlan[]
+  purchaseOrders            PurchaseOrder[]
+  purchaseRequests          PurchaseRequest[]
+  quotations                Quotation[]
+  referenceCodeCounters     ReferenceCodeCounter[]
+  reportDefinitions         ReportDefinition[]
+  reportSchedules           ReportSchedule[]
+  roles                     Role[]
+  salesOrders               SalesOrder[]
+  sections                  Section[]
+  subDivisions              SubDivision[]
+  technicalClarifications   TechnicalClarification[]
+  tenderRequests            TenderRequest[]
+  tenders                   Tender[]
+  users                     User[]
+  vehicles                  Vehicle[]
+  vendors                   Vendor[]
+  warehouses                Warehouse[]
+  workOrders                WorkOrder[]
+  notificationConfiguration NotificationConfiguration?
 
   @@map("companies")
 }
@@ -244,9 +245,36 @@ model User {
   approvedWorkOrders                WorkOrder[]                        @relation("WorkOrderApprovedBy")
   assignedWorkOrders                WorkOrder[]                        @relation("WorkOrderAssignedTo")
   createdWorkOrders                 WorkOrder[]                        @relation("WorkOrderCreatedBy")
+  vendorProductsCreated             VendorProduct[]
 
   @@index([companyId])
   @@map("users")
+}
+
+model VendorProduct {
+  id String @id @default(uuid())
+
+  vendorId   String
+  materialId String
+
+  vendorRate         Decimal? @db.Decimal(15, 2)
+  vendorMaterialCode String?
+  isPreferred        Boolean  @default(false)
+  notes              String?
+
+  createdById String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  vendor    Vendor   @relation(fields: [vendorId], references: [id])
+  material  Material @relation(fields: [materialId], references: [id])
+  createdBy User     @relation(fields: [createdById], references: [id])
+
+  @@unique([vendorId, materialId])
+  @@index([vendorId])
+  @@index([materialId])
+  @@map("vendor_products")
 }
 
 model RefreshToken {
@@ -387,45 +415,46 @@ model UserPermission {
 }
 
 model Employee {
-  id                    String                     @id @default(uuid())
-  userId                String?                    @unique
-  companyId             String
-  branchId              String?
-  departmentId          String?
-  teamId                String?
-  designationId         String?
-  reportsToId           String?
-  employeeCode          String                     @unique
-  firstName             String
-  lastName              String
-  dateOfBirth           DateTime?
-  gender                String?
-  dateOfJoining         DateTime?
-  dateOfExit            DateTime?
-  status                EmployeeStatus             @default(ACTIVE)
-  createdAt             DateTime                   @default(now())
-  updatedAt             DateTime                   @updatedAt
-  deletedAt             DateTime?
-  salesOrderAssignments SalesOrderAssignment[]
-  taskAssignments       TaskAssignment[]
-  attendances           Attendance[]
-  contacts              EmployeeContact[]
-  documents             EmployeeDocument[]
-  education             EmployeeEducation[]
-  emergencyContacts     EmployeeEmergencyContact[]
-  experience            EmployeeExperience[]
-  shiftAssignments      EmployeeShift[]
-  branch                Branch?                    @relation(fields: [branchId], references: [id])
-  company               Company                    @relation(fields: [companyId], references: [id])
-  department            Department?                @relation(fields: [departmentId], references: [id])
-  designation           Designation?               @relation(fields: [designationId], references: [id])
-  reportsTo             Employee?                  @relation("EmployeeHierarchy", fields: [reportsToId], references: [id])
-  subordinates          Employee[]                 @relation("EmployeeHierarchy")
-  team                  Team?                      @relation(fields: [teamId], references: [id])
-  user                  User?                      @relation(fields: [userId], references: [id])
-  leaves                Leave[]
-  salaries              Salary[]
-  tenderRequestsCreated TenderRequest[]            @relation("TenderRequestCreatedBy")
+  id                     String                     @id @default(uuid())
+  userId                 String?                    @unique
+  companyId              String
+  branchId               String?
+  departmentId           String?
+  teamId                 String?
+  designationId          String?
+  reportsToId            String?
+  employeeCode           String                     @unique
+  firstName              String
+  lastName               String
+  dateOfBirth            DateTime?
+  gender                 String?
+  dateOfJoining          DateTime?
+  dateOfExit             DateTime?
+  status                 EmployeeStatus             @default(ACTIVE)
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
+  deletedAt              DateTime?
+  salesOrderAssignments  SalesOrderAssignment[]
+  taskAssignments        TaskAssignment[]
+  attendances            Attendance[]
+  contacts               EmployeeContact[]
+  documents              EmployeeDocument[]
+  education              EmployeeEducation[]
+  emergencyContacts      EmployeeEmergencyContact[]
+  experience             EmployeeExperience[]
+  shiftAssignments       EmployeeShift[]
+  branch                 Branch?                    @relation(fields: [branchId], references: [id])
+  company                Company                    @relation(fields: [companyId], references: [id])
+  department             Department?                @relation(fields: [departmentId], references: [id])
+  designation            Designation?               @relation(fields: [designationId], references: [id])
+  reportsTo              Employee?                  @relation("EmployeeHierarchy", fields: [reportsToId], references: [id])
+  subordinates           Employee[]                 @relation("EmployeeHierarchy")
+  team                   Team?                      @relation(fields: [teamId], references: [id])
+  user                   User?                      @relation(fields: [userId], references: [id])
+  leaves                 Leave[]
+  salaries               Salary[]
+  tenderRequestsCreated  TenderRequest[]            @relation("TenderRequestCreatedBy")
+  notificationRecipients NotificationRecipient[]
 
   @@index([companyId])
   @@map("employees")
@@ -1534,6 +1563,7 @@ model Material {
   purchaseRequestItems  PurchaseRequestItem[]
   workOrderItems        WorkOrderItem[]
   workOrders            WorkOrder[]
+  vendorProducts        VendorProduct[]
 
   @@index([companyId])
   @@index([materialCode])
@@ -2487,9 +2517,10 @@ model Vendor {
 
   revisions VendorRevision[]
 
-  materials Material[] // <-- ADD THIS
+  materials Material[]
 
-  company Company @relation(fields: [companyId], references: [id])
+  company        Company         @relation(fields: [companyId], references: [id])
+  vendorProducts VendorProduct[]
 
   createdBy             User       @relation("VendorCreatedBy", fields: [createdById], references: [id])
   preferredForMaterials Material[] @relation("MaterialPreferredVendor")
@@ -2888,9 +2919,149 @@ model CustomFieldValue {
   @@map("custom_field_values")
 }
 
+model NotificationConfiguration {
+  id String @id @default(uuid())
+
+  companyId String  @unique
+  company   Company @relation(fields: [companyId], references: [id])
+
+  emailEnabled Boolean @default(true)
+
+  smtpHost      String?
+  smtpPort      Int?
+  smtpUsername  String?
+  smtpPassword  String?
+  smtpFromEmail String?
+  smtpFromName  String?
+
+  whatsappEnabled Boolean @default(false)
+
+  whatsappProvider NotificationProvider?
+  whatsappApiKey   String?
+  whatsappEndpoint String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model NotificationEvent {
+  id String @id @default(uuid())
+
+  code NotificationEventCode @unique
+
+  name String
+
+  emailEnabled Boolean @default(true)
+
+  whatsappEnabled Boolean @default(false)
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  notificationTemplates  NotificationTemplate[]
+  notificationRecipients NotificationRecipient[]
+}
+
+enum NotificationEventCode {
+  NEW_ORDER
+  PAYMENT_DUE
+  PO_CREATED
+  DELIVERY_DELAYED
+}
+
+model NotificationTemplate {
+  id String @id @default(uuid())
+
+  eventId String
+
+  channel NotificationChannel
+
+  subject String?
+
+  body String @db.Text
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  event NotificationEvent @relation(fields: [eventId], references: [id])
+}
+
+model NotificationRecipient {
+  id String @id @default(uuid())
+
+  eventId String
+
+  employeeId String?
+
+  email String?
+
+  phone String?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  event NotificationEvent @relation(fields: [eventId], references: [id])
+
+  employee Employee? @relation(fields: [employeeId], references: [id])
+}
+
+model NotificationLog {
+  id String @id @default(uuid())
+
+  eventCode String
+
+  channel NotificationChannel
+
+  recipient String
+
+  subject String?
+  eventId String?
+
+  message String @db.Text
+
+  status NotificationStatus
+
+  error String?
+
+  relatedModule String?
+
+  relatedRecordId String?
+
+  sentAt DateTime?
+
+  createdAt DateTime @default(now())
+}
+
 enum MaterialType {
   RAW
   SEMI_FINISHED
   FINISHED
   CONSUMABLE
+}
+
+enum NotificationChannel {
+  EMAIL
+  WHATSAPP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum NotificationProvider {
+  SMTP
+  META
+  TWILIO
+  WATI
 }
