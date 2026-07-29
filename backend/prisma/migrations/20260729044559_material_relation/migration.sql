@@ -1,15 +1,8 @@
 /*
-  Warnings:
+  NOTE: Reconciled on 2026-07-29.
 
-  - You are about to drop the column `categoryId` on the `materials` table. All the data in the column will be lost.
-
+  The `materials.categoryId` -> `materials.category` change this migration
+  originally performed had already been applied to the database out-of-band
+  before this migration file existed. There is nothing left to do here; this
+  file is intentionally a no-op so the migration history stays consistent.
 */
--- DropForeignKey
-ALTER TABLE "materials" DROP CONSTRAINT "materials_categoryId_fkey";
-
--- DropIndex
-DROP INDEX "materials_categoryId_idx";
-
--- AlterTable
-ALTER TABLE "materials" DROP COLUMN "categoryId",
-ADD COLUMN     "category" TEXT;
