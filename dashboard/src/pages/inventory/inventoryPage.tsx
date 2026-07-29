@@ -863,31 +863,30 @@ export function InventoryPage() {
 
     setLoading(true);
     try {
-      await apiService.movements.create(
-        selectedItemData.id,
-        stockMovType,
-        body,
-      );
-      try {
+      if (stockMovType === "IN" || stockMovType === "OUT") {
+        await apiService.movements.create(
+          selectedItemData.id,
+          stockMovType,
+          body,
+        );
+      } else {
+        // ADJUST / RETURN handled as a direct stock-level correction
         await apiService.stocks.update(selectedItemData.id, {
           openingStock: after,
           currentStock: after,
         });
-      } catch {
-        // non-fatal if backend movement handler auto-updates stock
       }
 
       setItems((prev) =>
-        prev.map((item) => {
-          if (item.id === selectedItemData.id) {
-            return {
-              ...item,
-              currentStock: after,
-              openingStock: after,
-            };
-          }
-          return item;
-        }),
+        prev.map((item) =>
+          item.id === selectedItemData.id
+            ? {
+                ...item,
+                currentStock: after,
+                openingStock: after,
+              }
+            : item,
+        ),
       );
 
       toast.success("Stock transaction submitted successfully");
@@ -2078,7 +2077,9 @@ export function InventoryPage() {
 
                     <Select
                       value={preferredVendorId}
-                      onValueChange={setPreferredVendorId}
+                      onValueChange={(val: string | null) =>
+                        setPreferredVendorId(val || "")
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select Vendor" />
