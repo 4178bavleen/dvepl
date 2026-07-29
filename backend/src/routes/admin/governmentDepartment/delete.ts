@@ -59,8 +59,9 @@ async function deleteGovernmentDepartmentRoute(
           });
         }
 
-        await fastify.prisma.governmentDepartment.delete({
+        await (fastify.prisma as any).governmentDepartment.update({
           where: { id },
+          data: { deletedAt: new Date() },
         });
 
         adminLogs.info("Government department deleted successfully", { departmentId: id });

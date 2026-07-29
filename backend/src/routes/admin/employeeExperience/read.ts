@@ -43,8 +43,9 @@ async function readEmployeeExperienceRoutes(
 
         const { employeeId } = request.query as { employeeId?: string };
 
-        const experience = await fastify.prisma.employeeExperience.findMany({
+        const experience = await (fastify.prisma as any).employeeExperience.findMany({
           where: {
+            deletedAt: null,
             employee: {
               companyId,
               deletedAt: null,
@@ -108,9 +109,10 @@ async function readEmployeeExperienceRoutes(
 
         const { id } = request.params as { id: string };
 
-        const experience = await fastify.prisma.employeeExperience.findFirst({
+        const experience = await (fastify.prisma as any).employeeExperience.findFirst({
           where: {
             id,
+            deletedAt: null,
             employee: {
               companyId,
               deletedAt: null,

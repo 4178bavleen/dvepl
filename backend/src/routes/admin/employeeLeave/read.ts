@@ -70,8 +70,9 @@ async function readLeaveRoutes(
           status?: string;
         };
 
-        const leaves = await fastify.prisma.leave.findMany({
+        const leaves = await (fastify.prisma as any).leave.findMany({
           where: {
+            deletedAt: null,
             employee: {
               companyId,
               deletedAt: null,
@@ -139,9 +140,10 @@ async function readLeaveRoutes(
 
         const { id } = request.params as { id: string };
 
-        const leave = await fastify.prisma.leave.findFirst({
+        const leave = await (fastify.prisma as any).leave.findFirst({
           where: {
             id,
+            deletedAt: null,
             employee: {
               companyId,
               deletedAt: null,

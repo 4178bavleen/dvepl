@@ -53,10 +53,9 @@ async function deleteEmployeeEducationRoute(
           });
         }
 
-        await fastify.prisma.employeeEducation.delete({
-          where: {
-            id,
-          },
+        await (fastify.prisma as any).employeeEducation.update({
+          where: {             id,           },
+          data: { deletedAt: new Date() },
         });
 
         adminLogs.info("Employee education record deleted successfully", {

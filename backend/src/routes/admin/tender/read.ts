@@ -112,7 +112,7 @@ async function readTenderRoutes(
 
         const { id } = request.params as { id: string };
 
-        const tender = await fastify.prisma.tender.findFirst({
+        const tender = await (fastify.prisma as any).tender.findFirst({
           where: {
             id,
             companyId,
@@ -133,6 +133,7 @@ async function readTenderRoutes(
             },
             governmentDepartment: true,
             files: {
+              where: { deletedAt: null },
               select: { id: true, fileName: true, fileUrl: true, fileType: true },
             },
             remarks: {
@@ -142,6 +143,7 @@ async function readTenderRoutes(
               orderBy: { createdAt: "desc" },
             },
             activities: {
+              where: { deletedAt: null },
               orderBy: { createdAt: "desc" },
             },
           },

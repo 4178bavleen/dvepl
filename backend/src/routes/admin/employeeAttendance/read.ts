@@ -79,8 +79,9 @@ async function readAttendanceRoutes(
           dateFilter.lte = new Date(endDate);
         }
 
-        const attendance = await fastify.prisma.attendance.findMany({
+        const attendance = await (fastify.prisma as any).attendance.findMany({
           where: {
+            deletedAt: null,
             employee: {
               companyId,
               deletedAt: null,
@@ -148,9 +149,10 @@ async function readAttendanceRoutes(
 
         const { id } = request.params as { id: string };
 
-        const attendance = await fastify.prisma.attendance.findFirst({
+        const attendance = await (fastify.prisma as any).attendance.findFirst({
           where: {
             id,
+            deletedAt: null,
             employee: {
               companyId,
               deletedAt: null,

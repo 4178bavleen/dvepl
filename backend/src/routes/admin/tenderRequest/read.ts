@@ -130,10 +130,11 @@ async function readTenderRequestRoutes(
           });
         }
 
-        const activities = await fastify.prisma.auditLog.findMany({
+        const activities = await (fastify.prisma as any).auditLog.findMany({
           where: {
             module: "TenderRequest",
             recordId: id,
+            deletedAt: null,
           },
           orderBy: {
             createdAt: "desc",

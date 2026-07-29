@@ -23,16 +23,23 @@ import { useERPStore } from '@/store/erpStore';
 
 export interface RecycleBinItem {
   id: string;
-  module: 'order' | 'task' | 'vendor' | 'user' | 'drawing' | 'customfield';
+  module: string;
+  moduleLabel?: string;
   name: string;
   deletedBy: string;
   deletedAt: string;
   originalData?: any;
 }
 
+interface RecycleBinModule {
+  module: string;
+  label: string;
+}
+
 export function RecycleBinPage() {
   const store = useERPStore();
   const [items, setItems] = useState<RecycleBinItem[]>([]);
+  const [modules, setModules] = useState<RecycleBinModule[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [moduleFilter, setModuleFilter] = useState<string>('all');
@@ -53,13 +60,16 @@ export function RecycleBinPage() {
     try {
       const res = await apiClient.get('/recycle-bin/list');
       const list = Array.isArray(res.data?.data) ? res.data.data : [];
+      const availableModules = Array.isArray(res.data?.modules) ? res.data.modules : [];
       const formatted: RecycleBinItem[] = list.map((item: any) => ({
         id: item.id,
         module: item.module,
+        moduleLabel: item.moduleLabel,
         name: item.name,
         deletedBy: item.deletedBy || 'Admin',
         deletedAt: item.deletedAt ? new Date(item.deletedAt).toLocaleString() : new Date().toLocaleString(),
       }));
+      setModules(availableModules);
       setItems(formatted);
     } catch (err: any) {
       console.error('Failed to load recycle bin records', err);
@@ -177,19 +187,10 @@ export function RecycleBinPage() {
     setConfirmModalOpen(false);
   };
 
-  const getModuleBadge = (module: string) => {
-    switch (module) {
-      case 'order':
-        return <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Orders</span>;
-      case 'task':
-        return <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">Tasks</span>;
-      case 'vendor':
-        return <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Vendors</span>;
-      case 'user':
-        return <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Users</span>;
-      default:
-        return <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">{module}</span>;
-    }
+  const getModuleBadge = (module: string, moduleLabel?: string) => {
+    const label = moduleLabel || modules.find((item) => item.module === module)?.label || module;
+
+    return <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">{label}</span>;
   };
 
   return (
@@ -253,10 +254,9 @@ export function RecycleBinPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Modules</SelectItem>
-                  <SelectItem value="order">Orders</SelectItem>
-                  <SelectItem value="task">Tasks</SelectItem>
-                  <SelectItem value="vendor">Vendors</SelectItem>
-                  <SelectItem value="user">Users</SelectItem>
+                  {modules.map((item) => (
+                    <SelectItem key={item.module} value={item.module}>{item.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -350,7 +350,7 @@ export function RecycleBinPage() {
                           className="rounded border-slate-300 cursor-pointer"
                         />
                       </td>
-                      <td className="py-3.5 px-3">{getModuleBadge(item.module)}</td>
+                      <td className="py-3.5 px-3">{getModuleBadge(item.module, item.moduleLabel)}</td>
                       <td className="py-3.5 px-3 font-bold text-slate-900 max-w-sm truncate" title={item.name}>
                         {item.name}
                       </td>

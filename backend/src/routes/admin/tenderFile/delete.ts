@@ -38,8 +38,8 @@ async function deleteTenderFileRoute(
         }
 
         // Fetch file and verify tenant
-        const tenderFile = await fastify.prisma.tenderFile.findFirst({
-          where: { id },
+        const tenderFile = await (fastify.prisma as any).tenderFile.findFirst({
+          where: { id, deletedAt: null },
           include: {
             tender: {
               select: { companyId: true },
@@ -55,8 +55,9 @@ async function deleteTenderFileRoute(
         }
 
         // Delete file metadata
-        await fastify.prisma.tenderFile.delete({
+        await (fastify.prisma as any).tenderFile.update({
           where: { id },
+          data: { deletedAt: new Date() },
         });
 
         // Log Tender Activity

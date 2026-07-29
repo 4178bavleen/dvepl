@@ -38,20 +38,23 @@ async function adminCompanyDeleteRoutes(
           });
         }
 
-        await fastify.prisma.company.delete({
+        await fastify.prisma.company.update({
           where: {
             id,
           },
-         
+          data: {
+            deletedAt: new Date(),
+            isActive: false,
+          },
         });
 
-        adminLogs.info("Company deleted", {
+        adminLogs.info("Company moved to recycle bin", {
           companyId: id,
         });
 
         return reply.status(200).send({
           success: true,
-          message: "Company deleted successfully.",
+          message: "Company moved to recycle bin successfully.",
         });
       } catch (error: any) {
         adminLogs.error("Company deletion failed", {

@@ -59,8 +59,9 @@ async function deleteCommunicationRoute(
         //--------------------------------
         // Hard Delete (CommunicationHistory has no deletedAt field in schema)
         //--------------------------------
-        await fastify.prisma.communicationHistory.delete({
+        await (fastify.prisma as any).communicationHistory.update({
           where: { id },
+          data: { deletedAt: new Date() },
         });
 
         adminLogs.info("Communication log deleted successfully", { logId: id });

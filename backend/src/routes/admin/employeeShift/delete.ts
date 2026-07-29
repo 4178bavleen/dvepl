@@ -53,10 +53,9 @@ async function deleteEmployeeShiftRoute(
           });
         }
 
-        await fastify.prisma.employeeShift.delete({
-          where: {
-            id,
-          },
+        await (fastify.prisma as any).employeeShift.update({
+          where: {             id,           },
+          data: { deletedAt: new Date() },
         });
 
         adminLogs.info("Employee shift assignment deleted successfully", {
