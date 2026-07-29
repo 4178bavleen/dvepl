@@ -475,28 +475,28 @@ model EmployeeContact {
 }
 
 model EmployeeEmergencyContact {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   employeeId   String
   name         String
   relationship String
   phone        String
-  createdAt    DateTime @default(now())
+  createdAt    DateTime  @default(now())
   deletedAt    DateTime?
-  employee     Employee @relation(fields: [employeeId], references: [id])
+  employee     Employee  @relation(fields: [employeeId], references: [id])
 
   @@map("employee_emergency_contacts")
 }
 
 model EmployeeEducation {
-  id            String   @id @default(uuid())
+  id            String    @id @default(uuid())
   employeeId    String
   degree        String
   institution   String
   yearOfPassing Int?
   grade         String?
-  createdAt     DateTime @default(now())
+  createdAt     DateTime  @default(now())
   deletedAt     DateTime?
-  employee      Employee @relation(fields: [employeeId], references: [id])
+  employee      Employee  @relation(fields: [employeeId], references: [id])
 
   @@map("employee_education")
 }
@@ -516,14 +516,14 @@ model EmployeeExperience {
 }
 
 model EmployeeDocument {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   employeeId   String
   documentType String
   fileUrl      String
   fileName     String
-  createdAt    DateTime @default(now())
+  createdAt    DateTime  @default(now())
   deletedAt    DateTime?
-  employee     Employee @relation(fields: [employeeId], references: [id])
+  employee     Employee  @relation(fields: [employeeId], references: [id])
 
   @@map("employee_documents")
 }
@@ -555,10 +555,10 @@ model EmployeeShift {
 }
 
 model Holiday {
-  id   String   @id @default(uuid())
-  name String   @unique
-  date DateTime
-  type String?
+  id        String    @id @default(uuid())
+  name      String    @unique
+  date      DateTime
+  type      String?
   deletedAt DateTime?
 
   @@map("holidays")
@@ -600,17 +600,17 @@ model Leave {
 }
 
 model Salary {
-  id            String   @id @default(uuid())
+  id            String    @id @default(uuid())
   employeeId    String
   effectiveFrom DateTime
-  basic         Decimal  @db.Decimal(12, 2)
-  hra           Decimal  @default(0) @db.Decimal(12, 2)
-  allowances    Decimal  @default(0) @db.Decimal(12, 2)
-  deductions    Decimal  @default(0) @db.Decimal(12, 2)
-  ctc           Decimal  @db.Decimal(12, 2)
-  createdAt     DateTime @default(now())
+  basic         Decimal   @db.Decimal(12, 2)
+  hra           Decimal   @default(0) @db.Decimal(12, 2)
+  allowances    Decimal   @default(0) @db.Decimal(12, 2)
+  deductions    Decimal   @default(0) @db.Decimal(12, 2)
+  ctc           Decimal   @db.Decimal(12, 2)
+  createdAt     DateTime  @default(now())
   deletedAt     DateTime?
-  employee      Employee @relation(fields: [employeeId], references: [id])
+  employee      Employee  @relation(fields: [employeeId], references: [id])
 
   @@index([employeeId])
   @@map("salaries")
@@ -728,15 +728,15 @@ model Tender {
 }
 
 model TenderFile {
-  id         String   @id @default(uuid())
+  id         String    @id @default(uuid())
   tenderId   String
   fileName   String
   fileUrl    String
   fileType   String?
   uploadedBy String?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
   deletedAt  DateTime?
-  tender     Tender   @relation(fields: [tenderId], references: [id])
+  tender     Tender    @relation(fields: [tenderId], references: [id])
 
   @@map("tender_files")
 }
@@ -779,15 +779,15 @@ model TenderRequest {
 }
 
 model TenderActivity {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   tenderId    String
   action      String
   oldValue    Json?
   newValue    Json?
   performedBy String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
   deletedAt   DateTime?
-  tender      Tender   @relation(fields: [tenderId], references: [id])
+  tender      Tender    @relation(fields: [tenderId], references: [id])
 
   @@map("tender_activities")
 }
@@ -869,7 +869,7 @@ model SubDivision {
 }
 
 model AuditLog {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String?
   module    String
   recordId  String
@@ -878,9 +878,9 @@ model AuditLog {
   newValue  Json?
   ipAddress String?
   userAgent String?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   deletedAt DateTime?
-  user      User?    @relation(fields: [userId], references: [id])
+  user      User?     @relation(fields: [userId], references: [id])
 
   @@index([module, recordId])
   @@map("audit_logs")
@@ -901,14 +901,14 @@ model ReferenceCode {
 }
 
 model ReferenceCodeCounter {
-  id           String   @id @default(uuid())
+  id           String    @id @default(uuid())
   companyId    String
-  prefix       String   @default("REF")
-  lastSequence Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  prefix       String    @default("REF")
+  lastSequence Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
-  company      Company  @relation(fields: [companyId], references: [id])
+  company      Company   @relation(fields: [companyId], references: [id])
 
   @@unique([companyId, prefix])
   @@map("reference_code_counters")
@@ -1552,8 +1552,8 @@ model Material {
   weight                Decimal?               @db.Decimal(10, 3)
   color                 String?
   reorderLevel          Decimal?               @db.Decimal(15, 3)
-  reorderQty             Decimal?               @db.Decimal(15, 3)
-  leadDays               Int?
+  reorderQty            Decimal?               @db.Decimal(15, 3)
+  leadDays              Int?
   alternativeMaterialId String?
   preferredVendorId     String?
   isActive              Boolean                @default(true)
@@ -1574,7 +1574,7 @@ model Material {
   createdBy             User                   @relation(fields: [createdById], references: [id])
   specification         MaterialSpecification? @relation(fields: [specificationId], references: [id])
   vendorId              String?
-  type MaterialType @default(RAW)
+  type                  MaterialType           @default(RAW)
 
   vendor Vendor? @relation(fields: [vendorId], references: [id])
 
@@ -2740,8 +2740,6 @@ enum StockType {
   TRANSIT
 }
 
-
-
 enum StockTransferStatus {
   REQUESTED
   APPROVED
@@ -3075,9 +3073,10 @@ enum NotificationProvider {
   TWILIO
   WATI
 }
+
 enum TransactionType {
-  STOCK_IN
-  STOCK_OUT
-  ADJUSTMENT
+  IN
+  OUT
+  ADJUST
   RETURN
 }

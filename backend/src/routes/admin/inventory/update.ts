@@ -92,96 +92,100 @@ async function adminInventoryUpdateRoutes(
         //   }
         // }
 
-        if (data.binId) {
-          const bin = await fastify.prisma.bin.findUnique({
-            where: { id: data.binId },
-          });
+        // if (data.binId) {
+        //   const bin = await fastify.prisma.bin.findUnique({
+        //     where: { id: data.binId },
+        //   });
 
-          if (!bin) {
-            return reply.status(404).send({
-              success: false,
-              message: "Bin not found.",
-            });
-          }
-        }
+        //   if (!bin) {
+        //     return reply.status(404).send({
+        //       success: false,
+        //       message: "Bin not found.",
+        //     });
+        //   }
+        // }
 
         // =========================================
         // Transaction
         // =========================================
 
         const updated = await fastify.prisma.$transaction(async (tx) => {
+          // Update Material master data
           await tx.material.update({
-            where: { id: existing.materialId },
+            where: {
+              id: existing.materialId,
+            },
             data: {
-              // binId: data.binId ?? undefined,
+              name: data.name ?? undefined,
 
-              quantity:
-                data.currentStock !== undefined
-                  ? new Prisma.Decimal(data.currentStock)
-                  : data.openingStock !== undefined
-                    ? new Prisma.Decimal(data.openingStock)
+              type: data.type ?? undefined,
+
+              category: data.category ?? undefined,
+
+              unit: data.unit ?? undefined,
+
+              hsnCode: data.hsnCode ?? undefined,
+
+              gst:
+                data.gstPercent !== undefined
+                  ? new Prisma.Decimal(data.gstPercent)
+                  : data.gst !== undefined
+                    ? new Prisma.Decimal(data.gst)
                     : undefined,
 
-              unitPrice:
-                data.unitRate !== undefined
-                  ? new Prisma.Decimal(data.unitRate)
+              reorderLevel:
+                data.reorderLevel !== undefined
+                  ? new Prisma.Decimal(data.reorderLevel)
                   : undefined,
 
-              location: data.location === undefined ? undefined : data.location,
-
-              batchNo: data.batchNo ?? undefined,
-
-              serialNo: data.serialNo ?? undefined,
-
-              barcode: data.barcode ?? undefined,
-
-              qrCode: data.qrCode ?? undefined,
-
-              expiryDate:
-                data.expiryDate === undefined
-                  ? undefined
-                  : data.expiryDate
-                    ? new Date(data.expiryDate)
-                    : null,
-            },
-          });
-          const inv = await tx.inventory.update({
-            where: { id },
-            data: {
-              quantity:
-                data.currentStock !== undefined
-                  ? new Prisma.Decimal(data.currentStock)
-                  : data.quantity !== undefined
-                    ? new Prisma.Decimal(data.quantity)
-                    : data.openingStock !== undefined
-                      ? new Prisma.Decimal(data.openingStock)
-                      : undefined,
-
-              unitPrice:
-                data.unitRate !== undefined
-                  ? new Prisma.Decimal(data.unitRate)
+              reorderQty:
+                data.reorderQty !== undefined
+                  ? new Prisma.Decimal(data.reorderQty)
                   : undefined,
 
-              location: data.location === undefined ? undefined : data.location,
+              description:
+                data.notes !== undefined
+                  ? data.notes
+                  : data.description !== undefined
+                    ? data.description
+                    : undefined,
 
-              binId: data.binId === undefined ? undefined : data.binId,
-
-              batchNo: data.batchNo === undefined ? undefined : data.batchNo,
-
-              serialNo: data.serialNo === undefined ? undefined : data.serialNo,
-
-              barcode: data.barcode === undefined ? undefined : data.barcode,
-
-              qrCode: data.qrCode === undefined ? undefined : data.qrCode,
-
-              expiryDate:
-                data.expiryDate === undefined
-                  ? undefined
-                  : data.expiryDate
-                    ? new Date(data.expiryDate)
-                    : null,
+              preferredVendorId:
+                data.preferredVendorId !== undefined
+                  ? data.preferredVendorId
+                  : undefined,
             },
           });
+
+          // Update Inventory stock data
+       const inv = await tx.inventory.update({
+  where: {
+    id,
+  },
+  data: {
+
+    quantity:
+      data.currentStock !== undefined
+        ? new Prisma.Decimal(data.currentStock)
+        : data.quantity !== undefined
+          ? new Prisma.Decimal(data.quantity)
+          : undefined,
+
+
+    unitPrice:
+      data.unitRate !== undefined
+        ? new Prisma.Decimal(data.unitRate)
+        : data.unitPrice !== undefined
+          ? new Prisma.Decimal(data.unitPrice)
+          : undefined,
+
+
+    location:
+      data.location !== undefined
+        ? data.location
+        : undefined,
+  },
+});
 
           return inv;
         });
