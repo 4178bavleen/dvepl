@@ -53,10 +53,9 @@ async function deleteEmployeeDocumentRoute(
           });
         }
 
-        await fastify.prisma.employeeDocument.delete({
-          where: {
-            id,
-          },
+        await (fastify.prisma as any).employeeDocument.update({
+          where: {             id,           },
+          data: { deletedAt: new Date() },
         });
 
         adminLogs.info("Employee document record deleted successfully", {

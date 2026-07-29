@@ -53,10 +53,9 @@ async function deleteEmployeeEmergencyContactRoute(
           });
         }
 
-        await fastify.prisma.employeeEmergencyContact.delete({
-          where: {
-            id,
-          },
+        await (fastify.prisma as any).employeeEmergencyContact.update({
+          where: {             id,           },
+          data: { deletedAt: new Date() },
         });
 
         adminLogs.info("Employee emergency contact deleted successfully", {

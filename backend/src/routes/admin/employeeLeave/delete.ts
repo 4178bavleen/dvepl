@@ -53,10 +53,9 @@ async function deleteLeaveRoute(
           });
         }
 
-        await fastify.prisma.leave.delete({
-          where: {
-            id,
-          },
+        await (fastify.prisma as any).leave.update({
+          where: {             id,           },
+          data: { deletedAt: new Date() },
         });
 
         adminLogs.info("Leave request deleted successfully", {

@@ -53,10 +53,9 @@ async function deleteAttendanceRoute(
           });
         }
 
-        await fastify.prisma.attendance.delete({
-          where: {
-            id,
-          },
+        await (fastify.prisma as any).attendance.update({
+          where: {             id,           },
+          data: { deletedAt: new Date() },
         });
 
         adminLogs.info("Attendance record deleted successfully", {

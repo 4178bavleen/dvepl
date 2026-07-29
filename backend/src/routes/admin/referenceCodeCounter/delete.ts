@@ -47,8 +47,9 @@ async function deleteCounterRoute(
           });
         }
 
-        await fastify.prisma.referenceCodeCounter.delete({
+        await (fastify.prisma as any).referenceCodeCounter.update({
           where: { id },
+          data: { deletedAt: new Date() },
         });
 
         adminLogs.info("Reference code counter deleted successfully", {

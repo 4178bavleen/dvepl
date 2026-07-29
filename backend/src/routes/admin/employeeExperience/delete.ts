@@ -53,10 +53,9 @@ async function deleteEmployeeExperienceRoute(
           });
         }
 
-        await fastify.prisma.employeeExperience.delete({
-          where: {
-            id,
-          },
+        await (fastify.prisma as any).employeeExperience.update({
+          where: {             id,           },
+          data: { deletedAt: new Date() },
         });
 
         adminLogs.info("Employee experience record deleted successfully", {

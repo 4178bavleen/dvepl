@@ -49,8 +49,9 @@ async function deletePermissionGroupRoutes(
           });
         }
 
-        await fastify.prisma.permissionGroup.delete({
+        await (fastify.prisma as any).permissionGroup.update({
           where: { id },
+          data: { deletedAt: new Date() },
         });
 
         adminLogs.info("Permission group deleted", {
