@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
+import * as XLSX from 'xlsx';
 import {
   Building2, Search, Plus, Trash2, Edit, Eye, Clock, FileText, X, Check, Copy, Trash, Maximize2, Minimize2, Save, Sparkles, AlertCircle, SlidersHorizontal, RefreshCw, Package
 } from 'lucide-react';
@@ -118,6 +119,7 @@ interface PORevision {
     division: string;
   };
   createdAt: string;
+  createdBy: string;
   revisionNo: number;
   customColumns?: string[];
 }
@@ -248,12 +250,17 @@ export function VendorsPage() {
   const [newColName, setNewColName] = useState('');
   const [isAddingCol, setIsAddingCol] = useState(false);
 
-  // Product picker (used in Vendor form AND PO line items)
+  // Product picker (used in Vendor form)
   const [productSearch, setProductSearch] = useState('');
   const [selectedMaterialIds, setSelectedMaterialIds] = useState<Set<string>>(new Set());
   const [existingVendorProducts, setExistingVendorProducts] = useState<VendorProductAssoc[]>([]);
-  const [isProductPickerOpen, setIsProductPickerOpen] = useState(false);
-  const [poProductSearch, setPoProductSearch] = useState('');
+
+  // Inline inventory search dropdown (used directly in PO line-item rows)
+  const [inventoryDropdownRowId, setInventoryDropdownRowId] = useState<string | null>(null);
+
+  // Excel import (line items)
+  const excelImportInputRef = useRef<HTMLInputElement>(null);
+  const [isImportingExcel, setIsImportingExcel] = useState(false);
 
   // Confirm Dialog States
   const [clearRowsConfirmOpen, setClearRowsConfirmOpen] = useState(false);
@@ -341,16 +348,18 @@ export function VendorsPage() {
     );
   }, [inventoryItems, productSearch]);
 
-  // Filtered inventory for PO line-item product picker
-  const filteredInventoryForPO = useMemo(() => {
-    if (!poProductSearch.trim()) return inventoryItems;
-    const q = poProductSearch.toLowerCase();
-    return inventoryItems.filter(i =>
-      i.material.name.toLowerCase().includes(q) ||
-      i.material.materialCode.toLowerCase().includes(q) ||
-      (i.material.category || '').toLowerCase().includes(q)
-    );
-  }, [inventoryItems, poProductSearch]);
+  // Inline inventory matches for a PO line-item row, based on its description text
+  const getInventoryMatches = (query: string): InventoryItem[] => {
+    const q = query.trim().toLowerCase();
+    const pool = !q
+      ? inventoryItems
+      : inventoryItems.filter(i =>
+          i.material.name.toLowerCase().includes(q) ||
+          i.material.materialCode.toLowerCase().includes(q) ||
+          (i.material.category || '').toLowerCase().includes(q)
+        );
+    return pool.slice(0, 20);
+  };
 
   const ALL_VENDOR_COLUMNS = useMemo(() => {
     const base = [
@@ -399,14 +408,23 @@ export function VendorsPage() {
   // for table display we keep a lightweight cache populated on demand)
   const [vendorProductCounts, setVendorProductCounts] = useState<Record<string, number>>({});
 
+  // Products Supplied quick-view dialog
+  const [productsQuickViewVendor, setProductsQuickViewVendor] = useState<Vendor | null>(null);
+  const [productsQuickViewList, setProductsQuickViewList] = useState<VendorProductAssoc[]>([]);
+  const [productsQuickViewLoading, setProductsQuickViewLoading] = useState(false);
+
   const openProductsQuickView = async (vendor: Vendor) => {
-    setActivePoVendor(vendor); // reuse for context if needed elsewhere
+    setProductsQuickViewVendor(vendor);
+    setProductsQuickViewList([]);
+    setProductsQuickViewLoading(true);
     try {
       const assocs = await apiService.vendorProducts.list(vendor.id);
+      setProductsQuickViewList(assocs);
       setVendorProductCounts(prev => ({ ...prev, [vendor.id]: assocs.length }));
-      toast.success(`${vendor.name} supplies ${assocs.length} product(s)`);
     } catch {
       toast.error('Failed to load products for this vendor');
+    } finally {
+      setProductsQuickViewLoading(false);
     }
   };
 
@@ -710,24 +728,140 @@ export function VendorsPage() {
     setPoItems(prev => [...prev, newItem]);
   };
 
-  const handleAddPoRowFromInventory = (item: InventoryItem) => {
-    const newItem: POItem = {
-      id: `row-${Date.now()}`,
-      description: item.material.name,
-      qty: 1,
-      unit: item.material.unit || 'Nos',
-      hsnCode: item.material.hsnCode || '',
-      catNo: item.material.materialCode || '',
-      rate: Number(item.unitPrice) || 0,
-      discountPercent: 0,
-      net: Number(item.unitPrice) || 0,
-      total: Number(item.unitPrice) || 0
+  // Fills an existing PO line-item row in-place with the selected inventory item's details.
+  const applyInventoryItemToRow = (rowId: string, invItem: InventoryItem) => {
+    setPoItems(prev => prev.map(item => {
+      if (item.id !== rowId) return item;
+      const qty = Number(item.qty) || 1;
+      const rate = Number(invItem.unitPrice) || 0;
+      const disc = Number(item.discountPercent) || 0;
+      const net = rate * (1 - disc / 100);
+      return {
+        ...item,
+        description: invItem.material.name,
+        unit: invItem.material.unit || item.unit,
+        hsnCode: invItem.material.hsnCode || item.hsnCode,
+        catNo: invItem.material.materialCode || item.catNo,
+        rate,
+        net,
+        total: qty * net
+      };
+    }));
+    toast.success(`${invItem.material.name} applied from inventory`);
+    setInventoryDropdownRowId(null);
+  };
+
+  // Excel import for PO line items
+  const handleImportExcelClick = () => {
+    excelImportInputRef.current?.click();
+  };
+
+  const getCellValue = (row: Record<string, any>, keys: string[]): string => {
+    const rowKeys = Object.keys(row);
+    for (const key of rowKeys) {
+      if (keys.includes(key.trim().toLowerCase())) {
+        const v = row[key];
+        return v === undefined || v === null ? '' : String(v).trim();
+      }
+    }
+    return '';
+  };
+
+  const handleExcelFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImportingExcel(true);
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = evt.target?.result;
+        const workbook = XLSX.read(data, { type: 'binary' });
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const rows: Record<string, any>[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+        if (rows.length === 0) {
+          toast.error('No data found in the selected file');
+          return;
+        }
+
+        let matchedFromInventory = 0;
+        const newItems: POItem[] = [];
+
+        rows.forEach((row, idx) => {
+          const catNoRaw = getCellValue(row, ['cat no', 'cat no.', 'catno', 'material code', 'code']);
+          const descriptionRaw = getCellValue(row, ['description', 'item', 'item description', 'name', 'material name']);
+
+          // Try to match against Inventory by material code first, then by name
+          const invMatch = inventoryItems.find(inv =>
+            (catNoRaw && inv.material.materialCode?.toLowerCase() === catNoRaw.toLowerCase()) ||
+            (descriptionRaw && inv.material.name?.toLowerCase() === descriptionRaw.toLowerCase())
+          );
+          if (invMatch) matchedFromInventory++;
+
+          const description = descriptionRaw || invMatch?.material.name || '';
+          if (!description) return; // skip empty rows
+
+          const qty = Number(getCellValue(row, ['qty', 'quantity'])) || 1;
+          const rate = Number(getCellValue(row, ['rate', 'unit price', 'price'])) || Number(invMatch?.unitPrice) || 0;
+          const discountPercent = Number(getCellValue(row, ['discount %', 'discount', 'discount percent'])) || 0;
+          const unit = getCellValue(row, ['unit', 'uom']) || invMatch?.material.unit || 'Nos';
+          const hsnCode = getCellValue(row, ['hsn code', 'hsn']) || invMatch?.material.hsnCode || '';
+          const catNo = catNoRaw || invMatch?.material.materialCode || '';
+          const net = rate * (1 - discountPercent / 100);
+          const total = qty * net;
+
+          const newItem: POItem = {
+            id: `row-${Date.now()}-${idx}`,
+            description,
+            qty,
+            unit,
+            hsnCode,
+            catNo,
+            rate,
+            discountPercent,
+            net,
+            total
+          };
+          customColumns.forEach(c => {
+            newItem[c] = getCellValue(row, [c.trim().toLowerCase()]);
+          });
+          newItems.push(newItem);
+        });
+
+        if (newItems.length === 0) {
+          toast.error('No valid rows found. Ensure the file has a "Description" column.');
+          return;
+        }
+
+        setPoItems(prev => [...prev, ...newItems]);
+        toast.success(
+          `Imported ${newItems.length} item(s) from Excel` +
+          (matchedFromInventory > 0 ? ` (${matchedFromInventory} matched to Inventory)` : '')
+        );
+      } catch (err) {
+        console.error(err);
+        toast.error('Failed to read the Excel file. Please check the file format and try again.');
+      } finally {
+        setIsImportingExcel(false);
+        if (excelImportInputRef.current) excelImportInputRef.current.value = '';
+      }
     };
-    customColumns.forEach(c => { newItem[c] = ''; });
-    setPoItems(prev => [...prev, newItem]);
-    toast.success(`${item.material.name} added from inventory`);
-    setIsProductPickerOpen(false);
-    setPoProductSearch('');
+    reader.onerror = () => {
+      toast.error('Failed to read the selected file.');
+      setIsImportingExcel(false);
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  const handleDownloadPoItemsTemplate = () => {
+    const headers = ['Description', 'CAT No', 'HSN Code', 'Qty', 'Unit', 'Rate', 'Discount %', ...customColumns];
+    const sampleRow = ['Sample Item Name', 'MAT-001', '8536', 10, 'Nos', 100, 0, ...customColumns.map(() => '')];
+    const ws = XLSX.utils.aoa_to_sheet([headers, sampleRow]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'PO Items');
+    XLSX.writeFile(wb, 'po_line_items_template.xlsx');
   };
 
   const handleDuplicateLastRow = () => {
@@ -858,6 +992,7 @@ export function VendorsPage() {
       lineItems: poItems,
       companyDetails,
       createdAt: new Date().toISOString(),
+      createdBy: useERPStore.getState().currentUserName || 'Unknown User',
       revisionNo: nextRevisionNo,
       customColumns: [...customColumns]
     };
@@ -1623,50 +1758,85 @@ export function VendorsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ── PRODUCT PICKER (used by PO Data Entry line items) ── */}
-      <Dialog open={isProductPickerOpen} onOpenChange={setIsProductPickerOpen}>
-        <DialogContent className="max-w-lg">
+      {/* ── PRODUCTS SUPPLIED QUICK VIEW ── */}
+      <Dialog open={!!productsQuickViewVendor} onOpenChange={(open) => { if (!open) setProductsQuickViewVendor(null); }}>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base font-bold text-primary">
               <Package className="size-5" />
-              Add Product from Inventory
+              Products Supplied
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-3 pt-2">
-            <div className="flex items-center gap-2 border rounded-xl px-3 bg-background shadow-xs focus-within:ring-1 focus-within:ring-primary">
-              <Search className="size-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name, code, or category..."
-                value={poProductSearch}
-                onChange={e => setPoProductSearch(e.target.value)}
-                className="h-9 border-none shadow-none focus-visible:ring-0 px-0"
-              />
-            </div>
-            <div className="border rounded-xl max-h-80 overflow-y-auto divide-y">
-              {filteredInventoryForPO.length === 0 && (
-                <div className="p-4 text-center text-xs text-muted-foreground">No matching products.</div>
-              )}
-              {filteredInventoryForPO.map(item => (
-                <button
-                  type="button"
-                  key={item.id}
-                  onClick={() => handleAddPoRowFromInventory(item)}
-                  className="w-full flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-muted/40 text-left transition-colors"
-                >
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold text-foreground truncate">{item.material.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {item.material.materialCode} • HSN: {item.material.hsnCode || '—'} • {item.material.unit}
+          {productsQuickViewVendor && (
+            <div className="space-y-3 pt-1">
+              <div className="flex items-center justify-between border rounded-lg px-3 py-2 bg-muted/30">
+                <div>
+                  <div className="text-sm font-semibold text-foreground">{productsQuickViewVendor.name}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {productsQuickViewVendor.category} • GSTIN: {productsQuickViewVendor.gstNumber || '—'}
+                  </div>
+                </div>
+                <span className="text-xs font-semibold text-[#b45309] bg-[#fff4e5] border border-[#fcd9a8] px-2.5 py-1 rounded-md">
+                  {productsQuickViewList.length} product{productsQuickViewList.length === 1 ? '' : 's'}
+                </span>
+              </div>
+
+              <div className="border rounded-xl max-h-96 overflow-y-auto divide-y">
+                {productsQuickViewLoading && (
+                  <div className="p-6 text-center text-xs text-muted-foreground">Loading products...</div>
+                )}
+                {!productsQuickViewLoading && productsQuickViewList.length === 0 && (
+                  <div className="p-6 flex flex-col items-center gap-2 text-center">
+                    <span className="text-xs text-muted-foreground">
+                      This vendor has no products linked from Inventory yet.
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5 h-8 text-xs cursor-pointer"
+                      onClick={() => {
+                        const vendor = productsQuickViewVendor;
+                        setProductsQuickViewVendor(null);
+                        if (vendor) {
+                          openEditVendor(vendor);
+                          setFormTab('products');
+                        }
+                      }}
+                    >
+                      <Package className="size-3.5" /> Attach Products from Inventory
+                    </Button>
+                  </div>
+                )}
+                {!productsQuickViewLoading && productsQuickViewList.map(assoc => (
+                  <div key={assoc.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-semibold text-foreground truncate">{assoc.material.name}</span>
+                        {assoc.isPreferred && (
+                          <span className="text-[10px] font-semibold text-[#137333] bg-[#e6f4ea] border border-[#b7e1c1] px-1.5 py-0.5 rounded">
+                            PREFERRED
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        Code: {assoc.vendorMaterialCode || assoc.material.materialCode} • Category: {assoc.material.category || '—'} • HSN: {assoc.material.hsnCode || '—'} • Unit: {assoc.material.unit || '—'}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-sm font-bold text-[#137333]">
+                        {(() => {
+                          const invItem = inventoryItems.find(i => i.materialId === assoc.materialId);
+                          const rate = invItem ? Number(invItem.unitPrice) : null;
+                          return rate != null && !isNaN(rate) ? `₹${rate.toLocaleString('en-IN')}` : '—';
+                        })()}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">Item Rate</div>
                     </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <div className="text-sm font-bold text-[#137333]">₹{Number(item.unitPrice).toLocaleString('en-IN')}</div>
-                    <div className="text-[10px] text-muted-foreground">Stock: {item.quantity}</div>
-                  </div>
-                </button>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -1725,6 +1895,10 @@ export function VendorsPage() {
                       <span>Date: {rev.poDate}</span>
                       <span>Items: {rev.lineItems.length}</span>
                       <span>Status: {rev.poStatus}</span>
+                    </div>
+                    <div className="rev-meta">
+                      <span>Created By: {rev.createdBy || 'Unknown User'}</span>
+                      <span>Created On: {rev.createdAt ? new Date(rev.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</span>
                     </div>
                     <div className="rev-amount">
                       ₹{rev.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -2000,7 +2174,17 @@ export function VendorsPage() {
                       <div className="de-toolbar">
                         <span className="de-toolbar-label">LINE ITEMS</span>
                         <button className="de-tbtn" onClick={handleAddPoRow}>➕ Add Row</button>
-                        <button className="de-tbtn" onClick={() => setIsProductPickerOpen(true)}>📦 From Inventory</button>
+                        <button className="de-tbtn" onClick={handleImportExcelClick} disabled={isImportingExcel}>
+                          {isImportingExcel ? '⏳ Importing...' : '📥 Import Excel'}
+                        </button>
+                        <button className="de-tbtn" onClick={handleDownloadPoItemsTemplate} title="Download an Excel template for bulk item import">📄 Template</button>
+                        <input
+                          ref={excelImportInputRef}
+                          type="file"
+                          accept=".xlsx,.xls"
+                          style={{ display: 'none' }}
+                          onChange={handleExcelFileChange}
+                        />
                         <button className="de-tbtn" onClick={handleDuplicateLastRow}>📋 Duplicate Last</button>
                         <div className="de-tbtn-sep"></div>
 
@@ -2063,7 +2247,55 @@ export function VendorsPage() {
                             {poItems.map((item, idx) => (
                               <tr key={item.id}>
                                 <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{idx + 1}</td>
-                                <td><input type="text" value={item.description} onChange={e => updatePoItemField(item.id, 'description', e.target.value)} placeholder="Item description..." style={!item.description.trim() ? { borderColor: '#f59e0b' } : undefined} /></td>
+                                <td style={{ position: 'relative' }}>
+                                  <input
+                                    type="text"
+                                    value={item.description}
+                                    onChange={e => {
+                                      updatePoItemField(item.id, 'description', e.target.value);
+                                      setInventoryDropdownRowId(item.id);
+                                    }}
+                                    onFocus={() => setInventoryDropdownRowId(item.id)}
+                                    onBlur={() => setTimeout(() => setInventoryDropdownRowId(prev => prev === item.id ? null : prev), 150)}
+                                    placeholder="Type to search Inventory or enter manually..."
+                                    autoComplete="off"
+                                    style={!item.description.trim() ? { borderColor: '#f59e0b' } : undefined}
+                                  />
+                                  {inventoryDropdownRowId === item.id && (
+                                    <div
+                                      className="absolute left-0 top-full mt-1 w-72 rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 z-50"
+                                      onMouseDown={(e) => e.preventDefault()}
+                                    >
+                                      <div className="flex items-center gap-1.5 px-3 py-2 border-b bg-muted/30">
+                                        <Package className="size-3.5 text-muted-foreground" />
+                                        <span className="text-[11px] font-semibold text-muted-foreground">INVENTORY MATCHES</span>
+                                      </div>
+                                      <div className="max-h-64 overflow-y-auto divide-y">
+                                        {getInventoryMatches(item.description).length === 0 && (
+                                          <div className="p-3 text-center text-xs text-muted-foreground">No matching inventory items.</div>
+                                        )}
+                                        {getInventoryMatches(item.description).map(inv => (
+                                          <button
+                                            type="button"
+                                            key={inv.id}
+                                            onClick={() => applyInventoryItemToRow(item.id, inv)}
+                                            className="w-full flex items-center justify-between gap-2 px-3 py-2 hover:bg-muted/40 text-left transition-colors"
+                                          >
+                                            <div className="min-w-0">
+                                              <div className="text-xs font-semibold text-foreground truncate">{inv.material.name}</div>
+                                              <div className="text-[10px] text-muted-foreground truncate">
+                                                {inv.material.materialCode} • HSN: {inv.material.hsnCode || '—'} • {inv.material.unit}
+                                              </div>
+                                            </div>
+                                            <div className="text-xs font-bold text-[#137333] shrink-0">
+                                              ₹{Number(inv.unitPrice).toLocaleString('en-IN')}
+                                            </div>
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </td>
                                 <td><input type="number" min={0.01} step="any" value={item.qty} onChange={e => updatePoItemField(item.id, 'qty', Number(e.target.value) || 0)} style={item.qty <= 0 ? { borderColor: '#f59e0b' } : undefined} /></td>
                                 <td><input type="text" value={item.unit} onChange={e => updatePoItemField(item.id, 'unit', e.target.value)} placeholder="PCS" /></td>
                                 <td><input type="text" value={item.hsnCode} onChange={e => updatePoItemField(item.id, 'hsnCode', e.target.value)} placeholder="HSN" /></td>
@@ -2085,7 +2317,7 @@ export function VendorsPage() {
                             {poItems.length === 0 && (
                               <tr>
                                 <td colSpan={12 + customColumns.length} style={{ padding: '24px', textAlign: 'center', color: 'var(--text2)' }}>
-                                  No items added. Click "+ Add Row" or "📦 From Inventory" to begin.
+                                  No items added. Click "+ Add Row" and start typing to search Inventory, or "📥 Import Excel" to bulk-add items.
                                 </td>
                               </tr>
                             )}
