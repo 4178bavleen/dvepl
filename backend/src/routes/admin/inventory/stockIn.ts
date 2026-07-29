@@ -7,7 +7,7 @@ import {
 
 import {
   Prisma,
-  InventoryTransactionType,
+  TransactionType,
 } from "@prisma/client";
 
 import { adminLogs } from "../../../services/logger/contextLogger";
@@ -100,7 +100,7 @@ async function adminInventoryStockInRoutes(
               inventoryId: inventory.id,
 
               transactionType:
-                InventoryTransactionType.STOCK_IN,
+                TransactionType.IN,
 
               quantity: new Prisma.Decimal(quantity),
 

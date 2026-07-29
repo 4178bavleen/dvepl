@@ -119,8 +119,6 @@ async function adminInventoryUpdateRoutes(
 
               category: data.category ?? undefined,
 
-              type: data.type ?? undefined,
-
               hsnCode: data.hsnCode ?? undefined,
 
               preferredVendor:

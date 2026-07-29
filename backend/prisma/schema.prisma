@@ -1534,6 +1534,9 @@ model Material {
   unit                  String
   weight                Decimal?               @db.Decimal(10, 3)
   color                 String?
+  reorderLevel          Decimal?               @db.Decimal(15, 3)
+  reorderQty             Decimal?               @db.Decimal(15, 3)
+  leadDays               Int?
   alternativeMaterialId String?
   preferredVendorId     String?
   isActive              Boolean                @default(true)
@@ -1854,6 +1857,7 @@ model Inventory {
   companyId          String
   materialId         String
   warehouseId        String
+  location           String?
   binId              String?
   batchNo            String?
   serialNo           String?
@@ -2972,6 +2976,8 @@ model InventoryTransaction {
   inventoryId     String
   transactionType TransactionType
   quantity        Decimal         @db.Decimal(15, 3)
+  stockBefore     Decimal         @db.Decimal(15, 3)
+  stockAfter      Decimal         @db.Decimal(15, 3)
   referenceType   String
   referenceId     String
   remarks         String?
@@ -3058,4 +3064,10 @@ enum NotificationProvider {
   META
   TWILIO
   WATI
+}
+enum InventoryTransactionType {
+  STOCK_IN
+  STOCK_OUT
+  ADJUSTMENT
+  RETURN
 }
