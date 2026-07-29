@@ -92,42 +92,46 @@ async function adminInventoryUpdateRoutes(
         //   }
         // }
 
-        if (data.binId) {
-          const bin = await fastify.prisma.bin.findUnique({
-            where: { id: data.binId },
-          });
+        // if (data.binId) {
+        //   const bin = await fastify.prisma.bin.findUnique({
+        //     where: { id: data.binId },
+        //   });
 
-          if (!bin) {
-            return reply.status(404).send({
-              success: false,
-              message: "Bin not found.",
-            });
-          }
-        }
+        //   if (!bin) {
+        //     return reply.status(404).send({
+        //       success: false,
+        //       message: "Bin not found.",
+        //     });
+        //   }
+        // }
 
         // =========================================
         // Transaction
         // =========================================
 
         const updated = await fastify.prisma.$transaction(async (tx) => {
+          // Update Material master data
           await tx.material.update({
-            where: { id: existing.materialId },
+            where: {
+              id: existing.materialId,
+            },
             data: {
               name: data.name ?? undefined,
 
-              description: data.notes === undefined ? undefined : data.notes,
+              type: data.type ?? undefined,
 
               category: data.category ?? undefined,
 
+              unit: data.unit ?? undefined,
+
               hsnCode: data.hsnCode ?? undefined,
 
-              preferredVendor:
-                data.preferredVendorId === undefined
-                  ? undefined
-                  : data.preferredVendorId === null ||
-                      data.preferredVendorId === ""
-                    ? { disconnect: true }
-                    : { connect: { id: data.preferredVendorId } },
+              gst:
+                data.gstPercent !== undefined
+                  ? new Prisma.Decimal(data.gstPercent)
+                  : data.gst !== undefined
+                    ? new Prisma.Decimal(data.gst)
+                    : undefined,
 
               reorderLevel:
                 data.reorderLevel !== undefined
@@ -139,54 +143,49 @@ async function adminInventoryUpdateRoutes(
                   ? new Prisma.Decimal(data.reorderQty)
                   : undefined,
 
-              leadDays: data.vendorLeadDays ?? undefined,
+              description:
+                data.notes !== undefined
+                  ? data.notes
+                  : data.description !== undefined
+                    ? data.description
+                    : undefined,
 
-              gst:
-                data.gst !== undefined
-                  ? new Prisma.Decimal(data.gst)
+              preferredVendorId:
+                data.preferredVendorId !== undefined
+                  ? data.preferredVendorId
                   : undefined,
-
-              unit: data.unit ?? undefined,
-
-              weight:
-                data.weight === undefined
-                  ? undefined
-                  : data.weight !== null
-                    ? new Prisma.Decimal(data.weight)
-                    : null,
-
-              color: data.color ?? undefined,
             },
           });
 
-          const inv = await tx.inventory.update({
-            where: { id },
-            data: {
-              binId: data.binId === undefined ? undefined : data.binId,
+          // Update Inventory stock data
+       const inv = await tx.inventory.update({
+  where: {
+    id,
+  },
+  data: {
 
-              
+    quantity:
+      data.currentStock !== undefined
+        ? new Prisma.Decimal(data.currentStock)
+        : data.quantity !== undefined
+          ? new Prisma.Decimal(data.quantity)
+          : undefined,
 
-              unitPrice:
-                data.unitRate !== undefined
-                  ? new Prisma.Decimal(data.unitRate)
-                  : undefined,
 
-              batchNo: data.batchNo === undefined ? undefined : data.batchNo,
+    unitPrice:
+      data.unitRate !== undefined
+        ? new Prisma.Decimal(data.unitRate)
+        : data.unitPrice !== undefined
+          ? new Prisma.Decimal(data.unitPrice)
+          : undefined,
 
-              serialNo: data.serialNo === undefined ? undefined : data.serialNo,
 
-              barcode: data.barcode === undefined ? undefined : data.barcode,
-
-              qrCode: data.qrCode === undefined ? undefined : data.qrCode,
-
-              expiryDate:
-                data.expiryDate === undefined
-                  ? undefined
-                  : data.expiryDate
-                    ? new Date(data.expiryDate)
-                    : null,
-            },
-          });
+    location:
+      data.location !== undefined
+        ? data.location
+        : undefined,
+  },
+});
 
           return inv;
         });

@@ -54,46 +54,30 @@ export const inventorySchema = z.object({
   location: z.string().optional().nullable(),
 });
 export const inventoryUpdateSchema = z.object({
-  name: z.string().trim().min(1).max(255).optional(),
+name: z.string().optional(),
+type: z.nativeEnum(MaterialType).optional(),
+category: z.string().optional(),
+unit: z.string().optional(),
+hsnCode: z.string().optional(),
 
-  notes: z.string().optional().nullable(),
+gstPercent: z.coerce.number().optional(),
+gst: z.coerce.number().optional(),
 
-  category: z.string().trim().optional(),
+reorderLevel: z.coerce.number().optional(),
+reorderQty: z.coerce.number().optional(),
 
-  type: z.nativeEnum(MaterialType).optional(),
+preferredVendorId: z.string().uuid().optional().nullable(),
 
-  hsnCode: z.string().trim().optional().nullable(),
+notes: z.string().optional().nullable(),
+description: z.string().optional().nullable(),
 
-  gst: z.coerce.number().min(0).max(100).optional(),
+currentStock: z.coerce.number().optional(),
+quantity: z.coerce.number().optional(),
 
-  unit: z.string().trim().min(1).optional(),
+unitRate: z.coerce.number().optional(),
+unitPrice: z.coerce.number().optional(),
 
-  weight: z.coerce.number().optional().nullable(),
-
-  color: z.string().trim().optional().nullable(),
-
-  reorderLevel: z.coerce.number().min(0).optional(),
-
-  reorderQty: z.coerce.number().min(0).optional(),
-
-  vendorLeadDays: z.coerce.number().int().min(0).optional(),
-
-  // warehouseId: z.string().uuid().optional().nullable(),
-
-  binId: z.string().uuid().optional().nullable(),
-
-  unitRate: z.coerce.number().min(0).optional(),
-
-  batchNo: z.string().trim().optional().nullable(),
-
-  serialNo: z.string().trim().optional().nullable(),
-
-  barcode: z.string().trim().optional().nullable(),
-  preferredVendorId: z.string().uuid().optional().nullable(),
-
-  qrCode: z.string().trim().optional().nullable(),
-
-  expiryDate: z.string().datetime().optional().nullable(),
+location: z.string().optional(),
 });
 
 export const inventoryStockInSchema = z.object({
