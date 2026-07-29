@@ -11,42 +11,42 @@ export const vendorSchema = z.object({
     z.string()
     .min(2,"Vendor name is required"),
 
+    phone: z
+  .preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().max(10, "Phone number cannot exceed 10 digits").optional()
+  ),
 
-  category:
-    z.string()
-    .optional(),
+email: z.preprocess(
+  (v) => (v === "" ? undefined : v),
+  z.string().email("Invalid email address").optional()
+),
 
+gstNumber: z.preprocess(
+  (v) => (v === "" ? undefined : v),
+  z.string().optional()
+),
 
-  contactPerson:
-    z.string()
-    .optional(),
+address: z.preprocess(
+  (v) => (v === "" ? undefined : v),
+  z.string().optional()
+),
 
+notes: z.preprocess(
+  (v) => (v === "" ? undefined : v),
+  z.string().optional()
+),
 
-  phone:
-    z.string()
-    .max(10, "Phone number cannot exceed 10 digits")
-    .optional(),
+contactPerson: z.preprocess(
+  (v) => (v === "" ? undefined : v),
+  z.string().optional()
+),
 
+category: z.preprocess(
+  (v) => (v === "" ? undefined : v),
+  z.string().optional()
+),
 
-  email:
-    z.string()
-    .email()
-    .optional(),
-
-
-  gstNumber:
-    z.string()
-    .optional(),
-
-
-  address:
-    z.string()
-    .optional(),
-
-
-  notes:
-    z.string()
-    .optional(),
-
+ 
 
 });

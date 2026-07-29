@@ -1557,6 +1557,7 @@ model Material {
   createdBy             User                   @relation(fields: [createdById], references: [id])
   specification         MaterialSpecification? @relation(fields: [specificationId], references: [id])
   vendorId              String?
+  type MaterialType @default(RAW)
 
   vendor Vendor? @relation(fields: [vendorId], references: [id])
 
@@ -1795,7 +1796,7 @@ model Warehouse {
   deletedAt          DateTime?
   stockTransfersFrom StockTransfer[] @relation("StockTransferFrom")
   stockTransfersTo   StockTransfer[] @relation("StockTransferTo")
-  inventories        Inventory[]
+  // inventories        Inventory[]
   racks              Rack[]
   company            Company         @relation(fields: [companyId], references: [id])
 
@@ -1856,7 +1857,7 @@ model Inventory {
   id                 String                 @id @default(uuid())
   companyId          String
   materialId         String
-  warehouseId        String
+  // warehouseId        String?
   location           String?
   binId              String?
   batchNo            String?
@@ -1881,13 +1882,13 @@ model Inventory {
   company            Company                @relation(fields: [companyId], references: [id])
   goodsReceiptItem   GoodsReceiptItem?      @relation(fields: [goodsReceiptItemId], references: [id])
   material           Material               @relation(fields: [materialId], references: [id])
-  warehouse          Warehouse              @relation(fields: [warehouseId], references: [id])
+  // warehouse          Warehouse              @relation(fields: [warehouseId], references: [id])
   transactions       InventoryTransaction[]
 
-  @@unique([materialId, warehouseId, batchNo, serialNo])
+  // @@unique([materialId, warehouseId, batchNo, serialNo])
   @@index([companyId])
   @@index([materialId])
-  @@index([warehouseId])
+  // @@index([warehouseId])
   @@map("inventories")
 }
 
@@ -2722,15 +2723,7 @@ enum StockType {
   TRANSIT
 }
 
-enum TransactionType {
-  IN
-  OUT
-  ADJUSTMENT
-  TRANSFER_IN
-  TRANSFER_OUT
-  RESERVED
-  UNRESERVED
-}
+
 
 enum StockTransferStatus {
   REQUESTED
@@ -3065,7 +3058,7 @@ enum NotificationProvider {
   TWILIO
   WATI
 }
-enum InventoryTransactionType {
+enum TransactionType {
   STOCK_IN
   STOCK_OUT
   ADJUSTMENT

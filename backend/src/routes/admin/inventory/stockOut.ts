@@ -120,7 +120,7 @@ async function adminInventoryStockOutRoutes(
                 inventoryId: inventory.id,
 
                 transactionType:
-                  TransactionType.OUT,
+                  TransactionType.STOCK_OUT,
 
                 quantity: new Prisma.Decimal(quantity),
 
@@ -159,7 +159,7 @@ async function adminInventoryStockOutRoutes(
                   preferredVendor: true,
                 },
               },
-              warehouse: true,
+              
               bin: true,
             },
           });

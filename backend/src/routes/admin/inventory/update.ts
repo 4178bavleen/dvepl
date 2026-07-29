@@ -79,18 +79,18 @@ async function adminInventoryUpdateRoutes(
         // Category / Warehouse / Bin Validation
         // =========================================
 
-        if (data.warehouseId) {
-          const warehouse = await fastify.prisma.warehouse.findUnique({
-            where: { id: data.warehouseId },
-          });
+        // if (data.warehouseId) {
+        //   const warehouse = await fastify.prisma.warehouse.findUnique({
+        //     where: { id: data.warehouseId },
+        //   });
 
-          if (!warehouse) {
-            return reply.status(404).send({
-              success: false,
-              message: "Warehouse not found.",
-            });
-          }
-        }
+        //   if (!warehouse) {
+        //     return reply.status(404).send({
+        //       success: false,
+        //       message: "Warehouse not found.",
+        //     });
+        //   }
+        // }
 
         if (data.binId) {
           const bin = await fastify.prisma.bin.findUnique({
@@ -162,16 +162,23 @@ async function adminInventoryUpdateRoutes(
           const inv = await tx.inventory.update({
             where: { id },
             data: {
-              warehouseId: data.warehouseId ?? undefined,
               binId: data.binId === undefined ? undefined : data.binId,
+
+              
+
               unitPrice:
                 data.unitRate !== undefined
                   ? new Prisma.Decimal(data.unitRate)
                   : undefined,
+
               batchNo: data.batchNo === undefined ? undefined : data.batchNo,
+
               serialNo: data.serialNo === undefined ? undefined : data.serialNo,
+
               barcode: data.barcode === undefined ? undefined : data.barcode,
+
               qrCode: data.qrCode === undefined ? undefined : data.qrCode,
+
               expiryDate:
                 data.expiryDate === undefined
                   ? undefined
@@ -198,14 +205,14 @@ async function adminInventoryUpdateRoutes(
                 preferredVendor: true,
               },
             },
-            warehouse: true,
+
             bin: true,
           },
         });
 
         adminLogs.info("Inventory Item updated successfully", {
           inventoryId: id,
-          updatedBy: (request as any).admin.id,
+          updatedBy: request.user.id,
         });
 
         return reply.status(200).send({

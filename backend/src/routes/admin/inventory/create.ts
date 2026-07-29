@@ -49,6 +49,7 @@ async function adminInventoryCreateRoutes(
           name,
           notes,
           category,
+          type,
           hsnCode,
           gst,
           unit,
@@ -59,8 +60,8 @@ async function adminInventoryCreateRoutes(
           vendorLeadDays,
           vendorName,
           vendorContact,
-          preferredVendorId: incomingPreferredVendorId,
-          warehouseId,
+          preferredVendorId: incomingPreferredVendorId, // ← naya
+        
           binId,
           openingStock,
           unitRate,
@@ -73,18 +74,6 @@ async function adminInventoryCreateRoutes(
         } = validationResult.data;
 
         const companyId = request.user.companyId;
-
-        // =========================================
-        // warehouseId Required Validation
-        // =========================================
-        // Inventory model mein warehouseId required hai, isliye yaha check zaroori
-
-        if (!warehouseId) {
-          return reply.status(400).send({
-            success: false,
-            message: "Warehouse is required.",
-          });
-        }
 
         // =========================================
         // Duplicate Material Code
@@ -121,21 +110,39 @@ async function adminInventoryCreateRoutes(
         }
 
         // =========================================
+        // Category Validation
+        // =========================================
+        // const materialCategory =
+        //   await fastify.prisma.materialCategory.findFirst({
+        //     where: {
+        //       companyId,
+        //       name: category.trim(),
+        //       deletedAt: null,
+        //     },
+        //   });
+        // if (!materialCategory) {
+        //   return reply.status(404).send({
+        //     success: false,
+        //     message: "Material category not found.",
+        //   });
+        // }
+
+        // =========================================
         // Warehouse Validation
         // =========================================
 
-        const warehouse = await fastify.prisma.warehouse.findUnique({
-          where: {
-            id: warehouseId,
-          },
-        });
+        // const warehouse = await fastify.prisma.warehouse.findUnique({
+        //   where: {
+        //     id: warehouseId,
+        //   },
+        // });
 
-        if (!warehouse) {
-          return reply.status(404).send({
-            success: false,
-            message: "Warehouse not found.",
-          });
-        }
+        // if (!warehouse) {
+        //   return reply.status(404).send({
+        //     success: false,
+        //     message: "Warehouse not found.",
+        //   });
+        // }
 
         // =========================================
         // Bin Validation
@@ -160,6 +167,9 @@ async function adminInventoryCreateRoutes(
         // Transaction
         // =========================================
 
+        // =========================================
+        // Transaction
+        // =========================================
         const result = await fastify.prisma.$transaction(async (tx) => {
           let vendorId: string | null = incomingPreferredVendorId ?? null;
 
@@ -195,6 +205,7 @@ async function adminInventoryCreateRoutes(
               name,
               description: notes ?? null,
               category,
+              type,
               hsnCode,
               gst: new Prisma.Decimal(gst),
               unit,
@@ -216,7 +227,7 @@ async function adminInventoryCreateRoutes(
               companyId,
               materialId: material.id,
 
-              warehouseId,
+             
               binId: binId ?? null,
 
               batchNo: batchNo ?? null,
@@ -241,7 +252,6 @@ async function adminInventoryCreateRoutes(
 
           return inventory;
         });
-
         // =========================================
         // Fetch Created Inventory
         // =========================================
@@ -260,7 +270,7 @@ async function adminInventoryCreateRoutes(
         adminLogs.info("Inventory Item created successfully", {
           inventoryId: result.id,
           materialCode,
-          createdBy: request.user.id,
+          createdBy: request.user.id, // ✅ admin → user
         });
 
         return reply.status(201).send({

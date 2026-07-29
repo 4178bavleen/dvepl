@@ -53,14 +53,14 @@ export const inventoryStocksConfig = {
   api: inventoryApi.stocks,
   selectOptions: {
     materialId: materialApi.materials.list,
-    warehouseId: inventoryApi.warehouses.list,
+    // warehouseId: inventoryApi.warehouses.list,
   },
   tableName: 'inventories',
   moduleName: 'Stock Record',
   pluralName: 'Stock Ledger',
   zodSchema: z.object({
     materialId: z.string().min(1, 'Select material'),
-    warehouseId: z.string().min(1, 'Select location'),
+    // warehouseId: z.string().min(1, 'Select location'),
     batchNo: z.string().optional().nullable(),
     serialNo: z.string().optional().nullable(),
     quantity: z.coerce.number().nonnegative(),
@@ -72,7 +72,7 @@ export const inventoryStocksConfig = {
   }),
   defaultFormValues: {
     materialId: '',
-    warehouseId: '',
+    // warehouseId: '',
     batchNo: '',
     serialNo: '',
     quantity: '0',
@@ -137,7 +137,7 @@ export const inventoryStocksConfig = {
 export const stockTransfersConfig = {
   api: inventoryApi.transfers,
   selectOptions: {
-    fromWarehouseId: inventoryApi.warehouses.list,
+    // fromWarehouseId: inventoryApi.warehouses.list,
     toWarehouseId: inventoryApi.warehouses.list,
     materialId: materialApi.materials.list,
     requestedById: securityApi.users.list,
@@ -147,8 +147,8 @@ export const stockTransfersConfig = {
   pluralName: 'Stock Transfers',
   zodSchema: z.object({
     transferNo: z.string().min(2, 'Enter transfer number'),
-    fromWarehouseId: z.string().min(1, 'Select source warehouse'),
-    toWarehouseId: z.string().min(1, 'Select target warehouse'),
+    // fromWarehouseId: z.string().min(1, 'Select source warehouse'),
+    // toWarehouseId: z.string().min(1, 'Select target warehouse'),
     materialId: z.string().min(1, 'Select material'),
     quantity: z.coerce.number().positive(),
     batchNo: z.string().optional().nullable(),
@@ -158,8 +158,8 @@ export const stockTransfersConfig = {
   }),
   defaultFormValues: {
     transferNo: '',
-    fromWarehouseId: '',
-    toWarehouseId: '',
+    // fromWarehouseId: '',
+    // toWarehouseId: '',
     materialId: '',
     quantity: '1',
     batchNo: '',

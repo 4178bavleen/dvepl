@@ -26,18 +26,22 @@ async function adminInventoryReadRoutes(
         const companyId = request.user.companyId;
 
         const items = await fastify.prisma.inventory.findMany({
-          where: { companyId, deletedAt: null },
-          include: {
-            material: {
-              include: {
-                preferredVendor: true,
-              },
-            },
-            warehouse: true,
-            bin: true,
-          },
-          orderBy: { createdAt: "desc" },
-        });
+  where: {
+    companyId,
+    deletedAt: null,
+  },
+  include: {
+    material: {
+      include: {
+        preferredVendor: true,
+      },
+    },
+    bin: true,
+  },
+  orderBy: {
+    createdAt: "desc",
+  },
+});
 
         return reply.status(200).send({
           success: true,
@@ -85,7 +89,7 @@ async function adminInventoryReadRoutes(
                 preferredVendor: true,
               },
             },
-            warehouse: true,
+            
             bin: true,
           },
         });

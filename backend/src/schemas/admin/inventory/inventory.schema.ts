@@ -35,7 +35,7 @@ export const inventorySchema = z.object({
 
   preferredVendorId: z.string().uuid().optional().nullable(), // 👈 ADD THIS
 
-  warehouseId: z.string().uuid().optional().nullable(),
+  // warehouseId: z.string().uuid().optional().nullable(),
 
   binId: z.string().uuid().optional().nullable(),
 
@@ -78,7 +78,7 @@ export const inventoryUpdateSchema = z.object({
 
   vendorLeadDays: z.coerce.number().int().min(0).optional(),
 
-  warehouseId: z.string().uuid().optional().nullable(),
+  // warehouseId: z.string().uuid().optional().nullable(),
 
   binId: z.string().uuid().optional().nullable(),
 
