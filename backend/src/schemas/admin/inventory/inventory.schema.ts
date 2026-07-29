@@ -63,6 +63,7 @@ export const inventoryUpdateSchema = z.object({
   type: z.nativeEnum(MaterialType).optional(),
 
   hsnCode: z.string().trim().optional().nullable(),
+  quantity: z.coerce.number().min(0).optional(),
 
   gst: z.coerce.number().min(0).max(100).optional(),
 
@@ -78,17 +79,23 @@ export const inventoryUpdateSchema = z.object({
 
   vendorLeadDays: z.coerce.number().int().min(0).optional(),
 
-  // warehouseId: z.string().uuid().optional().nullable(),
-
   binId: z.string().uuid().optional().nullable(),
 
   unitRate: z.coerce.number().min(0).optional(),
+
+  // ✅ ADD THESE
+  currentStock: z.coerce.number().min(0).optional(),
+
+  openingStock: z.coerce.number().min(0).optional(),
+
+  location: z.string().trim().optional().nullable(),
 
   batchNo: z.string().trim().optional().nullable(),
 
   serialNo: z.string().trim().optional().nullable(),
 
   barcode: z.string().trim().optional().nullable(),
+
   preferredVendorId: z.string().uuid().optional().nullable(),
 
   qrCode: z.string().trim().optional().nullable(),

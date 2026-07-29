@@ -113,63 +113,58 @@ async function adminInventoryUpdateRoutes(
           await tx.material.update({
             where: { id: existing.materialId },
             data: {
-              name: data.name ?? undefined,
+              // binId: data.binId ?? undefined,
 
-              description: data.notes === undefined ? undefined : data.notes,
-
-              category: data.category ?? undefined,
-
-              hsnCode: data.hsnCode ?? undefined,
-
-              preferredVendor:
-                data.preferredVendorId === undefined
-                  ? undefined
-                  : data.preferredVendorId === null ||
-                      data.preferredVendorId === ""
-                    ? { disconnect: true }
-                    : { connect: { id: data.preferredVendorId } },
-
-              reorderLevel:
-                data.reorderLevel !== undefined
-                  ? new Prisma.Decimal(data.reorderLevel)
-                  : undefined,
-
-              reorderQty:
-                data.reorderQty !== undefined
-                  ? new Prisma.Decimal(data.reorderQty)
-                  : undefined,
-
-              leadDays: data.vendorLeadDays ?? undefined,
-
-              gst:
-                data.gst !== undefined
-                  ? new Prisma.Decimal(data.gst)
-                  : undefined,
-
-              unit: data.unit ?? undefined,
-
-              weight:
-                data.weight === undefined
-                  ? undefined
-                  : data.weight !== null
-                    ? new Prisma.Decimal(data.weight)
-                    : null,
-
-              color: data.color ?? undefined,
-            },
-          });
-
-          const inv = await tx.inventory.update({
-            where: { id },
-            data: {
-              binId: data.binId === undefined ? undefined : data.binId,
-
-              
+              quantity:
+                data.currentStock !== undefined
+                  ? new Prisma.Decimal(data.currentStock)
+                  : data.openingStock !== undefined
+                    ? new Prisma.Decimal(data.openingStock)
+                    : undefined,
 
               unitPrice:
                 data.unitRate !== undefined
                   ? new Prisma.Decimal(data.unitRate)
                   : undefined,
+
+              location: data.location === undefined ? undefined : data.location,
+
+              batchNo: data.batchNo ?? undefined,
+
+              serialNo: data.serialNo ?? undefined,
+
+              barcode: data.barcode ?? undefined,
+
+              qrCode: data.qrCode ?? undefined,
+
+              expiryDate:
+                data.expiryDate === undefined
+                  ? undefined
+                  : data.expiryDate
+                    ? new Date(data.expiryDate)
+                    : null,
+            },
+          });
+          const inv = await tx.inventory.update({
+            where: { id },
+            data: {
+              quantity:
+                data.currentStock !== undefined
+                  ? new Prisma.Decimal(data.currentStock)
+                  : data.quantity !== undefined
+                    ? new Prisma.Decimal(data.quantity)
+                    : data.openingStock !== undefined
+                      ? new Prisma.Decimal(data.openingStock)
+                      : undefined,
+
+              unitPrice:
+                data.unitRate !== undefined
+                  ? new Prisma.Decimal(data.unitRate)
+                  : undefined,
+
+              location: data.location === undefined ? undefined : data.location,
+
+              binId: data.binId === undefined ? undefined : data.binId,
 
               batchNo: data.batchNo === undefined ? undefined : data.batchNo,
 
