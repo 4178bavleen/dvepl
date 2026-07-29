@@ -325,6 +325,16 @@ export function VendorsPage() {
   const [poItems, setPoItems] = useState<POItem[]>([]);
   const [selectedRevisionId, setSelectedRevisionId] = useState<string | null>(null);
 
+  // View PO preview (frontend-only)
+  const [isPoPreviewOpen, setIsPoPreviewOpen] = useState(false);
+
+  // PO Placed — send via WhatsApp/Email (frontend-only, no backend integration)
+  const [isPoPlacedDialogOpen, setIsPoPlacedDialogOpen] = useState(false);
+  const [placeSendWhatsapp, setPlaceSendWhatsapp] = useState(true);
+  const [placeSendEmail, setPlaceSendEmail] = useState(false);
+  const [placePhone, setPlacePhone] = useState('');
+  const [placeEmail, setPlaceEmail] = useState('');
+
   // Filter vendors
   const filteredVendors = useMemo(() => {
     if (!search) return vendors;
@@ -511,7 +521,7 @@ export function VendorsPage() {
             onClick={() => openNewDataEntry(vendor)}
             className="bg-[#e6f4ea] hover:bg-[#d2ebd9] text-[#137333] border border-[#a8d8b2] px-2.5 py-1 rounded-md text-xs font-semibold cursor-pointer transition-colors duration-150"
           >
-            ＋ PO Entry
+            ＋ Generate PO
           </button>
         );
       }
@@ -666,7 +676,7 @@ export function VendorsPage() {
       await apiService.vendors.delete(vendorToDelete);
       const list = await apiService.vendors.list();
       setVendors(list);
-      
+
       const savedRev = localStorage.getItem('dvepl_po_revisions');
       if (savedRev) {
         const revList: PORevision[] = JSON.parse(savedRev);
@@ -944,11 +954,11 @@ export function VendorsPage() {
       toast.error('Add at least one line item before saving');
       return;
     }
-    const invalidItems = poItems.filter(item => 
-      !item.description.trim() || 
-      !item.hsnCode.trim() || 
-      !item.catNo.trim() || 
-      item.qty <= 0 || 
+    const invalidItems = poItems.filter(item =>
+      !item.description.trim() ||
+      !item.hsnCode.trim() ||
+      !item.catNo.trim() ||
+      item.qty <= 0 ||
       item.rate <= 0
     );
     if (invalidItems.length > 0) {
@@ -966,9 +976,18 @@ export function VendorsPage() {
       return;
     }
 
-    const nextRevisionNo = revisions
-      .filter(r => r.vendorId === activePoVendor.id && r.poNumber === poNumber)
-      .length + 1;
+    // Get all revisions for this Vendor + PO
+    const existingRevisions = revisions.filter(
+      (r) =>
+        r.vendorId === activePoVendor.id &&
+        r.poNumber === poNumber
+    );
+
+    // First revision starts from R0
+    const nextRevisionNo =
+      existingRevisions.length === 0
+        ? 0
+        : Math.max(...existingRevisions.map((r) => r.revisionNo)) + 1;
 
     const newRevision: PORevision = {
       id: `rev-${Date.now()}`,
@@ -1002,7 +1021,7 @@ export function VendorsPage() {
       const list = await apiService.revisions.list();
       setRevisions(list);
       setSelectedRevisionId(newRevision.id);
-      toast.success(`Revision v${newRevision.revisionNo} saved successfully`);
+      toast.success(`Revision R${newRevision.revisionNo} saved successfully`);
     } catch (err: any) {
       toast.error('Failed to save PO revision');
     }
@@ -1053,26 +1072,14 @@ export function VendorsPage() {
     setDeleteRevisionConfirmOpen(true);
   };
 
-  const triggerExport = (format: string) => {
-    if (!activePoVendor) return;
+  // Builds the printable PO HTML document from current (dynamic) form state.
+  // Shared by the PDF export and the on-screen "View PO" preview.
+  const buildPoDocumentHtml = (): string => {
+    if (!activePoVendor) return '';
 
-    if (format === 'pdf') {
-      const iframe = document.createElement('iframe');
-      iframe.style.position = 'fixed';
-      iframe.style.width = '0px';
-      iframe.style.height = '0px';
-      iframe.style.border = 'none';
-      document.body.appendChild(iframe);
-      
-      const doc = iframe.contentWindow?.document || iframe.contentDocument;
-      if (!doc) {
-        toast.error('Unable to create offscreen document print context.');
-        return;
-      }
-      
-      const customColsTh = customColumns.map(c => `<th>${c}</th>`).join('');
-      
-      const itemsHtml = poItems.map((item, idx) => {
+    const customColsTh = customColumns.map(c => `<th>${c}</th>`).join('');
+
+    const itemsHtml = poItems.map((item, idx) => {
         const customColsTd = customColumns.map(c => `<td>${item[c] || '—'}</td>`).join('');
         return `
           <tr>
@@ -1089,8 +1096,8 @@ export function VendorsPage() {
           </tr>
         `;
       }).join('');
-      
-      doc.write(`
+
+      return `
         <html>
           <head>
             <title>Purchase Order - ${poNumber}</title>
@@ -1133,7 +1140,7 @@ export function VendorsPage() {
                 <p style="margin: 2px 0 0 0; font-size: 12px;"><strong>Status:</strong> ${poStatus}</p>
               </div>
             </div>
-            
+
             <div class="meta-grid">
               <div>
                 <h3 class="meta-title">Order Placed To (Vendor):</h3>
@@ -1153,7 +1160,7 @@ export function VendorsPage() {
                 </div>
               </div>
             </div>
-            
+
             <table>
               <thead>
                 <tr>
@@ -1174,7 +1181,7 @@ export function VendorsPage() {
                 ${poItems.length === 0 ? '<tr><td colspan="10" style="text-align: center; padding: 15px; color: #6b7280;">No items added to this purchase order.</td></tr>' : ''}
               </tbody>
             </table>
-            
+
             <div class="terms-box">
               <h4 style="margin: 0 0 2px 0; color: #1f2937; font-size: 11px; text-transform: uppercase;">Terms & Conditions:</h4>
               <p style="margin: 0; white-space: pre-wrap; font-size: 9.5px; line-height: 1.2;">${terms}</p>
@@ -1189,7 +1196,7 @@ export function VendorsPage() {
               <div class="totals-row"><span>Advance Paid:</span> <span>₹${advance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
               <div class="totals-row" style="font-weight: 700; color: #111827; border-top: 1px solid #e5e7eb; padding-top: 4px;"><span>Balance Due:</span> <span>₹${totals.balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
             </div>
-            
+
             <div class="sig-section">
               <div class="sig-box" style="border: none; text-align: left;">
                 <p class="sig-desc">Prepared By: DVEPL Team</p>
@@ -1201,9 +1208,35 @@ export function VendorsPage() {
             </div>
           </body>
         </html>
-      `);
+      `;
+  };
+
+  const triggerExport = (format: string) => {
+    if (!activePoVendor) return;
+
+    if (format === 'pdf') {
+      const html = buildPoDocumentHtml();
+      if (!html) {
+        toast.error('Select a vendor first.');
+        return;
+      }
+
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.width = '0px';
+      iframe.style.height = '0px';
+      iframe.style.border = 'none';
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentWindow?.document || iframe.contentDocument;
+      if (!doc) {
+        toast.error('Unable to create offscreen document print context.');
+        return;
+      }
+
+      doc.write(html);
       doc.close();
-      
+
       setTimeout(() => {
         iframe.contentWindow?.focus();
         iframe.contentWindow?.print();
@@ -1246,6 +1279,87 @@ export function VendorsPage() {
       y += 20; ctx.fillStyle = '#111827'; ctx.font = 'bold 13px sans-serif'; ctx.fillText(companyDetails.signatory, 700, y); ctx.font = '11px sans-serif'; ctx.fillStyle = '#4b5563'; ctx.fillText('Authorized Signatory', 700, y + 16);
       const downloadAnchor = document.createElement('a'); downloadAnchor.setAttribute("href", canvas.toDataURL(format === 'png' ? 'image/png' : 'image/jpeg', 0.95)); downloadAnchor.setAttribute("download", `${poNumber}.${format}`); document.body.appendChild(downloadAnchor); downloadAnchor.click(); downloadAnchor.remove();
     }
+  };
+
+  const openPoPreview = () => {
+    if (!activePoVendor) {
+      toast.error('No vendor context found.');
+      return;
+    }
+    if (poItems.length === 0) {
+      toast.error('Add at least one line item to preview the PO.');
+      return;
+    }
+    setIsPoPreviewOpen(true);
+  };
+
+  const buildPoMessageText = (): string => {
+    const itemsLine = poItems.length === 1 ? '1 item' : poItems.length + ' items';
+    const lines = [
+      'PURCHASE ORDER',
+      'PO Number: ' + poNumber,
+      'Date: ' + poDate,
+      'Vendor: ' + (activePoVendor?.name || ''),
+      'Items: ' + itemsLine,
+      'Grand Total: Rs. ' + totals.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 }),
+      'Payment Terms: ' + paymentTerms,
+      'Material Status: ' + materialStatus,
+    ];
+    if (remarks) lines.push('Remarks: ' + remarks);
+    lines.push('');
+    lines.push('Please confirm receipt of this Purchase Order.');
+    lines.push('');
+    lines.push('- ' + companyDetails.name);
+    return lines.join('\n');
+  };
+
+  const openPoPlacedDialog = () => {
+    if (!activePoVendor) {
+      toast.error('No vendor context found.');
+      return;
+    }
+    if (poItems.length === 0) {
+      toast.error('Add at least one line item before placing the PO.');
+      return;
+    }
+    setPlacePhone(activePoVendor.phone || '');
+    setPlaceEmail(activePoVendor.email || '');
+    setPlaceSendWhatsapp(true);
+    setPlaceSendEmail(false);
+    setIsPoPlacedDialogOpen(true);
+  };
+
+  const handleConfirmPoPlaced = () => {
+    if (!placeSendWhatsapp && !placeSendEmail) {
+      toast.error('Select at least one channel (WhatsApp or Email).');
+      return;
+    }
+    if (placeSendWhatsapp && !placePhone.trim()) {
+      toast.error('Enter a WhatsApp number to send the PO.');
+      return;
+    }
+    if (placeSendEmail && !placeEmail.trim()) {
+      toast.error('Enter an email address to send the PO.');
+      return;
+    }
+
+    const message = buildPoMessageText();
+    const sentChannels: string[] = [];
+
+    if (placeSendWhatsapp) {
+      const cleanPhone = placePhone.replace(/[^\d]/g, '');
+      window.open('https://wa.me/' + cleanPhone + '?text=' + encodeURIComponent(message), '_blank');
+      sentChannels.push('WhatsApp');
+    }
+    if (placeSendEmail) {
+      const subject = 'Purchase Order ' + poNumber + ' from ' + companyDetails.name;
+      window.open('mailto:' + placeEmail + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(message), '_blank');
+      sentChannels.push('Email');
+    }
+
+    setPoStatus('Placed');
+    toast.success('PO marked as Placed - sent via ' + sentChannels.join(' & '));
+    setIsPoPlacedDialogOpen(false);
   };
 
   return (
@@ -1758,6 +1872,71 @@ export function VendorsPage() {
         </DialogContent>
       </Dialog>
 
+      {/* ── VIEW PO PREVIEW (frontend-only) ── */}
+      <Dialog open={isPoPreviewOpen} onOpenChange={setIsPoPreviewOpen}>
+        <DialogContent className="max-w-4xl h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-primary">
+              <Eye className="size-5" />
+              PO Preview — {poNumber}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 border rounded-lg overflow-hidden bg-white">
+            {isPoPreviewOpen && (
+              <iframe title="po-preview" srcDoc={buildPoDocumentHtml()} className="w-full h-full" />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── PO PLACED — send via WhatsApp/Email (frontend-only) ── */}
+      <Dialog open={isPoPlacedDialogOpen} onOpenChange={setIsPoPlacedDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-primary">
+              📨 Place PO — Send to Vendor
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-1">
+            <div className="flex flex-col gap-2">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <Checkbox checked={placeSendWhatsapp} onCheckedChange={(v) => setPlaceSendWhatsapp(!!v)} />
+                Send via WhatsApp
+              </label>
+              {placeSendWhatsapp && (
+                <Input
+                  placeholder="Vendor WhatsApp number (with country code)"
+                  value={placePhone}
+                  onChange={e => setPlacePhone(e.target.value)}
+                  className="ml-6 h-9 text-xs"
+                />
+              )}
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <Checkbox checked={placeSendEmail} onCheckedChange={(v) => setPlaceSendEmail(!!v)} />
+                Send via Email
+              </label>
+              {placeSendEmail && (
+                <Input
+                  placeholder="Vendor email address"
+                  value={placeEmail}
+                  onChange={e => setPlaceEmail(e.target.value)}
+                  className="ml-6 h-9 text-xs"
+                />
+              )}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              This opens WhatsApp/Email with a pre-filled PO summary for you to review and send manually. No data is sent to any server.
+            </p>
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button variant="outline" size="sm" onClick={() => setIsPoPlacedDialogOpen(false)}>Cancel</Button>
+              <Button size="sm" className="bg-primary text-white" onClick={handleConfirmPoPlaced}>Send PO</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* ── PRODUCTS SUPPLIED QUICK VIEW ── */}
       <Dialog open={!!productsQuickViewVendor} onOpenChange={(open) => { if (!open) setProductsQuickViewVendor(null); }}>
         <DialogContent className="max-w-2xl">
@@ -1943,7 +2122,7 @@ export function VendorsPage() {
                   setSelectedVendorForRevisions(null);
                 }}
               >
-                + New Data Entry
+                + Generate PO
               </button>
             </div>
           </div>
@@ -1954,7 +2133,7 @@ export function VendorsPage() {
       {isDataEntryOpen && activePoVendor && (
         <div className="de-overlay" style={deMaximized ? { padding: 0 } : undefined}>
 
-                  <div 
+                  <div
                     className={`de-modal ${deMaximized ? 'rounded-none' : ''}`}
                     style={deMaximized ? { width: '100vw', height: '100vh', maxWidth: '100vw', maxHeight: '100vh' } : undefined}
                   >
@@ -2005,7 +2184,7 @@ export function VendorsPage() {
                           </span>
                         ))}
                         {revisions.filter(r => r.vendorId === activePoVendor.id && r.poNumber === poNumber).length === 0 && (
-                          <span className="de-rev-pill">R1</span>
+                          <span className="de-rev-pill">R0</span>
                         )}
                       </div>
                       <button
@@ -2226,8 +2405,8 @@ export function VendorsPage() {
                                 <th key={c} style={{ minWidth: '100px' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
                                     <span>{c}</span>
-                                    <button 
-                                      onClick={() => handleRemoveCustomColumn(c)} 
+                                    <button
+                                      onClick={() => handleRemoveCustomColumn(c)}
                                       style={{ color: '#ef4444', fontStyle: 'normal', cursor: 'pointer', border: 'none', background: 'none', fontSize: '12px', fontWeight: 'bold' }}
                                       title={`Remove column ${c}`}
                                     >
@@ -2358,7 +2537,9 @@ export function VendorsPage() {
                       <div className="de-footer-actions">
                         <button className="de-tbtn" style={{ padding: '10px 18px', fontSize: '13.5px' }} onClick={() => toast.success('Skipped')}>⏭️ Skip</button>
                         <button className="de-tbtn" style={{ padding: '10px 18px', fontSize: '13.5px' }} onClick={() => setIsDataEntryOpen(false)}>Cancel</button>
-                        <button className="btn-save-rev" onClick={handleSavePoRevision}>💾 Save Revision</button>
+                        <button className="de-tbtn" style={{ padding: '10px 18px', fontSize: '13.5px' }} onClick={openPoPreview}>👁️ View PO</button>
+                        <button className="btn-save-rev" onClick={handleSavePoRevision}>✅ PO Ready</button>
+                        <button className="btn-export-pdf" style={{ background: '#0f766e' }} onClick={openPoPlacedDialog}>📨 PO Placed</button>
                         <button className="btn-export-pdf" onClick={() => triggerExport('pdf')}>📘 Export PDF</button>
                       </div>
                     </div>
