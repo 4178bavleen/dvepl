@@ -15,6 +15,316 @@ interface ItemParams {
   id: string;
 }
 
+type RecycleBinModelConfig = {
+  module: string;
+  label: string;
+  delegate: string;
+  select: Record<string, boolean>;
+  where?: Record<string, any>;
+  formatName: (record: Record<string, any>) => string;
+  permanentDelete?: (fastify: FastifyInstance, id: string) => Promise<void>;
+};
+
+const recycleBinModels: RecycleBinModelConfig[] = [
+  {
+    module: "company",
+    label: "Company",
+    delegate: "company",
+    select: { id: true, name: true, email: true, deletedAt: true, updatedAt: true },
+    formatName: (record) => record.name || record.email || "Company Record",
+  },
+  {
+    module: "branch",
+    label: "Branch",
+    delegate: "branch",
+    select: { id: true, name: true, code: true, deletedAt: true, updatedAt: true },
+    formatName: (record) => `${record.name || "Branch"}${record.code ? ` (${record.code})` : ""}`,
+  },
+  {
+    module: "department",
+    label: "Department",
+    delegate: "department",
+    select: { id: true, name: true, code: true, deletedAt: true, updatedAt: true },
+    formatName: (record) => `${record.name || "Department"}${record.code ? ` (${record.code})` : ""}`,
+  },
+  {
+    module: "team",
+    label: "Team",
+    delegate: "team",
+    select: { id: true, name: true, deletedAt: true, updatedAt: true },
+    formatName: (record) => record.name || "Team Record",
+  },
+  {
+    module: "designation",
+    label: "Designation",
+    delegate: "designation",
+    select: { id: true, title: true, deletedAt: true, updatedAt: true },
+    formatName: (record) => record.title || "Designation Record",
+  },
+  {
+    module: "costcenter",
+    label: "Cost Center",
+    delegate: "costCenter",
+    select: { id: true, name: true, code: true, deletedAt: true, updatedAt: true },
+    formatName: (record) => `${record.name || "Cost Center"}${record.code ? ` (${record.code})` : ""}`,
+  },
+  {
+    module: "user",
+    label: "User",
+    delegate: "user",
+    select: { id: true, name: true, email: true, deletedAt: true, updatedAt: true },
+    formatName: (record) => `${record.name || "User"}${record.email ? ` (${record.email})` : ""}`,
+  },
+  {
+    module: "role",
+    label: "Role",
+    delegate: "role",
+    select: { id: true, name: true, deletedAt: true, updatedAt: true },
+    formatName: (record) => record.name || "Role Record",
+  },
+  {
+    module: "employee",
+    label: "Employee",
+    delegate: "employee",
+    select: { id: true, employeeCode: true, firstName: true, lastName: true, deletedAt: true, updatedAt: true },
+    formatName: (record) => `${[record.firstName, record.lastName].filter(Boolean).join(" ") || "Employee"}${record.employeeCode ? ` (${record.employeeCode})` : ""}`,
+  },
+  {
+    module: "shift",
+    label: "Shift",
+    delegate: "shift",
+    select: { id: true, name: true, deletedAt: true, updatedAt: true },
+    formatName: (record) => record.name || "Shift Record",
+  },
+  {
+    module: "customer",
+    label: "Customer",
+    delegate: "customer",
+    select: { id: true, name: true, gst: true, deletedAt: true, updatedAt: true },
+    formatName: (record) => `${record.name || "Customer"}${record.gst ? ` (${record.gst})` : ""}`,
+  },
+  {
+    module: "contact",
+    label: "Contact",
+    delegate: "contactPerson",
+    select: { id: true, name: true, email: true, phone: true, deletedAt: true, updatedAt: true },
+    formatName: (record) => `${record.name || "Contact"}${record.email || record.phone ? ` (${record.email || record.phone})` : ""}`,
+  },
+  {
+    module: "tender",
+    label: "Tender",
+    delegate: "tender",
+    select: { id: true, tenderNo: true, tenderCode: true, title: true, deletedAt: true, updatedAt: true },
+    formatName: (record) => record.title || record.tenderNo || record.tenderCode || "Tender Record",
+  },
+  {
+    module: "tenderrequest",
+    label: "Tender Request",
+    delegate: "tenderRequest",
+    select: { id: true, title: true, deletedAt: true, updatedAt: true },
+    formatName: (record) => record.title || "Tender Request Record",
+  },
+  {
+    module: "section",
+    label: "Section",
+    delegate: "section",
+    select: { id: true, name: true, code: true, deletedAt: true, updatedAt: true },
+    formatName: (record) => `${record.name || "Section"}${record.code ? ` (${record.code})` : ""}`,
+  },
+  {
+    module: "division",
+    label: "Division",
+    delegate: "division",
+    select: { id: true, name: true, code: true, deletedAt: true, updatedAt: true },
+    formatName: (record) => `${record.name || "Division"}${record.code ? ` (${record.code})` : ""}`,
+  },
+  {
+    module: "subdivision",
+    label: "Sub Division",
+    delegate: "subDivision",
+    select: { id: true, name: true, code: true, deletedAt: true, updatedAt: true },
+    formatName: (record) => `${record.name || "Sub Division"}${record.code ? ` (${record.code})` : ""}`,
+  },
+  {
+    module: "order",
+    label: "Sales Order",
+    delegate: "salesOrder",
+    select: { id: true, dveplCode: true, partyName: true, deletedAt: true, updatedAt: true },
+    formatName: (record) => `${record.dveplCode || "Sales Order"}${record.partyName ? ` - ${record.partyName}` : ""}`,
+    permanentDelete: async (fastify, id) => {
+      await fastify.prisma.salesOrderItem.deleteMany({ where: { salesOrderId: id } });
+      await (fastify.prisma as any).salesOrder.delete({ where: { id } });
+    },
+  },
+  {
+    module: "task",
+    label: "Task",
+    delegate: "task",
+    select: { id: true, title: true, deletedAt: true, updatedAt: true },
+    formatName: (record) => record.title || "Task Record",
+  },
+  {
+    module: "payment",
+    label: "Payment",
+    delegate: "payment",
+    select: { id: true, paymentNo: true, amount: true, deletedAt: true, updatedAt: true },
+    formatName: (record) => record.paymentNo || "Payment Record",
+  },
+  {
+    module: "vendor",
+    label: "Vendor",
+    delegate: "vendor",
+    select: { id: true, name: true, email: true, deletedAt: true, updatedAt: true },
+    formatName: (record) => record.name || record.email || "Vendor Profile",
+  },
+  {
+    module: "customfield",
+    label: "Custom Field",
+    delegate: "customField",
+    select: { id: true, name: true, module: true, deletedAt: true, updatedAt: true },
+    formatName: (record) => `Custom Field${record.module ? ` (${record.module})` : ""}: ${record.name || "Field"}`,
+    permanentDelete: async (fastify, id) => {
+      await fastify.prisma.customFieldOption.deleteMany({ where: { customFieldId: id } });
+      await fastify.prisma.customFieldValue.deleteMany({ where: { customFieldId: id } });
+      await (fastify.prisma as any).customField.delete({ where: { id } });
+    },
+  },
+  {
+    module: "permissiongroup",
+    label: "Permission Group",
+    delegate: "permissionGroup",
+    select: { id: true, name: true, deletedAt: true },
+    formatName: (record) => record.name || "Permission Group",
+  },
+  {
+    module: "employeecontact",
+    label: "Employee Contact",
+    delegate: "employeeContact",
+    select: { id: true, type: true, value: true, deletedAt: true },
+    formatName: (record) => `${record.type || "Contact"}: ${record.value || "Employee Contact"}`,
+  },
+  {
+    module: "employeeemergencycontact",
+    label: "Employee Emergency Contact",
+    delegate: "employeeEmergencyContact",
+    select: { id: true, name: true, relationship: true, phone: true, deletedAt: true },
+    formatName: (record) => `${record.name || "Emergency Contact"}${record.phone ? ` (${record.phone})` : ""}`,
+  },
+  {
+    module: "employeeeducation",
+    label: "Employee Education",
+    delegate: "employeeEducation",
+    select: { id: true, degree: true, institution: true, deletedAt: true },
+    formatName: (record) => `${record.degree || "Education"}${record.institution ? ` - ${record.institution}` : ""}`,
+  },
+  {
+    module: "employeeexperience",
+    label: "Employee Experience",
+    delegate: "employeeExperience",
+    select: { id: true, companyName: true, designation: true, deletedAt: true },
+    formatName: (record) => `${record.designation || "Experience"}${record.companyName ? ` at ${record.companyName}` : ""}`,
+  },
+  {
+    module: "employeedocument",
+    label: "Employee Document",
+    delegate: "employeeDocument",
+    select: { id: true, documentType: true, fileName: true, deletedAt: true },
+    formatName: (record) => `${record.documentType || "Document"}${record.fileName ? ` - ${record.fileName}` : ""}`,
+  },
+  {
+    module: "employeeshift",
+    label: "Employee Shift Assignment",
+    delegate: "employeeShift",
+    select: { id: true, effectiveFrom: true, effectiveTo: true, deletedAt: true },
+    formatName: (record) => `Shift Assignment${record.effectiveFrom ? ` from ${new Date(record.effectiveFrom).toLocaleDateString()}` : ""}`,
+  },
+  {
+    module: "holiday",
+    label: "Holiday",
+    delegate: "holiday",
+    select: { id: true, name: true, date: true, deletedAt: true },
+    formatName: (record) => `${record.name || "Holiday"}${record.date ? ` (${new Date(record.date).toLocaleDateString()})` : ""}`,
+  },
+  {
+    module: "attendance",
+    label: "Attendance",
+    delegate: "attendance",
+    select: { id: true, date: true, status: true, deletedAt: true },
+    formatName: (record) => `Attendance${record.date ? ` - ${new Date(record.date).toLocaleDateString()}` : ""}${record.status ? ` (${record.status})` : ""}`,
+  },
+  {
+    module: "leave",
+    label: "Leave",
+    delegate: "leave",
+    select: { id: true, leaveType: true, fromDate: true, toDate: true, deletedAt: true },
+    formatName: (record) => `${record.leaveType || "Leave"}${record.fromDate ? ` from ${new Date(record.fromDate).toLocaleDateString()}` : ""}`,
+  },
+  {
+    module: "salary",
+    label: "Salary",
+    delegate: "salary",
+    select: { id: true, effectiveFrom: true, ctc: true, deletedAt: true },
+    formatName: (record) => `Salary${record.effectiveFrom ? ` from ${new Date(record.effectiveFrom).toLocaleDateString()}` : ""}`,
+  },
+  {
+    module: "communication",
+    label: "Communication History",
+    delegate: "communicationHistory",
+    select: { id: true, type: true, subject: true, deletedAt: true },
+    formatName: (record) => `${record.type || "Communication"}${record.subject ? ` - ${record.subject}` : ""}`,
+  },
+  {
+    module: "tenderfile",
+    label: "Tender File",
+    delegate: "tenderFile",
+    select: { id: true, fileName: true, fileType: true, deletedAt: true },
+    formatName: (record) => record.fileName || "Tender File",
+  },
+  {
+    module: "tenderactivity",
+    label: "Tender Activity",
+    delegate: "tenderActivity",
+    select: { id: true, action: true, deletedAt: true },
+    formatName: (record) => `Tender Activity${record.action ? ` (${record.action})` : ""}`,
+  },
+  {
+    module: "governmentdepartment",
+    label: "Government Department",
+    delegate: "governmentDepartment",
+    select: { id: true, name: true, code: true, shortName: true, deletedAt: true },
+    formatName: (record) => record.name || record.shortName || record.code || "Government Department",
+  },
+  {
+    module: "tenderrequestactivity",
+    label: "Tender Request Activity",
+    delegate: "auditLog",
+    select: { id: true, module: true, action: true, recordId: true, deletedAt: true },
+    where: { module: "TenderRequest" },
+    formatName: (record) => `Tender Request Activity${record.action ? ` (${record.action})` : ""}`,
+  },
+  {
+    module: "referencecodecounter",
+    label: "Reference Code Counter",
+    delegate: "referenceCodeCounter",
+    select: { id: true, prefix: true, lastSequence: true, deletedAt: true },
+    formatName: (record) => `${record.prefix || "Reference Code Counter"} (${record.lastSequence ?? 0})`,
+  },
+];
+
+const recycleBinModelMap = new Map(
+  recycleBinModels.map((config) => [config.module, config])
+);
+
+const getDelegate = (fastify: FastifyInstance, config: RecycleBinModelConfig) => {
+  const delegate = (fastify.prisma as any)[config.delegate];
+
+  if (!delegate) {
+    throw new Error(`Recycle bin delegate not found: ${config.delegate}`);
+  }
+
+  return delegate;
+};
+
 export async function recycleBinRoutes(
   fastify: FastifyInstance,
   options: FastifyPluginOptions
@@ -32,83 +342,42 @@ export async function recycleBinRoutes(
     async (request: FastifyRequest<{ Querystring: Query }>, reply: FastifyReply) => {
       try {
         const { module } = request.query;
+        const normalizedModule = module?.toLowerCase();
+        const configs = normalizedModule
+          ? recycleBinModels.filter((config) => config.module === normalizedModule)
+          : recycleBinModels;
 
-        const deletedOrders = (!module || module === "order")
-          ? await fastify.prisma.salesOrder.findMany({
-              where: { NOT: { deletedAt: null } },
-              select: { id: true, dveplCode: true, partyName: true, deletedAt: true, updatedAt: true },
-            })
-          : [];
+        if (normalizedModule && configs.length === 0) {
+          return reply.status(400).send({ success: false, message: "Invalid module specified." });
+        }
 
-        const deletedTasks = (!module || module === "task")
-          ? await fastify.prisma.task.findMany({
-              where: { NOT: { deletedAt: null } },
-              select: { id: true, title: true, deletedAt: true, updatedAt: true },
-            })
-          : [];
+        const deletedRecords = await Promise.all(
+          configs.map(async (config) => {
+            const delegate = getDelegate(fastify, config);
+            const records = await delegate.findMany({
+              where: { ...config.where, NOT: { deletedAt: null } },
+              select: config.select,
+            });
 
-        const deletedVendors = (!module || module === "vendor")
-          ? await fastify.prisma.vendor.findMany({
-              where: { NOT: { deletedAt: null } },
-              select: { id: true, name: true, deletedAt: true, updatedAt: true },
-            })
-          : [];
+            return records.map((record: Record<string, any>) => ({
+              id: record.id,
+              module: config.module,
+              moduleLabel: config.label,
+              name: config.formatName(record),
+              deletedBy: "Admin",
+              deletedAt: record.deletedAt,
+            }));
+          })
+        );
 
-        const deletedUsers = (!module || module === "user")
-          ? await fastify.prisma.user.findMany({
-              where: { NOT: { deletedAt: null } },
-              select: { id: true, name: true, email: true, deletedAt: true, updatedAt: true },
-            })
-          : [];
-
-        const deletedCustomFields = (!module || module === "customfield")
-          ? await fastify.prisma.customField.findMany({
-              where: { NOT: { deletedAt: null } },
-              select: { id: true, name: true, module: true, deletedAt: true, updatedAt: true },
-            })
-          : [];
-
-        const formatted = [
-          ...deletedOrders.map((o) => ({
-            id: o.id,
-            module: "order",
-            name: `${o.dveplCode || "Sales Order"} - ${o.partyName || "Client"}`,
-            deletedBy: "Admin",
-            deletedAt: o.deletedAt,
-          })),
-          ...deletedTasks.map((t) => ({
-            id: t.id,
-            module: "task",
-            name: t.title || "Task Record",
-            deletedBy: "Admin",
-            deletedAt: t.deletedAt,
-          })),
-          ...deletedVendors.map((v) => ({
-            id: v.id,
-            module: "vendor",
-            name: v.name || "Vendor Profile",
-            deletedBy: "Admin",
-            deletedAt: v.deletedAt,
-          })),
-          ...deletedUsers.map((u) => ({
-            id: u.id,
-            module: "user",
-            name: `${u.name} (${u.email})`,
-            deletedBy: "System Admin",
-            deletedAt: u.deletedAt,
-          })),
-          ...deletedCustomFields.map((cf) => ({
-            id: cf.id,
-            module: "customfield",
-            name: `Custom Field (${cf.module}): ${cf.name}`,
-            deletedBy: "Admin",
-            deletedAt: cf.deletedAt,
-          })),
-        ];
+        const formatted = deletedRecords
+          .flat()
+          .sort((a, b) => new Date(b.deletedAt).getTime() - new Date(a.deletedAt).getTime());
 
         return reply.status(200).send({
           success: true,
           data: formatted,
+          modules: recycleBinModels.map(({ module, label }) => ({ module, label })),
         });
       } catch (error) {
         adminLogs.error("Failed to fetch recycle bin items", { error });
@@ -132,25 +401,22 @@ export async function recycleBinRoutes(
     },
     async (request: FastifyRequest<{ Params: ItemParams }>, reply: FastifyReply) => {
       try {
-        const { module, id } = request.params;
+        const { id } = request.params;
+        const module = request.params.module.toLowerCase();
+        const config = recycleBinModelMap.get(module);
 
-        if (module === "order") {
-          await fastify.prisma.salesOrder.update({ where: { id }, data: { deletedAt: null } });
-        } else if (module === "task") {
-          await fastify.prisma.task.update({ where: { id }, data: { deletedAt: null } });
-        } else if (module === "vendor") {
-          await fastify.prisma.vendor.update({ where: { id }, data: { deletedAt: null } });
-        } else if (module === "user") {
-          await fastify.prisma.user.update({ where: { id }, data: { deletedAt: null } });
-        } else if (module === "customfield") {
-          await fastify.prisma.customField.update({ where: { id }, data: { deletedAt: null } });
-        } else {
+        if (!config) {
           return reply.status(400).send({ success: false, message: "Invalid module specified." });
         }
 
+        await getDelegate(fastify, config).update({
+          where: { id },
+          data: { deletedAt: null, ...(module === "company" ? { isActive: true } : {}) },
+        });
+
         return reply.status(200).send({
           success: true,
-          message: `${module} record restored successfully.`,
+          message: `${config.label} record restored successfully.`,
         });
       } catch (error) {
         adminLogs.error("Failed to restore recycle bin item", { error });
@@ -174,28 +440,23 @@ export async function recycleBinRoutes(
     },
     async (request: FastifyRequest<{ Params: ItemParams }>, reply: FastifyReply) => {
       try {
-        const { module, id } = request.params;
+        const { id } = request.params;
+        const module = request.params.module.toLowerCase();
+        const config = recycleBinModelMap.get(module);
 
-        if (module === "order") {
-          await fastify.prisma.salesOrderItem.deleteMany({ where: { salesOrderId: id } });
-          await fastify.prisma.salesOrder.delete({ where: { id } });
-        } else if (module === "task") {
-          await fastify.prisma.task.delete({ where: { id } });
-        } else if (module === "vendor") {
-          await fastify.prisma.vendor.delete({ where: { id } });
-        } else if (module === "user") {
-          await fastify.prisma.user.delete({ where: { id } });
-        } else if (module === "customfield") {
-          await fastify.prisma.customFieldOption.deleteMany({ where: { customFieldId: id } });
-          await fastify.prisma.customFieldValue.deleteMany({ where: { customFieldId: id } });
-          await fastify.prisma.customField.delete({ where: { id } });
-        } else {
+        if (!config) {
           return reply.status(400).send({ success: false, message: "Invalid module specified." });
+        }
+
+        if (config.permanentDelete) {
+          await config.permanentDelete(fastify, id);
+        } else {
+          await getDelegate(fastify, config).delete({ where: { id } });
         }
 
         return reply.status(200).send({
           success: true,
-          message: `${module} record permanently deleted.`,
+          message: `${config.label} record permanently deleted.`,
         });
       } catch (error) {
         adminLogs.error("Failed to permanently delete item", { error });
@@ -219,25 +480,21 @@ export async function recycleBinRoutes(
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const deletedOrderIds = (
-          await fastify.prisma.salesOrder.findMany({
-            where: { NOT: { deletedAt: null } },
+        for (const config of recycleBinModels) {
+          const delegate = getDelegate(fastify, config);
+          const deletedRecords = await delegate.findMany({
+            where: { ...config.where, NOT: { deletedAt: null } },
             select: { id: true },
-          })
-        ).map((o) => o.id);
+          });
 
-        if (deletedOrderIds.length > 0) {
-          await fastify.prisma.salesOrderItem.deleteMany({
-            where: { salesOrderId: { in: deletedOrderIds } },
-          });
-          await fastify.prisma.salesOrder.deleteMany({
-            where: { id: { in: deletedOrderIds } },
-          });
+          for (const record of deletedRecords) {
+            if (config.permanentDelete) {
+              await config.permanentDelete(fastify, record.id);
+            } else {
+              await delegate.delete({ where: { id: record.id } });
+            }
+          }
         }
-
-        await fastify.prisma.task.deleteMany({ where: { NOT: { deletedAt: null } } });
-        await fastify.prisma.vendor.deleteMany({ where: { NOT: { deletedAt: null } } });
-        await fastify.prisma.user.deleteMany({ where: { NOT: { deletedAt: null } } });
 
         return reply.status(200).send({
           success: true,

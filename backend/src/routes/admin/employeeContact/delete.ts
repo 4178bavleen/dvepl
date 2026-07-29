@@ -53,10 +53,9 @@ async function deleteEmployeeContactRoute(
           });
         }
 
-        await fastify.prisma.employeeContact.delete({
-          where: {
-            id,
-          },
+        await (fastify.prisma as any).employeeContact.update({
+          where: {             id,           },
+          data: { deletedAt: new Date() },
         });
 
         adminLogs.info("Employee contact deleted successfully", {

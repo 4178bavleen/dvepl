@@ -70,8 +70,8 @@ async function readCommunicationRoutes(
             });
           }
 
-          logs = await fastify.prisma.communicationHistory.findMany({
-            where: { customerId },
+          logs = await (fastify.prisma as any).communicationHistory.findMany({
+            where: { customerId, deletedAt: null },
             orderBy: { createdAt: "desc" },
             include: {
               user: {
@@ -85,8 +85,9 @@ async function readCommunicationRoutes(
           });
         } else {
           // Fetch all communication history logs for this company
-          logs = await fastify.prisma.communicationHistory.findMany({
+          logs = await (fastify.prisma as any).communicationHistory.findMany({
             where: {
+              deletedAt: null,
               customer: {
                 companyId,
                 deletedAt: null,
@@ -159,9 +160,10 @@ async function readCommunicationRoutes(
         //--------------------------------
         // Fetch Log with tenant check
         //--------------------------------
-        const log = await fastify.prisma.communicationHistory.findFirst({
+        const log = await (fastify.prisma as any).communicationHistory.findFirst({
           where: {
             id,
+            deletedAt: null,
             customer: {
               companyId,
               deletedAt: null,

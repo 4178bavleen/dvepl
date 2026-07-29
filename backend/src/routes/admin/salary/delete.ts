@@ -53,10 +53,9 @@ async function deleteSalaryRoute(
           });
         }
 
-        await fastify.prisma.salary.delete({
-          where: {
-            id,
-          },
+        await (fastify.prisma as any).salary.update({
+          where: {             id,           },
+          data: { deletedAt: new Date() },
         });
 
         adminLogs.info("Salary record deleted successfully", {

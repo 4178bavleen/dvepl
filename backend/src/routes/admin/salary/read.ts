@@ -43,8 +43,9 @@ async function readSalaryRoutes(
 
         const { employeeId } = request.query as { employeeId?: string };
 
-        const salaries = await fastify.prisma.salary.findMany({
+        const salaries = await (fastify.prisma as any).salary.findMany({
           where: {
+            deletedAt: null,
             employee: {
               companyId,
               deletedAt: null,
@@ -111,9 +112,10 @@ async function readSalaryRoutes(
 
         const { id } = request.params as { id: string };
 
-        const salary = await fastify.prisma.salary.findFirst({
+        const salary = await (fastify.prisma as any).salary.findFirst({
           where: {
             id,
+            deletedAt: null,
             employee: {
               companyId,
               deletedAt: null,

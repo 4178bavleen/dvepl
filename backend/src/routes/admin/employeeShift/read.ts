@@ -43,8 +43,9 @@ async function readEmployeeShiftRoutes(
 
         const { employeeId } = request.query as { employeeId?: string };
 
-        const assignments = await fastify.prisma.employeeShift.findMany({
+        const assignments = await (fastify.prisma as any).employeeShift.findMany({
           where: {
+            deletedAt: null,
             employee: {
               companyId,
               deletedAt: null,
@@ -109,9 +110,10 @@ async function readEmployeeShiftRoutes(
 
         const { id } = request.params as { id: string };
 
-        const assignment = await fastify.prisma.employeeShift.findFirst({
+        const assignment = await (fastify.prisma as any).employeeShift.findFirst({
           where: {
             id,
+            deletedAt: null,
             employee: {
               companyId,
               deletedAt: null,

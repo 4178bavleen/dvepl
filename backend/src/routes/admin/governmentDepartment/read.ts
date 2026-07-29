@@ -36,9 +36,10 @@ async function readGovernmentDepartmentRoutes(
           });
         }
 
-        const departments = await fastify.prisma.governmentDepartment.findMany({
+        const departments = await (fastify.prisma as any).governmentDepartment.findMany({
           where: {
             companyId,
+            deletedAt: null,
           },
           orderBy: {
             name: "asc",
@@ -91,10 +92,11 @@ async function readGovernmentDepartmentRoutes(
 
         const { id } = request.params as { id: string };
 
-        const department = await fastify.prisma.governmentDepartment.findFirst({
+        const department = await (fastify.prisma as any).governmentDepartment.findFirst({
           where: {
             id,
             companyId,
+            deletedAt: null,
           },
           include: {
             sections: true,

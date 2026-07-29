@@ -43,8 +43,9 @@ async function readEmployeeDocumentRoutes(
 
         const { employeeId } = request.query as { employeeId?: string };
 
-        const documents = await fastify.prisma.employeeDocument.findMany({
+        const documents = await (fastify.prisma as any).employeeDocument.findMany({
           where: {
+            deletedAt: null,
             employee: {
               companyId,
               deletedAt: null,
@@ -108,9 +109,10 @@ async function readEmployeeDocumentRoutes(
 
         const { id } = request.params as { id: string };
 
-        const document = await fastify.prisma.employeeDocument.findFirst({
+        const document = await (fastify.prisma as any).employeeDocument.findFirst({
           where: {
             id,
+            deletedAt: null,
             employee: {
               companyId,
               deletedAt: null,

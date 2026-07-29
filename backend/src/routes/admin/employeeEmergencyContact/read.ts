@@ -43,8 +43,9 @@ async function readEmployeeEmergencyContactRoutes(
 
         const { employeeId } = request.query as { employeeId?: string };
 
-        const contacts = await fastify.prisma.employeeEmergencyContact.findMany({
+        const contacts = await (fastify.prisma as any).employeeEmergencyContact.findMany({
           where: {
+            deletedAt: null,
             employee: {
               companyId,
               deletedAt: null,
@@ -108,9 +109,10 @@ async function readEmployeeEmergencyContactRoutes(
 
         const { id } = request.params as { id: string };
 
-        const contact = await fastify.prisma.employeeEmergencyContact.findFirst({
+        const contact = await (fastify.prisma as any).employeeEmergencyContact.findFirst({
           where: {
             id,
+            deletedAt: null,
             employee: {
               companyId,
               deletedAt: null,

@@ -40,10 +40,9 @@ async function deleteHolidayRoute(
           });
         }
 
-        await fastify.prisma.holiday.delete({
-          where: {
-            id,
-          },
+        await (fastify.prisma as any).holiday.update({
+          where: {             id,           },
+          data: { deletedAt: new Date() },
         });
 
         adminLogs.info("Holiday deleted successfully", {

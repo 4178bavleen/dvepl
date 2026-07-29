@@ -24,7 +24,10 @@ async function readPermissionGroupRoutes(
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         const permissionGroups =
-          await fastify.prisma.permissionGroup.findMany({
+          await (fastify.prisma as any).permissionGroup.findMany({
+            where: {
+              deletedAt: null,
+            },
             include: {
               _count: {
                 select: {

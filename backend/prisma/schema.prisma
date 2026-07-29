@@ -361,6 +361,7 @@ model PermissionGroup {
   name        String       @unique
   description String?
   permissions Permission[]
+  deletedAt   DateTime?
 
   @@map("permission_groups")
 }
@@ -467,6 +468,7 @@ model EmployeeContact {
   value      String
   isPrimary  Boolean     @default(false)
   createdAt  DateTime    @default(now())
+  deletedAt  DateTime?
   employee   Employee    @relation(fields: [employeeId], references: [id])
 
   @@map("employee_contacts")
@@ -479,6 +481,7 @@ model EmployeeEmergencyContact {
   relationship String
   phone        String
   createdAt    DateTime @default(now())
+  deletedAt    DateTime?
   employee     Employee @relation(fields: [employeeId], references: [id])
 
   @@map("employee_emergency_contacts")
@@ -492,6 +495,7 @@ model EmployeeEducation {
   yearOfPassing Int?
   grade         String?
   createdAt     DateTime @default(now())
+  deletedAt     DateTime?
   employee      Employee @relation(fields: [employeeId], references: [id])
 
   @@map("employee_education")
@@ -505,6 +509,7 @@ model EmployeeExperience {
   fromDate    DateTime?
   toDate      DateTime?
   createdAt   DateTime  @default(now())
+  deletedAt   DateTime?
   employee    Employee  @relation(fields: [employeeId], references: [id])
 
   @@map("employee_experience")
@@ -517,6 +522,7 @@ model EmployeeDocument {
   fileUrl      String
   fileName     String
   createdAt    DateTime @default(now())
+  deletedAt    DateTime?
   employee     Employee @relation(fields: [employeeId], references: [id])
 
   @@map("employee_documents")
@@ -543,6 +549,7 @@ model EmployeeShift {
   effectiveTo   DateTime?
   employee      Employee  @relation(fields: [employeeId], references: [id])
   shift         Shift     @relation(fields: [shiftId], references: [id])
+  deletedAt     DateTime?
 
   @@map("employee_shifts")
 }
@@ -552,6 +559,7 @@ model Holiday {
   name String   @unique
   date DateTime
   type String?
+  deletedAt DateTime?
 
   @@map("holidays")
 }
@@ -565,6 +573,7 @@ model Attendance {
   status     AttendanceStatus @default(PRESENT)
   remarks    String?
   createdAt  DateTime         @default(now())
+  deletedAt  DateTime?
   employee   Employee         @relation(fields: [employeeId], references: [id])
 
   @@unique([employeeId, date])
@@ -583,6 +592,7 @@ model Leave {
   approvedById String?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
+  deletedAt    DateTime?
   employee     Employee    @relation(fields: [employeeId], references: [id])
 
   @@index([employeeId])
@@ -599,6 +609,7 @@ model Salary {
   deductions    Decimal  @default(0) @db.Decimal(12, 2)
   ctc           Decimal  @db.Decimal(12, 2)
   createdAt     DateTime @default(now())
+  deletedAt     DateTime?
   employee      Employee @relation(fields: [employeeId], references: [id])
 
   @@index([employeeId])
@@ -659,6 +670,7 @@ model CommunicationHistory {
   subject    String?
   content    String?
   createdAt  DateTime          @default(now())
+  deletedAt  DateTime?
   customer   Customer          @relation(fields: [customerId], references: [id])
   user       User?             @relation(fields: [userId], references: [id])
 
@@ -723,6 +735,7 @@ model TenderFile {
   fileType   String?
   uploadedBy String?
   createdAt  DateTime @default(now())
+  deletedAt  DateTime?
   tender     Tender   @relation(fields: [tenderId], references: [id])
 
   @@map("tender_files")
@@ -773,6 +786,7 @@ model TenderActivity {
   newValue    Json?
   performedBy String?
   createdAt   DateTime @default(now())
+  deletedAt   DateTime?
   tender      Tender   @relation(fields: [tenderId], references: [id])
 
   @@map("tender_activities")
@@ -787,6 +801,7 @@ model GovernmentDepartment {
   isActive  Boolean   @default(true)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
   company   Company   @relation(fields: [companyId], references: [id])
   sections  Section[]
   tenders   Tender[]
@@ -864,6 +879,7 @@ model AuditLog {
   ipAddress String?
   userAgent String?
   createdAt DateTime @default(now())
+  deletedAt DateTime?
   user      User?    @relation(fields: [userId], references: [id])
 
   @@index([module, recordId])
@@ -891,6 +907,7 @@ model ReferenceCodeCounter {
   lastSequence Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
   company      Company  @relation(fields: [companyId], references: [id])
 
   @@unique([companyId, prefix])

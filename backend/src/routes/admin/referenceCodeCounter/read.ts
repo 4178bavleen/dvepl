@@ -36,8 +36,8 @@ async function readCounterRoutes(
           });
         }
 
-        const counters = await fastify.prisma.referenceCodeCounter.findMany({
-          where: { companyId },
+        const counters = await (fastify.prisma as any).referenceCodeCounter.findMany({
+          where: { companyId, deletedAt: null },
           orderBy: { prefix: "asc" },
         });
 
@@ -84,8 +84,8 @@ async function readCounterRoutes(
           });
         }
 
-        const counter = await fastify.prisma.referenceCodeCounter.findFirst({
-          where: { id, companyId },
+        const counter = await (fastify.prisma as any).referenceCodeCounter.findFirst({
+          where: { id, companyId, deletedAt: null },
         });
 
         if (!counter) {

@@ -54,8 +54,9 @@ async function deleteTenderActivityRoute(
           });
         }
 
-        await fastify.prisma.tenderActivity.delete({
+        await (fastify.prisma as any).tenderActivity.update({
           where: { id },
+          data: { deletedAt: new Date() },
         });
 
         adminLogs.info("Tender activity deleted successfully", { activityId: id });

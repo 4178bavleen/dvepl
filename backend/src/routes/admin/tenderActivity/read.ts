@@ -63,8 +63,8 @@ async function readTenderActivityRoutes(
           });
         }
 
-        const activities = await fastify.prisma.tenderActivity.findMany({
-          where: { tenderId },
+        const activities = await (fastify.prisma as any).tenderActivity.findMany({
+          where: { tenderId, deletedAt: null },
           orderBy: { createdAt: "desc" },
         });
 
@@ -113,9 +113,10 @@ async function readTenderActivityRoutes(
           });
         }
 
-        const activity = await fastify.prisma.tenderActivity.findFirst({
+        const activity = await (fastify.prisma as any).tenderActivity.findFirst({
           where: {
             id,
+            deletedAt: null,
             tender: {
               companyId,
               deletedAt: null,
