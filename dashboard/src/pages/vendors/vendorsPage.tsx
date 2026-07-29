@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
 import {
-  Building2, Search, Plus, Trash2, Edit, Eye, Clock, FileText, X, Check, Copy, Trash, Maximize2, Minimize2, Save, Sparkles, AlertCircle, SlidersHorizontal, RefreshCw
+  Building2, Search, Plus, Trash2, Edit, Eye, Clock, FileText, X, Check, Copy, Trash, Maximize2, Minimize2, Save, Sparkles, AlertCircle, SlidersHorizontal, RefreshCw, Package
 } from 'lucide-react';
 import { GenericTable, sortableHeader } from '@/components/tables/genericTable';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from 'react-hot-toast';
+import { tenderApi, inventoryApi } from '@/services/modules';
 import { apiClient } from '@/services/axios';
 import { useERPStore } from '@/store/erpStore';
 import { DynamicFormRenderer } from '@/components/customFields/dynamicFormRenderer';
@@ -40,6 +41,36 @@ interface Vendor {
   address: string;
   notes: string;
   createdAt: string;
+}
+
+interface InventoryMaterial {
+  id: string;
+  materialCode: string;
+  name: string;
+  category: string;
+  hsnCode: string;
+  gst: string;
+  unit: string;
+  type: string;
+}
+
+interface InventoryItem {
+  id: string;
+  materialId: string;
+  quantity: string;
+  unitPrice: string;
+  location: string | null;
+  material: InventoryMaterial;
+}
+
+interface VendorProductAssoc {
+  id: string;
+  vendorId: string;
+  materialId: string;
+  vendorRate: number | null;
+  vendorMaterialCode: string | null;
+  isPreferred: boolean;
+  material: InventoryMaterial;
 }
 
 interface POItem {
@@ -88,11 +119,6 @@ interface PORevision {
   };
   createdAt: string;
   revisionNo: number;
-  createdBy?: {
-    id: string;
-    name: string;
-    email: string;
-  };
   customColumns?: string[];
 }
 
@@ -119,75 +145,97 @@ const DEFAULT_TERMS = `1. Payment: 30 days net from the date of receipt and appr
 export const apiService = {
   vendors: {
     list: async (): Promise<Vendor[]> => {
-      const response = await apiClient.get('/vendor/read/');
-      return response.data.data;
+      return tenderApi.vendors.list() as unknown as Vendor[];
     },
     create: async (vendor: Omit<Vendor, 'id' | 'createdAt'>): Promise<Vendor> => {
       const companyId = useERPStore.getState().currentCompanyId;
-      const response = await apiClient.post('/vendor/create/', { ...vendor, companyId });
-      return response.data.data;
+      return tenderApi.vendors.create({ ...vendor, companyId }) as unknown as Vendor;
     },
     update: async (id: string, vendor: Partial<Vendor>): Promise<Vendor> => {
       const companyId = useERPStore.getState().currentCompanyId;
-      const response = await apiClient.patch(`/vendor/update/${id}`, { ...vendor, companyId });
-      return response.data.data;
+      return tenderApi.vendors.update!(id, { ...vendor, companyId }) as unknown as Vendor;
     },
     delete: async (id: string): Promise<void> => {
-      await apiClient.delete(`/vendor/delete/${id}`);
+      return tenderApi.vendors.remove!(id);
     }
   },
   revisions: {
     list: async (): Promise<PORevision[]> => {
-      const response = await apiClient.get('/vendor-po-revision/');
-      return response.data.data;
+      await new Promise(resolve => setTimeout(resolve, 150));
+      const saved = localStorage.getItem('dvepl_po_revisions');
+      return saved ? JSON.parse(saved) : [];
     },
     create: async (revision: PORevision): Promise<PORevision> => {
-      const response = await apiClient.post('/vendor-po-revision/', revision);
-      return response.data.data;
+      await new Promise(resolve => setTimeout(resolve, 150));
+      const saved = localStorage.getItem('dvepl_po_revisions');
+      const list: PORevision[] = saved ? JSON.parse(saved) : [];
+      list.unshift(revision);
+      localStorage.setItem('dvepl_po_revisions', JSON.stringify(list));
+      return revision;
     },
     delete: async (id: string): Promise<void> => {
-      await apiClient.delete(`/vendor-po-revision/${id}`);
+      await new Promise(resolve => setTimeout(resolve, 150));
+      const saved = localStorage.getItem('dvepl_po_revisions');
+      const list: PORevision[] = saved ? JSON.parse(saved) : [];
+      const filtered = list.filter(r => r.id !== id);
+      localStorage.setItem('dvepl_po_revisions', JSON.stringify(filtered));
+    }
+  },
+  inventory: {
+    list: async (): Promise<InventoryItem[]> => {
+      return inventoryApi.list() as unknown as Promise<InventoryItem[]>;
+    }
+  },
+  vendorProducts: {
+    list: async (vendorId: string): Promise<VendorProductAssoc[]> => {
+      return tenderApi.vendorProducts.list(vendorId) as unknown as VendorProductAssoc[];
+    },
+    attach: async (vendorId: string, materialIds: string[]): Promise<VendorProductAssoc[]> => {
+      return tenderApi.vendorProducts.attach(vendorId, materialIds) as unknown as VendorProductAssoc[];
+    },
+    detach: async (id: string): Promise<void> => {
+      return tenderApi.vendorProducts.detach(id);
     }
   }
 };
 
 export function VendorsPage() {
-  const currentCompanyId = useERPStore(state => state.currentCompanyId);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [revisions, setRevisions] = useState<PORevision[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const fetchAllData = async () => {
     setLoading(true);
-    const [vendorResult, revisionResult] = await Promise.allSettled([
-      apiService.vendors.list(),
-      apiService.revisions.list(),
-    ]);
-
-    if (vendorResult.status === 'fulfilled') {
-      setVendors(vendorResult.value);
-    } else {
-      toast.error('Failed to load vendors');
+    setInventoryLoading(true);
+    try {
+      const [vList, rList, invList] = await Promise.all([
+        apiService.vendors.list(),
+        apiService.revisions.list(),
+        apiService.inventory.list()
+      ]);
+      setVendors(vList);
+      setRevisions(rList);
+      setInventoryItems(invList);
+    } catch (err: any) {
+      toast.error('Failed to sync data');
+    } finally {
+      setLoading(false);
+      setInventoryLoading(false);
     }
-
-    if (revisionResult.status === 'fulfilled') {
-      setRevisions(revisionResult.value);
-    } else {
-      toast.error('Failed to load PO revisions');
-    }
-
-    setLoading(false);
   };
 
   useEffect(() => {
     fetchAllData();
-  }, [currentCompanyId]);
+  }, []);
 
   // UI States
   const [search, setSearch] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
   const [overviewVendor, setOverviewVendor] = useState<Vendor | null>(null);
+  const [formTab, setFormTab] = useState<'details' | 'products'>('details');
 
   // Revisions Modal States
   const [selectedVendorForRevisions, setSelectedVendorForRevisions] = useState<Vendor | null>(null);
@@ -199,6 +247,13 @@ export function VendorsPage() {
   const [customColumns, setCustomColumns] = useState<string[]>([]);
   const [newColName, setNewColName] = useState('');
   const [isAddingCol, setIsAddingCol] = useState(false);
+
+  // Product picker (used in Vendor form AND PO line items)
+  const [productSearch, setProductSearch] = useState('');
+  const [selectedMaterialIds, setSelectedMaterialIds] = useState<Set<string>>(new Set());
+  const [existingVendorProducts, setExistingVendorProducts] = useState<VendorProductAssoc[]>([]);
+  const [isProductPickerOpen, setIsProductPickerOpen] = useState(false);
+  const [poProductSearch, setPoProductSearch] = useState('');
 
   // Confirm Dialog States
   const [clearRowsConfirmOpen, setClearRowsConfirmOpen] = useState(false);
@@ -240,10 +295,11 @@ export function VendorsPage() {
     if (vGst.trim() && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(vGst.trim().toUpperCase())) {
       errs.gst = 'Enter a valid 15-character GSTIN (e.g. 22AAAAA0000A1Z5)';
     }
-    const customFieldErrors = validateCustomFields(vendorCustomFields, vCustomFields);
-    const allErrors = { ...errs, ...customFieldErrors };
-    setVErrors(allErrors);
-    return Object.keys(allErrors).length === 0;
+
+    const cfErrs = validateCustomFields(vendorCustomFields, vCustomFields);
+    const combinedErrs = { ...errs, ...cfErrs };
+    setVErrors(combinedErrs);
+    return Object.keys(combinedErrs).length === 0;
   };
 
   // PO Form Fields
@@ -267,44 +323,63 @@ export function VendorsPage() {
     if (!search) return vendors;
     const query = search.toLowerCase();
     return vendors.filter(v =>
-      (v.name || '').toLowerCase().includes(query) ||
-      (v.category || '').toLowerCase().includes(query) ||
-      (v.gstNumber || '').toLowerCase().includes(query) ||
-      (v.contactPerson || '').toLowerCase().includes(query)
+      v.name.toLowerCase().includes(query) ||
+      v.category.toLowerCase().includes(query) ||
+      v.gstNumber.toLowerCase().includes(query) ||
+      v.contactPerson.toLowerCase().includes(query)
     );
   }, [vendors, search]);
 
-  // Column Visibility State
-  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
-    name: true,
-    category: true,
-    contactPerson: true,
-    phone: true,
-    email: true,
-    gstNumber: true,
-    revisions: true,
-    dataEntry: true,
-  });
+  // Filtered inventory for Vendor form "Products Supplied" tab
+  const filteredInventoryForForm = useMemo(() => {
+    if (!productSearch.trim()) return inventoryItems;
+    const q = productSearch.toLowerCase();
+    return inventoryItems.filter(i =>
+      i.material.name.toLowerCase().includes(q) ||
+      i.material.materialCode.toLowerCase().includes(q) ||
+      (i.material.category || '').toLowerCase().includes(q)
+    );
+  }, [inventoryItems, productSearch]);
 
-  const ALL_VENDOR_COLUMNS = useMemo(() => [
-    { id: 'name', label: 'Vendor Name' },
-    { id: 'category', label: 'Category' },
-    { id: 'contactPerson', label: 'Contact Person' },
-    { id: 'phone', label: 'Phone' },
-    { id: 'email', label: 'Email' },
-    { id: 'gstNumber', label: 'GSTIN' },
-    { id: 'revisions', label: 'Revision History' },
-    { id: 'dataEntry', label: 'Data Entry' },
-    ...vendorCustomFields
-      .filter(field => field.isActive !== false && field.showInTable !== false)
-      .map(field => ({ id: `cf_${field.key}`, label: field.name })),
-  ], [vendorCustomFields]);
+  // Filtered inventory for PO line-item product picker
+  const filteredInventoryForPO = useMemo(() => {
+    if (!poProductSearch.trim()) return inventoryItems;
+    const q = poProductSearch.toLowerCase();
+    return inventoryItems.filter(i =>
+      i.material.name.toLowerCase().includes(q) ||
+      i.material.materialCode.toLowerCase().includes(q) ||
+      (i.material.category || '').toLowerCase().includes(q)
+    );
+  }, [inventoryItems, poProductSearch]);
+
+  const ALL_VENDOR_COLUMNS = useMemo(() => {
+    const base = [
+      { id: 'name', label: 'Vendor Name' },
+      { id: 'category', label: 'Category' },
+      { id: 'contactPerson', label: 'Contact Person' },
+      { id: 'phone', label: 'Phone' },
+      { id: 'email', label: 'Email' },
+      { id: 'gstNumber', label: 'GSTIN' },
+      { id: 'products', label: 'Products Supplied' },
+      { id: 'revisions', label: 'Revision History' },
+      { id: 'dataEntry', label: 'Data Entry' },
+    ];
+    const cfCols = vendorCustomFields
+      .filter((f) => f.isActive && f.showInTable)
+      .map((f) => ({ id: `cf_${f.key}`, label: f.name }));
+    return [...base, ...cfCols];
+  }, [vendorCustomFields]);
+
+  // Column Visibility State
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    setVisibleColumns(current => {
-      const next = { ...current };
-      ALL_VENDOR_COLUMNS.forEach(column => {
-        if (next[column.id] === undefined) next[column.id] = true;
+    setVisibleColumns((prev) => {
+      const next = { ...prev };
+      ALL_VENDOR_COLUMNS.forEach((col) => {
+        if (next[col.id] === undefined) {
+          next[col.id] = true;
+        }
       });
       return next;
     });
@@ -318,6 +393,21 @@ export function VendorsPage() {
     const next: Record<string, boolean> = {};
     ALL_VENDOR_COLUMNS.forEach(c => { next[c.id] = val; });
     setVisibleColumns(next);
+  };
+
+  // Count of products per vendor (from currently-loaded associations is per-vendor lazy;
+  // for table display we keep a lightweight cache populated on demand)
+  const [vendorProductCounts, setVendorProductCounts] = useState<Record<string, number>>({});
+
+  const openProductsQuickView = async (vendor: Vendor) => {
+    setActivePoVendor(vendor); // reuse for context if needed elsewhere
+    try {
+      const assocs = await apiService.vendorProducts.list(vendor.id);
+      setVendorProductCounts(prev => ({ ...prev, [vendor.id]: assocs.length }));
+      toast.success(`${vendor.name} supplies ${assocs.length} product(s)`);
+    } catch {
+      toast.error('Failed to load products for this vendor');
+    }
   };
 
   // Column definitions for GenericTable
@@ -361,6 +451,23 @@ export function VendorsPage() {
       cell: ({ getValue }) => (getValue() as string) || '—',
     },
     {
+      id: 'products',
+      header: 'Products Supplied',
+      cell: ({ row }) => {
+        const vendor = row.original;
+        const count = vendorProductCounts[vendor.id];
+        return (
+          <button
+            onClick={() => openProductsQuickView(vendor)}
+            className="bg-[#fff4e5] hover:bg-[#ffe9cc] text-[#b45309] border border-[#fcd9a8] px-2.5 py-1 rounded-md text-xs font-semibold cursor-pointer transition-colors duration-150 inline-flex items-center gap-1"
+          >
+            <Package className="size-3" />
+            {count !== undefined ? `${count} Products` : 'View Products'}
+          </button>
+        );
+      }
+    },
+    {
       id: 'revisions',
       header: 'Revision History',
       cell: ({ row }) => {
@@ -391,13 +498,13 @@ export function VendorsPage() {
         );
       }
     }
-  ], [revisions]);
+  ], [revisions, vendorProductCounts]);
 
   const activeColumns = useMemo<ColumnDef<Vendor>[]>(() => {
-    const builtInColumns = allTableColumns.filter(col => visibleColumns[col.id || (col as any).accessorKey]);
-    const customColumns = vendorTableCustomCols.filter(column => visibleColumns[column.id!]);
-    return [...builtInColumns, ...customColumns] as unknown as ColumnDef<Vendor>[];
-  }, [allTableColumns, vendorTableCustomCols, visibleColumns]);
+    const baseCols = allTableColumns.filter(col => visibleColumns[col.id || (col as any).accessorKey]);
+    const cfCols = (vendorTableCustomCols as any[]).filter(col => visibleColumns[col.id]);
+    return [...baseCols, ...cfCols] as ColumnDef<Vendor>[];
+  }, [allTableColumns, visibleColumns, vendorTableCustomCols]);
 
   // Form operations
   const resetVendorForm = () => {
@@ -412,10 +519,14 @@ export function VendorsPage() {
     setVNotes('');
     setVCustomFields({});
     setVErrors({});
+    setFormTab('details');
+    setProductSearch('');
+    setSelectedMaterialIds(new Set());
+    setExistingVendorProducts([]);
     setIsFormOpen(false);
   };
 
-  const openEditVendor = (vendor: Vendor) => {
+  const openEditVendor = async (vendor: Vendor) => {
     setEditingVendor(vendor);
     setVName(vendor.name);
     setVCategory(vendor.category);
@@ -426,20 +537,59 @@ export function VendorsPage() {
     setVAddress(vendor.address);
     setVNotes(vendor.notes);
     setVCustomFields((vendor as any).customFields || {});
+    setFormTab('details');
+    setProductSearch('');
     setIsFormOpen(true);
+
+    // Load existing vendor-product associations
+    try {
+      const assocs = await apiService.vendorProducts.list(vendor.id);
+      setExistingVendorProducts(assocs);
+      setSelectedMaterialIds(new Set(assocs.map(a => a.materialId)));
+      setVendorProductCounts(prev => ({ ...prev, [vendor.id]: assocs.length }));
+    } catch {
+      setExistingVendorProducts([]);
+      setSelectedMaterialIds(new Set());
+    }
+  };
+
+  const toggleMaterialSelection = (materialId: string) => {
+    setSelectedMaterialIds(prev => {
+      const next = new Set(prev);
+      if (next.has(materialId)) next.delete(materialId); else next.add(materialId);
+      return next;
+    });
+  };
+
+  const handleDetachExistingProduct = async (assoc: VendorProductAssoc) => {
+    try {
+      await apiService.vendorProducts.detach(assoc.id);
+      setExistingVendorProducts(prev => prev.filter(a => a.id !== assoc.id));
+      setSelectedMaterialIds(prev => {
+        const next = new Set(prev);
+        next.delete(assoc.materialId);
+        return next;
+      });
+      if (editingVendor) {
+        setVendorProductCounts(prev => ({ ...prev, [editingVendor.id]: Math.max(0, (prev[editingVendor.id] || 1) - 1) }));
+      }
+      toast.success('Product detached from vendor');
+    } catch {
+      toast.error('Failed to detach product');
+    }
   };
 
   const handleSaveVendor = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateVendorForm()) {
-      toast.error('Please fix the validation errors before saving');
+      toast.error('Please review highlighted fields and correct required details.');
       return;
     }
 
     try {
       let vendorId = editingVendor?.id;
       if (editingVendor) {
-        const updated = await apiService.vendors.update(editingVendor.id, {
+        await apiService.vendors.update(editingVendor.id, {
           name: vName,
           category: vCategory,
           contactPerson: vContact,
@@ -449,7 +599,6 @@ export function VendorsPage() {
           address: vAddress,
           notes: vNotes
         });
-        setVendors(current => current.map(vendor => vendor.id === updated.id ? { ...vendor, ...updated } : vendor));
         toast.success('Vendor updated successfully');
       } else {
         const created = await apiService.vendors.create({
@@ -463,7 +612,6 @@ export function VendorsPage() {
           notes: vNotes
         });
         vendorId = created.id;
-        setVendors(current => [created, ...current.filter(vendor => vendor.id !== created.id)]);
         toast.success('New vendor registered successfully');
       }
 
@@ -471,11 +619,21 @@ export function VendorsPage() {
         await apiClient.post(`/custom-fields/values/vendor/${vendorId}`, { values: vCustomFields });
       }
 
+      // Attach newly-selected products (skip ones already attached)
+      if (vendorId && selectedMaterialIds.size > 0) {
+        const alreadyAttachedIds = new Set(existingVendorProducts.map(a => a.materialId));
+        const toAttach = Array.from(selectedMaterialIds).filter(id => !alreadyAttachedIds.has(id));
+        if (toAttach.length > 0) {
+          await apiService.vendorProducts.attach(vendorId, toAttach);
+        }
+        setVendorProductCounts(prev => ({ ...prev, [vendorId!]: selectedMaterialIds.size }));
+      }
+
       const list = await apiService.vendors.list();
       setVendors(list);
       resetVendorForm();
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to save vendor');
+      toast.error('Failed to save vendor');
     }
   };
 
@@ -490,6 +648,14 @@ export function VendorsPage() {
       await apiService.vendors.delete(vendorToDelete);
       const list = await apiService.vendors.list();
       setVendors(list);
+      
+      const savedRev = localStorage.getItem('dvepl_po_revisions');
+      if (savedRev) {
+        const revList: PORevision[] = JSON.parse(savedRev);
+        const filtered = revList.filter(r => r.vendorId !== vendorToDelete);
+        localStorage.setItem('dvepl_po_revisions', JSON.stringify(filtered));
+        setRevisions(filtered);
+      }
       toast.success('Vendor deleted successfully');
     } catch (err: any) {
       toast.error('Failed to delete vendor');
@@ -542,6 +708,26 @@ export function VendorsPage() {
     };
     customColumns.forEach(c => { newItem[c] = ''; });
     setPoItems(prev => [...prev, newItem]);
+  };
+
+  const handleAddPoRowFromInventory = (item: InventoryItem) => {
+    const newItem: POItem = {
+      id: `row-${Date.now()}`,
+      description: item.material.name,
+      qty: 1,
+      unit: item.material.unit || 'Nos',
+      hsnCode: item.material.hsnCode || '',
+      catNo: item.material.materialCode || '',
+      rate: Number(item.unitPrice) || 0,
+      discountPercent: 0,
+      net: Number(item.unitPrice) || 0,
+      total: Number(item.unitPrice) || 0
+    };
+    customColumns.forEach(c => { newItem[c] = ''; });
+    setPoItems(prev => [...prev, newItem]);
+    toast.success(`${item.material.name} added from inventory`);
+    setIsProductPickerOpen(false);
+    setPoProductSearch('');
   };
 
   const handleDuplicateLastRow = () => {
@@ -677,11 +863,11 @@ export function VendorsPage() {
     };
 
     try {
-      const savedRevision = await apiService.revisions.create(newRevision);
+      await apiService.revisions.create(newRevision);
       const list = await apiService.revisions.list();
       setRevisions(list);
-      setSelectedRevisionId(savedRevision.id);
-      toast.success(`Revision v${savedRevision.revisionNo} saved successfully`);
+      setSelectedRevisionId(newRevision.id);
+      toast.success(`Revision v${newRevision.revisionNo} saved successfully`);
     } catch (err: any) {
       toast.error('Failed to save PO revision');
     }
@@ -954,230 +1140,331 @@ export function VendorsPage() {
               <h2 className="text-sm font-bold uppercase tracking-wider text-primary">
                 {editingVendor ? 'Edit Vendor' : 'Add New Vendor'}
               </h2>
-              <p className="text-xs text-muted-foreground">Enter vendor company details, GST, and contact info</p>
+              <p className="text-xs text-muted-foreground">Enter vendor company details, GST, contact info, and supplied products</p>
             </div>
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={resetVendorForm}>
               <X className="size-4" />
             </Button>
           </div>
 
-          <form onSubmit={handleSaveVendor} className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
-            <div className="flex flex-col gap-1.5 sm:col-span-2">
-              <Label className="text-xs font-semibold">Vendor / Company Name *</Label>
-              <Input
-                value={vName}
-                onChange={e => { setVName(e.target.value); if (vErrors.name) setVErrors(p => ({ ...p, name: '' })); }}
-                placeholder="e.g. Acme Pvt. Ltd."
-                className={vErrors.name ? 'border-destructive focus-visible:ring-destructive' : ''}
-              />
-              {vErrors.name && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="size-3" />{vErrors.name}</p>}
-            </div>
-            {vendorCustomFields.some(f => f.afterField === 'name') && (
-              <div className="sm:col-span-2">
-                <DynamicFormRenderer
-                  fields={vendorCustomFields}
-                  values={vCustomFields}
-                  onChange={(key, val) => {
-                    setVCustomFields(prev => ({ ...prev, [key]: val }));
-                    if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
-                  }}
-                  errors={vErrors}
-                  afterFieldPosition="name"
-                />
+          {/* Tab Switcher */}
+          <div className="flex items-center gap-1 border-b">
+            <button
+              type="button"
+              onClick={() => setFormTab('details')}
+              className={`px-4 py-2 text-xs font-semibold border-b-2 -mb-px transition-colors ${formTab === 'details' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+            >
+              Vendor Details
+            </button>
+            <button
+              type="button"
+              onClick={() => setFormTab('products')}
+              className={`px-4 py-2 text-xs font-semibold border-b-2 -mb-px transition-colors flex items-center gap-1.5 ${formTab === 'products' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+            >
+              <Package className="size-3.5" />
+              Products Supplied
+              {selectedMaterialIds.size > 0 && (
+                <span className="bg-primary/10 text-primary rounded-full px-1.5 py-0.5 text-[10px] font-bold">
+                  {selectedMaterialIds.size}
+                </span>
+              )}
+            </button>
+          </div>
+
+          <form onSubmit={handleSaveVendor} className="w-full">
+
+            {formTab === 'details' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+                <div className="flex flex-col gap-1.5 sm:col-span-2">
+                  <Label className="text-xs font-semibold">Vendor / Company Name *</Label>
+                  <Input
+                    value={vName}
+                    onChange={e => { setVName(e.target.value); if (vErrors.name) setVErrors(p => ({ ...p, name: '' })); }}
+                    placeholder="e.g. Acme Pvt. Ltd."
+                    className={vErrors.name ? 'border-destructive focus-visible:ring-destructive' : ''}
+                  />
+                  {vErrors.name && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="size-3" />{vErrors.name}</p>}
+                </div>
+                {vendorCustomFields.some(f => f.afterField === 'name') && (
+                  <div className="sm:col-span-2">
+                    <DynamicFormRenderer
+                      fields={vendorCustomFields}
+                      values={vCustomFields}
+                      onChange={(key, val) => {
+                        setVCustomFields(prev => ({ ...prev, [key]: val }));
+                        if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
+                      }}
+                      errors={vErrors}
+                      afterFieldPosition="name"
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-xs font-semibold">Category</Label>
+                  <Input
+                    value={vCategory}
+                    onChange={e => setVCategory(e.target.value)}
+                    placeholder="e.g. Electrical, Mechanical"
+                  />
+                </div>
+                {vendorCustomFields.some(f => f.afterField === 'category') && (
+                  <div className="sm:col-span-2">
+                    <DynamicFormRenderer
+                      fields={vendorCustomFields}
+                      values={vCustomFields}
+                      onChange={(key, val) => {
+                        setVCustomFields(prev => ({ ...prev, [key]: val }));
+                        if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
+                      }}
+                      errors={vErrors}
+                      afterFieldPosition="category"
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-xs font-semibold">Contact Person</Label>
+                  <Input
+                    value={vContact}
+                    onChange={e => setVContact(e.target.value)}
+                    placeholder="e.g. Rajesh Kumar"
+                  />
+                </div>
+                {vendorCustomFields.some(f => f.afterField === 'contactPerson') && (
+                  <div className="sm:col-span-2">
+                    <DynamicFormRenderer
+                      fields={vendorCustomFields}
+                      values={vCustomFields}
+                      onChange={(key, val) => {
+                        setVCustomFields(prev => ({ ...prev, [key]: val }));
+                        if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
+                      }}
+                      errors={vErrors}
+                      afterFieldPosition="contactPerson"
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-xs font-semibold">Phone</Label>
+                  <Input
+                    value={vPhone}
+                    onChange={e => {
+                      const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setVPhone(digits);
+                      if (vErrors.phone) setVErrors(p => ({ ...p, phone: '' }));
+                    }}
+                    placeholder="9876543210"
+                    maxLength={10}
+                    inputMode="numeric"
+                    className={vErrors.phone ? 'border-destructive focus-visible:ring-destructive' : ''}
+                  />
+                  {vErrors.phone && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="size-3" />{vErrors.phone}</p>}
+                </div>
+                {vendorCustomFields.some(f => f.afterField === 'phone') && (
+                  <div className="sm:col-span-2">
+                    <DynamicFormRenderer
+                      fields={vendorCustomFields}
+                      values={vCustomFields}
+                      onChange={(key, val) => {
+                        setVCustomFields(prev => ({ ...prev, [key]: val }));
+                        if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
+                      }}
+                      errors={vErrors}
+                      afterFieldPosition="phone"
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-xs font-semibold">Email</Label>
+                  <Input
+                    type="text"
+                    value={vEmail}
+                    onChange={e => { setVEmail(e.target.value); if (vErrors.email) setVErrors(p => ({ ...p, email: '' })); }}
+                    placeholder="vendor@company.com"
+                    className={vErrors.email ? 'border-destructive focus-visible:ring-destructive' : ''}
+                  />
+                  {vErrors.email && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="size-3" />{vErrors.email}</p>}
+                </div>
+                {vendorCustomFields.some(f => f.afterField === 'email') && (
+                  <div className="sm:col-span-2">
+                    <DynamicFormRenderer
+                      fields={vendorCustomFields}
+                      values={vCustomFields}
+                      onChange={(key, val) => {
+                        setVCustomFields(prev => ({ ...prev, [key]: val }));
+                        if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
+                      }}
+                      errors={vErrors}
+                      afterFieldPosition="email"
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-1.5 sm:col-span-2">
+                  <Label className="text-xs font-semibold">GST Number</Label>
+                  <Input
+                    value={vGst}
+                    onChange={e => { setVGst(e.target.value.toUpperCase()); if (vErrors.gst) setVErrors(p => ({ ...p, gst: '' })); }}
+                    placeholder="22AAAAA0000A1Z5"
+                    maxLength={15}
+                    className={vErrors.gst ? 'border-destructive focus-visible:ring-destructive' : ''}
+                  />
+                  {vErrors.gst && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="size-3" />{vErrors.gst}</p>}
+                </div>
+                {vendorCustomFields.some(f => f.afterField === 'gstNumber') && (
+                  <div className="sm:col-span-2">
+                    <DynamicFormRenderer
+                      fields={vendorCustomFields}
+                      values={vCustomFields}
+                      onChange={(key, val) => {
+                        setVCustomFields(prev => ({ ...prev, [key]: val }));
+                        if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
+                      }}
+                      errors={vErrors}
+                      afterFieldPosition="gstNumber"
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-1.5 sm:col-span-2">
+                  <Label className="text-xs font-semibold">Address</Label>
+                  <Input
+                    value={vAddress}
+                    onChange={e => setVAddress(e.target.value)}
+                    placeholder="Full address"
+                  />
+                </div>
+                {vendorCustomFields.some(f => f.afterField === 'address') && (
+                  <div className="sm:col-span-2">
+                    <DynamicFormRenderer
+                      fields={vendorCustomFields}
+                      values={vCustomFields}
+                      onChange={(key, val) => {
+                        setVCustomFields(prev => ({ ...prev, [key]: val }));
+                        if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
+                      }}
+                      errors={vErrors}
+                      afterFieldPosition="address"
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-1.5 sm:col-span-2">
+                  <Label className="text-xs font-semibold">Notes</Label>
+                  <Textarea
+                    value={vNotes}
+                    onChange={e => setVNotes(e.target.value)}
+                    placeholder="Any additional notes..."
+                    rows={2}
+                  />
+                </div>
+                {vendorCustomFields.some(f => f.afterField === 'notes') && (
+                  <div className="sm:col-span-2">
+                    <DynamicFormRenderer
+                      fields={vendorCustomFields}
+                      values={vCustomFields}
+                      onChange={(key, val) => {
+                        setVCustomFields(prev => ({ ...prev, [key]: val }));
+                        if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
+                      }}
+                      errors={vErrors}
+                      afterFieldPosition="notes"
+                    />
+                  </div>
+                )}
+
+                {/* Dynamic EAV Custom Fields without specific afterField position or assigned to end */}
+                {vendorCustomFields.some(f => !f.afterField || f.afterField === 'end') && (
+                  <div className="sm:col-span-2">
+                    <DynamicFormRenderer
+                      fields={vendorCustomFields.filter(f => !f.afterField || f.afterField === 'end')}
+                      values={vCustomFields}
+                      onChange={(key, val) => {
+                        setVCustomFields(prev => ({ ...prev, [key]: val }));
+                        if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
+                      }}
+                      errors={vErrors}
+                    />
+                  </div>
+                )}
               </div>
             )}
 
-            <div className="flex flex-col gap-1.5">
-              <Label className="text-xs font-semibold">Category</Label>
-              <Input
-                value={vCategory}
-                onChange={e => setVCategory(e.target.value)}
-                placeholder="e.g. Electrical, Mechanical"
-              />
-            </div>
-            {vendorCustomFields.some(f => f.afterField === 'category') && (
-              <div className="sm:col-span-2">
-                <DynamicFormRenderer
-                  fields={vendorCustomFields}
-                  values={vCustomFields}
-                  onChange={(key, val) => {
-                    setVCustomFields(prev => ({ ...prev, [key]: val }));
-                    if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
-                  }}
-                  errors={vErrors}
-                  afterFieldPosition="category"
-                />
+            {formTab === 'products' && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 border rounded-xl px-3 bg-background shadow-xs focus-within:ring-1 focus-within:ring-primary">
+                  <Search className="size-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search products by name, code, or category..."
+                    value={productSearch}
+                    onChange={e => setProductSearch(e.target.value)}
+                    className="h-9 border-none shadow-none focus-visible:ring-0 px-0"
+                  />
+                </div>
+
+                {selectedMaterialIds.size > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {inventoryItems
+                      .filter(i => selectedMaterialIds.has(i.materialId))
+                      .map(i => {
+                        const existing = existingVendorProducts.find(a => a.materialId === i.materialId);
+                        return (
+                          <span
+                            key={i.materialId}
+                            className="inline-flex items-center gap-1.5 bg-[#f3f0ff] text-[#5b33b5] border border-[#cbbff5] px-2 py-1 rounded-md text-xs font-medium"
+                          >
+                            {i.material.name}
+                            <button
+                              type="button"
+                              onClick={() => existing ? handleDetachExistingProduct(existing) : toggleMaterialSelection(i.materialId)}
+                              className="hover:text-red-600"
+                            >
+                              <X className="size-3" />
+                            </button>
+                          </span>
+                        );
+                      })}
+                  </div>
+                )}
+
+                <div className="border rounded-xl max-h-72 overflow-y-auto divide-y">
+                  {inventoryLoading && (
+                    <div className="p-4 text-center text-xs text-muted-foreground">Loading products…</div>
+                  )}
+                  {!inventoryLoading && filteredInventoryForForm.length === 0 && (
+                    <div className="p-4 text-center text-xs text-muted-foreground">No products found in inventory.</div>
+                  )}
+                  {!inventoryLoading && filteredInventoryForForm.map(item => {
+                    const isSelected = selectedMaterialIds.has(item.materialId);
+                    return (
+                      <label
+                        key={item.id}
+                        className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted/40 cursor-pointer transition-colors"
+                      >
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => toggleMaterialSelection(item.materialId)}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-foreground truncate">{item.material.name}</span>
+                            <span className="text-[10px] text-muted-foreground font-mono">{item.material.materialCode}</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {item.material.category || 'Uncategorized'} • {item.material.unit} • Stock: {item.quantity} • ₹{Number(item.unitPrice).toLocaleString('en-IN')}
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
             )}
 
-            <div className="flex flex-col gap-1.5">
-              <Label className="text-xs font-semibold">Contact Person</Label>
-              <Input
-                value={vContact}
-                onChange={e => setVContact(e.target.value)}
-                placeholder="e.g. Rajesh Kumar"
-              />
-            </div>
-            {vendorCustomFields.some(f => f.afterField === 'contactPerson') && (
-              <div className="sm:col-span-2">
-                <DynamicFormRenderer
-                  fields={vendorCustomFields}
-                  values={vCustomFields}
-                  onChange={(key, val) => {
-                    setVCustomFields(prev => ({ ...prev, [key]: val }));
-                    if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
-                  }}
-                  errors={vErrors}
-                  afterFieldPosition="contactPerson"
-                />
-              </div>
-            )}
-
-            <div className="flex flex-col gap-1.5">
-              <Label className="text-xs font-semibold">Phone</Label>
-              <Input
-                value={vPhone}
-                onChange={e => {
-                  const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
-                  setVPhone(digits);
-                  if (vErrors.phone) setVErrors(p => ({ ...p, phone: '' }));
-                }}
-                placeholder="9876543210"
-                maxLength={10}
-                inputMode="numeric"
-                className={vErrors.phone ? 'border-destructive focus-visible:ring-destructive' : ''}
-              />
-              {vErrors.phone && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="size-3" />{vErrors.phone}</p>}
-            </div>
-            {vendorCustomFields.some(f => f.afterField === 'phone') && (
-              <div className="sm:col-span-2">
-                <DynamicFormRenderer
-                  fields={vendorCustomFields}
-                  values={vCustomFields}
-                  onChange={(key, val) => {
-                    setVCustomFields(prev => ({ ...prev, [key]: val }));
-                    if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
-                  }}
-                  errors={vErrors}
-                  afterFieldPosition="phone"
-                />
-              </div>
-            )}
-
-            <div className="flex flex-col gap-1.5">
-              <Label className="text-xs font-semibold">Email</Label>
-              <Input
-                type="text"
-                value={vEmail}
-                onChange={e => { setVEmail(e.target.value); if (vErrors.email) setVErrors(p => ({ ...p, email: '' })); }}
-                placeholder="vendor@company.com"
-                className={vErrors.email ? 'border-destructive focus-visible:ring-destructive' : ''}
-              />
-              {vErrors.email && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="size-3" />{vErrors.email}</p>}
-            </div>
-            {vendorCustomFields.some(f => f.afterField === 'email') && (
-              <div className="sm:col-span-2">
-                <DynamicFormRenderer
-                  fields={vendorCustomFields}
-                  values={vCustomFields}
-                  onChange={(key, val) => {
-                    setVCustomFields(prev => ({ ...prev, [key]: val }));
-                    if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
-                  }}
-                  errors={vErrors}
-                  afterFieldPosition="email"
-                />
-              </div>
-            )}
-            <div className="flex flex-col gap-1.5 sm:col-span-2">
-              <Label className="text-xs font-semibold">GST Number</Label>
-              <Input
-                value={vGst}
-                onChange={e => { setVGst(e.target.value.toUpperCase()); if (vErrors.gst) setVErrors(p => ({ ...p, gst: '' })); }}
-                placeholder="22AAAAA0000A1Z5"
-                maxLength={15}
-                className={vErrors.gst ? 'border-destructive focus-visible:ring-destructive' : ''}
-              />
-              {vErrors.gst && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="size-3" />{vErrors.gst}</p>}
-            </div>
-            {vendorCustomFields.some(f => f.afterField === 'gstNumber') && (
-              <div className="sm:col-span-2">
-                <DynamicFormRenderer
-                  fields={vendorCustomFields}
-                  values={vCustomFields}
-                  onChange={(key, val) => {
-                    setVCustomFields(prev => ({ ...prev, [key]: val }));
-                    if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
-                  }}
-                  errors={vErrors}
-                  afterFieldPosition="gstNumber"
-                />
-              </div>
-            )}
-
-            <div className="flex flex-col gap-1.5 sm:col-span-2">
-              <Label className="text-xs font-semibold">Address</Label>
-              <Input
-                value={vAddress}
-                onChange={e => setVAddress(e.target.value)}
-                placeholder="Full address"
-              />
-            </div>
-            {vendorCustomFields.some(f => f.afterField === 'address') && (
-              <div className="sm:col-span-2">
-                <DynamicFormRenderer
-                  fields={vendorCustomFields}
-                  values={vCustomFields}
-                  onChange={(key, val) => {
-                    setVCustomFields(prev => ({ ...prev, [key]: val }));
-                    if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
-                  }}
-                  errors={vErrors}
-                  afterFieldPosition="address"
-                />
-              </div>
-            )}
-
-            <div className="flex flex-col gap-1.5 sm:col-span-2">
-              <Label className="text-xs font-semibold">Notes</Label>
-              <Textarea
-                value={vNotes}
-                onChange={e => setVNotes(e.target.value)}
-                placeholder="Any additional notes..."
-                rows={2}
-              />
-            </div>
-            {vendorCustomFields.some(f => f.afterField === 'notes') && (
-              <div className="sm:col-span-2">
-                <DynamicFormRenderer
-                  fields={vendorCustomFields}
-                  values={vCustomFields}
-                  onChange={(key, val) => {
-                    setVCustomFields(prev => ({ ...prev, [key]: val }));
-                    if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
-                  }}
-                  errors={vErrors}
-                  afterFieldPosition="notes"
-                />
-              </div>
-            )}
-
-            {/* Dynamic EAV Custom Fields without specific afterField position or assigned to end */}
-            {vendorCustomFields.some(f => !f.afterField || f.afterField === 'end') && (
-              <div className="sm:col-span-2">
-                <DynamicFormRenderer
-                  fields={vendorCustomFields.filter(f => !f.afterField || f.afterField === 'end')}
-                  values={vCustomFields}
-                  onChange={(key, val) => {
-                    setVCustomFields(prev => ({ ...prev, [key]: val }));
-                    if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
-                  }}
-                  errors={vErrors}
-                />
-              </div>
-            )}
-
-            <div className="sm:col-span-2 flex justify-end gap-2 border-t pt-4">
+            <div className="flex justify-end gap-2 border-t pt-4 mt-4">
               <Button type="button" variant="outline" onClick={resetVendorForm}>Cancel</Button>
               <Button type="submit" className="bg-primary text-white">Save Vendor</Button>
             </div>
@@ -1336,6 +1623,53 @@ export function VendorsPage() {
         </DialogContent>
       </Dialog>
 
+      {/* ── PRODUCT PICKER (used by PO Data Entry line items) ── */}
+      <Dialog open={isProductPickerOpen} onOpenChange={setIsProductPickerOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-primary">
+              <Package className="size-5" />
+              Add Product from Inventory
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center gap-2 border rounded-xl px-3 bg-background shadow-xs focus-within:ring-1 focus-within:ring-primary">
+              <Search className="size-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name, code, or category..."
+                value={poProductSearch}
+                onChange={e => setPoProductSearch(e.target.value)}
+                className="h-9 border-none shadow-none focus-visible:ring-0 px-0"
+              />
+            </div>
+            <div className="border rounded-xl max-h-80 overflow-y-auto divide-y">
+              {filteredInventoryForPO.length === 0 && (
+                <div className="p-4 text-center text-xs text-muted-foreground">No matching products.</div>
+              )}
+              {filteredInventoryForPO.map(item => (
+                <button
+                  type="button"
+                  key={item.id}
+                  onClick={() => handleAddPoRowFromInventory(item)}
+                  className="w-full flex items-center justify-between gap-3 px-3 py-2.5 hover:bg-muted/40 text-left transition-colors"
+                >
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-foreground truncate">{item.material.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {item.material.materialCode} • HSN: {item.material.hsnCode || '—'} • {item.material.unit}
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-sm font-bold text-[#137333]">₹{Number(item.unitPrice).toLocaleString('en-IN')}</div>
+                    <div className="text-[10px] text-muted-foreground">Stock: {item.quantity}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* ── REVISIONS PANEL MODAL ── */}
       {selectedVendorForRevisions && (
         <div className="rev-panel-overlay" onClick={() => setSelectedVendorForRevisions(null)}>
@@ -1391,7 +1725,6 @@ export function VendorsPage() {
                       <span>Date: {rev.poDate}</span>
                       <span>Items: {rev.lineItems.length}</span>
                       <span>Status: {rev.poStatus}</span>
-                      <span>Created by: {rev.createdBy?.name || 'Unknown user'}</span>
                     </div>
                     <div className="rev-amount">
                       ₹{rev.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -1667,6 +2000,7 @@ export function VendorsPage() {
                       <div className="de-toolbar">
                         <span className="de-toolbar-label">LINE ITEMS</span>
                         <button className="de-tbtn" onClick={handleAddPoRow}>➕ Add Row</button>
+                        <button className="de-tbtn" onClick={() => setIsProductPickerOpen(true)}>📦 From Inventory</button>
                         <button className="de-tbtn" onClick={handleDuplicateLastRow}>📋 Duplicate Last</button>
                         <div className="de-tbtn-sep"></div>
 
@@ -1751,7 +2085,7 @@ export function VendorsPage() {
                             {poItems.length === 0 && (
                               <tr>
                                 <td colSpan={12 + customColumns.length} style={{ padding: '24px', textAlign: 'center', color: 'var(--text2)' }}>
-                                  No items added. Click "+ Add Row" to begin.
+                                  No items added. Click "+ Add Row" or "📦 From Inventory" to begin.
                                 </td>
                               </tr>
                             )}
