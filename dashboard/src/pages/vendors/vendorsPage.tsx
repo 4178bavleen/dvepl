@@ -448,44 +448,45 @@ export function VendorsPage() {
   }, [searchField, vendors]);
 
   const filteredVendors = useMemo(() => {
-    const query =
-      searchField === "all"
-        ? globalSearch.trim().toLowerCase()
-        : fieldSearch.trim().toLowerCase();
+    let result = vendors;
 
-    if (!query) return vendors;
-
-    if (searchField === "products") {
-      const matchingVendorIds = new Set(
-        allVendorProducts
-          .filter(
-            (a) =>
-              (a.material?.name ?? "").toLowerCase().includes(query) ||
-              (a.material?.materialCode ?? "").toLowerCase().includes(query) ||
-              (a.material?.category ?? "").toLowerCase().includes(query) ||
-              (a.vendorMaterialCode ?? "").toLowerCase().includes(query),
-          )
-          .map((a) => a.vendorId),
-      );
-
-      return vendors.filter((v) => matchingVendorIds.has(v.id));
-    }
-
-    if (searchField === "all") {
-      return vendors.filter(
+    // 1. Apply Global Search (searches name, category, gstNumber, contactPerson)
+    const globalQuery = globalSearch.trim().toLowerCase();
+    if (globalQuery) {
+      result = result.filter(
         (v) =>
-          (v.name ?? "").toLowerCase().includes(query) ||
-          (v.category ?? "").toLowerCase().includes(query) ||
-          (v.gstNumber ?? "").toLowerCase().includes(query) ||
-          (v.contactPerson ?? "").toLowerCase().includes(query),
+          (v.name ?? "").toLowerCase().includes(globalQuery) ||
+          (v.category ?? "").toLowerCase().includes(globalQuery) ||
+          (v.gstNumber ?? "").toLowerCase().includes(globalQuery) ||
+          (v.contactPerson ?? "").toLowerCase().includes(globalQuery),
       );
     }
 
-    const fieldValue = (v: Vendor) => (v as any)[searchField] ?? "";
+    // 2. Apply Column-specific Search
+    const columnQuery = fieldSearch.trim().toLowerCase();
+    if (columnQuery && searchField !== "all") {
+      if (searchField === "products") {
+        const matchingVendorIds = new Set(
+          allVendorProducts
+            .filter(
+              (a) =>
+                (a.material?.name ?? "").toLowerCase().includes(columnQuery) ||
+                (a.material?.materialCode ?? "").toLowerCase().includes(columnQuery) ||
+                (a.material?.category ?? "").toLowerCase().includes(columnQuery) ||
+                (a.vendorMaterialCode ?? "").toLowerCase().includes(columnQuery),
+            )
+            .map((a) => a.vendorId),
+        );
+        result = result.filter((v) => matchingVendorIds.has(v.id));
+      } else {
+        const fieldValue = (v: Vendor) => (v as any)[searchField] ?? "";
+        result = result.filter((v) =>
+          fieldValue(v).toString().toLowerCase().includes(columnQuery),
+        );
+      }
+    }
 
-    return vendors.filter((v) =>
-      fieldValue(v).toString().toLowerCase().includes(query),
-    );
+    return result;
   }, [vendors, globalSearch, fieldSearch, searchField, allVendorProducts]);
 
   // Filtered inventory for Vendor form "Products Supplied" tab
@@ -506,11 +507,11 @@ export function VendorsPage() {
     const pool = !q
       ? inventoryItems
       : inventoryItems.filter(
-          (i) =>
-            i.material.name.toLowerCase().includes(q) ||
-            i.material.materialCode.toLowerCase().includes(q) ||
-            (i.material.category || "").toLowerCase().includes(q),
-        );
+        (i) =>
+          i.material.name.toLowerCase().includes(q) ||
+          i.material.materialCode.toLowerCase().includes(q) ||
+          (i.material.category || "").toLowerCase().includes(q),
+      );
     return pool.slice(0, 20);
   };
 
@@ -1043,10 +1044,10 @@ export function VendorsPage() {
             (inv) =>
               (catNoRaw &&
                 inv.material.materialCode?.toLowerCase() ===
-                  catNoRaw.toLowerCase()) ||
+                catNoRaw.toLowerCase()) ||
               (descriptionRaw &&
                 inv.material.name?.toLowerCase() ===
-                  descriptionRaw.toLowerCase()),
+                descriptionRaw.toLowerCase()),
           );
           if (invMatch) matchedFromInventory++;
 
@@ -1102,9 +1103,9 @@ export function VendorsPage() {
         setPoItems((prev) => [...prev, ...newItems]);
         toast.success(
           `Imported ${newItems.length} item(s) from Excel` +
-            (matchedFromInventory > 0
-              ? ` (${matchedFromInventory} matched to Inventory)`
-              : ""),
+          (matchedFromInventory > 0
+            ? ` (${matchedFromInventory} matched to Inventory)`
+            : ""),
         );
       } catch (err) {
         console.error(err);
@@ -1623,7 +1624,7 @@ export function VendorsPage() {
       "Vendor: " + (activePoVendor?.name || ""),
       "Items: " + itemsLine,
       "Grand Total: Rs. " +
-        totals.grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 }),
+      totals.grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 }),
       "Payment Terms: " + paymentTerms,
       "Material Status: " + materialStatus,
     ];
@@ -1730,7 +1731,7 @@ export function VendorsPage() {
     setPoStatus("Placed");
     toast.success(
       "PO marked as Placed - PDF generated and sent via " +
-        sentChannels.join(" & "),
+      sentChannels.join(" & "),
     );
     setIsPoPlacedDialogOpen(false);
   };
@@ -1859,20 +1860,20 @@ export function VendorsPage() {
                 {vendorCustomFields.some(
                   (f) => f.afterField === "category",
                 ) && (
-                  <div className="sm:col-span-2">
-                    <DynamicFormRenderer
-                      fields={vendorCustomFields}
-                      values={vCustomFields}
-                      onChange={(key, val) => {
-                        setVCustomFields((prev) => ({ ...prev, [key]: val }));
-                        if (vErrors[key])
-                          setVErrors((prev) => ({ ...prev, [key]: "" }));
-                      }}
-                      errors={vErrors}
-                      afterFieldPosition="category"
-                    />
-                  </div>
-                )}
+                    <div className="sm:col-span-2">
+                      <DynamicFormRenderer
+                        fields={vendorCustomFields}
+                        values={vCustomFields}
+                        onChange={(key, val) => {
+                          setVCustomFields((prev) => ({ ...prev, [key]: val }));
+                          if (vErrors[key])
+                            setVErrors((prev) => ({ ...prev, [key]: "" }));
+                        }}
+                        errors={vErrors}
+                        afterFieldPosition="category"
+                      />
+                    </div>
+                  )}
 
                 <div className="flex flex-col gap-1.5">
                   <Label className="text-xs font-semibold">
@@ -1887,20 +1888,20 @@ export function VendorsPage() {
                 {vendorCustomFields.some(
                   (f) => f.afterField === "contactPerson",
                 ) && (
-                  <div className="sm:col-span-2">
-                    <DynamicFormRenderer
-                      fields={vendorCustomFields}
-                      values={vCustomFields}
-                      onChange={(key, val) => {
-                        setVCustomFields((prev) => ({ ...prev, [key]: val }));
-                        if (vErrors[key])
-                          setVErrors((prev) => ({ ...prev, [key]: "" }));
-                      }}
-                      errors={vErrors}
-                      afterFieldPosition="contactPerson"
-                    />
-                  </div>
-                )}
+                    <div className="sm:col-span-2">
+                      <DynamicFormRenderer
+                        fields={vendorCustomFields}
+                        values={vCustomFields}
+                        onChange={(key, val) => {
+                          setVCustomFields((prev) => ({ ...prev, [key]: val }));
+                          if (vErrors[key])
+                            setVErrors((prev) => ({ ...prev, [key]: "" }));
+                        }}
+                        errors={vErrors}
+                        afterFieldPosition="contactPerson"
+                      />
+                    </div>
+                  )}
 
                 <div className="flex flex-col gap-1.5">
                   <Label className="text-xs font-semibold">Phone</Label>
@@ -2012,20 +2013,20 @@ export function VendorsPage() {
                 {vendorCustomFields.some(
                   (f) => f.afterField === "gstNumber",
                 ) && (
-                  <div className="sm:col-span-2">
-                    <DynamicFormRenderer
-                      fields={vendorCustomFields}
-                      values={vCustomFields}
-                      onChange={(key, val) => {
-                        setVCustomFields((prev) => ({ ...prev, [key]: val }));
-                        if (vErrors[key])
-                          setVErrors((prev) => ({ ...prev, [key]: "" }));
-                      }}
-                      errors={vErrors}
-                      afterFieldPosition="gstNumber"
-                    />
-                  </div>
-                )}
+                    <div className="sm:col-span-2">
+                      <DynamicFormRenderer
+                        fields={vendorCustomFields}
+                        values={vCustomFields}
+                        onChange={(key, val) => {
+                          setVCustomFields((prev) => ({ ...prev, [key]: val }));
+                          if (vErrors[key])
+                            setVErrors((prev) => ({ ...prev, [key]: "" }));
+                        }}
+                        errors={vErrors}
+                        afterFieldPosition="gstNumber"
+                      />
+                    </div>
+                  )}
 
                 <div className="flex flex-col gap-1.5 sm:col-span-2">
                   <Label className="text-xs font-semibold">Address</Label>
@@ -2080,34 +2081,33 @@ export function VendorsPage() {
                 {vendorCustomFields.some(
                   (f) => !f.afterField || f.afterField === "end",
                 ) && (
-                  <div className="sm:col-span-2">
-                    <DynamicFormRenderer
-                      fields={vendorCustomFields.filter(
-                        (f) => !f.afterField || f.afterField === "end",
-                      )}
-                      values={vCustomFields}
-                      onChange={(key, val) => {
-                        setVCustomFields((prev) => ({ ...prev, [key]: val }));
-                        if (vErrors[key])
-                          setVErrors((prev) => ({ ...prev, [key]: "" }));
-                      }}
-                      errors={vErrors}
-                    />
-                  </div>
-                )}
+                    <div className="sm:col-span-2">
+                      <DynamicFormRenderer
+                        fields={vendorCustomFields.filter(
+                          (f) => !f.afterField || f.afterField === "end",
+                        )}
+                        values={vCustomFields}
+                        onChange={(key, val) => {
+                          setVCustomFields((prev) => ({ ...prev, [key]: val }));
+                          if (vErrors[key])
+                            setVErrors((prev) => ({ ...prev, [key]: "" }));
+                        }}
+                        errors={vErrors}
+                      />
+                    </div>
+                  )}
               </div>
             )}
 
             {formTab === "products" && (
               <div className="space-y-4">
-                <div className="flex items-center gap-2.5 border rounded-xl px-3.5 h-10 bg-background shadow-xs focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all duration-200">
-                  <Search className="size-4 text-primary animate-pulse" />
-                  <input
-                    type="text"
+                <div className="flex items-center gap-2 border rounded-xl px-3 bg-background shadow-xs focus-within:ring-1 focus-within:ring-primary">
+                  <Search className="size-4 text-muted-foreground" />
+                  <Input
                     placeholder="Search products by name, code, or category..."
                     value={productSearch}
                     onChange={(e) => setProductSearch(e.target.value)}
-                    className="border-0 bg-transparent p-0 focus:ring-0 focus-visible:ring-0 h-full w-full placeholder:text-muted-foreground/75 text-xs text-foreground outline-none"
+                    className="h-9 border-none shadow-none focus-visible:ring-0 px-0"
                   />
                 </div>
 
@@ -2205,68 +2205,77 @@ export function VendorsPage() {
       )}
 
       {/* ── Search Bar & Column Visibility ── */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gradient-to-r from-card to-background p-4 rounded-2xl border border-primary/10 shadow-sm shadow-primary/5 hover:shadow-md transition-all duration-300">
-        <div className="flex items-center w-full max-w-2xl bg-background border border-primary/15 rounded-xl shadow-xs focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all duration-200 overflow-hidden divide-x divide-primary/10">
-          <Select
-            value={searchField}
-            onValueChange={(val) => {
-              setSearchField(val as any);
-              setGlobalSearch("");
-              setFieldSearch("");
-            }}
-          >
-            <SelectTrigger className="w-[180px] h-10 border-0 bg-transparent rounded-none px-4 font-medium text-xs text-foreground focus:ring-0 focus:ring-offset-0">
-              <SelectValue placeholder="Search in" />
-            </SelectTrigger>
-            <SelectContent className="rounded-xl shadow-lg border border-primary/10">
-              <SelectItem value="all" className="text-xs">All Fields</SelectItem>
-              <SelectItem value="name" className="text-xs">Vendor Name</SelectItem>
-              <SelectItem value="category" className="text-xs">Category</SelectItem>
-              <SelectItem value="contactPerson" className="text-xs">Contact Person</SelectItem>
-              <SelectItem value="phone" className="text-xs">Phone</SelectItem>
-              <SelectItem value="email" className="text-xs">Email</SelectItem>
-              <SelectItem value="gstNumber" className="text-xs">GSTIN</SelectItem>
-              <SelectItem value="products" className="text-xs">Products Supplied</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <div className="flex items-center gap-2.5 flex-1 px-4 h-10 bg-transparent">
-            <Search className="size-4 text-primary animate-pulse" />
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* Search Bars Container */}
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          {/* 1. Global Search Bar */}
+          <div className="flex items-center w-full sm:w-72 h-10 bg-card border border-primary/15 rounded-full shadow-xs hover:border-primary/30 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all duration-200 overflow-hidden">
+            <Search className="size-4 text-muted-foreground ml-4 mr-2 shrink-0" />
             <input
               type="text"
-              className="border-0 bg-transparent p-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 h-full w-full placeholder:text-muted-foreground/75 text-xs text-foreground outline-none"
+              placeholder="Search all fields..."
+              className="flex-1 h-full bg-transparent pr-4 text-sm placeholder:text-muted-foreground focus:outline-none border-none ring-0 outline-none"
+              value={globalSearch}
+              onChange={(e) => setGlobalSearch(e.target.value)}
+            />
+          </div>
+
+          {/* 2. Column-specific Search Bar */}
+          <div className="flex items-center w-full sm:w-[360px] h-10 bg-card border border-primary/15 rounded-full shadow-xs hover:border-primary/30 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all duration-200 overflow-hidden">
+            <Select
+              value={searchField}
+              onValueChange={(val) => {
+                setSearchField(val as any);
+                setFieldSearch("");
+              }}
+            >
+              <SelectTrigger className="border-none shadow-none focus:ring-0 focus:ring-offset-0 w-[125px] h-full pl-4 pr-1 text-xs font-semibold text-muted-foreground bg-transparent hover:text-foreground cursor-pointer transition-colors shrink-0">
+                <SelectValue placeholder="Search in" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Select Column</SelectItem>
+                <SelectItem value="name">Vendor Name</SelectItem>
+                <SelectItem value="category">Category</SelectItem>
+                <SelectItem value="contactPerson">Contact Person</SelectItem>
+                <SelectItem value="phone">Phone</SelectItem>
+                <SelectItem value="email">Email</SelectItem>
+                <SelectItem value="gstNumber">GSTIN</SelectItem>
+                <SelectItem value="products">Products Supplied</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <div className="w-px h-5 bg-border shrink-0" />
+
+            <input
+              type="text"
+              className="flex-1 h-full bg-transparent px-3 text-sm placeholder:text-muted-foreground focus:outline-none border-none ring-0 outline-none"
+              disabled={searchField === "all"}
               placeholder={
                 searchField === "all"
-                  ? "Search vendors by name, category, GST..."
-                  : `Search by ${
-                      searchField === "gstNumber"
-                        ? "GSTIN"
-                        : searchField === "contactPerson"
-                          ? "contact person"
-                          : searchField
-                    }...`
+                  ? "Select a column to filter..."
+                  : `Search by ${searchField === "gstNumber"
+                    ? "GSTIN"
+                    : searchField === "contactPerson"
+                      ? "contact person"
+                      : searchField
+                  }...`
               }
-              value={searchField === "all" ? globalSearch : fieldSearch}
-              onChange={(e) => {
-                if (searchField === "all") {
-                  setGlobalSearch(e.target.value);
-                } else {
-                  setFieldSearch(e.target.value);
-                }
-              }}
+              value={fieldSearch}
+              onChange={(e) => setFieldSearch(e.target.value)}
             />
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5 shrink-0 self-end md:self-auto">
+        {/* Actions Container */}
+        <div className="flex items-center gap-2 shrink-0">
           <Button
             variant="outline"
             size="sm"
             onClick={() => void fetchAllData()}
-            className="gap-2 font-medium h-10 rounded-xl px-4 border-primary/10 hover:bg-primary/5 hover:text-primary transition-all duration-200"
+            className="gap-2 font-medium h-10 rounded-lg px-4"
             title="Refresh Vendors"
           >
-            <RefreshCw className={`size-3.5 ${loading ? "animate-spin text-primary" : "text-muted-foreground"}`} />
+            <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
 
@@ -2276,9 +2285,9 @@ export function VendorsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-2 font-medium h-10 rounded-xl px-4 border-primary/10 hover:bg-primary/5 hover:text-primary transition-all duration-200"
+                  className="gap-2 font-medium h-10 rounded-lg px-4"
                 >
-                  <SlidersHorizontal className="size-3.5 text-muted-foreground" />
+                  <SlidersHorizontal className="size-4" />
                   Customize Columns
                 </Button>
               }
@@ -2711,12 +2720,12 @@ export function VendorsPage() {
                         Created On:{" "}
                         {rev.createdAt
                           ? new Date(rev.createdAt).toLocaleString("en-IN", {
-                              day: "2-digit",
-                              month: "short",
-                              year: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
                           : "—"}
                       </span>
                     </div>
@@ -2791,11 +2800,11 @@ export function VendorsPage() {
             style={
               deMaximized
                 ? {
-                    width: "100vw",
-                    height: "100vh",
-                    maxWidth: "100vw",
-                    maxHeight: "100vh",
-                  }
+                  width: "100vw",
+                  height: "100vh",
+                  maxWidth: "100vw",
+                  maxHeight: "100vh",
+                }
                 : undefined
             }
           >
@@ -3454,10 +3463,10 @@ export function VendorsPage() {
                               <div className="max-h-64 overflow-y-auto divide-y">
                                 {getInventoryMatches(item.description)
                                   .length === 0 && (
-                                  <div className="p-3 text-center text-xs text-muted-foreground">
-                                    No matching inventory items.
-                                  </div>
-                                )}
+                                    <div className="p-3 text-center text-xs text-muted-foreground">
+                                      No matching inventory items.
+                                    </div>
+                                  )}
                                 {getInventoryMatches(item.description).map(
                                   (inv) => (
                                     <button

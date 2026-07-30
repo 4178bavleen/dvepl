@@ -116,3 +116,11 @@ input,
 .card {
   transition: all .2s ease;
 }
+
+/* Hide vertical scrollbar only */
+.no-scrollbar-y::-webkit-scrollbar {
+  width: 0px;
+}
+.no-scrollbar-y {
+  scrollbar-width: none; /* Firefox option */
+}
