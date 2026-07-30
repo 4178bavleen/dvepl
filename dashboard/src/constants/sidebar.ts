@@ -1,23 +1,23 @@
-import { 
-  LayoutDashboard, 
-  Building2, 
-  GitBranch, 
-  Network, 
-  Users2, 
-  Award, 
-  Wallet, 
-  UserCheck, 
-  CalendarDays, 
-  Briefcase, 
-  Clock, 
-  DollarSign, 
-  Handshake, 
-  Contact, 
-  MessageSquare, 
-  FolderGit2, 
-  ShieldCheck, 
-  FileText, 
-  History as AuditIcon, 
+import {
+  LayoutDashboard,
+  Building2,
+  GitBranch,
+  Network,
+  Users2,
+  Award,
+  Wallet,
+  UserCheck,
+  CalendarDays,
+  Briefcase,
+  Clock,
+  DollarSign,
+  Handshake,
+  Contact,
+  MessageSquare,
+  FolderGit2,
+  ShieldCheck,
+  FileText,
+  History as AuditIcon,
   Settings2,
   FolderOpen,
   FileCheck,
@@ -41,7 +41,7 @@ export interface SidebarItem {
 
 export const sidebarItems: SidebarItem[] = [
   { name: 'Dashboard', icon: LayoutDashboard, path: ROUTES.DASHBOARD },
-  
+
   // Organization
   { name: 'Companies', icon: Building2, path: ROUTES.ORGANIZATION_COMPANIES, section: 'Organization' },
   { name: 'Branches', icon: GitBranch, path: ROUTES.ORGANIZATION_BRANCHES, section: 'Organization' },
@@ -83,13 +83,10 @@ export const sidebarItems: SidebarItem[] = [
   { name: 'Reference Codes', icon: FileCheck, path: ROUTES.TENDER_REF_CODES, section: 'Lead Management' },
 
   // Security (PRBAC)
-  { name: 'Users', icon: UserCheck, path: ROUTES.SECURITY_USERS, section: 'Security' },
   { name: 'Roles', icon: ShieldCheck, path: ROUTES.SECURITY_ROLES, section: 'Security' },
-  { name: 'Permissions', icon: Zap, path: ROUTES.SECURITY_PERMISSIONS, section: 'Security' },
-  { name: 'Permission Groups', icon: FolderOpen, path: ROUTES.SECURITY_PERMISSION_GROUPS, section: 'Security' },
   { name: 'Approval Requests', icon: CheckSquare, path: ROUTES.SECURITY_APPROVAL_REQUESTS, section: 'Security' },
 
- 
+
   { name: 'Reports', icon: FileSpreadsheet, path: ROUTES.REPORTS },
   { name: 'Audit Logs', icon: AuditIcon, path: ROUTES.AUDIT_LOGS },
   { name: 'Custom Fields', icon: Settings2, path: ROUTES.CUSTOM_FIELDS, section: 'Settings' },

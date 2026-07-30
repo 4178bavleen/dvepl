@@ -110,12 +110,13 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     void Promise.all([
       organizationApi.companies.list(),
       authService.profile(),
-      securityApi.users.list().catch(() => [])
+      securityApi.users.list().catch(() => []),
+      securityApi.roles.list().catch(() => [])
     ])
-      .then(([companies, userProfile, usersList]) => {
+      .then(([companies, userProfile, usersList, rolesList]) => {
         if (!isMounted) return;
         setHeaderCompanies(companies.map((company) => ({ id: company.id, name: String(company.name ?? '') })));
-        useERPStore.setState({ companies, users: usersList });
+        useERPStore.setState({ companies, users: usersList, roles: rolesList });
         setProfile(userProfile);
         store.setCurrentUser(userProfile.id, userProfile.name);
         if (userProfile.company?.id) store.setCompanyId(userProfile.company.id);

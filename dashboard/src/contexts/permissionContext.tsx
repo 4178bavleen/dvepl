@@ -1,5 +1,4 @@
 import React, { createContext, useContext } from 'react';
-import { useERPStore } from '@/store/erpStore';
 
 interface PermissionContextType {
   hasPermission: (permissionCode: string) => boolean;
@@ -9,8 +8,7 @@ interface PermissionContextType {
 const PermissionContext = createContext<PermissionContextType | undefined>(undefined);
 
 export function PermissionProvider({ children }: { children: React.ReactNode }) {
-  const rawPermissions = useERPStore(state => state.permissions);
-  const permissions = React.useMemo(() => rawPermissions.map(p => p.code), [rawPermissions]);
+  const permissions = React.useMemo(() => [] as string[], []);
 
   const hasPermission = (permissionCode: string) => {
     // In our simulated dashboard, we allow all admin functions

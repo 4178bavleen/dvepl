@@ -1,0 +1,31 @@
+{
+  "bgColor": "#ffffff",
+  "sidebarPos": "left",
+  "waSettings": {
+    "orderGen": false,
+    "gatePass": false,
+    "paymentRel": false,
+    "clientNotify": false
+  },
+  "emailSettings": {
+    "orderGen": false,
+    "gatePass": false,
+    "paymentRel": false,
+    "clientNotify": false,
+    "address": "",
+    "name": ""
+  },
+  "smtpSettings": {
+    "host": "",
+    "port": 587,
+    "username": "",
+    "password": "",
+    "secure": false
+  },
+  "gatewaySettings": {
+    "provider": "twilio",
+    "apiKey": "",
+    "instanceId": ""
+  },
+  "brandColor": "#33cc33"
+}

@@ -37,8 +37,8 @@ export const crmApi = {
   contacts: crud(API_ENDPOINTS.crm.contacts),
 
   communications: crud(
-      API_ENDPOINTS.crm.communications,
-      { update: false }
+    API_ENDPOINTS.crm.communications,
+    { update: false }
   ),
 
   leads: crud(API_ENDPOINTS.crm.leads),
@@ -93,13 +93,26 @@ export const approvalRuleApi = {
 };
 
 export const securityApi = {
-  users: crud(API_ENDPOINTS.security.users),
+  users: {
+    ...crud(API_ENDPOINTS.security.users),
+    bulkImport: (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      return apiClient.post((API_ENDPOINTS.security.users as any).bulkImport, formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      }).then(res => res.data);
+    }
+  },
   roles: crud(API_ENDPOINTS.security.roles),
-  permissions: {
-    list: () => unwrap(apiClient.get<ApiResponse<ApiRecord[]>>(API_ENDPOINTS.security.permissions.list)),
-    create: async () => { throw new Error('Permissions are read-only.'); },
-  } satisfies ResourceApi<any>,
-  permissionGroups: crud(API_ENDPOINTS.security.permissionGroups),
+  settings: {
+    read: () => apiClient.get(API_ENDPOINTS.security.settings.read).then(res => res.data.data),
+    update: (data: any) => apiClient.post(API_ENDPOINTS.security.settings.update, data).then(res => res.data.data),
+    testSmtp: (data: any) => apiClient.post((API_ENDPOINTS.security.settings as any).testSmtp, data).then(res => res.data),
+    sendTestEmail: (data: any) => apiClient.post((API_ENDPOINTS.security.settings as any).sendTestEmail, data).then(res => res.data),
+    testWhatsapp: (data: any) => apiClient.post((API_ENDPOINTS.security.settings as any).testWhatsapp, data).then(res => res.data),
+    exportBackup: () => apiClient.get((API_ENDPOINTS.security.settings as any).exportBackup).then(res => res.data.data),
+    importBackup: (data: any) => apiClient.post((API_ENDPOINTS.security.settings as any).importBackup, data).then(res => res.data),
+  }
 };
 
 export const engineeringApi = {
@@ -150,7 +163,7 @@ export const logisticsApi = {
 };
 
 export const reportsApi = {
-  getReport: (type: string, fromDate?: string, toDate?: string) => 
+  getReport: (type: string, fromDate?: string, toDate?: string) =>
     apiClient.get(`/reports/read/`, { params: { type, fromDate, toDate } }).then(res => res.data)
 };
 
