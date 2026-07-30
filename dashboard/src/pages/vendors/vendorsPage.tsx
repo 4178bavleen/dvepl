@@ -2204,77 +2204,67 @@ export function VendorsPage() {
       )}
 
       {/* ── Search Bar & Column Visibility ── */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2 max-w-md w-full border rounded-xl px-3 bg-card shadow-xs focus-within:ring-1 focus-within:ring-primary">
-          <Search className="size-4 text-muted-foreground" />
-          <Input
-            placeholder="Search vendors by name, category, GST..."
-            value={globalSearch}
-            onChange={(e) => setGlobalSearch(e.target.value)}
-          />
-        </div>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gradient-to-r from-card to-background p-4 rounded-2xl border border-primary/10 shadow-sm shadow-primary/5 hover:shadow-md transition-all duration-300">
+        <div className="flex items-center w-full max-w-2xl bg-background border border-primary/15 rounded-xl shadow-xs focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all duration-200 overflow-hidden divide-x divide-primary/10">
+          <Select
+            value={searchField}
+            onValueChange={(val) => {
+              setSearchField(val as any);
+              setGlobalSearch("");
+              setFieldSearch("");
+            }}
+          >
+            <SelectTrigger className="w-[180px] h-10 border-0 bg-transparent rounded-none px-4 font-medium text-xs text-foreground focus:ring-0 focus:ring-offset-0">
+              <SelectValue placeholder="Search in" />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl shadow-lg border border-primary/10">
+              <SelectItem value="all" className="text-xs">All Fields</SelectItem>
+              <SelectItem value="name" className="text-xs">Vendor Name</SelectItem>
+              <SelectItem value="category" className="text-xs">Category</SelectItem>
+              <SelectItem value="contactPerson" className="text-xs">Contact Person</SelectItem>
+              <SelectItem value="phone" className="text-xs">Phone</SelectItem>
+              <SelectItem value="email" className="text-xs">Email</SelectItem>
+              <SelectItem value="gstNumber" className="text-xs">GSTIN</SelectItem>
+              <SelectItem value="products" className="text-xs">Products Supplied</SelectItem>
+            </SelectContent>
+          </Select>
 
-        {/* new added */}
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2 max-w-md w-full">
-            <Select
-              value={searchField}
-              onValueChange={(val) => {
-                setSearchField(val as any);
-                setFieldSearch("");
-              }}
-            >
-              <SelectTrigger className="w-[150px] h-9 shrink-0">
-                <SelectValue placeholder="Search in" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Fields</SelectItem>
-                <SelectItem value="name">Vendor Name</SelectItem>
-                <SelectItem value="category">Category</SelectItem>
-                <SelectItem value="contactPerson">Contact Person</SelectItem>
-                <SelectItem value="phone">Phone</SelectItem>
-                <SelectItem value="email">Email</SelectItem>
-                <SelectItem value="gstNumber">GSTIN</SelectItem>
-                <SelectItem value="products">Products Supplied</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <div className="flex items-center gap-2 flex-1 border rounded-xl px-3 bg-card shadow-xs focus-within:ring-1 focus-within:ring-primary">
-              <Search className="size-4 text-muted-foreground" />
-              <Input
-                placeholder={
-                  searchField === "all"
-                    ? "Search vendors by name, category, GST..."
-                    : `Search by ${
-                        searchField === "gstNumber"
-                          ? "GSTIN"
-                          : searchField === "contactPerson"
-                            ? "contact person"
-                            : searchField
-                      }...`
+          <div className="flex items-center gap-2.5 flex-1 px-4 h-10 bg-transparent">
+            <Search className="size-4 text-primary animate-pulse" />
+            <Input
+              className="border-0 bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 h-full w-full placeholder:text-muted-foreground/75 text-xs text-foreground"
+              placeholder={
+                searchField === "all"
+                  ? "Search vendors by name, category, GST..."
+                  : `Search by ${
+                      searchField === "gstNumber"
+                        ? "GSTIN"
+                        : searchField === "contactPerson"
+                          ? "contact person"
+                          : searchField
+                    }...`
+              }
+              value={searchField === "all" ? globalSearch : fieldSearch}
+              onChange={(e) => {
+                if (searchField === "all") {
+                  setGlobalSearch(e.target.value);
+                } else {
+                  setFieldSearch(e.target.value);
                 }
-                value={fieldSearch}
-                onChange={(e) => setFieldSearch(e.target.value)}
-              />
-              {/* {searchField === 'products' && !vendorProductsLoaded && (
-  <p className="text-xs text-muted-foreground px-1">Loading product data for search…</p>
-)} */}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            {/* existing Refresh + Customize Columns buttons stay as-is */}
+              }}
+            />
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+
+        <div className="flex items-center gap-2.5 shrink-0 self-end md:self-auto">
           <Button
             variant="outline"
             size="sm"
             onClick={() => void fetchAllData()}
-            className="gap-2 font-medium"
+            className="gap-2 font-medium h-10 rounded-xl px-4 border-primary/10 hover:bg-primary/5 hover:text-primary transition-all duration-200"
             title="Refresh Vendors"
           >
-            <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw className={`size-3.5 ${loading ? "animate-spin text-primary" : "text-muted-foreground"}`} />
             Refresh
           </Button>
 
@@ -2284,9 +2274,9 @@ export function VendorsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-2 font-medium"
+                  className="gap-2 font-medium h-10 rounded-xl px-4 border-primary/10 hover:bg-primary/5 hover:text-primary transition-all duration-200"
                 >
-                  <SlidersHorizontal className="size-4" />
+                  <SlidersHorizontal className="size-3.5 text-muted-foreground" />
                   Customize Columns
                 </Button>
               }
