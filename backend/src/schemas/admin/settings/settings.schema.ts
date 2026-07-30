@@ -25,11 +25,15 @@ export const settingsSchema = z.object({
     qcRejectionAlert: z.boolean().optional()
   }).optional(),
   smtpSettings: z.object({
+    title: z.string().optional(),
     host: z.string().optional(),
     port: z.any().optional(),
     username: z.string().optional(),
     password: z.string().optional(),
-    secure: z.boolean().optional()
+    secure: z.boolean().optional(),
+    supportEmail: z.string().optional(),
+    supportPhone: z.string().optional(),
+    address: z.string().optional()
   }).optional(),
   captchaSettings: z.object({
     siteKey: z.string().optional(),
@@ -40,6 +44,9 @@ export const settingsSchema = z.object({
     provider: z.string().optional(),
     apiKey: z.string().optional(),
     instanceId: z.string().optional(),
+    baseUrl: z.string().optional(),
+    secretKey: z.string().optional(),
+    enabled: z.boolean().optional(),
     sandbox: z.boolean().optional()
   }).optional(),
   templates: z.array(z.any()).optional(),

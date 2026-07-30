@@ -12,20 +12,27 @@
     "gatePass": false,
     "paymentRel": false,
     "clientNotify": false,
-    "address": "",
-    "name": ""
+    "address": "noreply@vibrantick.in",
+    "name": "DVEPL PORTAL"
   },
   "smtpSettings": {
-    "host": "",
-    "port": 587,
-    "username": "",
-    "password": "",
-    "secure": false
+    "title": "DVEPL PORTAL",
+    "host": "smtp.hostinger.com",
+    "port": 465,
+    "username": "noreply@vibrantick.in",
+    "password": "7F2gaC>7jU",
+    "secure": false,
+    "supportEmail": "",
+    "supportPhone": "",
+    "address": ""
   },
   "gatewaySettings": {
     "provider": "twilio",
-    "apiKey": "",
-    "instanceId": ""
+    "apiKey": "test-api-key-2",
+    "instanceId": "https://api.whatsapp.com/v2",
+    "baseUrl": "https://api.whatsapp.com/v2",
+    "secretKey": "test-secret-key-2",
+    "enabled": true
   },
   "brandColor": "#33cc33"
 }

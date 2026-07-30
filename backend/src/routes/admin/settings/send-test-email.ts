@@ -25,7 +25,7 @@ async function sendTestEmailRoute(
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { smtpSettings, toEmail, fromEmail, fromName } = request.body as any;
+        const { smtpSettings, toEmail, fromEmail, fromName, subject, text, html } = request.body as any;
 
         if (!smtpSettings?.host || !smtpSettings?.port || !toEmail) {
           return reply.status(400).send({
@@ -34,10 +34,11 @@ async function sendTestEmailRoute(
           });
         }
 
+        const parsedPort = parseInt(String(smtpSettings.port), 10);
         const transporter = nodemailer.createTransport({
           host: smtpSettings.host,
-          port: parseInt(String(smtpSettings.port), 10),
-          secure: !!smtpSettings.secure,
+          port: parsedPort,
+          secure: parsedPort === 465,
           auth: smtpSettings.username && smtpSettings.password ? {
             user: smtpSettings.username,
             pass: smtpSettings.password,
@@ -48,9 +49,9 @@ async function sendTestEmailRoute(
         await transporter.sendMail({
           from: `"${fromName || "DVEPL Test"}" <${fromEmail || smtpSettings.username || "test@dvepl.com"}>`,
           to: toEmail,
-          subject: "DVEPL SMTP Connection Test",
-          text: "Hello,\n\nThis is a test email sent from the DVEPL ERP Settings page. If you are reading this, your SMTP configuration is successfully working!\n\nRegards,\nDVEPL Team",
-          html: "<p>Hello,</p><p>This is a test email sent from the DVEPL ERP Settings page. If you are reading this, your SMTP configuration is successfully working!</p><p>Regards,<br>DVEPL Team</p>",
+          subject: subject || "DVEPL SMTP Connection Test",
+          text: text || "Hello,\n\nThis is a test email sent from the DVEPL ERP Settings page. If you are reading this, your SMTP configuration is successfully working!\n\nRegards,\nDVEPL Team",
+          html: html || "<p>Hello,</p><p>This is a test email sent from the DVEPL ERP Settings page. If you are reading this, your SMTP configuration is successfully working!</p><p>Regards,<br>DVEPL Team</p>",
         });
 
         return reply.status(200).send({

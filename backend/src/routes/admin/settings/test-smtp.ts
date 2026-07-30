@@ -34,10 +34,11 @@ async function testSmtpRoute(
           });
         }
 
+        const parsedPort = parseInt(String(port), 10);
         const transporter = nodemailer.createTransport({
           host,
-          port: parseInt(String(port), 10),
-          secure: !!secure,
+          port: parsedPort,
+          secure: parsedPort === 465,
           auth: username && password ? {
             user: username,
             pass: password,

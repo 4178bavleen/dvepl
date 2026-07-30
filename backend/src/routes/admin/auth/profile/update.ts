@@ -4,6 +4,7 @@ import {
   FastifyReply,
   FastifyRequest,
 } from "fastify";
+import { Prisma } from "@prisma/client";
 
 import { adminLogs } from "../../../../services/logger/contextLogger";
 import { updateUserSchema } from "../../../../schemas/user/auth/update-user.schema";
@@ -57,7 +58,7 @@ async function updateProfileRoute(
           },
           data: {
             name,
-            phone,
+            phone: phone && phone.trim() !== "" ? phone.trim() : null,
           },
         });
 
@@ -75,13 +76,19 @@ async function updateProfileRoute(
           error,
         });
 
+        if (error instanceof Prisma.PrismaClientKnownRequestError) {
+          if (error.code === "P2002" && (error.meta?.target as string[])?.includes("phone")) {
+            return reply.status(400).send({
+              success: false,
+              message: "This phone number is already in use by another user.",
+            });
+          }
+        }
+
         return reply.status(500).send({
           success: false,
           message: "Server error while updating profile.",
-          details:
-            process.env.NODE_ENV === "development"
-              ? error.message
-              : undefined,
+          details: error.message,
         });
       }
     },

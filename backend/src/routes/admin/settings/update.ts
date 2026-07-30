@@ -80,12 +80,12 @@ async function updateSettingsRoute(
               smtpPort: isNaN(smtpPortVal as any) ? null : smtpPortVal,
               smtpUsername: validationResult.data.smtpSettings?.username || null,
               smtpPassword: validationResult.data.smtpSettings?.password || null,
-              smtpFromEmail: validationResult.data.emailSettings?.address || null,
-              smtpFromName: validationResult.data.emailSettings?.name || null,
-              whatsappEnabled,
+              smtpFromEmail: validationResult.data.smtpSettings?.username || validationResult.data.emailSettings?.address || null,
+              smtpFromName: validationResult.data.smtpSettings?.title || validationResult.data.emailSettings?.name || null,
+              whatsappEnabled: validationResult.data.gatewaySettings?.enabled ?? whatsappEnabled,
               whatsappProvider: providerEnum,
               whatsappApiKey: validationResult.data.gatewaySettings?.apiKey || null,
-              whatsappEndpoint: validationResult.data.gatewaySettings?.instanceId || null,
+              whatsappEndpoint: validationResult.data.gatewaySettings?.instanceId || validationResult.data.gatewaySettings?.baseUrl || null,
             },
             create: {
               companyId,
@@ -94,12 +94,12 @@ async function updateSettingsRoute(
               smtpPort: isNaN(smtpPortVal as any) ? null : smtpPortVal,
               smtpUsername: validationResult.data.smtpSettings?.username || null,
               smtpPassword: validationResult.data.smtpSettings?.password || null,
-              smtpFromEmail: validationResult.data.emailSettings?.address || null,
-              smtpFromName: validationResult.data.emailSettings?.name || null,
-              whatsappEnabled,
+              smtpFromEmail: validationResult.data.smtpSettings?.username || validationResult.data.emailSettings?.address || null,
+              smtpFromName: validationResult.data.smtpSettings?.title || validationResult.data.emailSettings?.name || null,
+              whatsappEnabled: validationResult.data.gatewaySettings?.enabled ?? whatsappEnabled,
               whatsappProvider: providerEnum,
               whatsappApiKey: validationResult.data.gatewaySettings?.apiKey || null,
-              whatsappEndpoint: validationResult.data.gatewaySettings?.instanceId || null,
+              whatsappEndpoint: validationResult.data.gatewaySettings?.instanceId || validationResult.data.gatewaySettings?.baseUrl || null,
             }
           });
         }

@@ -364,12 +364,24 @@
     "designation": "Executive",
     "pageAccess": [
       "dashboard",
+      "companies",
+      "branches",
+      "departments",
+      "teams",
+      "designations",
+      "employees",
+      "attendance",
+      "leaves",
+      "holidays",
+      "customers",
+      "contacts",
+      "communication",
       "orders",
       "vendors"
     ],
     "fieldPermissions": {
       "company_tax_id": {
-        "view": true,
+        "view": false,
         "edit": false
       },
       "registration_number": {
@@ -405,7 +417,7 @@
         "edit": false
       },
       "discount_margin": {
-        "view": false,
+        "view": true,
         "edit": false
       },
       "markup_percent": {
@@ -414,43 +426,43 @@
       },
       "employee_code": {
         "view": true,
-        "edit": true
+        "edit": false
       },
       "basic_salary": {
         "view": true,
-        "edit": true
+        "edit": false
       },
       "hra_allowance": {
-        "view": true,
-        "edit": true
+        "view": false,
+        "edit": false
       },
       "allowances": {
-        "view": true,
-        "edit": true
+        "view": false,
+        "edit": false
       },
       "deductions": {
-        "view": true,
-        "edit": true
+        "view": false,
+        "edit": false
       },
       "total_ctc": {
-        "view": true,
-        "edit": true
+        "view": false,
+        "edit": false
       },
       "pan_no": {
-        "view": true,
-        "edit": true
+        "view": false,
+        "edit": false
       },
       "aadhaar_no": {
-        "view": true,
-        "edit": true
+        "view": false,
+        "edit": false
       },
       "pf_uan": {
-        "view": true,
-        "edit": true
+        "view": false,
+        "edit": false
       },
       "date_of_birth": {
-        "view": true,
-        "edit": true
+        "view": false,
+        "edit": false
       },
       "customer_pan": {
         "view": false,
@@ -477,43 +489,43 @@
         "edit": false
       },
       "po_number": {
-        "view": true,
-        "edit": true
+        "view": false,
+        "edit": false
       },
       "po_value": {
-        "view": true,
-        "edit": true
+        "view": false,
+        "edit": false
       },
       "delivery_month_target": {
-        "view": true,
-        "edit": true
+        "view": false,
+        "edit": false
       },
       "concerned_person": {
-        "view": true,
-        "edit": true
+        "view": false,
+        "edit": false
       },
       "drawing_status": {
-        "view": true,
-        "edit": true
+        "view": false,
+        "edit": false
       },
       "material_status": {
-        "view": true,
-        "edit": true
+        "view": false,
+        "edit": false
       },
       "plant_status": {
-        "view": true,
-        "edit": true
+        "view": false,
+        "edit": false
       },
       "dispatch_date": {
-        "view": true,
-        "edit": true
+        "view": false,
+        "edit": false
       }
     },
     "actionPermissions": {
-      "create": true,
-      "edit": true,
+      "create": false,
+      "edit": false,
       "delete": false,
-      "export": true
+      "export": false
     }
   }
 }

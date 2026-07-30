@@ -54,6 +54,7 @@ async function readSettingsRoute(
           if (dbConfig) {
             // Merge database values back into SMTP, WhatsApp & email notifications settings format
             if (!settings.smtpSettings) settings.smtpSettings = {};
+            settings.smtpSettings.title = dbConfig.smtpFromName || settings.smtpSettings.title || "";
             settings.smtpSettings.host = dbConfig.smtpHost || settings.smtpSettings.host || "";
             settings.smtpSettings.port = dbConfig.smtpPort || settings.smtpSettings.port || 587;
             settings.smtpSettings.username = dbConfig.smtpUsername || settings.smtpSettings.username || "";
@@ -82,6 +83,9 @@ async function readSettingsRoute(
             settings.gatewaySettings.provider = dbConfig.whatsappProvider?.toLowerCase() || settings.gatewaySettings.provider || "twilio";
             settings.gatewaySettings.apiKey = dbConfig.whatsappApiKey || settings.gatewaySettings.apiKey || "";
             settings.gatewaySettings.instanceId = dbConfig.whatsappEndpoint || settings.gatewaySettings.instanceId || "";
+            settings.gatewaySettings.baseUrl = dbConfig.whatsappEndpoint || settings.gatewaySettings.baseUrl || "";
+            settings.gatewaySettings.secretKey = settings.gatewaySettings.secretKey || "";
+            settings.gatewaySettings.enabled = dbConfig.whatsappEnabled;
           }
         }
 

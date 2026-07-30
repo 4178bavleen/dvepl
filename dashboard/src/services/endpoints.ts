@@ -261,8 +261,9 @@ export const API_ENDPOINTS = {
     settings: {
       read: '/settings/read/',
       update: '/settings/update/',
-      testSmtp: '/settings/test-smtp/',
-      sendTestEmail: '/settings/send-test-email/',
+      testSmtp: '/settings/test-smtp',
+      sendTestEmail: '/settings/send-test-email',
+      sendPoEmail: '/settings/send-po-email',
       testWhatsapp: '/settings/test-whatsapp/',
       exportBackup: '/settings/backup/export',
       importBackup: '/settings/backup/import',

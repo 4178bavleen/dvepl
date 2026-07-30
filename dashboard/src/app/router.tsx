@@ -181,7 +181,7 @@ export function AppRouter() {
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/settings/custom-fields" element={<CustomFieldsPage />} />
               <Route path="/settings/recycle-bin" element={<RecycleBinPage />} />
-              <Route path="/settings/profile" element={<ProfilePage />} />
+              <Route path="/profile" element={<ProfilePage />} />
               <Route path="/settings/notifications" element={<NotificationsPage />} />
             </Route>
 

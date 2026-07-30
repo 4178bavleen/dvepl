@@ -108,7 +108,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let isMounted = true;
     void Promise.all([
-      organizationApi.companies.list(),
+      organizationApi.companies.list().catch(() => []),
       authService.profile(),
       securityApi.users.list().catch(() => []),
       securityApi.roles.list().catch(() => [])
@@ -116,7 +116,34 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       .then(([companies, userProfile, usersList, rolesList]) => {
         if (!isMounted) return;
         setHeaderCompanies(companies.map((company) => ({ id: company.id, name: String(company.name ?? '') })));
-        useERPStore.setState({ companies, users: usersList, roles: rolesList });
+        
+        const profileUserObj = {
+          id: userProfile.id,
+          name: userProfile.name,
+          email: userProfile.email,
+          phone: userProfile.phone,
+          companyId: userProfile.company?.id || "",
+          isEmailVerified: true,
+          isPhoneVerified: true,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          role: userProfile.roles?.[0] || "",
+          designation: userProfile.designation || "Team Member",
+          pageAccess: userProfile.pageAccess || [],
+          fieldPermissions: userProfile.fieldPermissions || {},
+          actionPermissions: userProfile.actionPermissions || { create: true, edit: true, delete: false, export: true },
+          roles: (userProfile.roles || []).map((rName: string) => ({
+            id: rName,
+            name: rName
+          }))
+        };
+
+        const mergedUsers = usersList.some((u: any) => u.id === userProfile.id)
+          ? usersList.map((u: any) => u.id === userProfile.id ? { ...u, ...profileUserObj } : u)
+          : [...usersList, profileUserObj];
+
+        useERPStore.setState({ companies, users: mergedUsers as any, roles: rolesList });
         setProfile(userProfile);
         store.setCurrentUser(userProfile.id, userProfile.name);
         if (userProfile.company?.id) store.setCompanyId(userProfile.company.id);

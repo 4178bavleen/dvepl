@@ -67,7 +67,52 @@ async function adminRoutes(
     //runs automatically before every req
     instance.addHook("preHandler", async (req, reply) => {
       await instance.verifyToken(req, reply); // 1️⃣ Verify token
-      await instance.authorizePermissions(["company.create"])(req, reply); // 2️⃣ Verify role
+
+      // Determine required permissions dynamically based on the request URL and method
+      const url = req.url;
+      let requiredPermissions: string[] = [];
+
+      if (url.includes("/company/")) {
+        if (url.includes("/create")) requiredPermissions = ["company.create"];
+        else if (url.includes("/update")) requiredPermissions = ["company.update"];
+        else if (url.includes("/delete")) requiredPermissions = ["company.delete"];
+        else if (url.includes("/read")) requiredPermissions = ["company.view"];
+      } else if (url.includes("/branch/")) {
+        if (url.includes("/create")) requiredPermissions = ["branch.create"];
+        else if (url.includes("/update")) requiredPermissions = ["branch.update"];
+        else if (url.includes("/delete")) requiredPermissions = ["branch.delete"];
+        else if (url.includes("/read")) requiredPermissions = ["branch.view"];
+      } else if (url.includes("/department/") || url.includes("/designation/") || url.includes("/cost-center/") || url.includes("/team/")) {
+        if (url.includes("/create")) requiredPermissions = ["employee.create"];
+        else if (url.includes("/update")) requiredPermissions = ["employee.update"];
+        else if (url.includes("/delete")) requiredPermissions = ["employee.delete"];
+        else if (url.includes("/read")) requiredPermissions = ["employee.view"];
+      } else if (url.includes("/employee/")) {
+        if (url.includes("/create")) requiredPermissions = ["employee.create"];
+        else if (url.includes("/update")) requiredPermissions = ["employee.update"];
+        else if (url.includes("/delete")) requiredPermissions = ["employee.delete"];
+        else if (url.includes("/read")) requiredPermissions = ["employee.view"];
+      } else if (url.includes("/settings/")) {
+        // Settings are administrative, allow company.update, company.create, or role.update
+        requiredPermissions = ["company.update", "company.create", "role.update"];
+      } else if (url.includes("/order/")) {
+        if (url.includes("/create") || url.includes("/update") || url.includes("/delete") || url.includes("/bulk")) {
+          requiredPermissions = ["company.create", "tender.update"];
+        } else {
+          requiredPermissions = ["company.view", "tender.view"];
+        }
+      } else if (url.includes("/vendor/")) {
+        if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
+          requiredPermissions = ["company.create", "tender.update"];
+        } else {
+          requiredPermissions = ["company.view", "tender.view"];
+        }
+      }
+
+      // If we identified specific required permissions, authorize them
+      if (requiredPermissions.length > 0) {
+        await instance.authorizePermissions(requiredPermissions)(req, reply);
+      }
     });
 
     instance.register(adminBranchRouteGroup, { prefix: "/branch" });
@@ -159,28 +204,28 @@ async function adminRoutes(
     instance.register(adminTechnicalClarificationRouteGroup, {
       prefix: "/technical-clarification",
     });
-    fastify.register(accessRoutes, {
+    instance.register(accessRoutes, {
       prefix: "/user/access",
     });
-    fastify.register(adminOrderRouteGroup, {
+    instance.register(adminOrderRouteGroup, {
       prefix: "/order",
     });
-    fastify.register(adminVendorRouteGroup, {
+    instance.register(adminVendorRouteGroup, {
       prefix: "/vendor",
     });
-    fastify.register(adminTaskRouteGroup, {
+    instance.register(adminTaskRouteGroup, {
       prefix: "/task",
     });
-    fastify.register(adminReportsRouteGroup, {
+    instance.register(adminReportsRouteGroup, {
       prefix: "/reports",
     });
-    fastify.register(adminPaymentRouteGroup, {
+    instance.register(adminPaymentRouteGroup, {
       prefix: "/payment",
     });
-    fastify.register(adminInventoryRouteGroup, {
+    instance.register(adminInventoryRouteGroup, {
       prefix: "/inventory",
     });
-    fastify.register(adminVendorProductRouteGroup, {
+    instance.register(adminVendorProductRouteGroup, {
       prefix: "/vendor-product",
     });
     // fastify.register(notificationRoutes, {
