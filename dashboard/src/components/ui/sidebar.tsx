@@ -13,7 +13,6 @@ import { useERPStore } from '@/store/erpStore';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useUiConfig } from '@/contexts/ui/uiConfigContext';
-import { translations } from '@/constants/translations';
 
 export default function Sidebar() {
   const store = useERPStore();
@@ -29,13 +28,73 @@ export default function Sidebar() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
-  const currentUser = store.users.find((u) => u.id === store.currentUserId);
+  const currentUser = store.users.find((u) => u.id === store.currentUserId) as any;
 
-  /* sidebar items moved to UiConfigContext */
+  // Filter sidebar items based on pageAccess
+  const visibleSidebarItems = React.useMemo(() => {
+    if (!currentUser || !currentUser.pageAccess) return sidebarItems;
+    
+    // Always grant full access to Admins/Super Admins
+    const isAdmin = currentUser.role?.toLowerCase().includes('admin') || 
+                    currentUser.name?.toLowerCase().includes('admin');
+    if (isAdmin) return sidebarItems;
 
-  const sections = Array.from(
-    new Set(sidebarItems.filter((i) => i.section).map((i) => i.section))
-  ) as string[];
+    const mapping: Record<string, string> = {
+      'dashboard': 'dashboard',
+      'companies': 'companies',
+      'branches': 'branches',
+      'departments': 'departments',
+      'teams': 'teams',
+      'designations': 'designations',
+      'cost_centers': 'cost_centers',
+      'employees': 'employees',
+      'attendance': 'attendance',
+      'leaves': 'leaves',
+      'holidays': 'holidays',
+      'shift_management': 'shift_management',
+      'payroll': 'payroll',
+      'documents': 'documents',
+      'tasks': 'tasks',
+      'customers': 'customers',
+      'contact_persons': 'contacts',
+      'communication_history': 'communication',
+      'orders': 'orders',
+      'delivery': 'delivery',
+      'vendors': 'vendors',
+      'inventory': 'inventory',
+      'finance': 'finance',
+      'tender_requests': 'tender_requests',
+      'tenders': 'tenders',
+      'technical_clarifications': 'technical_clarifications',
+      'government_departments': 'government_departments',
+      'sections': 'sections',
+      'divisions': 'divisions',
+      'sub_divisions': 'sub_divisions',
+      'reference_codes': 'reference_codes',
+      'users': 'users',
+      'roles': 'roles',
+      'permissions': 'permissions',
+      'permission_groups': 'permission_groups',
+      'approval_requests': 'approval_requests',
+      'reports': 'reports',
+      'audit_logs': 'audit_logs',
+      'custom_fields': 'custom_fields',
+      'recycle_bin': 'recycle_bin',
+      'settings': 'settings'
+    };
+
+    return sidebarItems.filter(item => {
+      const normalizedKey = item.name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      const key = mapping[normalizedKey] || normalizedKey;
+      return currentUser.pageAccess.includes(key);
+    });
+  }, [currentUser, sidebarItems]);
+
+  const sections = React.useMemo(() => {
+    return Array.from(
+      new Set(visibleSidebarItems.filter((i) => i.section).map((i) => i.section))
+    ) as string[];
+  }, [visibleSidebarItems]);
 
   return (
     <>
@@ -66,7 +125,7 @@ export default function Sidebar() {
         </div>
         <div className="flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] py-4 px-3 space-y-6">
           <div className="space-y-1">
-            {sidebarItems.filter((i) => !i.section).map((item) => {
+            {visibleSidebarItems.filter((i) => !i.section).map((item) => {
               const active = location.pathname === item.path;
               return (
                 <Link
@@ -90,7 +149,7 @@ export default function Sidebar() {
               )}
               {isSidebarCollapsed && <div className="h-px bg-border my-2 mx-2" />}
               <div className="space-y-1">
-                {sidebarItems.filter((i) => i.section === secName).map((item) => {
+                {visibleSidebarItems.filter((i) => i.section === secName).map((item) => {
                   const active = location.pathname === item.path;
                   return (
                     <Link
@@ -140,7 +199,7 @@ export default function Sidebar() {
                 </div>
                 <nav className="space-y-6">
                   <div className="space-y-1">
-                    {sidebarItems.filter((i) => !i.section).map((item) => (
+                    {visibleSidebarItems.filter((i) => !i.section).map((item) => (
                       <Link
                         key={item.name}
                         to={item.path || '#'}
@@ -157,7 +216,7 @@ export default function Sidebar() {
                     <div key={secName} className="space-y-1.5">
                       <p className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider px-3">{t(secName)}</p>
                       <div className="space-y-1">
-                        {sidebarItems.filter((i) => i.section === secName).map((item) => (
+                        {visibleSidebarItems.filter((i) => i.section === secName).map((item) => (
                           <Link
                             key={item.name}
                             to={item.path || '#'}

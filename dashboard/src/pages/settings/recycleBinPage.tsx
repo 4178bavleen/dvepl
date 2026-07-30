@@ -61,7 +61,8 @@ export function RecycleBinPage() {
       const res = await apiClient.get('/recycle-bin/list');
       const list = Array.isArray(res.data?.data) ? res.data.data : [];
       const availableModules = Array.isArray(res.data?.modules) ? res.data.modules : [];
-      const formatted: RecycleBinItem[] = list.map((item: any) => ({
+      
+      const backendFormatted: RecycleBinItem[] = list.map((item: any) => ({
         id: item.id,
         module: item.module,
         moduleLabel: item.moduleLabel,
@@ -69,8 +70,30 @@ export function RecycleBinPage() {
         deletedBy: item.deletedBy || 'Admin',
         deletedAt: item.deletedAt ? new Date(item.deletedAt).toLocaleString() : new Date().toLocaleString(),
       }));
-      setModules(availableModules);
-      setItems(formatted);
+
+      // Fetch local storage trash PO Revisions
+      const localTrashSaved = localStorage.getItem('dvepl_po_revisions_trash');
+      const localTrash: any[] = localTrashSaved ? JSON.parse(localTrashSaved) : [];
+      const localFormatted: RecycleBinItem[] = localTrash.map((rev) => ({
+        id: rev.id,
+        module: 'porevision',
+        moduleLabel: 'PO Revision',
+        name: `PO #${rev.poNumber} (R${rev.revisionNo}) - ${rev.vendorName || 'Vendor'}`,
+        deletedBy: 'Admin',
+        deletedAt: rev.deletedAt ? new Date(rev.deletedAt).toLocaleString() : new Date().toLocaleString(),
+      }));
+
+      const combinedList = [...localFormatted, ...backendFormatted].sort(
+        (a, b) => new Date(b.deletedAt).getTime() - new Date(a.deletedAt).getTime()
+      );
+
+      const combinedModules = [...availableModules];
+      if (!combinedModules.some(m => m.module === 'porevision')) {
+        combinedModules.push({ module: 'porevision', label: 'PO Revision' });
+      }
+
+      setModules(combinedModules);
+      setItems(combinedList);
     } catch (err: any) {
       console.error('Failed to load recycle bin records', err);
       toast.error('Failed to fetch recycle bin items');
@@ -123,8 +146,34 @@ export function RecycleBinPage() {
     }
   };
 
-  // Restore single item via backend API
+  // Restore single item via backend API or localStorage
   const performRestore = async (item: RecycleBinItem) => {
+    if (item.module === 'porevision') {
+      try {
+        const trashSaved = localStorage.getItem('dvepl_po_revisions_trash');
+        const trashList: any[] = trashSaved ? JSON.parse(trashSaved) : [];
+        const toRestore = trashList.find(r => r.id === item.id);
+        if (toRestore) {
+          delete toRestore.deletedAt;
+          const saved = localStorage.getItem('dvepl_po_revisions');
+          const list: any[] = saved ? JSON.parse(saved) : [];
+          list.unshift(toRestore);
+          localStorage.setItem('dvepl_po_revisions', JSON.stringify(list));
+
+          const newTrash = trashList.filter(r => r.id !== item.id);
+          localStorage.setItem('dvepl_po_revisions_trash', JSON.stringify(newTrash));
+
+          toast.success(`Restored "${item.name}" successfully`);
+          fetchRecycleBin();
+        } else {
+          toast.error(`Failed to find ${item.name} in trash`);
+        }
+      } catch (err) {
+        toast.error(`Failed to restore ${item.name}`);
+      }
+      return;
+    }
+
     try {
       await apiClient.post(`/recycle-bin/restore/${item.module}/${item.id}`);
       toast.success(`Restored "${item.name}" successfully`);
@@ -134,8 +183,22 @@ export function RecycleBinPage() {
     }
   };
 
-  // Permanent Delete single item via backend API
+  // Permanent Delete single item via backend API or localStorage
   const performPermanentDelete = async (item: RecycleBinItem) => {
+    if (item.module === 'porevision') {
+      try {
+        const trashSaved = localStorage.getItem('dvepl_po_revisions_trash');
+        const trashList: any[] = trashSaved ? JSON.parse(trashSaved) : [];
+        const newTrash = trashList.filter(r => r.id !== item.id);
+        localStorage.setItem('dvepl_po_revisions_trash', JSON.stringify(newTrash));
+        toast.success(`Permanently deleted "${item.name}"`);
+        fetchRecycleBin();
+      } catch (err) {
+        toast.error(`Failed to delete ${item.name}`);
+      }
+      return;
+    }
+
     try {
       await apiClient.delete(`/recycle-bin/permanent-delete/${item.module}/${item.id}`);
       toast.success(`Permanently deleted "${item.name}"`);
