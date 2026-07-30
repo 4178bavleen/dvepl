@@ -16,9 +16,9 @@ import { useERPStore } from '@/store/erpStore';
 import { useAuth } from '@/contexts/authContext';
 import { authService, type ProfileResponse } from '@/services/auth';
 import { organizationApi } from '@/services/organization';
+import { securityApi } from '@/services/modules';
 import { Button } from '@/components/ui/button';
 import Sidebar from '@/components/ui/sidebar';
-import { translations } from '@/constants/translations';
 
 
 
@@ -42,6 +42,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [headerCompanies, setHeaderCompanies] = useState<Array<{ id: string; name: string }>>([]);
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
+  const [sidebarPos, setSidebarPos] = useState(localStorage.getItem('dvepl_theme_sidebar_pos') || 'left');
 
   // Sync theme with HTML tag
   useEffect(() => {
@@ -53,13 +54,70 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     }
   }, [store.theme]);
 
+  // Load and apply brand color and background color globally from localStorage
+  useEffect(() => {
+    const savedBrandColor = localStorage.getItem('dvepl_brand_color') || '#33cc33';
+    const hexToHslString = (hex: string): string => {
+      hex = hex.replace(/^#/, '');
+      if (hex.length === 3) {
+        hex = hex.split('').map(char => char + char).join('');
+      }
+      const r = parseInt(hex.substring(0, 2), 16) / 255;
+      const g = parseInt(hex.substring(2, 4), 16) / 255;
+      const b = parseInt(hex.substring(4, 6), 16) / 255;
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      let h = 0;
+      let s = 0;
+      const l = (max + min) / 2;
+      if (max !== min) {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+          case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+          case g: h = (b - r) / d + 2; break;
+          case b: h = (r - g) / d + 4; break;
+        }
+        h /= 6;
+      }
+      return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+    };
+    
+    try {
+      const hslVal = hexToHslString(savedBrandColor);
+      document.documentElement.style.setProperty('--primary', hslVal);
+    } catch (e) {
+      document.documentElement.style.setProperty('--primary', savedBrandColor);
+    }
+
+    const savedBgColor = localStorage.getItem('dvepl_bg_color');
+    if (savedBgColor) {
+      document.documentElement.style.setProperty('--bg', savedBgColor);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handlePosChange = () => {
+      setProfile(null); // Force small reload triggers if needed, but not required
+      setSidebarPos(localStorage.getItem('dvepl_theme_sidebar_pos') || 'left');
+    };
+    window.addEventListener('dvepl_sidebar_pos_changed', handlePosChange);
+    return () => window.removeEventListener('dvepl_sidebar_pos_changed', handlePosChange);
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
-    void Promise.all([organizationApi.companies.list(), authService.profile()])
-      .then(([companies, userProfile]) => {
+    void Promise.all([
+      organizationApi.companies.list(),
+      authService.profile(),
+      securityApi.users.list().catch(() => [])
+    ])
+      .then(([companies, userProfile, usersList]) => {
         if (!isMounted) return;
         setHeaderCompanies(companies.map((company) => ({ id: company.id, name: String(company.name ?? '') })));
+        useERPStore.setState({ companies, users: usersList });
         setProfile(userProfile);
+        store.setCurrentUser(userProfile.id, userProfile.name);
         if (userProfile.company?.id) store.setCompanyId(userProfile.company.id);
       })
       .catch(() => {
@@ -97,14 +155,83 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   // Sidebar Menu Config
 
 
-  // Grouped items
   const { config } = useUiConfig();
-  const sections = Array.from(new Set(config.sidebarItems.filter(i => i.section).map(i => i.section))) as string[];
+  const companies = headerCompanies.length > 0 ? headerCompanies : store.companies;
+  const currentUser = profile ?? store.users.find(u => u.id === store.currentUserId);
+
+  // Filter sidebar items based on pageAccess
+  const visibleSidebarItems = React.useMemo(() => {
+    const sidebarItems = config.sidebarItems;
+    const userObj = currentUser as any;
+    if (!userObj || !userObj.pageAccess) return sidebarItems;
+    
+    // Always grant full access to Admins/Super Admins
+    const isAdmin = userObj.role?.toLowerCase().includes('admin') || 
+                    userObj.name?.toLowerCase().includes('admin');
+    if (isAdmin) return sidebarItems;
+
+    const mapping: Record<string, string> = {
+      'dashboard': 'dashboard',
+      'companies': 'companies',
+      'branches': 'branches',
+      'departments': 'departments',
+      'teams': 'teams',
+      'designations': 'designations',
+      'cost_centers': 'cost_centers',
+      'employees': 'employees',
+      'attendance': 'attendance',
+      'leaves': 'leaves',
+      'holidays': 'holidays',
+      'shift_management': 'shift_management',
+      'payroll': 'payroll',
+      'documents': 'documents',
+      'tasks': 'tasks',
+      'customers': 'customers',
+      'contact_persons': 'contacts',
+      'communication_history': 'communication',
+      'orders': 'orders',
+      'delivery': 'delivery',
+      'vendors': 'vendors',
+      'inventory': 'inventory',
+      'finance': 'finance',
+      'tender_requests': 'tender_requests',
+      'tenders': 'tenders',
+      'technical_clarifications': 'technical_clarifications',
+      'government_departments': 'government_departments',
+      'sections': 'sections',
+      'divisions': 'divisions',
+      'sub_divisions': 'sub_divisions',
+      'reference_codes': 'reference_codes',
+      'users': 'users',
+      'roles': 'roles',
+      'permissions': 'permissions',
+      'permission_groups': 'permission_groups',
+      'approval_requests': 'approval_requests',
+      'reports': 'reports',
+      'audit_logs': 'audit_logs',
+      'custom_fields': 'custom_fields',
+      'recycle_bin': 'recycle_bin',
+      'settings': 'settings'
+    };
+
+    return sidebarItems.filter(item => {
+      const normalizedKey = item.name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      const key = mapping[normalizedKey] || normalizedKey;
+      return userObj.pageAccess.includes(key);
+    });
+  }, [currentUser, config.sidebarItems]);
+
+  // Grouped items
+  const sections = React.useMemo(() => {
+    return Array.from(new Set(visibleSidebarItems.filter(i => i.section).map(i => i.section))) as string[];
+  }, [visibleSidebarItems]);
 
   // Command palette filter
-  const commandFilteredItems = config.sidebarItems.filter(item => 
-    item.name.toLowerCase().includes(commandSearch.toLowerCase())
-  );
+  const commandFilteredItems = React.useMemo(() => {
+    return visibleSidebarItems.filter(item => 
+      item.name.toLowerCase().includes(commandSearch.toLowerCase())
+    );
+  }, [visibleSidebarItems, commandSearch]);
 
   const handleCommandSelect = (path: string) => {
     navigate(path);
@@ -123,17 +250,17 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const companies = headerCompanies.length > 0 ? headerCompanies : store.companies;
-  const currentUser = profile ?? store.users.find(u => u.id === store.currentUserId);
-
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground transition-colors duration-300">
+    <div className={`flex h-screen w-screen overflow-hidden bg-background text-foreground transition-colors duration-300 ${sidebarPos === 'right' ? 'flex-row-reverse' : ''}`}>
       
       {/* 1. COLLAPSIBLE SIDEBAR */}
       <Sidebar />
 
       {/* 2. MAIN LAYOUT CONTAINER */}
-      <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
+      <div 
+        className="flex-1 flex flex-col h-full min-w-0 overflow-hidden"
+        style={{ backgroundColor: store.theme === 'dark' ? 'hsl(var(--background))' : 'var(--bg, hsl(var(--background)))' }}
+      >
         
         {/* TOP NAVBAR */}
         <Header

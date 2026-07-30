@@ -124,23 +124,6 @@ interface PORevision {
   customColumns?: string[];
 }
 
-const DEFAULT_COMPANY_DETAILS = {
-  name: 'D.V. Electromatic Pvt. Ltd.',
-  address: 'F-003, Industrial Growth Centre, Phase-III, Sector 5, Gurugram, HR',
-  phone: '+91 92572-17609',
-  email: 'procurement@dvepl.com',
-  gstin: '03AABCD4308A1ZL',
-  iso: 'AN ISO 9001:2008 CERTIFIED CO.',
-  signatory: 'Gabrial Deora (Procurement Head)',
-  division: 'Industrial Procurement Division'
-};
-
-const DEFAULT_TERMS = `1. Payment: 30 days net from the date of receipt and approval.
-2. Goods must be accompanied by GST invoice and delivery challan.
-3. All items are subject to inspection and test at our warehouse.
-4. Warranty: Minimum 12 months from the date of commissioning.
-5. Subject to Gurugram jurisdiction only.`;
-
 // ==========================================
 // API ADAPTERS (EASILY REPLACE WITH AXIOS/FETCH LATER)
 // ==========================================
@@ -179,6 +162,14 @@ export const apiService = {
       await new Promise(resolve => setTimeout(resolve, 150));
       const saved = localStorage.getItem('dvepl_po_revisions');
       const list: PORevision[] = saved ? JSON.parse(saved) : [];
+      const toDelete = list.find(r => r.id === id);
+      if (toDelete) {
+        const trashSaved = localStorage.getItem('dvepl_po_revisions_trash');
+        const trashList: PORevision[] = trashSaved ? JSON.parse(trashSaved) : [];
+        (toDelete as any).deletedAt = new Date().toISOString();
+        trashList.unshift(toDelete);
+        localStorage.setItem('dvepl_po_revisions_trash', JSON.stringify(trashList));
+      }
       const filtered = list.filter(r => r.id !== id);
       localStorage.setItem('dvepl_po_revisions', JSON.stringify(filtered));
     }
@@ -202,6 +193,7 @@ export const apiService = {
 };
 
 export function VendorsPage() {
+  const { currentCompanyId, companies } = useERPStore();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [revisions, setRevisions] = useState<PORevision[]>([]);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
@@ -310,7 +302,16 @@ export function VendorsPage() {
   };
 
   // PO Form Fields
-  const [companyDetails, setCompanyDetails] = useState(DEFAULT_COMPANY_DETAILS);
+  const [companyDetails, setCompanyDetails] = useState({
+    name: '',
+    address: '',
+    phone: '',
+    email: '',
+    gstin: '',
+    iso: '',
+    signatory: '',
+    division: ''
+  });
   const [poNumber, setPoNumber] = useState('');
   const [poDate, setPoDate] = useState(new Date().toISOString().split('T')[0]);
   const [poStatus, setPoStatus] = useState('Pending');
@@ -321,9 +322,27 @@ export function VendorsPage() {
   const [cgstPercent, setCgstPercent] = useState(9);
   const [sgstPercent, setSgstPercent] = useState(9);
   const [igstPercent, setIgstPercent] = useState(0);
-  const [terms, setTerms] = useState(DEFAULT_TERMS);
+  const [terms, setTerms] = useState('');
   const [poItems, setPoItems] = useState<POItem[]>([]);
   const [selectedRevisionId, setSelectedRevisionId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isDataEntryOpen && !selectedRevisionId) {
+      const activeCompany = companies.find(c => c.id === currentCompanyId);
+      if (activeCompany) {
+        setCompanyDetails({
+          name: activeCompany.name || '',
+          address: activeCompany.address || '',
+          phone: activeCompany.phone || '',
+          email: activeCompany.email || '',
+          gstin: activeCompany.gst || '',
+          iso: '',
+          signatory: '',
+          division: ''
+        });
+      }
+    }
+  }, [currentCompanyId, companies, isDataEntryOpen, selectedRevisionId]);
 
   // View PO preview (frontend-only)
   const [isPoPreviewOpen, setIsPoPreviewOpen] = useState(false);
@@ -680,9 +699,20 @@ export function VendorsPage() {
       const savedRev = localStorage.getItem('dvepl_po_revisions');
       if (savedRev) {
         const revList: PORevision[] = JSON.parse(savedRev);
-        const filtered = revList.filter(r => r.vendorId !== vendorToDelete);
-        localStorage.setItem('dvepl_po_revisions', JSON.stringify(filtered));
-        setRevisions(filtered);
+        const toTrash = revList.filter(r => r.vendorId === vendorToDelete);
+        const remaining = revList.filter(r => r.vendorId !== vendorToDelete);
+        localStorage.setItem('dvepl_po_revisions', JSON.stringify(remaining));
+        setRevisions(remaining);
+
+        if (toTrash.length > 0) {
+          const trashSaved = localStorage.getItem('dvepl_po_revisions_trash');
+          const trashList: PORevision[] = trashSaved ? JSON.parse(trashSaved) : [];
+          toTrash.forEach(r => {
+            (r as any).deletedAt = new Date().toISOString();
+            trashList.unshift(r);
+          });
+          localStorage.setItem('dvepl_po_revisions_trash', JSON.stringify(trashList));
+        }
       }
       toast.success('Vendor deleted successfully');
     } catch (err: any) {
@@ -1059,9 +1089,19 @@ export function VendorsPage() {
     setCgstPercent(9);
     setSgstPercent(9);
     setIgstPercent(0);
-    setTerms(DEFAULT_TERMS);
+    setTerms('');
     setPoItems([]);
-    setCompanyDetails(DEFAULT_COMPANY_DETAILS);
+    const activeCompany = companies.find(c => c.id === currentCompanyId);
+    setCompanyDetails({
+      name: activeCompany?.name || '',
+      address: activeCompany?.address || '',
+      phone: activeCompany?.phone || '',
+      email: activeCompany?.email || '',
+      gstin: activeCompany?.gst || '',
+      iso: '',
+      signatory: '',
+      division: ''
+    });
     setSelectedRevisionId(null);
     setIsDataEntryOpen(true);
   };
@@ -1343,6 +1383,9 @@ export function VendorsPage() {
       return;
     }
 
+    // Generate the PDF PO for user to print/save and attach
+    triggerExport('pdf');
+
     const message = buildPoMessageText();
     const sentChannels: string[] = [];
 
@@ -1358,7 +1401,7 @@ export function VendorsPage() {
     }
 
     setPoStatus('Placed');
-    toast.success('PO marked as Placed - sent via ' + sentChannels.join(' & '));
+    toast.success('PO marked as Placed - PDF generated and sent via ' + sentChannels.join(' & '));
     setIsPoPlacedDialogOpen(false);
   };
 
@@ -1927,7 +1970,7 @@ export function VendorsPage() {
               )}
             </div>
             <p className="text-[11px] text-muted-foreground">
-              This opens WhatsApp/Email with a pre-filled PO summary for you to review and send manually. No data is sent to any server.
+              This will generate the PDF purchase order for you to save/print, and open WhatsApp/Email with a pre-filled message where you can attach the PDF.
             </p>
             <div className="flex justify-end gap-2 pt-2 border-t">
               <Button variant="outline" size="sm" onClick={() => setIsPoPlacedDialogOpen(false)}>Cancel</Button>
@@ -2042,10 +2085,6 @@ export function VendorsPage() {
               <div className="rev-sum-card">
                 <div className="rev-sum-label">Total POs</div>
                 <div className="rev-sum-val">{revisionStats.poCount}</div>
-              </div>
-              <div className="rev-sum-card">
-                <div className="rev-sum-label">Total Spent</div>
-                <div className="rev-sum-val green">₹{revisionStats.totalSpent.toLocaleString('en-IN')}</div>
               </div>
               <div className="rev-sum-card">
                 <div className="rev-sum-label">Revisions</div>
