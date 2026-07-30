@@ -176,6 +176,19 @@ const recycleBinModels: RecycleBinModelConfig[] = [
     delegate: "vendor",
     select: { id: true, name: true, email: true, deletedAt: true, updatedAt: true },
     formatName: (record) => record.name || record.email || "Vendor Profile",
+    permanentDelete: async (fastify, id) => {
+      await fastify.prisma.customFieldValue.deleteMany({ where: { entityId: id } });
+      await fastify.prisma.material.updateMany({
+        where: { vendorId: id },
+        data: { vendorId: null },
+      });
+      await fastify.prisma.material.updateMany({
+        where: { preferredVendorId: id },
+        data: { preferredVendorId: null },
+      });
+      await fastify.prisma.vendorProduct.deleteMany({ where: { vendorId: id } });
+      await (fastify.prisma as any).vendor.delete({ where: { id } });
+    },
   },
   {
     module: "customfield",
