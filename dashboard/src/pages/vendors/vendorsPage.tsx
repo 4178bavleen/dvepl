@@ -1,34 +1,63 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { ColumnDef } from '@tanstack/react-table';
-import * as XLSX from 'xlsx';
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { ColumnDef } from "@tanstack/react-table";
+import * as XLSX from "xlsx";
 import {
-  Building2, Search, Plus, Trash2, Edit, Eye, Clock, FileText, X, Check, Copy, Trash, Maximize2, Minimize2, Save, Sparkles, AlertCircle, SlidersHorizontal, RefreshCw, Package
-} from 'lucide-react';
-import { GenericTable, sortableHeader } from '@/components/tables/genericTable';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
+  Building2,
+  Search,
+  Plus,
+  Trash2,
+  Edit,
+  Eye,
+  Clock,
+  FileText,
+  X,
+  Check,
+  Copy,
+  Trash,
+  Maximize2,
+  Minimize2,
+  Save,
+  Sparkles,
+  AlertCircle,
+  SlidersHorizontal,
+  RefreshCw,
+  Package,
+} from "lucide-react";
+import { GenericTable, sortableHeader } from "@/components/tables/genericTable";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from '@/components/ui/popover';
+} from "@/components/ui/popover";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { toast } from 'react-hot-toast';
-import { tenderApi, inventoryApi } from '@/services/modules';
-import { apiClient } from '@/services/axios';
-import { useERPStore } from '@/store/erpStore';
-import { DynamicFormRenderer } from '@/components/customFields/dynamicFormRenderer';
-import { useDynamicCustomFields, validateCustomFields } from '@/hooks/useDynamicCustomFields';
-import { ConfirmDialog } from '@/components/shared/confirmDialog';
-import '@/styles/vendors.css';
+} from "@/components/ui/dialog";
+import { toast } from "react-hot-toast";
+import { tenderApi, inventoryApi } from "@/services/modules";
+import { apiClient } from "@/services/axios";
+import { useERPStore } from "@/store/erpStore";
+import { DynamicFormRenderer } from "@/components/customFields/dynamicFormRenderer";
+import {
+  useDynamicCustomFields,
+  validateCustomFields,
+} from "@/hooks/useDynamicCustomFields";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
+import { ConfirmDialog } from "@/components/shared/confirmDialog";
+import "@/styles/vendors.css";
 
 // Interfaces
 interface Vendor {
@@ -132,64 +161,85 @@ export const apiService = {
     list: async (): Promise<Vendor[]> => {
       return tenderApi.vendors.list() as unknown as Vendor[];
     },
-    create: async (vendor: Omit<Vendor, 'id' | 'createdAt'>): Promise<Vendor> => {
+    create: async (
+      vendor: Omit<Vendor, "id" | "createdAt">,
+    ): Promise<Vendor> => {
       const companyId = useERPStore.getState().currentCompanyId;
-      return tenderApi.vendors.create({ ...vendor, companyId }) as unknown as Vendor;
+      return tenderApi.vendors.create({
+        ...vendor,
+        companyId,
+      }) as unknown as Vendor;
     },
     update: async (id: string, vendor: Partial<Vendor>): Promise<Vendor> => {
       const companyId = useERPStore.getState().currentCompanyId;
-      return tenderApi.vendors.update!(id, { ...vendor, companyId }) as unknown as Vendor;
+      return tenderApi.vendors.update!(id, {
+        ...vendor,
+        companyId,
+      }) as unknown as Vendor;
     },
     delete: async (id: string): Promise<void> => {
       return tenderApi.vendors.remove!(id);
-    }
+    },
   },
   revisions: {
     list: async (): Promise<PORevision[]> => {
-      await new Promise(resolve => setTimeout(resolve, 150));
-      const saved = localStorage.getItem('dvepl_po_revisions');
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      const saved = localStorage.getItem("dvepl_po_revisions");
       return saved ? JSON.parse(saved) : [];
     },
     create: async (revision: PORevision): Promise<PORevision> => {
-      await new Promise(resolve => setTimeout(resolve, 150));
-      const saved = localStorage.getItem('dvepl_po_revisions');
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      const saved = localStorage.getItem("dvepl_po_revisions");
       const list: PORevision[] = saved ? JSON.parse(saved) : [];
       list.unshift(revision);
-      localStorage.setItem('dvepl_po_revisions', JSON.stringify(list));
+      localStorage.setItem("dvepl_po_revisions", JSON.stringify(list));
       return revision;
     },
     delete: async (id: string): Promise<void> => {
-      await new Promise(resolve => setTimeout(resolve, 150));
-      const saved = localStorage.getItem('dvepl_po_revisions');
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      const saved = localStorage.getItem("dvepl_po_revisions");
       const list: PORevision[] = saved ? JSON.parse(saved) : [];
-      const toDelete = list.find(r => r.id === id);
+      const toDelete = list.find((r) => r.id === id);
       if (toDelete) {
-        const trashSaved = localStorage.getItem('dvepl_po_revisions_trash');
-        const trashList: PORevision[] = trashSaved ? JSON.parse(trashSaved) : [];
+        const trashSaved = localStorage.getItem("dvepl_po_revisions_trash");
+        const trashList: PORevision[] = trashSaved
+          ? JSON.parse(trashSaved)
+          : [];
         (toDelete as any).deletedAt = new Date().toISOString();
         trashList.unshift(toDelete);
-        localStorage.setItem('dvepl_po_revisions_trash', JSON.stringify(trashList));
+        localStorage.setItem(
+          "dvepl_po_revisions_trash",
+          JSON.stringify(trashList),
+        );
       }
-      const filtered = list.filter(r => r.id !== id);
-      localStorage.setItem('dvepl_po_revisions', JSON.stringify(filtered));
-    }
+      const filtered = list.filter((r) => r.id !== id);
+      localStorage.setItem("dvepl_po_revisions", JSON.stringify(filtered));
+    },
   },
   inventory: {
     list: async (): Promise<InventoryItem[]> => {
       return inventoryApi.list() as unknown as Promise<InventoryItem[]>;
-    }
+    },
   },
   vendorProducts: {
     list: async (vendorId: string): Promise<VendorProductAssoc[]> => {
-      return tenderApi.vendorProducts.list(vendorId) as unknown as VendorProductAssoc[];
+      return tenderApi.vendorProducts.list(
+        vendorId,
+      ) as unknown as VendorProductAssoc[];
     },
-    attach: async (vendorId: string, materialIds: string[]): Promise<VendorProductAssoc[]> => {
-      return tenderApi.vendorProducts.attach(vendorId, materialIds) as unknown as VendorProductAssoc[];
+    attach: async (
+      vendorId: string,
+      materialIds: string[],
+    ): Promise<VendorProductAssoc[]> => {
+      return tenderApi.vendorProducts.attach(
+        vendorId,
+        materialIds,
+      ) as unknown as VendorProductAssoc[];
     },
     detach: async (id: string): Promise<void> => {
       return tenderApi.vendorProducts.detach(id);
-    }
-  }
+    },
+  },
 };
 
 export function VendorsPage() {
@@ -199,6 +249,10 @@ export function VendorsPage() {
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [inventoryLoading, setInventoryLoading] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [allVendorProducts, setAllVendorProducts] = useState<
+    VendorProductAssoc[]
+  >([]);
+  const [vendorProductsLoaded, setVendorProductsLoaded] = useState(false);
 
   const fetchAllData = async () => {
     setLoading(true);
@@ -207,13 +261,13 @@ export function VendorsPage() {
       const [vList, rList, invList] = await Promise.all([
         apiService.vendors.list(),
         apiService.revisions.list(),
-        apiService.inventory.list()
+        apiService.inventory.list(),
       ]);
       setVendors(vList);
       setRevisions(rList);
       setInventoryItems(invList);
     } catch (err: any) {
-      toast.error('Failed to sync data');
+      toast.error("Failed to sync data");
     } finally {
       setLoading(false);
       setInventoryLoading(false);
@@ -225,30 +279,49 @@ export function VendorsPage() {
   }, []);
 
   // UI States
-  const [search, setSearch] = useState('');
+  const [globalSearch, setGlobalSearch] = useState("");
+  const [fieldSearch, setFieldSearch] = useState("");
+
+  const [searchField, setSearchField] = useState<
+    | "all"
+    | "name"
+    | "category"
+    | "contactPerson"
+    | "phone"
+    | "email"
+    | "gstNumber"
+    | "products"
+  >("all");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
   const [overviewVendor, setOverviewVendor] = useState<Vendor | null>(null);
-  const [formTab, setFormTab] = useState<'details' | 'products'>('details');
+  const [formTab, setFormTab] = useState<"details" | "products">("details");
 
   // Revisions Modal States
-  const [selectedVendorForRevisions, setSelectedVendorForRevisions] = useState<Vendor | null>(null);
+  const [selectedVendorForRevisions, setSelectedVendorForRevisions] =
+    useState<Vendor | null>(null);
 
   // Data Entry PO States
   const [activePoVendor, setActivePoVendor] = useState<Vendor | null>(null);
   const [isDataEntryOpen, setIsDataEntryOpen] = useState(false);
   const [deMaximized, setDeMaximized] = useState(false);
   const [customColumns, setCustomColumns] = useState<string[]>([]);
-  const [newColName, setNewColName] = useState('');
+  const [newColName, setNewColName] = useState("");
   const [isAddingCol, setIsAddingCol] = useState(false);
 
   // Product picker (used in Vendor form)
-  const [productSearch, setProductSearch] = useState('');
-  const [selectedMaterialIds, setSelectedMaterialIds] = useState<Set<string>>(new Set());
-  const [existingVendorProducts, setExistingVendorProducts] = useState<VendorProductAssoc[]>([]);
+  const [productSearch, setProductSearch] = useState("");
+  const [selectedMaterialIds, setSelectedMaterialIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [existingVendorProducts, setExistingVendorProducts] = useState<
+    VendorProductAssoc[]
+  >([]);
 
   // Inline inventory search dropdown (used directly in PO line-item rows)
-  const [inventoryDropdownRowId, setInventoryDropdownRowId] = useState<string | null>(null);
+  const [inventoryDropdownRowId, setInventoryDropdownRowId] = useState<
+    string | null
+  >(null);
 
   // Excel import (line items)
   const excelImportInputRef = useRef<HTMLInputElement>(null);
@@ -258,24 +331,28 @@ export function VendorsPage() {
   const [clearRowsConfirmOpen, setClearRowsConfirmOpen] = useState(false);
   const [removeColConfirmOpen, setRemoveColConfirmOpen] = useState(false);
   const [colToRemove, setColToRemove] = useState<string | null>(null);
-  const [deleteRevisionConfirmOpen, setDeleteRevisionConfirmOpen] = useState(false);
+  const [deleteRevisionConfirmOpen, setDeleteRevisionConfirmOpen] =
+    useState(false);
   const [revisionToDelete, setRevisionToDelete] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [vendorToDelete, setVendorToDelete] = useState<string | null>(null);
 
   // Dynamic EAV Custom Fields
-  const { fields: vendorCustomFields, tableCustomColumns: vendorTableCustomCols } = useDynamicCustomFields('vendor');
+  const {
+    fields: vendorCustomFields,
+    tableCustomColumns: vendorTableCustomCols,
+  } = useDynamicCustomFields("vendor");
   const [vCustomFields, setVCustomFields] = useState<Record<string, any>>({});
 
   // Vendor Form Fields
-  const [vName, setVName] = useState('');
-  const [vCategory, setVCategory] = useState('');
-  const [vContact, setVContact] = useState('');
-  const [vPhone, setVPhone] = useState('');
-  const [vEmail, setVEmail] = useState('');
-  const [vGst, setVGst] = useState('');
-  const [vAddress, setVAddress] = useState('');
-  const [vNotes, setVNotes] = useState('');
+  const [vName, setVName] = useState("");
+  const [vCategory, setVCategory] = useState("");
+  const [vContact, setVContact] = useState("");
+  const [vPhone, setVPhone] = useState("");
+  const [vEmail, setVEmail] = useState("");
+  const [vGst, setVGst] = useState("");
+  const [vAddress, setVAddress] = useState("");
+  const [vNotes, setVNotes] = useState("");
 
   // Vendor Form Errors
   const [vErrors, setVErrors] = useState<Record<string, string>>({});
@@ -283,16 +360,21 @@ export function VendorsPage() {
   const validateVendorForm = (): boolean => {
     const errs: Record<string, string> = {};
     if (!vName.trim() || vName.trim().length < 2) {
-      errs.name = 'Vendor name must be at least 2 characters';
+      errs.name = "Vendor name must be at least 2 characters";
     }
     if (vEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(vEmail.trim())) {
-      errs.email = 'Enter a valid email address';
+      errs.email = "Enter a valid email address";
     }
     if (vPhone.trim() && !/^[6-9]\d{9}$/.test(vPhone.trim())) {
-      errs.phone = 'Enter a valid 10-digit Indian mobile number';
+      errs.phone = "Enter a valid 10-digit Indian mobile number";
     }
-    if (vGst.trim() && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(vGst.trim().toUpperCase())) {
-      errs.gst = 'Enter a valid 15-character GSTIN (e.g. 22AAAAA0000A1Z5)';
+    if (
+      vGst.trim() &&
+      !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(
+        vGst.trim().toUpperCase(),
+      )
+    ) {
+      errs.gst = "Enter a valid 15-character GSTIN (e.g. 22AAAAA0000A1Z5)";
     }
 
     const cfErrs = validateCustomFields(vendorCustomFields, vCustomFields);
@@ -303,42 +385,44 @@ export function VendorsPage() {
 
   // PO Form Fields
   const [companyDetails, setCompanyDetails] = useState({
-    name: '',
-    address: '',
-    phone: '',
-    email: '',
-    gstin: '',
-    iso: '',
-    signatory: '',
-    division: ''
+    name: "",
+    address: "",
+    phone: "",
+    email: "",
+    gstin: "",
+    iso: "",
+    signatory: "",
+    division: "",
   });
-  const [poNumber, setPoNumber] = useState('');
-  const [poDate, setPoDate] = useState(new Date().toISOString().split('T')[0]);
-  const [poStatus, setPoStatus] = useState('Pending');
-  const [paymentTerms, setPaymentTerms] = useState('30 days net');
-  const [materialStatus, setMaterialStatus] = useState('Pending');
+  const [poNumber, setPoNumber] = useState("");
+  const [poDate, setPoDate] = useState(new Date().toISOString().split("T")[0]);
+  const [poStatus, setPoStatus] = useState("Pending");
+  const [paymentTerms, setPaymentTerms] = useState("30 days net");
+  const [materialStatus, setMaterialStatus] = useState("Pending");
   const [advance, setAdvance] = useState(0);
-  const [remarks, setRemarks] = useState('');
+  const [remarks, setRemarks] = useState("");
   const [cgstPercent, setCgstPercent] = useState(9);
   const [sgstPercent, setSgstPercent] = useState(9);
   const [igstPercent, setIgstPercent] = useState(0);
-  const [terms, setTerms] = useState('');
+  const [terms, setTerms] = useState("");
   const [poItems, setPoItems] = useState<POItem[]>([]);
-  const [selectedRevisionId, setSelectedRevisionId] = useState<string | null>(null);
+  const [selectedRevisionId, setSelectedRevisionId] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     if (isDataEntryOpen && !selectedRevisionId) {
-      const activeCompany = companies.find(c => c.id === currentCompanyId);
+      const activeCompany = companies.find((c) => c.id === currentCompanyId);
       if (activeCompany) {
         setCompanyDetails({
-          name: activeCompany.name || '',
-          address: activeCompany.address || '',
-          phone: activeCompany.phone || '',
-          email: activeCompany.email || '',
-          gstin: activeCompany.gst || '',
-          iso: '',
-          signatory: '',
-          division: ''
+          name: activeCompany.name || "",
+          address: activeCompany.address || "",
+          phone: activeCompany.phone || "",
+          email: activeCompany.email || "",
+          gstin: activeCompany.gst || "",
+          iso: "",
+          signatory: "",
+          division: "",
         });
       }
     }
@@ -351,29 +435,67 @@ export function VendorsPage() {
   const [isPoPlacedDialogOpen, setIsPoPlacedDialogOpen] = useState(false);
   const [placeSendWhatsapp, setPlaceSendWhatsapp] = useState(true);
   const [placeSendEmail, setPlaceSendEmail] = useState(false);
-  const [placePhone, setPlacePhone] = useState('');
-  const [placeEmail, setPlaceEmail] = useState('');
+  const [placePhone, setPlacePhone] = useState("");
+  const [placeEmail, setPlaceEmail] = useState("");
 
   // Filter vendors
+
+  useEffect(() => {
+    if (searchField === "products") {
+      loadAllVendorProducts();
+    }
+  }, [searchField, vendors]);
+
   const filteredVendors = useMemo(() => {
-    if (!search) return vendors;
-    const query = search.toLowerCase();
-    return vendors.filter(v =>
-      v.name.toLowerCase().includes(query) ||
-      v.category.toLowerCase().includes(query) ||
-      v.gstNumber.toLowerCase().includes(query) ||
-      v.contactPerson.toLowerCase().includes(query)
+    const query =
+      searchField === "all"
+        ? globalSearch.trim().toLowerCase()
+        : fieldSearch.trim().toLowerCase();
+
+    if (!query) return vendors;
+
+    if (searchField === "products") {
+      const matchingVendorIds = new Set(
+        allVendorProducts
+          .filter(
+            (a) =>
+              (a.material?.name ?? "").toLowerCase().includes(query) ||
+              (a.material?.materialCode ?? "").toLowerCase().includes(query) ||
+              (a.material?.category ?? "").toLowerCase().includes(query) ||
+              (a.vendorMaterialCode ?? "").toLowerCase().includes(query),
+          )
+          .map((a) => a.vendorId),
+      );
+
+      return vendors.filter((v) => matchingVendorIds.has(v.id));
+    }
+
+    if (searchField === "all") {
+      return vendors.filter(
+        (v) =>
+          (v.name ?? "").toLowerCase().includes(query) ||
+          (v.category ?? "").toLowerCase().includes(query) ||
+          (v.gstNumber ?? "").toLowerCase().includes(query) ||
+          (v.contactPerson ?? "").toLowerCase().includes(query),
+      );
+    }
+
+    const fieldValue = (v: Vendor) => (v as any)[searchField] ?? "";
+
+    return vendors.filter((v) =>
+      fieldValue(v).toString().toLowerCase().includes(query),
     );
-  }, [vendors, search]);
+  }, [vendors, globalSearch, fieldSearch, searchField, allVendorProducts]);
 
   // Filtered inventory for Vendor form "Products Supplied" tab
   const filteredInventoryForForm = useMemo(() => {
     if (!productSearch.trim()) return inventoryItems;
     const q = productSearch.toLowerCase();
-    return inventoryItems.filter(i =>
-      i.material.name.toLowerCase().includes(q) ||
-      i.material.materialCode.toLowerCase().includes(q) ||
-      (i.material.category || '').toLowerCase().includes(q)
+    return inventoryItems.filter(
+      (i) =>
+        (i.material.name ?? "").toLowerCase().includes(q) ||
+        (i.material.materialCode ?? "").toLowerCase().includes(q) ||
+        (i.material.category ?? "").toLowerCase().includes(q),
     );
   }, [inventoryItems, productSearch]);
 
@@ -382,25 +504,26 @@ export function VendorsPage() {
     const q = query.trim().toLowerCase();
     const pool = !q
       ? inventoryItems
-      : inventoryItems.filter(i =>
-          i.material.name.toLowerCase().includes(q) ||
-          i.material.materialCode.toLowerCase().includes(q) ||
-          (i.material.category || '').toLowerCase().includes(q)
+      : inventoryItems.filter(
+          (i) =>
+            i.material.name.toLowerCase().includes(q) ||
+            i.material.materialCode.toLowerCase().includes(q) ||
+            (i.material.category || "").toLowerCase().includes(q),
         );
     return pool.slice(0, 20);
   };
 
   const ALL_VENDOR_COLUMNS = useMemo(() => {
     const base = [
-      { id: 'name', label: 'Vendor Name' },
-      { id: 'category', label: 'Category' },
-      { id: 'contactPerson', label: 'Contact Person' },
-      { id: 'phone', label: 'Phone' },
-      { id: 'email', label: 'Email' },
-      { id: 'gstNumber', label: 'GSTIN' },
-      { id: 'products', label: 'Products Supplied' },
-      { id: 'revisions', label: 'Revision History' },
-      { id: 'dataEntry', label: 'Data Entry' },
+      { id: "name", label: "Vendor Name" },
+      { id: "category", label: "Category" },
+      { id: "contactPerson", label: "Contact Person" },
+      { id: "phone", label: "Phone" },
+      { id: "email", label: "Email" },
+      { id: "gstNumber", label: "GSTIN" },
+      { id: "products", label: "Products" },
+      { id: "revisions", label: "Revision History" },
+      { id: "dataEntry", label: "Data Entry" },
     ];
     const cfCols = vendorCustomFields
       .filter((f) => f.isActive && f.showInTable)
@@ -409,7 +532,9 @@ export function VendorsPage() {
   }, [vendorCustomFields]);
 
   // Column Visibility State
-  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({});
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(
+    {},
+  );
 
   useEffect(() => {
     setVisibleColumns((prev) => {
@@ -424,23 +549,45 @@ export function VendorsPage() {
   }, [ALL_VENDOR_COLUMNS]);
 
   const toggleColumn = (key: string) => {
-    setVisibleColumns(prev => ({ ...prev, [key]: !prev[key] }));
+    setVisibleColumns((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   const toggleAllColumns = (val: boolean) => {
     const next: Record<string, boolean> = {};
-    ALL_VENDOR_COLUMNS.forEach(c => { next[c.id] = val; });
+    ALL_VENDOR_COLUMNS.forEach((c) => {
+      next[c.id] = val;
+    });
     setVisibleColumns(next);
   };
 
+  const loadAllVendorProducts = async () => {
+    if (vendorProductsLoaded || vendors.length === 0) return;
+    try {
+      const results = await Promise.all(
+        vendors.map((v) =>
+          apiService.vendorProducts.list(v.id).catch(() => []),
+        ),
+      );
+      setAllVendorProducts(results.flat());
+      setVendorProductsLoaded(true);
+    } catch {
+      toast.error("Failed to load vendor products for search");
+    }
+  };
   // Count of products per vendor (from currently-loaded associations is per-vendor lazy;
   // for table display we keep a lightweight cache populated on demand)
-  const [vendorProductCounts, setVendorProductCounts] = useState<Record<string, number>>({});
+  const [vendorProductCounts, setVendorProductCounts] = useState<
+    Record<string, number>
+  >({});
 
   // Products Supplied quick-view dialog
-  const [productsQuickViewVendor, setProductsQuickViewVendor] = useState<Vendor | null>(null);
-  const [productsQuickViewList, setProductsQuickViewList] = useState<VendorProductAssoc[]>([]);
-  const [productsQuickViewLoading, setProductsQuickViewLoading] = useState(false);
+  const [productsQuickViewVendor, setProductsQuickViewVendor] =
+    useState<Vendor | null>(null);
+  const [productsQuickViewList, setProductsQuickViewList] = useState<
+    VendorProductAssoc[]
+  >([]);
+  const [productsQuickViewLoading, setProductsQuickViewLoading] =
+    useState(false);
 
   const openProductsQuickView = async (vendor: Vendor) => {
     setProductsQuickViewVendor(vendor);
@@ -449,125 +596,139 @@ export function VendorsPage() {
     try {
       const assocs = await apiService.vendorProducts.list(vendor.id);
       setProductsQuickViewList(assocs);
-      setVendorProductCounts(prev => ({ ...prev, [vendor.id]: assocs.length }));
+      setVendorProductCounts((prev) => ({
+        ...prev,
+        [vendor.id]: assocs.length,
+      }));
     } catch {
-      toast.error('Failed to load products for this vendor');
+      toast.error("Failed to load products for this vendor");
     } finally {
       setProductsQuickViewLoading(false);
     }
   };
 
   // Column definitions for GenericTable
-  const allTableColumns = useMemo<ColumnDef<Vendor>[]>(() => [
-    {
-      id: 'name',
-      accessorKey: 'name',
-      header: sortableHeader('Vendor Name'),
-      cell: ({ row }) => (
-        <span className="font-semibold text-foreground">{row.original.name}</span>
-      ),
-    },
-    {
-      id: 'category',
-      accessorKey: 'category',
-      header: 'Category',
-      cell: ({ getValue }) => (getValue() as string) || '—',
-    },
-    {
-      id: 'contactPerson',
-      accessorKey: 'contactPerson',
-      header: 'Contact Person',
-      cell: ({ getValue }) => (getValue() as string) || '—',
-    },
-    {
-      id: 'phone',
-      accessorKey: 'phone',
-      header: 'Phone',
-      cell: ({ getValue }) => (getValue() as string) || '—',
-    },
-    {
-      id: 'email',
-      accessorKey: 'email',
-      header: 'Email',
-      cell: ({ getValue }) => (getValue() as string) || '—',
-    },
-    {
-      id: 'gstNumber',
-      accessorKey: 'gstNumber',
-      header: 'GSTIN',
-      cell: ({ getValue }) => (getValue() as string) || '—',
-    },
-    {
-      id: 'products',
-      header: 'Products Supplied',
-      cell: ({ row }) => {
-        const vendor = row.original;
-        const count = vendorProductCounts[vendor.id];
-        return (
-          <button
-            onClick={() => openProductsQuickView(vendor)}
-            className="bg-[#fff4e5] hover:bg-[#ffe9cc] text-[#b45309] border border-[#fcd9a8] px-2.5 py-1 rounded-md text-xs font-semibold cursor-pointer transition-colors duration-150 inline-flex items-center gap-1"
-          >
-            <Package className="size-3" />
-            {count !== undefined ? `${count} Products` : 'View Products'}
-          </button>
-        );
-      }
-    },
-    {
-      id: 'revisions',
-      header: 'Revision History',
-      cell: ({ row }) => {
-        const vendor = row.original;
-        const count = revisions.filter(r => r.vendorId === vendor.id).length;
-        return (
-          <button
-            onClick={() => setSelectedVendorForRevisions(vendor)}
-            className="bg-[#f3f0ff] hover:bg-[#e8e3ff] text-[#5b33b5] border border-[#cbbff5] px-2.5 py-1 rounded-md text-xs font-semibold cursor-pointer transition-colors duration-150"
-          >
-            📋 Revisions ({count})
-          </button>
-        );
-      }
-    },
-    {
-      id: 'dataEntry',
-      header: 'Data Entry',
-      cell: ({ row }) => {
-        const vendor = row.original;
-        return (
-          <button
-            onClick={() => openNewDataEntry(vendor)}
-            className="bg-[#e6f4ea] hover:bg-[#d2ebd9] text-[#137333] border border-[#a8d8b2] px-2.5 py-1 rounded-md text-xs font-semibold cursor-pointer transition-colors duration-150"
-          >
-            ＋ Generate PO
-          </button>
-        );
-      }
-    }
-  ], [revisions, vendorProductCounts]);
+  const allTableColumns = useMemo<ColumnDef<Vendor>[]>(
+    () => [
+      {
+        id: "name",
+        accessorKey: "name",
+        header: sortableHeader("Vendor Name"),
+        cell: ({ row }) => (
+          <span className="font-semibold text-foreground">
+            {row.original.name}
+          </span>
+        ),
+      },
+      {
+        id: "category",
+        accessorKey: "category",
+        header: "Category",
+        cell: ({ getValue }) => (getValue() as string) || "—",
+      },
+      {
+        id: "contactPerson",
+        accessorKey: "contactPerson",
+        header: "Contact Person",
+        cell: ({ getValue }) => (getValue() as string) || "—",
+      },
+      {
+        id: "phone",
+        accessorKey: "phone",
+        header: "Phone",
+        cell: ({ getValue }) => (getValue() as string) || "—",
+      },
+      {
+        id: "email",
+        accessorKey: "email",
+        header: "Email",
+        cell: ({ getValue }) => (getValue() as string) || "—",
+      },
+      {
+        id: "gstNumber",
+        accessorKey: "gstNumber",
+        header: "GSTIN",
+        cell: ({ getValue }) => (getValue() as string) || "—",
+      },
+      {
+        id: "products",
+        header: "Products Supplied",
+        cell: ({ row }) => {
+          const vendor = row.original;
+          const count = vendorProductCounts[vendor.id];
+          return (
+            <button
+              onClick={() => openProductsQuickView(vendor)}
+              className="bg-[#fff4e5] hover:bg-[#ffe9cc] text-[#b45309] border border-[#fcd9a8] px-2.5 py-1 rounded-md text-xs font-semibold cursor-pointer transition-colors duration-150 inline-flex items-center gap-1"
+            >
+              <Package className="size-3" />
+              {count !== undefined ? `${count} Products` : "View Products"}
+            </button>
+          );
+        },
+      },
+      {
+        id: "revisions",
+        header: "Revision History",
+        cell: ({ row }) => {
+          const vendor = row.original;
+          const count = revisions.filter(
+            (r) => r.vendorId === vendor.id,
+          ).length;
+          return (
+            <button
+              onClick={() => setSelectedVendorForRevisions(vendor)}
+              className="bg-[#f3f0ff] hover:bg-[#e8e3ff] text-[#5b33b5] border border-[#cbbff5] px-2.5 py-1 rounded-md text-xs font-semibold cursor-pointer transition-colors duration-150"
+            >
+              📋 Revisions ({count})
+            </button>
+          );
+        },
+      },
+      {
+        id: "dataEntry",
+        header: "Data Entry",
+        cell: ({ row }) => {
+          const vendor = row.original;
+          return (
+            <button
+              onClick={() => openNewDataEntry(vendor)}
+              className="bg-[#e6f4ea] hover:bg-[#d2ebd9] text-[#137333] border border-[#a8d8b2] px-2.5 py-1 rounded-md text-xs font-semibold cursor-pointer transition-colors duration-150"
+            >
+              ＋ Generate PO
+            </button>
+          );
+        },
+      },
+    ],
+    [revisions, vendorProductCounts],
+  );
 
   const activeColumns = useMemo<ColumnDef<Vendor>[]>(() => {
-    const baseCols = allTableColumns.filter(col => visibleColumns[col.id || (col as any).accessorKey]);
-    const cfCols = (vendorTableCustomCols as any[]).filter(col => visibleColumns[col.id]);
+    const baseCols = allTableColumns.filter(
+      (col) => visibleColumns[col.id || (col as any).accessorKey],
+    );
+    const cfCols = (vendorTableCustomCols as any[]).filter(
+      (col) => visibleColumns[col.id],
+    );
     return [...baseCols, ...cfCols] as ColumnDef<Vendor>[];
   }, [allTableColumns, visibleColumns, vendorTableCustomCols]);
 
   // Form operations
   const resetVendorForm = () => {
     setEditingVendor(null);
-    setVName('');
-    setVCategory('');
-    setVContact('');
-    setVPhone('');
-    setVEmail('');
-    setVGst('');
-    setVAddress('');
-    setVNotes('');
+    setVName("");
+    setVCategory("");
+    setVContact("");
+    setVPhone("");
+    setVEmail("");
+    setVGst("");
+    setVAddress("");
+    setVNotes("");
     setVCustomFields({});
     setVErrors({});
-    setFormTab('details');
-    setProductSearch('');
+    setFormTab("details");
+    setProductSearch("");
     setSelectedMaterialIds(new Set());
     setExistingVendorProducts([]);
     setIsFormOpen(false);
@@ -584,16 +745,19 @@ export function VendorsPage() {
     setVAddress(vendor.address);
     setVNotes(vendor.notes);
     setVCustomFields((vendor as any).customFields || {});
-    setFormTab('details');
-    setProductSearch('');
+    setFormTab("details");
+    setProductSearch("");
     setIsFormOpen(true);
 
     // Load existing vendor-product associations
     try {
       const assocs = await apiService.vendorProducts.list(vendor.id);
       setExistingVendorProducts(assocs);
-      setSelectedMaterialIds(new Set(assocs.map(a => a.materialId)));
-      setVendorProductCounts(prev => ({ ...prev, [vendor.id]: assocs.length }));
+      setSelectedMaterialIds(new Set(assocs.map((a) => a.materialId)));
+      setVendorProductCounts((prev) => ({
+        ...prev,
+        [vendor.id]: assocs.length,
+      }));
     } catch {
       setExistingVendorProducts([]);
       setSelectedMaterialIds(new Set());
@@ -601,9 +765,10 @@ export function VendorsPage() {
   };
 
   const toggleMaterialSelection = (materialId: string) => {
-    setSelectedMaterialIds(prev => {
+    setSelectedMaterialIds((prev) => {
       const next = new Set(prev);
-      if (next.has(materialId)) next.delete(materialId); else next.add(materialId);
+      if (next.has(materialId)) next.delete(materialId);
+      else next.add(materialId);
       return next;
     });
   };
@@ -611,25 +776,32 @@ export function VendorsPage() {
   const handleDetachExistingProduct = async (assoc: VendorProductAssoc) => {
     try {
       await apiService.vendorProducts.detach(assoc.id);
-      setExistingVendorProducts(prev => prev.filter(a => a.id !== assoc.id));
-      setSelectedMaterialIds(prev => {
+      setExistingVendorProducts((prev) =>
+        prev.filter((a) => a.id !== assoc.id),
+      );
+      setSelectedMaterialIds((prev) => {
         const next = new Set(prev);
         next.delete(assoc.materialId);
         return next;
       });
       if (editingVendor) {
-        setVendorProductCounts(prev => ({ ...prev, [editingVendor.id]: Math.max(0, (prev[editingVendor.id] || 1) - 1) }));
+        setVendorProductCounts((prev) => ({
+          ...prev,
+          [editingVendor.id]: Math.max(0, (prev[editingVendor.id] || 1) - 1),
+        }));
       }
-      toast.success('Product detached from vendor');
+      toast.success("Product detached from vendor");
     } catch {
-      toast.error('Failed to detach product');
+      toast.error("Failed to detach product");
     }
   };
 
   const handleSaveVendor = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateVendorForm()) {
-      toast.error('Please review highlighted fields and correct required details.');
+      toast.error(
+        "Please review highlighted fields and correct required details.",
+      );
       return;
     }
 
@@ -644,9 +816,9 @@ export function VendorsPage() {
           email: vEmail,
           gstNumber: vGst,
           address: vAddress,
-          notes: vNotes
+          notes: vNotes,
         });
-        toast.success('Vendor updated successfully');
+        toast.success("Vendor updated successfully");
       } else {
         const created = await apiService.vendors.create({
           name: vName,
@@ -656,31 +828,40 @@ export function VendorsPage() {
           email: vEmail,
           gstNumber: vGst,
           address: vAddress,
-          notes: vNotes
+          notes: vNotes,
         });
         vendorId = created.id;
-        toast.success('New vendor registered successfully');
+        toast.success("New vendor registered successfully");
       }
 
       if (vendorId && Object.keys(vCustomFields).length > 0) {
-        await apiClient.post(`/custom-fields/values/vendor/${vendorId}`, { values: vCustomFields });
+        await apiClient.post(`/custom-fields/values/vendor/${vendorId}`, {
+          values: vCustomFields,
+        });
       }
 
       // Attach newly-selected products (skip ones already attached)
       if (vendorId && selectedMaterialIds.size > 0) {
-        const alreadyAttachedIds = new Set(existingVendorProducts.map(a => a.materialId));
-        const toAttach = Array.from(selectedMaterialIds).filter(id => !alreadyAttachedIds.has(id));
+        const alreadyAttachedIds = new Set(
+          existingVendorProducts.map((a) => a.materialId),
+        );
+        const toAttach = Array.from(selectedMaterialIds).filter(
+          (id) => !alreadyAttachedIds.has(id),
+        );
         if (toAttach.length > 0) {
           await apiService.vendorProducts.attach(vendorId, toAttach);
         }
-        setVendorProductCounts(prev => ({ ...prev, [vendorId!]: selectedMaterialIds.size }));
+        setVendorProductCounts((prev) => ({
+          ...prev,
+          [vendorId!]: selectedMaterialIds.size,
+        }));
       }
 
       const list = await apiService.vendors.list();
       setVendors(list);
       resetVendorForm();
     } catch (err: any) {
-      toast.error('Failed to save vendor');
+      toast.error("Failed to save vendor");
     }
   };
 
@@ -696,27 +877,32 @@ export function VendorsPage() {
       const list = await apiService.vendors.list();
       setVendors(list);
 
-      const savedRev = localStorage.getItem('dvepl_po_revisions');
+      const savedRev = localStorage.getItem("dvepl_po_revisions");
       if (savedRev) {
         const revList: PORevision[] = JSON.parse(savedRev);
-        const toTrash = revList.filter(r => r.vendorId === vendorToDelete);
-        const remaining = revList.filter(r => r.vendorId !== vendorToDelete);
-        localStorage.setItem('dvepl_po_revisions', JSON.stringify(remaining));
+        const toTrash = revList.filter((r) => r.vendorId === vendorToDelete);
+        const remaining = revList.filter((r) => r.vendorId !== vendorToDelete);
+        localStorage.setItem("dvepl_po_revisions", JSON.stringify(remaining));
         setRevisions(remaining);
 
         if (toTrash.length > 0) {
-          const trashSaved = localStorage.getItem('dvepl_po_revisions_trash');
-          const trashList: PORevision[] = trashSaved ? JSON.parse(trashSaved) : [];
-          toTrash.forEach(r => {
+          const trashSaved = localStorage.getItem("dvepl_po_revisions_trash");
+          const trashList: PORevision[] = trashSaved
+            ? JSON.parse(trashSaved)
+            : [];
+          toTrash.forEach((r) => {
             (r as any).deletedAt = new Date().toISOString();
             trashList.unshift(r);
           });
-          localStorage.setItem('dvepl_po_revisions_trash', JSON.stringify(trashList));
+          localStorage.setItem(
+            "dvepl_po_revisions_trash",
+            JSON.stringify(trashList),
+          );
         }
       }
-      toast.success('Vendor deleted successfully');
+      toast.success("Vendor deleted successfully");
     } catch (err: any) {
-      toast.error('Failed to delete vendor');
+      toast.error("Failed to delete vendor");
     } finally {
       setVendorToDelete(null);
       setDeleteConfirmOpen(false);
@@ -727,14 +913,14 @@ export function VendorsPage() {
   const vendorRevisions = useMemo(() => {
     if (!selectedVendorForRevisions) return [];
     return revisions
-      .filter(r => r.vendorId === selectedVendorForRevisions.id)
+      .filter((r) => r.vendorId === selectedVendorForRevisions.id)
       .sort((a, b) => b.revisionNo - a.revisionNo);
   }, [revisions, selectedVendorForRevisions]);
 
   const revisionStats = useMemo(() => {
     const list = vendorRevisions;
     const totalSpent = list.reduce((sum, r) => sum + r.grandTotal, 0);
-    const poCount = new Set(list.map(r => r.poNumber)).size;
+    const poCount = new Set(list.map((r) => r.poNumber)).size;
     return { poCount, totalSpent, revisionCount: list.length };
   }, [vendorRevisions]);
 
@@ -754,39 +940,43 @@ export function VendorsPage() {
   const handleAddPoRow = () => {
     const newItem: POItem = {
       id: `row-${Date.now()}`,
-      description: '',
+      description: "",
       qty: 1,
-      unit: 'Nos',
-      hsnCode: '',
-      catNo: '',
+      unit: "Nos",
+      hsnCode: "",
+      catNo: "",
       rate: 0,
       discountPercent: 0,
       net: 0,
-      total: 0
+      total: 0,
     };
-    customColumns.forEach(c => { newItem[c] = ''; });
-    setPoItems(prev => [...prev, newItem]);
+    customColumns.forEach((c) => {
+      newItem[c] = "";
+    });
+    setPoItems((prev) => [...prev, newItem]);
   };
 
   // Fills an existing PO line-item row in-place with the selected inventory item's details.
   const applyInventoryItemToRow = (rowId: string, invItem: InventoryItem) => {
-    setPoItems(prev => prev.map(item => {
-      if (item.id !== rowId) return item;
-      const qty = Number(item.qty) || 1;
-      const rate = Number(invItem.unitPrice) || 0;
-      const disc = Number(item.discountPercent) || 0;
-      const net = rate * (1 - disc / 100);
-      return {
-        ...item,
-        description: invItem.material.name,
-        unit: invItem.material.unit || item.unit,
-        hsnCode: invItem.material.hsnCode || item.hsnCode,
-        catNo: invItem.material.materialCode || item.catNo,
-        rate,
-        net,
-        total: qty * net
-      };
-    }));
+    setPoItems((prev) =>
+      prev.map((item) => {
+        if (item.id !== rowId) return item;
+        const qty = Number(item.qty) || 1;
+        const rate = Number(invItem.unitPrice) || 0;
+        const disc = Number(item.discountPercent) || 0;
+        const net = rate * (1 - disc / 100);
+        return {
+          ...item,
+          description: invItem.material.name,
+          unit: invItem.material.unit || item.unit,
+          hsnCode: invItem.material.hsnCode || item.hsnCode,
+          catNo: invItem.material.materialCode || item.catNo,
+          rate,
+          net,
+          total: qty * net,
+        };
+      }),
+    );
     toast.success(`${invItem.material.name} applied from inventory`);
     setInventoryDropdownRowId(null);
   };
@@ -801,10 +991,10 @@ export function VendorsPage() {
     for (const key of rowKeys) {
       if (keys.includes(key.trim().toLowerCase())) {
         const v = row[key];
-        return v === undefined || v === null ? '' : String(v).trim();
+        return v === undefined || v === null ? "" : String(v).trim();
       }
     }
-    return '';
+    return "";
   };
 
   const handleExcelFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -816,13 +1006,15 @@ export function VendorsPage() {
     reader.onload = (evt) => {
       try {
         const data = evt.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary' });
+        const workbook = XLSX.read(data, { type: "binary" });
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
-        const rows: Record<string, any>[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+        const rows: Record<string, any>[] = XLSX.utils.sheet_to_json(sheet, {
+          defval: "",
+        });
 
         if (rows.length === 0) {
-          toast.error('No data found in the selected file');
+          toast.error("No data found in the selected file");
           return;
         }
 
@@ -830,25 +1022,54 @@ export function VendorsPage() {
         const newItems: POItem[] = [];
 
         rows.forEach((row, idx) => {
-          const catNoRaw = getCellValue(row, ['cat no', 'cat no.', 'catno', 'material code', 'code']);
-          const descriptionRaw = getCellValue(row, ['description', 'item', 'item description', 'name', 'material name']);
+          const catNoRaw = getCellValue(row, [
+            "cat no",
+            "cat no.",
+            "catno",
+            "material code",
+            "code",
+          ]);
+          const descriptionRaw = getCellValue(row, [
+            "description",
+            "item",
+            "item description",
+            "name",
+            "material name",
+          ]);
 
           // Try to match against Inventory by material code first, then by name
-          const invMatch = inventoryItems.find(inv =>
-            (catNoRaw && inv.material.materialCode?.toLowerCase() === catNoRaw.toLowerCase()) ||
-            (descriptionRaw && inv.material.name?.toLowerCase() === descriptionRaw.toLowerCase())
+          const invMatch = inventoryItems.find(
+            (inv) =>
+              (catNoRaw &&
+                inv.material.materialCode?.toLowerCase() ===
+                  catNoRaw.toLowerCase()) ||
+              (descriptionRaw &&
+                inv.material.name?.toLowerCase() ===
+                  descriptionRaw.toLowerCase()),
           );
           if (invMatch) matchedFromInventory++;
 
-          const description = descriptionRaw || invMatch?.material.name || '';
+          const description = descriptionRaw || invMatch?.material.name || "";
           if (!description) return; // skip empty rows
 
-          const qty = Number(getCellValue(row, ['qty', 'quantity'])) || 1;
-          const rate = Number(getCellValue(row, ['rate', 'unit price', 'price'])) || Number(invMatch?.unitPrice) || 0;
-          const discountPercent = Number(getCellValue(row, ['discount %', 'discount', 'discount percent'])) || 0;
-          const unit = getCellValue(row, ['unit', 'uom']) || invMatch?.material.unit || 'Nos';
-          const hsnCode = getCellValue(row, ['hsn code', 'hsn']) || invMatch?.material.hsnCode || '';
-          const catNo = catNoRaw || invMatch?.material.materialCode || '';
+          const qty = Number(getCellValue(row, ["qty", "quantity"])) || 1;
+          const rate =
+            Number(getCellValue(row, ["rate", "unit price", "price"])) ||
+            Number(invMatch?.unitPrice) ||
+            0;
+          const discountPercent =
+            Number(
+              getCellValue(row, ["discount %", "discount", "discount percent"]),
+            ) || 0;
+          const unit =
+            getCellValue(row, ["unit", "uom"]) ||
+            invMatch?.material.unit ||
+            "Nos";
+          const hsnCode =
+            getCellValue(row, ["hsn code", "hsn"]) ||
+            invMatch?.material.hsnCode ||
+            "";
+          const catNo = catNoRaw || invMatch?.material.materialCode || "";
           const net = rate * (1 - discountPercent / 100);
           const total = qty * net;
 
@@ -862,51 +1083,75 @@ export function VendorsPage() {
             rate,
             discountPercent,
             net,
-            total
+            total,
           };
-          customColumns.forEach(c => {
+          customColumns.forEach((c) => {
             newItem[c] = getCellValue(row, [c.trim().toLowerCase()]);
           });
           newItems.push(newItem);
         });
 
         if (newItems.length === 0) {
-          toast.error('No valid rows found. Ensure the file has a "Description" column.');
+          toast.error(
+            'No valid rows found. Ensure the file has a "Description" column.',
+          );
           return;
         }
 
-        setPoItems(prev => [...prev, ...newItems]);
+        setPoItems((prev) => [...prev, ...newItems]);
         toast.success(
           `Imported ${newItems.length} item(s) from Excel` +
-          (matchedFromInventory > 0 ? ` (${matchedFromInventory} matched to Inventory)` : '')
+            (matchedFromInventory > 0
+              ? ` (${matchedFromInventory} matched to Inventory)`
+              : ""),
         );
       } catch (err) {
         console.error(err);
-        toast.error('Failed to read the Excel file. Please check the file format and try again.');
+        toast.error(
+          "Failed to read the Excel file. Please check the file format and try again.",
+        );
       } finally {
         setIsImportingExcel(false);
-        if (excelImportInputRef.current) excelImportInputRef.current.value = '';
+        if (excelImportInputRef.current) excelImportInputRef.current.value = "";
       }
     };
     reader.onerror = () => {
-      toast.error('Failed to read the selected file.');
+      toast.error("Failed to read the selected file.");
       setIsImportingExcel(false);
     };
     reader.readAsBinaryString(file);
   };
 
   const handleDownloadPoItemsTemplate = () => {
-    const headers = ['Description', 'CAT No', 'HSN Code', 'Qty', 'Unit', 'Rate', 'Discount %', ...customColumns];
-    const sampleRow = ['Sample Item Name', 'MAT-001', '8536', 10, 'Nos', 100, 0, ...customColumns.map(() => '')];
+    const headers = [
+      "Description",
+      "CAT No",
+      "HSN Code",
+      "Qty",
+      "Unit",
+      "Rate",
+      "Discount %",
+      ...customColumns,
+    ];
+    const sampleRow = [
+      "Sample Item Name",
+      "MAT-001",
+      "8536",
+      10,
+      "Nos",
+      100,
+      0,
+      ...customColumns.map(() => ""),
+    ];
     const ws = XLSX.utils.aoa_to_sheet([headers, sampleRow]);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'PO Items');
-    XLSX.writeFile(wb, 'po_line_items_template.xlsx');
+    XLSX.utils.book_append_sheet(wb, ws, "PO Items");
+    XLSX.writeFile(wb, "po_line_items_template.xlsx");
   };
 
   const handleDuplicateLastRow = () => {
     if (poItems.length === 0) {
-      toast.error('No items to duplicate. Add a row first.');
+      toast.error("No items to duplicate. Add a row first.");
       return;
     }
     const last = poItems[poItems.length - 1];
@@ -914,8 +1159,8 @@ export function VendorsPage() {
       ...last,
       id: `row-${Date.now()}`,
     };
-    setPoItems(prev => [...prev, duplicated]);
-    toast.success('Last row duplicated');
+    setPoItems((prev) => [...prev, duplicated]);
+    toast.success("Last row duplicated");
   };
 
   const handleClearAllRows = () => {
@@ -923,39 +1168,45 @@ export function VendorsPage() {
   };
 
   const updatePoItemField = (id: string, field: string, val: any) => {
-    setPoItems(prev => prev.map(item => {
-      if (item.id !== id) return item;
-      const updated = { ...item, [field]: val };
+    setPoItems((prev) =>
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        const updated = { ...item, [field]: val };
 
-      if (field === 'qty' || field === 'rate' || field === 'discountPercent') {
-        const qty = Number(updated.qty) || 0;
-        const rate = Number(updated.rate) || 0;
-        const disc = Number(updated.discountPercent) || 0;
-        const net = rate * (1 - disc / 100);
-        updated.net = net;
-        updated.total = qty * net;
-      }
-      return updated;
-    }));
+        if (
+          field === "qty" ||
+          field === "rate" ||
+          field === "discountPercent"
+        ) {
+          const qty = Number(updated.qty) || 0;
+          const rate = Number(updated.rate) || 0;
+          const disc = Number(updated.discountPercent) || 0;
+          const net = rate * (1 - disc / 100);
+          updated.net = net;
+          updated.total = qty * net;
+        }
+        return updated;
+      }),
+    );
   };
 
   const handleDeletePoRow = (id: string) => {
-    setPoItems(prev => prev.filter(item => item.id !== id));
+    setPoItems((prev) => prev.filter((item) => item.id !== id));
   };
 
   const handleAddCustomColumn = () => {
     if (!newColName.trim()) {
-      toast.error('Column name is required');
+      toast.error("Column name is required");
       return;
     }
     const safeName = newColName.trim();
     if (customColumns.includes(safeName)) {
-      toast.error('Column already exists');
+      toast.error("Column already exists");
       return;
     }
-    setCustomColumns(prev => [...prev, safeName]);
-    setPoItems(prev => prev.map(item => ({ ...item, [safeName]: '' })));
-    setNewColName('');
+    setCustomColumns((prev) => [...prev, safeName]);
+    setPoItems((prev) => prev.map((item) => ({ ...item, [safeName]: "" })));
+    setNewColName("");
     setIsAddingCol(false);
     toast.success(`Column "${safeName}" added`);
   };
@@ -971,46 +1222,47 @@ export function VendorsPage() {
 
     // PO header validations
     if (!poNumber.trim()) {
-      toast.error('PO Number is required');
+      toast.error("PO Number is required");
       return;
     }
     if (!poDate) {
-      toast.error('PO Date is required');
+      toast.error("PO Date is required");
       return;
     }
 
     // Line item validations
     if (poItems.length === 0) {
-      toast.error('Add at least one line item before saving');
+      toast.error("Add at least one line item before saving");
       return;
     }
-    const invalidItems = poItems.filter(item =>
-      !item.description.trim() ||
-      !item.hsnCode.trim() ||
-      !item.catNo.trim() ||
-      item.qty <= 0 ||
-      item.rate <= 0
+    const invalidItems = poItems.filter(
+      (item) =>
+        !item.description.trim() ||
+        !item.hsnCode.trim() ||
+        !item.catNo.trim() ||
+        item.qty <= 0 ||
+        item.rate <= 0,
     );
     if (invalidItems.length > 0) {
-      toast.error(`${invalidItems.length} line item(s) have missing details (description, HSN, CAT No.) or invalid qty/rate (must be > 0)`);
+      toast.error(
+        `${invalidItems.length} line item(s) have missing details (description, HSN, CAT No.) or invalid qty/rate (must be > 0)`,
+      );
       return;
     }
 
     // Financial validations
     if (advance < 0) {
-      toast.error('Advance amount cannot be negative');
+      toast.error("Advance amount cannot be negative");
       return;
     }
     if (advance > totals.grandTotal && totals.grandTotal > 0) {
-      toast.error('Advance cannot exceed the grand total');
+      toast.error("Advance cannot exceed the grand total");
       return;
     }
 
     // Get all revisions for this Vendor + PO
     const existingRevisions = revisions.filter(
-      (r) =>
-        r.vendorId === activePoVendor.id &&
-        r.poNumber === poNumber
+      (r) => r.vendorId === activePoVendor.id && r.poNumber === poNumber,
     );
 
     // First revision starts from R0
@@ -1041,9 +1293,9 @@ export function VendorsPage() {
       lineItems: poItems,
       companyDetails,
       createdAt: new Date().toISOString(),
-      createdBy: useERPStore.getState().currentUserName || 'Unknown User',
+      createdBy: useERPStore.getState().currentUserName || "Unknown User",
       revisionNo: nextRevisionNo,
-      customColumns: [...customColumns]
+      customColumns: [...customColumns],
     };
 
     try {
@@ -1053,7 +1305,7 @@ export function VendorsPage() {
       setSelectedRevisionId(newRevision.id);
       toast.success(`Revision R${newRevision.revisionNo} saved successfully`);
     } catch (err: any) {
-      toast.error('Failed to save PO revision');
+      toast.error("Failed to save PO revision");
     }
   };
 
@@ -1079,28 +1331,30 @@ export function VendorsPage() {
 
   const openNewDataEntry = (vendor: Vendor) => {
     setActivePoVendor(vendor);
-    setPoNumber(`PO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`);
-    setPoDate(new Date().toISOString().split('T')[0]);
-    setPoStatus('Pending');
-    setPaymentTerms('30 days net');
-    setMaterialStatus('Pending');
+    setPoNumber(
+      `PO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+    );
+    setPoDate(new Date().toISOString().split("T")[0]);
+    setPoStatus("Pending");
+    setPaymentTerms("30 days net");
+    setMaterialStatus("Pending");
     setAdvance(0);
-    setRemarks('');
+    setRemarks("");
     setCgstPercent(9);
     setSgstPercent(9);
     setIgstPercent(0);
-    setTerms('');
+    setTerms("");
     setPoItems([]);
-    const activeCompany = companies.find(c => c.id === currentCompanyId);
+    const activeCompany = companies.find((c) => c.id === currentCompanyId);
     setCompanyDetails({
-      name: activeCompany?.name || '',
-      address: activeCompany?.address || '',
-      phone: activeCompany?.phone || '',
-      email: activeCompany?.email || '',
-      gstin: activeCompany?.gst || '',
-      iso: '',
-      signatory: '',
-      division: ''
+      name: activeCompany?.name || "",
+      address: activeCompany?.address || "",
+      phone: activeCompany?.phone || "",
+      email: activeCompany?.email || "",
+      gstin: activeCompany?.gst || "",
+      iso: "",
+      signatory: "",
+      division: "",
     });
     setSelectedRevisionId(null);
     setIsDataEntryOpen(true);
@@ -1115,29 +1369,33 @@ export function VendorsPage() {
   // Builds the printable PO HTML document from current (dynamic) form state.
   // Shared by the PDF export and the on-screen "View PO" preview.
   const buildPoDocumentHtml = (): string => {
-    if (!activePoVendor) return '';
+    if (!activePoVendor) return "";
 
-    const customColsTh = customColumns.map(c => `<th>${c}</th>`).join('');
+    const customColsTh = customColumns.map((c) => `<th>${c}</th>`).join("");
 
-    const itemsHtml = poItems.map((item, idx) => {
-        const customColsTd = customColumns.map(c => `<td>${item[c] || '—'}</td>`).join('');
+    const itemsHtml = poItems
+      .map((item, idx) => {
+        const customColsTd = customColumns
+          .map((c) => `<td>${item[c] || "—"}</td>`)
+          .join("");
         return `
           <tr>
             <td style="text-align: center;">${idx + 1}</td>
-            <td>${item.description || '—'}</td>
+            <td>${item.description || "—"}</td>
             <td style="text-align: center;">${item.qty}</td>
             <td style="text-align: center;">${item.unit}</td>
-            <td>${item.hsnCode || '—'}</td>
-            <td>${item.catNo || '—'}</td>
+            <td>${item.hsnCode || "—"}</td>
+            <td>${item.catNo || "—"}</td>
             ${customColsTd}
-            <td style="text-align: right;">₹${(item.rate || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+            <td style="text-align: right;">₹${(item.rate || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
             <td style="text-align: center;">${item.discountPercent}%</td>
-            <td style="text-align: right; font-weight: bold;">₹${(item.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+            <td style="text-align: right; font-weight: bold;">₹${(item.total || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
           </tr>
         `;
-      }).join('');
+      })
+      .join("");
 
-      return `
+    return `
         <html>
           <head>
             <title>Purchase Order - ${poNumber}</title>
@@ -1196,7 +1454,7 @@ export function VendorsPage() {
                 <div class="meta-body">
                   <p style="margin: 0 0 2px 0;"><strong>Material Status:</strong> ${materialStatus}</p>
                   <p style="margin: 0 0 2px 0;"><strong>Payment Terms:</strong> ${paymentTerms}</p>
-                  <p style="margin: 0 0 2px 0;"><strong>Remarks:</strong> ${remarks || 'None'}</p>
+                  <p style="margin: 0 0 2px 0;"><strong>Remarks:</strong> ${remarks || "None"}</p>
                 </div>
               </div>
             </div>
@@ -1218,7 +1476,7 @@ export function VendorsPage() {
               </thead>
               <tbody>
                 ${itemsHtml}
-                ${poItems.length === 0 ? '<tr><td colspan="10" style="text-align: center; padding: 15px; color: #6b7280;">No items added to this purchase order.</td></tr>' : ''}
+                ${poItems.length === 0 ? '<tr><td colspan="10" style="text-align: center; padding: 15px; color: #6b7280;">No items added to this purchase order.</td></tr>' : ""}
               </tbody>
             </table>
 
@@ -1228,13 +1486,13 @@ export function VendorsPage() {
             </div>
 
             <div class="totals-box">
-              <div class="totals-row"><span>Subtotal:</span> <span>₹${totals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
-              <div class="totals-row"><span>CGST (${cgstPercent}%):</span> <span>₹${totals.cgstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
-              <div class="totals-row"><span>SGST (${sgstPercent}%):</span> <span>₹${totals.sgstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
-              <div class="totals-row"><span>IGST (${igstPercent}%):</span> <span>₹${totals.igstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
-              <div class="totals-row grand-total"><span>Grand Total:</span> <span>₹${totals.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
-              <div class="totals-row"><span>Advance Paid:</span> <span>₹${advance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
-              <div class="totals-row" style="font-weight: 700; color: #111827; border-top: 1px solid #e5e7eb; padding-top: 4px;"><span>Balance Due:</span> <span>₹${totals.balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
+              <div class="totals-row"><span>Subtotal:</span> <span>₹${totals.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
+              <div class="totals-row"><span>CGST (${cgstPercent}%):</span> <span>₹${totals.cgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
+              <div class="totals-row"><span>SGST (${sgstPercent}%):</span> <span>₹${totals.sgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
+              <div class="totals-row"><span>IGST (${igstPercent}%):</span> <span>₹${totals.igstAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
+              <div class="totals-row grand-total"><span>Grand Total:</span> <span>₹${totals.grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
+              <div class="totals-row"><span>Advance Paid:</span> <span>₹${advance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
+              <div class="totals-row" style="font-weight: 700; color: #111827; border-top: 1px solid #e5e7eb; padding-top: 4px;"><span>Balance Due:</span> <span>₹${totals.balance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
             </div>
 
             <div class="sig-section">
@@ -1254,23 +1512,23 @@ export function VendorsPage() {
   const triggerExport = (format: string) => {
     if (!activePoVendor) return;
 
-    if (format === 'pdf') {
+    if (format === "pdf") {
       const html = buildPoDocumentHtml();
       if (!html) {
-        toast.error('Select a vendor first.');
+        toast.error("Select a vendor first.");
         return;
       }
 
-      const iframe = document.createElement('iframe');
-      iframe.style.position = 'fixed';
-      iframe.style.width = '0px';
-      iframe.style.height = '0px';
-      iframe.style.border = 'none';
+      const iframe = document.createElement("iframe");
+      iframe.style.position = "fixed";
+      iframe.style.width = "0px";
+      iframe.style.height = "0px";
+      iframe.style.border = "none";
       document.body.appendChild(iframe);
 
       const doc = iframe.contentWindow?.document || iframe.contentDocument;
       if (!doc) {
-        toast.error('Unable to create offscreen document print context.');
+        toast.error("Unable to create offscreen document print context.");
         return;
       }
 
@@ -1283,87 +1541,254 @@ export function VendorsPage() {
         document.body.removeChild(iframe);
       }, 500);
     } else {
-      const canvas = document.createElement('canvas');
+      const canvas = document.createElement("canvas");
       canvas.width = 1000;
-      const dynamicHeight = 520 + (poItems.length * 32) + 260;
+      const dynamicHeight = 520 + poItems.length * 32 + 260;
       canvas.height = Math.max(800, dynamicHeight);
-      const ctx = canvas.getContext('2d');
-      if (!ctx) { toast.error('Unable to create canvas context.'); return; }
-      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#1e3a8a'; ctx.font = 'bold 22px sans-serif'; ctx.fillText(companyDetails.name, 40, 60);
-      ctx.fillStyle = '#4b5563'; ctx.font = '13px sans-serif';
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        toast.error("Unable to create canvas context.");
+        return;
+      }
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#1e3a8a";
+      ctx.font = "bold 22px sans-serif";
+      ctx.fillText(companyDetails.name, 40, 60);
+      ctx.fillStyle = "#4b5563";
+      ctx.font = "13px sans-serif";
       ctx.fillText(companyDetails.address, 40, 85);
-      ctx.fillText(`Phone: ${companyDetails.phone} | Email: ${companyDetails.email}`, 40, 105);
-      ctx.fillText(`GSTIN: ${companyDetails.gstin} | ${companyDetails.iso}`, 40, 125);
-      ctx.fillStyle = '#111827'; ctx.font = 'bold 28px sans-serif'; ctx.fillText('PURCHASE ORDER', 620, 60);
-      ctx.font = '14px sans-serif'; ctx.fillText(`PO Number: ${poNumber}`, 620, 95); ctx.fillText(`Date: ${poDate}`, 620, 120);
-      ctx.strokeStyle = '#111827'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(40, 150); ctx.lineTo(960, 150); ctx.stroke();
-      ctx.fillStyle = '#2563eb'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('ORDER PLACED TO (VENDOR):', 40, 180); ctx.fillText('DELIVERY & SHIPPING TERMS:', 500, 180);
-      ctx.fillStyle = '#111827'; ctx.font = 'bold 14px sans-serif'; ctx.fillText(activePoVendor.name, 40, 205);
-      ctx.font = '13px sans-serif'; ctx.fillText(`Category: ${activePoVendor.category}`, 40, 225); ctx.fillText(`Phone: ${activePoVendor.phone} | Email: ${activePoVendor.email}`, 40, 245); ctx.fillText(`GSTIN: ${activePoVendor.gstNumber}`, 40, 265);
-      ctx.fillText(`Material Status: ${materialStatus}`, 500, 205); ctx.fillText(`Payment Terms: ${paymentTerms}`, 500, 225); ctx.fillText(`Remarks: ${remarks || 'None'}`, 500, 245);
-      let y = 300; ctx.fillStyle = '#f3f4f6'; ctx.fillRect(40, y, 920, 32); ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 1; ctx.strokeRect(40, y, 920, 32);
-      ctx.fillStyle = '#374151'; ctx.font = 'bold 11px sans-serif'; ctx.fillText('S.No.', 50, y + 20); ctx.fillText('Item Description', 100, y + 20); ctx.fillText('Qty', 440, y + 20); ctx.fillText('Unit', 500, y + 20); ctx.fillText('HSN Code', 560, y + 20); ctx.fillText('CAT No.', 650, y + 20); ctx.fillText('Rate', 740, y + 20); ctx.fillText('Total', 880, y + 20);
-      ctx.fillStyle = '#1f2937'; ctx.font = '13px sans-serif';
-      poItems.forEach((item, idx) => { y += 32; ctx.strokeRect(40, y, 920, 32); ctx.fillText(String(idx + 1), 50, y + 20); ctx.fillText(item.description || '—', 100, y + 20); ctx.fillText(String(item.qty), 440, y + 20); ctx.fillText(item.unit || 'PCS', 500, y + 20); ctx.fillText(item.hsnCode || '—', 560, y + 20); ctx.fillText(item.catNo || '—', 650, y + 20); ctx.fillText(`₹${item.rate.toFixed(2)}`, 740, y + 20); ctx.font = 'bold 13px sans-serif'; ctx.fillStyle = '#1e4620'; ctx.fillText(`₹${item.total.toFixed(2)}`, 880, y + 20); ctx.fillStyle = '#1f2937'; ctx.font = '13px sans-serif'; });
-      y += 50; const rightX = 640; ctx.font = '13px sans-serif'; ctx.fillStyle = '#4b5563'; ctx.fillText('Subtotal:', rightX, y); ctx.fillStyle = '#111827'; ctx.fillText(`₹${totals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 860, y);
-      y += 24; ctx.fillStyle = '#4b5563'; ctx.fillText(`CGST (${cgstPercent}%):`, rightX, y); ctx.fillStyle = '#111827'; ctx.fillText(`₹${totals.cgstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 860, y);
-      y += 24; ctx.fillStyle = '#4b5563'; ctx.fillText(`SGST (${sgstPercent}%):`, rightX, y); ctx.fillStyle = '#111827'; ctx.fillText(`₹${totals.sgstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 860, y);
-      y += 24; ctx.fillStyle = '#4b5563'; ctx.fillText(`IGST (${igstPercent}%):`, rightX, y); ctx.fillStyle = '#111827'; ctx.fillText(`₹${totals.igstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 860, y);
-      y += 12; ctx.strokeStyle = '#111827'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(rightX, y); ctx.lineTo(960, y); ctx.stroke();
-      y += 20; ctx.fillStyle = '#111827'; ctx.font = 'bold 14px sans-serif'; ctx.fillText('Grand Total:', rightX, y); ctx.fillStyle = '#1e4620'; ctx.fillText(`₹${totals.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 860, y);
-      y += 24; ctx.font = '13px sans-serif'; ctx.fillStyle = '#4b5563'; ctx.fillText('Advance Paid:', rightX, y); ctx.fillStyle = '#111827'; ctx.fillText(`₹${advance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 860, y);
-      y += 24; ctx.fillStyle = '#111827'; ctx.font = 'bold 13px sans-serif'; ctx.fillText('Balance Due:', rightX, y); ctx.fillStyle = '#1e4620'; ctx.fillText(`₹${totals.balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 860, y);
-      ctx.fillStyle = '#1f2937'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('TERMS & CONDITIONS:', 40, y - 100); ctx.fillStyle = '#4b5563'; ctx.font = '11px sans-serif'; const termLines = terms.split('\n'); let termY = y - 80; termLines.forEach(line => { ctx.fillText(line, 40, termY); termY += 16; });
-      y += 80; ctx.strokeStyle = '#111827'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(680, y); ctx.lineTo(920, y); ctx.stroke();
-      y += 20; ctx.fillStyle = '#111827'; ctx.font = 'bold 13px sans-serif'; ctx.fillText(companyDetails.signatory, 700, y); ctx.font = '11px sans-serif'; ctx.fillStyle = '#4b5563'; ctx.fillText('Authorized Signatory', 700, y + 16);
-      const downloadAnchor = document.createElement('a'); downloadAnchor.setAttribute("href", canvas.toDataURL(format === 'png' ? 'image/png' : 'image/jpeg', 0.95)); downloadAnchor.setAttribute("download", `${poNumber}.${format}`); document.body.appendChild(downloadAnchor); downloadAnchor.click(); downloadAnchor.remove();
+      ctx.fillText(
+        `Phone: ${companyDetails.phone} | Email: ${companyDetails.email}`,
+        40,
+        105,
+      );
+      ctx.fillText(
+        `GSTIN: ${companyDetails.gstin} | ${companyDetails.iso}`,
+        40,
+        125,
+      );
+      ctx.fillStyle = "#111827";
+      ctx.font = "bold 28px sans-serif";
+      ctx.fillText("PURCHASE ORDER", 620, 60);
+      ctx.font = "14px sans-serif";
+      ctx.fillText(`PO Number: ${poNumber}`, 620, 95);
+      ctx.fillText(`Date: ${poDate}`, 620, 120);
+      ctx.strokeStyle = "#111827";
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(40, 150);
+      ctx.lineTo(960, 150);
+      ctx.stroke();
+      ctx.fillStyle = "#2563eb";
+      ctx.font = "bold 12px sans-serif";
+      ctx.fillText("ORDER PLACED TO (VENDOR):", 40, 180);
+      ctx.fillText("DELIVERY & SHIPPING TERMS:", 500, 180);
+      ctx.fillStyle = "#111827";
+      ctx.font = "bold 14px sans-serif";
+      ctx.fillText(activePoVendor.name, 40, 205);
+      ctx.font = "13px sans-serif";
+      ctx.fillText(`Category: ${activePoVendor.category}`, 40, 225);
+      ctx.fillText(
+        `Phone: ${activePoVendor.phone} | Email: ${activePoVendor.email}`,
+        40,
+        245,
+      );
+      ctx.fillText(`GSTIN: ${activePoVendor.gstNumber}`, 40, 265);
+      ctx.fillText(`Material Status: ${materialStatus}`, 500, 205);
+      ctx.fillText(`Payment Terms: ${paymentTerms}`, 500, 225);
+      ctx.fillText(`Remarks: ${remarks || "None"}`, 500, 245);
+      let y = 300;
+      ctx.fillStyle = "#f3f4f6";
+      ctx.fillRect(40, y, 920, 32);
+      ctx.strokeStyle = "#cbd5e1";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(40, y, 920, 32);
+      ctx.fillStyle = "#374151";
+      ctx.font = "bold 11px sans-serif";
+      ctx.fillText("S.No.", 50, y + 20);
+      ctx.fillText("Item Description", 100, y + 20);
+      ctx.fillText("Qty", 440, y + 20);
+      ctx.fillText("Unit", 500, y + 20);
+      ctx.fillText("HSN Code", 560, y + 20);
+      ctx.fillText("CAT No.", 650, y + 20);
+      ctx.fillText("Rate", 740, y + 20);
+      ctx.fillText("Total", 880, y + 20);
+      ctx.fillStyle = "#1f2937";
+      ctx.font = "13px sans-serif";
+      poItems.forEach((item, idx) => {
+        y += 32;
+        ctx.strokeRect(40, y, 920, 32);
+        ctx.fillText(String(idx + 1), 50, y + 20);
+        ctx.fillText(item.description || "—", 100, y + 20);
+        ctx.fillText(String(item.qty), 440, y + 20);
+        ctx.fillText(item.unit || "PCS", 500, y + 20);
+        ctx.fillText(item.hsnCode || "—", 560, y + 20);
+        ctx.fillText(item.catNo || "—", 650, y + 20);
+        ctx.fillText(`₹${item.rate.toFixed(2)}`, 740, y + 20);
+        ctx.font = "bold 13px sans-serif";
+        ctx.fillStyle = "#1e4620";
+        ctx.fillText(`₹${item.total.toFixed(2)}`, 880, y + 20);
+        ctx.fillStyle = "#1f2937";
+        ctx.font = "13px sans-serif";
+      });
+      y += 50;
+      const rightX = 640;
+      ctx.font = "13px sans-serif";
+      ctx.fillStyle = "#4b5563";
+      ctx.fillText("Subtotal:", rightX, y);
+      ctx.fillStyle = "#111827";
+      ctx.fillText(
+        `₹${totals.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+        860,
+        y,
+      );
+      y += 24;
+      ctx.fillStyle = "#4b5563";
+      ctx.fillText(`CGST (${cgstPercent}%):`, rightX, y);
+      ctx.fillStyle = "#111827";
+      ctx.fillText(
+        `₹${totals.cgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+        860,
+        y,
+      );
+      y += 24;
+      ctx.fillStyle = "#4b5563";
+      ctx.fillText(`SGST (${sgstPercent}%):`, rightX, y);
+      ctx.fillStyle = "#111827";
+      ctx.fillText(
+        `₹${totals.sgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+        860,
+        y,
+      );
+      y += 24;
+      ctx.fillStyle = "#4b5563";
+      ctx.fillText(`IGST (${igstPercent}%):`, rightX, y);
+      ctx.fillStyle = "#111827";
+      ctx.fillText(
+        `₹${totals.igstAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+        860,
+        y,
+      );
+      y += 12;
+      ctx.strokeStyle = "#111827";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(rightX, y);
+      ctx.lineTo(960, y);
+      ctx.stroke();
+      y += 20;
+      ctx.fillStyle = "#111827";
+      ctx.font = "bold 14px sans-serif";
+      ctx.fillText("Grand Total:", rightX, y);
+      ctx.fillStyle = "#1e4620";
+      ctx.fillText(
+        `₹${totals.grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+        860,
+        y,
+      );
+      y += 24;
+      ctx.font = "13px sans-serif";
+      ctx.fillStyle = "#4b5563";
+      ctx.fillText("Advance Paid:", rightX, y);
+      ctx.fillStyle = "#111827";
+      ctx.fillText(
+        `₹${advance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+        860,
+        y,
+      );
+      y += 24;
+      ctx.fillStyle = "#111827";
+      ctx.font = "bold 13px sans-serif";
+      ctx.fillText("Balance Due:", rightX, y);
+      ctx.fillStyle = "#1e4620";
+      ctx.fillText(
+        `₹${totals.balance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+        860,
+        y,
+      );
+      ctx.fillStyle = "#1f2937";
+      ctx.font = "bold 12px sans-serif";
+      ctx.fillText("TERMS & CONDITIONS:", 40, y - 100);
+      ctx.fillStyle = "#4b5563";
+      ctx.font = "11px sans-serif";
+      const termLines = terms.split("\n");
+      let termY = y - 80;
+      termLines.forEach((line) => {
+        ctx.fillText(line, 40, termY);
+        termY += 16;
+      });
+      y += 80;
+      ctx.strokeStyle = "#111827";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(680, y);
+      ctx.lineTo(920, y);
+      ctx.stroke();
+      y += 20;
+      ctx.fillStyle = "#111827";
+      ctx.font = "bold 13px sans-serif";
+      ctx.fillText(companyDetails.signatory, 700, y);
+      ctx.font = "11px sans-serif";
+      ctx.fillStyle = "#4b5563";
+      ctx.fillText("Authorized Signatory", 700, y + 16);
+      const downloadAnchor = document.createElement("a");
+      downloadAnchor.setAttribute(
+        "href",
+        canvas.toDataURL(format === "png" ? "image/png" : "image/jpeg", 0.95),
+      );
+      downloadAnchor.setAttribute("download", `${poNumber}.${format}`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
     }
   };
 
   const openPoPreview = () => {
     if (!activePoVendor) {
-      toast.error('No vendor context found.');
+      toast.error("No vendor context found.");
       return;
     }
     if (poItems.length === 0) {
-      toast.error('Add at least one line item to preview the PO.');
+      toast.error("Add at least one line item to preview the PO.");
       return;
     }
     setIsPoPreviewOpen(true);
   };
 
   const buildPoMessageText = (): string => {
-    const itemsLine = poItems.length === 1 ? '1 item' : poItems.length + ' items';
+    const itemsLine =
+      poItems.length === 1 ? "1 item" : poItems.length + " items";
     const lines = [
-      'PURCHASE ORDER',
-      'PO Number: ' + poNumber,
-      'Date: ' + poDate,
-      'Vendor: ' + (activePoVendor?.name || ''),
-      'Items: ' + itemsLine,
-      'Grand Total: Rs. ' + totals.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 }),
-      'Payment Terms: ' + paymentTerms,
-      'Material Status: ' + materialStatus,
+      "PURCHASE ORDER",
+      "PO Number: " + poNumber,
+      "Date: " + poDate,
+      "Vendor: " + (activePoVendor?.name || ""),
+      "Items: " + itemsLine,
+      "Grand Total: Rs. " +
+        totals.grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 }),
+      "Payment Terms: " + paymentTerms,
+      "Material Status: " + materialStatus,
     ];
-    if (remarks) lines.push('Remarks: ' + remarks);
-    lines.push('');
-    lines.push('Please confirm receipt of this Purchase Order.');
-    lines.push('');
-    lines.push('- ' + companyDetails.name);
-    return lines.join('\n');
+    if (remarks) lines.push("Remarks: " + remarks);
+    lines.push("");
+    lines.push("Please confirm receipt of this Purchase Order.");
+    lines.push("");
+    lines.push("- " + companyDetails.name);
+    return lines.join("\n");
   };
 
   const openPoPlacedDialog = () => {
     if (!activePoVendor) {
-      toast.error('No vendor context found.');
+      toast.error("No vendor context found.");
       return;
     }
     if (poItems.length === 0) {
-      toast.error('Add at least one line item before placing the PO.');
+      toast.error("Add at least one line item before placing the PO.");
       return;
     }
-    setPlacePhone(activePoVendor.phone || '');
-    setPlaceEmail(activePoVendor.email || '');
+    setPlacePhone(activePoVendor.phone || "");
+    setPlaceEmail(activePoVendor.email || "");
     setPlaceSendWhatsapp(true);
     setPlaceSendEmail(false);
     setIsPoPlacedDialogOpen(true);
@@ -1371,43 +1796,57 @@ export function VendorsPage() {
 
   const handleConfirmPoPlaced = () => {
     if (!placeSendWhatsapp && !placeSendEmail) {
-      toast.error('Select at least one channel (WhatsApp or Email).');
+      toast.error("Select at least one channel (WhatsApp or Email).");
       return;
     }
     if (placeSendWhatsapp && !placePhone.trim()) {
-      toast.error('Enter a WhatsApp number to send the PO.');
+      toast.error("Enter a WhatsApp number to send the PO.");
       return;
     }
     if (placeSendEmail && !placeEmail.trim()) {
-      toast.error('Enter an email address to send the PO.');
+      toast.error("Enter an email address to send the PO.");
       return;
     }
 
     // Generate the PDF PO for user to print/save and attach
-    triggerExport('pdf');
+    triggerExport("pdf");
 
     const message = buildPoMessageText();
     const sentChannels: string[] = [];
 
     if (placeSendWhatsapp) {
-      const cleanPhone = placePhone.replace(/[^\d]/g, '');
-      window.open('https://wa.me/' + cleanPhone + '?text=' + encodeURIComponent(message), '_blank');
-      sentChannels.push('WhatsApp');
+      const cleanPhone = placePhone.replace(/[^\d]/g, "");
+      window.open(
+        "https://wa.me/" + cleanPhone + "?text=" + encodeURIComponent(message),
+        "_blank",
+      );
+      sentChannels.push("WhatsApp");
     }
     if (placeSendEmail) {
-      const subject = 'Purchase Order ' + poNumber + ' from ' + companyDetails.name;
-      window.open('mailto:' + placeEmail + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(message), '_blank');
-      sentChannels.push('Email');
+      const subject =
+        "Purchase Order " + poNumber + " from " + companyDetails.name;
+      window.open(
+        "mailto:" +
+          placeEmail +
+          "?subject=" +
+          encodeURIComponent(subject) +
+          "&body=" +
+          encodeURIComponent(message),
+        "_blank",
+      );
+      sentChannels.push("Email");
     }
 
-    setPoStatus('Placed');
-    toast.success('PO marked as Placed - PDF generated and sent via ' + sentChannels.join(' & '));
+    setPoStatus("Placed");
+    toast.success(
+      "PO marked as Placed - PDF generated and sent via " +
+        sentChannels.join(" & "),
+    );
     setIsPoPlacedDialogOpen(false);
   };
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
-
       {/* ── Page Header ── */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
@@ -1416,10 +1855,15 @@ export function VendorsPage() {
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Vendors</h1>
-            <p className="mt-1 text-xs text-muted-foreground">{vendors.length} registered vendors</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {vendors.length} registered vendors
+            </p>
           </div>
         </div>
-        <Button onClick={() => setIsFormOpen(true)} className="gap-2 bg-primary text-white font-semibold">
+        <Button
+          onClick={() => setIsFormOpen(true)}
+          className="gap-2 bg-primary text-white font-semibold"
+        >
           + Add Vendor
         </Button>
       </div>
@@ -1430,11 +1874,19 @@ export function VendorsPage() {
           <div className="border-b pb-3 flex items-center justify-between">
             <div>
               <h2 className="text-sm font-bold uppercase tracking-wider text-primary">
-                {editingVendor ? 'Edit Vendor' : 'Add New Vendor'}
+                {editingVendor ? "Edit Vendor" : "Add New Vendor"}
               </h2>
-              <p className="text-xs text-muted-foreground">Enter vendor company details, GST, contact info, and supplied products</p>
+              <p className="text-xs text-muted-foreground">
+                Enter vendor company details, GST, contact info, and supplied
+                products
+              </p>
             </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={resetVendorForm}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={resetVendorForm}
+            >
               <X className="size-4" />
             </Button>
           </div>
@@ -1443,15 +1895,15 @@ export function VendorsPage() {
           <div className="flex items-center gap-1 border-b">
             <button
               type="button"
-              onClick={() => setFormTab('details')}
-              className={`px-4 py-2 text-xs font-semibold border-b-2 -mb-px transition-colors ${formTab === 'details' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+              onClick={() => setFormTab("details")}
+              className={`px-4 py-2 text-xs font-semibold border-b-2 -mb-px transition-colors ${formTab === "details" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
             >
               Vendor Details
             </button>
             <button
               type="button"
-              onClick={() => setFormTab('products')}
-              className={`px-4 py-2 text-xs font-semibold border-b-2 -mb-px transition-colors flex items-center gap-1.5 ${formTab === 'products' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+              onClick={() => setFormTab("products")}
+              className={`px-4 py-2 text-xs font-semibold border-b-2 -mb-px transition-colors flex items-center gap-1.5 ${formTab === "products" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
             >
               <Package className="size-3.5" />
               Products Supplied
@@ -1464,27 +1916,41 @@ export function VendorsPage() {
           </div>
 
           <form onSubmit={handleSaveVendor} className="w-full">
-
-            {formTab === 'details' && (
+            {formTab === "details" && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
                 <div className="flex flex-col gap-1.5 sm:col-span-2">
-                  <Label className="text-xs font-semibold">Vendor / Company Name *</Label>
+                  <Label className="text-xs font-semibold">
+                    Vendor / Company Name *
+                  </Label>
                   <Input
                     value={vName}
-                    onChange={e => { setVName(e.target.value); if (vErrors.name) setVErrors(p => ({ ...p, name: '' })); }}
+                    onChange={(e) => {
+                      setVName(e.target.value);
+                      if (vErrors.name) setVErrors((p) => ({ ...p, name: "" }));
+                    }}
                     placeholder="e.g. Acme Pvt. Ltd."
-                    className={vErrors.name ? 'border-destructive focus-visible:ring-destructive' : ''}
+                    className={
+                      vErrors.name
+                        ? "border-destructive focus-visible:ring-destructive"
+                        : ""
+                    }
                   />
-                  {vErrors.name && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="size-3" />{vErrors.name}</p>}
+                  {vErrors.name && (
+                    <p className="text-xs text-destructive flex items-center gap-1">
+                      <AlertCircle className="size-3" />
+                      {vErrors.name}
+                    </p>
+                  )}
                 </div>
-                {vendorCustomFields.some(f => f.afterField === 'name') && (
+                {vendorCustomFields.some((f) => f.afterField === "name") && (
                   <div className="sm:col-span-2">
                     <DynamicFormRenderer
                       fields={vendorCustomFields}
                       values={vCustomFields}
                       onChange={(key, val) => {
-                        setVCustomFields(prev => ({ ...prev, [key]: val }));
-                        if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
+                        setVCustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (vErrors[key])
+                          setVErrors((prev) => ({ ...prev, [key]: "" }));
                       }}
                       errors={vErrors}
                       afterFieldPosition="name"
@@ -1496,18 +1962,21 @@ export function VendorsPage() {
                   <Label className="text-xs font-semibold">Category</Label>
                   <Input
                     value={vCategory}
-                    onChange={e => setVCategory(e.target.value)}
+                    onChange={(e) => setVCategory(e.target.value)}
                     placeholder="e.g. Electrical, Mechanical"
                   />
                 </div>
-                {vendorCustomFields.some(f => f.afterField === 'category') && (
+                {vendorCustomFields.some(
+                  (f) => f.afterField === "category",
+                ) && (
                   <div className="sm:col-span-2">
                     <DynamicFormRenderer
                       fields={vendorCustomFields}
                       values={vCustomFields}
                       onChange={(key, val) => {
-                        setVCustomFields(prev => ({ ...prev, [key]: val }));
-                        if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
+                        setVCustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (vErrors[key])
+                          setVErrors((prev) => ({ ...prev, [key]: "" }));
                       }}
                       errors={vErrors}
                       afterFieldPosition="category"
@@ -1516,21 +1985,26 @@ export function VendorsPage() {
                 )}
 
                 <div className="flex flex-col gap-1.5">
-                  <Label className="text-xs font-semibold">Contact Person</Label>
+                  <Label className="text-xs font-semibold">
+                    Contact Person
+                  </Label>
                   <Input
                     value={vContact}
-                    onChange={e => setVContact(e.target.value)}
+                    onChange={(e) => setVContact(e.target.value)}
                     placeholder="e.g. Rajesh Kumar"
                   />
                 </div>
-                {vendorCustomFields.some(f => f.afterField === 'contactPerson') && (
+                {vendorCustomFields.some(
+                  (f) => f.afterField === "contactPerson",
+                ) && (
                   <div className="sm:col-span-2">
                     <DynamicFormRenderer
                       fields={vendorCustomFields}
                       values={vCustomFields}
                       onChange={(key, val) => {
-                        setVCustomFields(prev => ({ ...prev, [key]: val }));
-                        if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
+                        setVCustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (vErrors[key])
+                          setVErrors((prev) => ({ ...prev, [key]: "" }));
                       }}
                       errors={vErrors}
                       afterFieldPosition="contactPerson"
@@ -1542,26 +2016,39 @@ export function VendorsPage() {
                   <Label className="text-xs font-semibold">Phone</Label>
                   <Input
                     value={vPhone}
-                    onChange={e => {
-                      const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    onChange={(e) => {
+                      const digits = e.target.value
+                        .replace(/\D/g, "")
+                        .slice(0, 10);
                       setVPhone(digits);
-                      if (vErrors.phone) setVErrors(p => ({ ...p, phone: '' }));
+                      if (vErrors.phone)
+                        setVErrors((p) => ({ ...p, phone: "" }));
                     }}
                     placeholder="9876543210"
                     maxLength={10}
                     inputMode="numeric"
-                    className={vErrors.phone ? 'border-destructive focus-visible:ring-destructive' : ''}
+                    className={
+                      vErrors.phone
+                        ? "border-destructive focus-visible:ring-destructive"
+                        : ""
+                    }
                   />
-                  {vErrors.phone && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="size-3" />{vErrors.phone}</p>}
+                  {vErrors.phone && (
+                    <p className="text-xs text-destructive flex items-center gap-1">
+                      <AlertCircle className="size-3" />
+                      {vErrors.phone}
+                    </p>
+                  )}
                 </div>
-                {vendorCustomFields.some(f => f.afterField === 'phone') && (
+                {vendorCustomFields.some((f) => f.afterField === "phone") && (
                   <div className="sm:col-span-2">
                     <DynamicFormRenderer
                       fields={vendorCustomFields}
                       values={vCustomFields}
                       onChange={(key, val) => {
-                        setVCustomFields(prev => ({ ...prev, [key]: val }));
-                        if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
+                        setVCustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (vErrors[key])
+                          setVErrors((prev) => ({ ...prev, [key]: "" }));
                       }}
                       errors={vErrors}
                       afterFieldPosition="phone"
@@ -1574,20 +2061,34 @@ export function VendorsPage() {
                   <Input
                     type="text"
                     value={vEmail}
-                    onChange={e => { setVEmail(e.target.value); if (vErrors.email) setVErrors(p => ({ ...p, email: '' })); }}
+                    onChange={(e) => {
+                      setVEmail(e.target.value);
+                      if (vErrors.email)
+                        setVErrors((p) => ({ ...p, email: "" }));
+                    }}
                     placeholder="vendor@company.com"
-                    className={vErrors.email ? 'border-destructive focus-visible:ring-destructive' : ''}
+                    className={
+                      vErrors.email
+                        ? "border-destructive focus-visible:ring-destructive"
+                        : ""
+                    }
                   />
-                  {vErrors.email && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="size-3" />{vErrors.email}</p>}
+                  {vErrors.email && (
+                    <p className="text-xs text-destructive flex items-center gap-1">
+                      <AlertCircle className="size-3" />
+                      {vErrors.email}
+                    </p>
+                  )}
                 </div>
-                {vendorCustomFields.some(f => f.afterField === 'email') && (
+                {vendorCustomFields.some((f) => f.afterField === "email") && (
                   <div className="sm:col-span-2">
                     <DynamicFormRenderer
                       fields={vendorCustomFields}
                       values={vCustomFields}
                       onChange={(key, val) => {
-                        setVCustomFields(prev => ({ ...prev, [key]: val }));
-                        if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
+                        setVCustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (vErrors[key])
+                          setVErrors((prev) => ({ ...prev, [key]: "" }));
                       }}
                       errors={vErrors}
                       afterFieldPosition="email"
@@ -1599,21 +2100,36 @@ export function VendorsPage() {
                   <Label className="text-xs font-semibold">GST Number</Label>
                   <Input
                     value={vGst}
-                    onChange={e => { setVGst(e.target.value.toUpperCase()); if (vErrors.gst) setVErrors(p => ({ ...p, gst: '' })); }}
+                    onChange={(e) => {
+                      setVGst(e.target.value.toUpperCase());
+                      if (vErrors.gst) setVErrors((p) => ({ ...p, gst: "" }));
+                    }}
                     placeholder="22AAAAA0000A1Z5"
                     maxLength={15}
-                    className={vErrors.gst ? 'border-destructive focus-visible:ring-destructive' : ''}
+                    className={
+                      vErrors.gst
+                        ? "border-destructive focus-visible:ring-destructive"
+                        : ""
+                    }
                   />
-                  {vErrors.gst && <p className="text-xs text-destructive flex items-center gap-1"><AlertCircle className="size-3" />{vErrors.gst}</p>}
+                  {vErrors.gst && (
+                    <p className="text-xs text-destructive flex items-center gap-1">
+                      <AlertCircle className="size-3" />
+                      {vErrors.gst}
+                    </p>
+                  )}
                 </div>
-                {vendorCustomFields.some(f => f.afterField === 'gstNumber') && (
+                {vendorCustomFields.some(
+                  (f) => f.afterField === "gstNumber",
+                ) && (
                   <div className="sm:col-span-2">
                     <DynamicFormRenderer
                       fields={vendorCustomFields}
                       values={vCustomFields}
                       onChange={(key, val) => {
-                        setVCustomFields(prev => ({ ...prev, [key]: val }));
-                        if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
+                        setVCustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (vErrors[key])
+                          setVErrors((prev) => ({ ...prev, [key]: "" }));
                       }}
                       errors={vErrors}
                       afterFieldPosition="gstNumber"
@@ -1625,18 +2141,19 @@ export function VendorsPage() {
                   <Label className="text-xs font-semibold">Address</Label>
                   <Input
                     value={vAddress}
-                    onChange={e => setVAddress(e.target.value)}
+                    onChange={(e) => setVAddress(e.target.value)}
                     placeholder="Full address"
                   />
                 </div>
-                {vendorCustomFields.some(f => f.afterField === 'address') && (
+                {vendorCustomFields.some((f) => f.afterField === "address") && (
                   <div className="sm:col-span-2">
                     <DynamicFormRenderer
                       fields={vendorCustomFields}
                       values={vCustomFields}
                       onChange={(key, val) => {
-                        setVCustomFields(prev => ({ ...prev, [key]: val }));
-                        if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
+                        setVCustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (vErrors[key])
+                          setVErrors((prev) => ({ ...prev, [key]: "" }));
                       }}
                       errors={vErrors}
                       afterFieldPosition="address"
@@ -1648,19 +2165,20 @@ export function VendorsPage() {
                   <Label className="text-xs font-semibold">Notes</Label>
                   <Textarea
                     value={vNotes}
-                    onChange={e => setVNotes(e.target.value)}
+                    onChange={(e) => setVNotes(e.target.value)}
                     placeholder="Any additional notes..."
                     rows={2}
                   />
                 </div>
-                {vendorCustomFields.some(f => f.afterField === 'notes') && (
+                {vendorCustomFields.some((f) => f.afterField === "notes") && (
                   <div className="sm:col-span-2">
                     <DynamicFormRenderer
                       fields={vendorCustomFields}
                       values={vCustomFields}
                       onChange={(key, val) => {
-                        setVCustomFields(prev => ({ ...prev, [key]: val }));
-                        if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
+                        setVCustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (vErrors[key])
+                          setVErrors((prev) => ({ ...prev, [key]: "" }));
                       }}
                       errors={vErrors}
                       afterFieldPosition="notes"
@@ -1669,14 +2187,19 @@ export function VendorsPage() {
                 )}
 
                 {/* Dynamic EAV Custom Fields without specific afterField position or assigned to end */}
-                {vendorCustomFields.some(f => !f.afterField || f.afterField === 'end') && (
+                {vendorCustomFields.some(
+                  (f) => !f.afterField || f.afterField === "end",
+                ) && (
                   <div className="sm:col-span-2">
                     <DynamicFormRenderer
-                      fields={vendorCustomFields.filter(f => !f.afterField || f.afterField === 'end')}
+                      fields={vendorCustomFields.filter(
+                        (f) => !f.afterField || f.afterField === "end",
+                      )}
                       values={vCustomFields}
                       onChange={(key, val) => {
-                        setVCustomFields(prev => ({ ...prev, [key]: val }));
-                        if (vErrors[key]) setVErrors(prev => ({ ...prev, [key]: '' }));
+                        setVCustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (vErrors[key])
+                          setVErrors((prev) => ({ ...prev, [key]: "" }));
                       }}
                       errors={vErrors}
                     />
@@ -1685,14 +2208,14 @@ export function VendorsPage() {
               </div>
             )}
 
-            {formTab === 'products' && (
+            {formTab === "products" && (
               <div className="space-y-4">
                 <div className="flex items-center gap-2 border rounded-xl px-3 bg-background shadow-xs focus-within:ring-1 focus-within:ring-primary">
                   <Search className="size-4 text-muted-foreground" />
                   <Input
                     placeholder="Search products by name, code, or category..."
                     value={productSearch}
-                    onChange={e => setProductSearch(e.target.value)}
+                    onChange={(e) => setProductSearch(e.target.value)}
                     className="h-9 border-none shadow-none focus-visible:ring-0 px-0"
                   />
                 </div>
@@ -1700,9 +2223,11 @@ export function VendorsPage() {
                 {selectedMaterialIds.size > 0 && (
                   <div className="flex flex-wrap gap-1.5">
                     {inventoryItems
-                      .filter(i => selectedMaterialIds.has(i.materialId))
-                      .map(i => {
-                        const existing = existingVendorProducts.find(a => a.materialId === i.materialId);
+                      .filter((i) => selectedMaterialIds.has(i.materialId))
+                      .map((i) => {
+                        const existing = existingVendorProducts.find(
+                          (a) => a.materialId === i.materialId,
+                        );
                         return (
                           <span
                             key={i.materialId}
@@ -1711,7 +2236,11 @@ export function VendorsPage() {
                             {i.material.name}
                             <button
                               type="button"
-                              onClick={() => existing ? handleDetachExistingProduct(existing) : toggleMaterialSelection(i.materialId)}
+                              onClick={() =>
+                                existing
+                                  ? handleDetachExistingProduct(existing)
+                                  : toggleMaterialSelection(i.materialId)
+                              }
                               className="hover:text-red-600"
                             >
                               <X className="size-3" />
@@ -1724,41 +2253,61 @@ export function VendorsPage() {
 
                 <div className="border rounded-xl max-h-72 overflow-y-auto divide-y">
                   {inventoryLoading && (
-                    <div className="p-4 text-center text-xs text-muted-foreground">Loading products…</div>
+                    <div className="p-4 text-center text-xs text-muted-foreground">
+                      Loading products…
+                    </div>
                   )}
-                  {!inventoryLoading && filteredInventoryForForm.length === 0 && (
-                    <div className="p-4 text-center text-xs text-muted-foreground">No products found in inventory.</div>
-                  )}
-                  {!inventoryLoading && filteredInventoryForForm.map(item => {
-                    const isSelected = selectedMaterialIds.has(item.materialId);
-                    return (
-                      <label
-                        key={item.id}
-                        className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted/40 cursor-pointer transition-colors"
-                      >
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={() => toggleMaterialSelection(item.materialId)}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold text-foreground truncate">{item.material.name}</span>
-                            <span className="text-[10px] text-muted-foreground font-mono">{item.material.materialCode}</span>
+                  {!inventoryLoading &&
+                    filteredInventoryForForm.length === 0 && (
+                      <div className="p-4 text-center text-xs text-muted-foreground">
+                        No products found in inventory.
+                      </div>
+                    )}
+                  {!inventoryLoading &&
+                    filteredInventoryForForm.map((item) => {
+                      const isSelected = selectedMaterialIds.has(
+                        item.materialId,
+                      );
+                      return (
+                        <label
+                          key={item.id}
+                          className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted/40 cursor-pointer transition-colors"
+                        >
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() =>
+                              toggleMaterialSelection(item.materialId)
+                            }
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold text-foreground truncate">
+                                {item.material.name}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground font-mono">
+                                {item.material.materialCode}
+                              </span>
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {item.material.category || "Uncategorized"} •{" "}
+                              {item.material.unit} • Stock: {item.quantity} • ₹
+                              {Number(item.unitPrice).toLocaleString("en-IN")}
+                            </div>
                           </div>
-                          <div className="text-xs text-muted-foreground">
-                            {item.material.category || 'Uncategorized'} • {item.material.unit} • Stock: {item.quantity} • ₹{Number(item.unitPrice).toLocaleString('en-IN')}
-                          </div>
-                        </div>
-                      </label>
-                    );
-                  })}
+                        </label>
+                      );
+                    })}
                 </div>
               </div>
             )}
 
             <div className="flex justify-end gap-2 border-t pt-4 mt-4">
-              <Button type="button" variant="outline" onClick={resetVendorForm}>Cancel</Button>
-              <Button type="submit" className="bg-primary text-white">Save Vendor</Button>
+              <Button type="button" variant="outline" onClick={resetVendorForm}>
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-primary text-white">
+                Save Vendor
+              </Button>
             </div>
           </form>
         </div>
@@ -1770,12 +2319,63 @@ export function VendorsPage() {
           <Search className="size-4 text-muted-foreground" />
           <Input
             placeholder="Search vendors by name, category, GST..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="h-9 border-none shadow-none focus-visible:ring-0 px-0"
+            value={globalSearch}
+            onChange={(e) => setGlobalSearch(e.target.value)}
           />
         </div>
 
+        {/* new added */}
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 max-w-md w-full">
+            <Select
+              value={searchField}
+              onValueChange={(val) => {
+                setSearchField(val as any);
+                setFieldSearch("");
+              }}
+            >
+              <SelectTrigger className="w-[150px] h-9 shrink-0">
+                <SelectValue placeholder="Search in" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Fields</SelectItem>
+                <SelectItem value="name">Vendor Name</SelectItem>
+                <SelectItem value="category">Category</SelectItem>
+                <SelectItem value="contactPerson">Contact Person</SelectItem>
+                <SelectItem value="phone">Phone</SelectItem>
+                <SelectItem value="email">Email</SelectItem>
+                <SelectItem value="gstNumber">GSTIN</SelectItem>
+                <SelectItem value="products">Products Supplied</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <div className="flex items-center gap-2 flex-1 border rounded-xl px-3 bg-card shadow-xs focus-within:ring-1 focus-within:ring-primary">
+              <Search className="size-4 text-muted-foreground" />
+              <Input
+                placeholder={
+                  searchField === "all"
+                    ? "Search vendors by name, category, GST..."
+                    : `Search by ${
+                        searchField === "gstNumber"
+                          ? "GSTIN"
+                          : searchField === "contactPerson"
+                            ? "contact person"
+                            : searchField
+                      }...`
+                }
+                value={fieldSearch}
+                onChange={(e) => setFieldSearch(e.target.value)}
+              />
+              {/* {searchField === 'products' && !vendorProductsLoaded && (
+  <p className="text-xs text-muted-foreground px-1">Loading product data for search…</p>
+)} */}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {/* existing Refresh + Customize Columns buttons stay as-is */}
+          </div>
+        </div>
         <div className="flex items-center gap-2 shrink-0">
           <Button
             variant="outline"
@@ -1784,76 +2384,84 @@ export function VendorsPage() {
             className="gap-2 font-medium"
             title="Refresh Vendors"
           >
-            <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
 
           <Popover>
             <PopoverTrigger
               render={
-                <Button variant="outline" size="sm" className="gap-2 font-medium">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 font-medium"
+                >
                   <SlidersHorizontal className="size-4" />
                   Customize Columns
                 </Button>
               }
             />
-          <PopoverContent align="end" className="w-56 p-3">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between border-b pb-2">
-                <span className="text-xs font-semibold text-foreground">
-                  Toggle Columns
-                </span>
-                <div className="flex items-center gap-1">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      const allSelected = ALL_VENDOR_COLUMNS.every(c => visibleColumns[c.id]);
-                      toggleAllColumns(!allSelected);
-                    }}
-                    className="h-6 px-1.5 text-[11px] font-medium text-primary hover:text-primary hover:bg-primary/10 gap-1.5"
-                  >
-                    <Checkbox
-                      checked={ALL_VENDOR_COLUMNS.every(c => visibleColumns[c.id])}
-                      className="pointer-events-none size-3.5"
-                    />
-                    Select All
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => toggleAllColumns(false)}
-                    className="h-6 px-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground"
-                  >
-                    Clear
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-1.5 max-h-60 overflow-y-auto">
-                {ALL_VENDOR_COLUMNS.map((col) => {
-                  const isChecked = !!visibleColumns[col.id];
-                  return (
-                    <label
-                      key={col.id}
-                      className="flex items-center gap-2.5 px-1 py-1 rounded hover:bg-muted/50 text-xs font-medium cursor-pointer transition-colors"
+            <PopoverContent align="end" className="w-56 p-3">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border-b pb-2">
+                  <span className="text-xs font-semibold text-foreground">
+                    Toggle Columns
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const allSelected = ALL_VENDOR_COLUMNS.every(
+                          (c) => visibleColumns[c.id],
+                        );
+                        toggleAllColumns(!allSelected);
+                      }}
+                      className="h-6 px-1.5 text-[11px] font-medium text-primary hover:text-primary hover:bg-primary/10 gap-1.5"
                     >
                       <Checkbox
-                        checked={isChecked}
-                        onCheckedChange={() => toggleColumn(col.id)}
+                        checked={ALL_VENDOR_COLUMNS.every(
+                          (c) => visibleColumns[c.id],
+                        )}
+                        className="pointer-events-none size-3.5"
                       />
-                      <span>{col.label}</span>
-                    </label>
-                  );
-                })}
+                      Select All
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleAllColumns(false)}
+                      className="h-6 px-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                  {ALL_VENDOR_COLUMNS.map((col) => {
+                    const isChecked = !!visibleColumns[col.id];
+                    return (
+                      <label
+                        key={col.id}
+                        className="flex items-center gap-2.5 px-1 py-1 rounded hover:bg-muted/50 text-xs font-medium cursor-pointer transition-colors"
+                      >
+                        <Checkbox
+                          checked={isChecked}
+                          onCheckedChange={() => toggleColumn(col.id)}
+                        />
+                        <span>{col.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          </PopoverContent>
-        </Popover>
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
-    </div>
 
       {/* ── Vendor Table ── */}
       <GenericTable
@@ -1866,7 +2474,10 @@ export function VendorsPage() {
       />
 
       {/* ── OVERVIEW MODAL ── */}
-      <Dialog open={!!overviewVendor} onOpenChange={(open) => !open && setOverviewVendor(null)}>
+      <Dialog
+        open={!!overviewVendor}
+        onOpenChange={(open) => !open && setOverviewVendor(null)}
+      >
         <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg font-bold text-primary">
@@ -1878,37 +2489,61 @@ export function VendorsPage() {
           {overviewVendor && (
             <div className="space-y-4 pt-2 text-sm">
               <div className="bg-muted/40 p-4 rounded-xl space-y-1">
-                <h3 className="text-base font-bold text-foreground">{overviewVendor.name}</h3>
-                <p className="text-xs text-muted-foreground">Category: {overviewVendor.category || '—'}</p>
+                <h3 className="text-base font-bold text-foreground">
+                  {overviewVendor.name}
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Category: {overviewVendor.category || "—"}
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <span className="text-xs font-medium text-muted-foreground">Contact Person</span>
-                  <p className="font-semibold">{overviewVendor.contactPerson || '—'}</p>
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Contact Person
+                  </span>
+                  <p className="font-semibold">
+                    {overviewVendor.contactPerson || "—"}
+                  </p>
                 </div>
                 <div className="space-y-1">
-                  <span className="text-xs font-medium text-muted-foreground">Phone</span>
-                  <p className="font-semibold">{overviewVendor.phone || '—'}</p>
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Phone
+                  </span>
+                  <p className="font-semibold">{overviewVendor.phone || "—"}</p>
                 </div>
                 <div className="space-y-1">
-                  <span className="text-xs font-medium text-muted-foreground">Email</span>
-                  <p className="font-semibold break-all">{overviewVendor.email || '—'}</p>
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Email
+                  </span>
+                  <p className="font-semibold break-all">
+                    {overviewVendor.email || "—"}
+                  </p>
                 </div>
                 <div className="space-y-1">
-                  <span className="text-xs font-medium text-muted-foreground">GSTIN</span>
-                  <p className="font-semibold">{overviewVendor.gstNumber || '—'}</p>
+                  <span className="text-xs font-medium text-muted-foreground">
+                    GSTIN
+                  </span>
+                  <p className="font-semibold">
+                    {overviewVendor.gstNumber || "—"}
+                  </p>
                 </div>
               </div>
 
               <div className="space-y-1 border-t pt-3">
-                <span className="text-xs font-medium text-muted-foreground">Address</span>
-                <p className="text-sm">{overviewVendor.address || '—'}</p>
+                <span className="text-xs font-medium text-muted-foreground">
+                  Address
+                </span>
+                <p className="text-sm">{overviewVendor.address || "—"}</p>
               </div>
 
               <div className="space-y-1 border-t pt-3">
-                <span className="text-xs font-medium text-muted-foreground">Notes</span>
-                <p className="text-sm whitespace-pre-wrap text-muted-foreground">{overviewVendor.notes || '—'}</p>
+                <span className="text-xs font-medium text-muted-foreground">
+                  Notes
+                </span>
+                <p className="text-sm whitespace-pre-wrap text-muted-foreground">
+                  {overviewVendor.notes || "—"}
+                </p>
               </div>
             </div>
           )}
@@ -1926,14 +2561,21 @@ export function VendorsPage() {
           </DialogHeader>
           <div className="flex-1 min-h-0 border rounded-lg overflow-hidden bg-white">
             {isPoPreviewOpen && (
-              <iframe title="po-preview" srcDoc={buildPoDocumentHtml()} className="w-full h-full" />
+              <iframe
+                title="po-preview"
+                srcDoc={buildPoDocumentHtml()}
+                className="w-full h-full"
+              />
             )}
           </div>
         </DialogContent>
       </Dialog>
 
       {/* ── PO PLACED — send via WhatsApp/Email (frontend-only) ── */}
-      <Dialog open={isPoPlacedDialogOpen} onOpenChange={setIsPoPlacedDialogOpen}>
+      <Dialog
+        open={isPoPlacedDialogOpen}
+        onOpenChange={setIsPoPlacedDialogOpen}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base font-bold text-primary">
@@ -1943,45 +2585,70 @@ export function VendorsPage() {
           <div className="space-y-4 pt-1">
             <div className="flex flex-col gap-2">
               <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <Checkbox checked={placeSendWhatsapp} onCheckedChange={(v) => setPlaceSendWhatsapp(!!v)} />
+                <Checkbox
+                  checked={placeSendWhatsapp}
+                  onCheckedChange={(v) => setPlaceSendWhatsapp(!!v)}
+                />
                 Send via WhatsApp
               </label>
               {placeSendWhatsapp && (
                 <Input
                   placeholder="Vendor WhatsApp number (with country code)"
                   value={placePhone}
-                  onChange={e => setPlacePhone(e.target.value)}
+                  onChange={(e) => setPlacePhone(e.target.value)}
                   className="ml-6 h-9 text-xs"
                 />
               )}
             </div>
             <div className="flex flex-col gap-2">
               <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <Checkbox checked={placeSendEmail} onCheckedChange={(v) => setPlaceSendEmail(!!v)} />
+                <Checkbox
+                  checked={placeSendEmail}
+                  onCheckedChange={(v) => setPlaceSendEmail(!!v)}
+                />
                 Send via Email
               </label>
               {placeSendEmail && (
                 <Input
                   placeholder="Vendor email address"
                   value={placeEmail}
-                  onChange={e => setPlaceEmail(e.target.value)}
+                  onChange={(e) => setPlaceEmail(e.target.value)}
                   className="ml-6 h-9 text-xs"
                 />
               )}
             </div>
             <p className="text-[11px] text-muted-foreground">
-              This will generate the PDF purchase order for you to save/print, and open WhatsApp/Email with a pre-filled message where you can attach the PDF.
+              This will generate the PDF purchase order for you to save/print,
+              and open WhatsApp/Email with a pre-filled message where you can
+              attach the PDF.
             </p>
             <div className="flex justify-end gap-2 pt-2 border-t">
-              <Button variant="outline" size="sm" onClick={() => setIsPoPlacedDialogOpen(false)}>Cancel</Button>
-              <Button size="sm" className="bg-primary text-white" onClick={handleConfirmPoPlaced}>Send PO</Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsPoPlacedDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                className="bg-primary text-white"
+                onClick={handleConfirmPoPlaced}
+              >
+                Send PO
+              </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
       {/* ── PRODUCTS SUPPLIED QUICK VIEW ── */}
-      <Dialog open={!!productsQuickViewVendor} onOpenChange={(open) => { if (!open) setProductsQuickViewVendor(null); }}>
+      <Dialog
+        open={!!productsQuickViewVendor}
+        onOpenChange={(open) => {
+          if (!open) setProductsQuickViewVendor(null);
+        }}
+      >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base font-bold text-primary">
@@ -1993,69 +2660,96 @@ export function VendorsPage() {
             <div className="space-y-3 pt-1">
               <div className="flex items-center justify-between border rounded-lg px-3 py-2 bg-muted/30">
                 <div>
-                  <div className="text-sm font-semibold text-foreground">{productsQuickViewVendor.name}</div>
+                  <div className="text-sm font-semibold text-foreground">
+                    {productsQuickViewVendor.name}
+                  </div>
                   <div className="text-xs text-muted-foreground">
-                    {productsQuickViewVendor.category} • GSTIN: {productsQuickViewVendor.gstNumber || '—'}
+                    {productsQuickViewVendor.category} • GSTIN:{" "}
+                    {productsQuickViewVendor.gstNumber || "—"}
                   </div>
                 </div>
                 <span className="text-xs font-semibold text-[#b45309] bg-[#fff4e5] border border-[#fcd9a8] px-2.5 py-1 rounded-md">
-                  {productsQuickViewList.length} product{productsQuickViewList.length === 1 ? '' : 's'}
+                  {productsQuickViewList.length} product
+                  {productsQuickViewList.length === 1 ? "" : "s"}
                 </span>
               </div>
 
               <div className="border rounded-xl max-h-96 overflow-y-auto divide-y">
                 {productsQuickViewLoading && (
-                  <div className="p-6 text-center text-xs text-muted-foreground">Loading products...</div>
+                  <div className="p-6 text-center text-xs text-muted-foreground">
+                    Loading products...
+                  </div>
                 )}
-                {!productsQuickViewLoading && productsQuickViewList.length === 0 && (
-                  <div className="p-6 flex flex-col items-center gap-2 text-center">
-                    <span className="text-xs text-muted-foreground">
-                      This vendor has no products linked from Inventory yet.
-                    </span>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-1.5 h-8 text-xs cursor-pointer"
-                      onClick={() => {
-                        const vendor = productsQuickViewVendor;
-                        setProductsQuickViewVendor(null);
-                        if (vendor) {
-                          openEditVendor(vendor);
-                          setFormTab('products');
-                        }
-                      }}
+                {!productsQuickViewLoading &&
+                  productsQuickViewList.length === 0 && (
+                    <div className="p-6 flex flex-col items-center gap-2 text-center">
+                      <span className="text-xs text-muted-foreground">
+                        This vendor has no products linked from Inventory yet.
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5 h-8 text-xs cursor-pointer"
+                        onClick={() => {
+                          const vendor = productsQuickViewVendor;
+                          setProductsQuickViewVendor(null);
+                          if (vendor) {
+                            openEditVendor(vendor);
+                            setFormTab("products");
+                          }
+                        }}
+                      >
+                        <Package className="size-3.5" /> Attach Products from
+                        Inventory
+                      </Button>
+                    </div>
+                  )}
+                {!productsQuickViewLoading &&
+                  productsQuickViewList.map((assoc) => (
+                    <div
+                      key={assoc.id}
+                      className="flex items-center justify-between gap-3 px-3 py-2.5"
                     >
-                      <Package className="size-3.5" /> Attach Products from Inventory
-                    </Button>
-                  </div>
-                )}
-                {!productsQuickViewLoading && productsQuickViewList.map(assoc => (
-                  <div key={assoc.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-semibold text-foreground truncate">{assoc.material.name}</span>
-                        {assoc.isPreferred && (
-                          <span className="text-[10px] font-semibold text-[#137333] bg-[#e6f4ea] border border-[#b7e1c1] px-1.5 py-0.5 rounded">
-                            PREFERRED
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm font-semibold text-foreground truncate">
+                            {assoc.material.name}
                           </span>
-                        )}
+                          {assoc.isPreferred && (
+                            <span className="text-[10px] font-semibold text-[#137333] bg-[#e6f4ea] border border-[#b7e1c1] px-1.5 py-0.5 rounded">
+                              PREFERRED
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          Code:{" "}
+                          {assoc.vendorMaterialCode ||
+                            assoc.material.materialCode}{" "}
+                          • Category: {assoc.material.category || "—"} • HSN:{" "}
+                          {assoc.material.hsnCode || "—"} • Unit:{" "}
+                          {assoc.material.unit || "—"}
+                        </div>
                       </div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        Code: {assoc.vendorMaterialCode || assoc.material.materialCode} • Category: {assoc.material.category || '—'} • HSN: {assoc.material.hsnCode || '—'} • Unit: {assoc.material.unit || '—'}
+                      <div className="text-right shrink-0">
+                        <div className="text-sm font-bold text-[#137333]">
+                          {(() => {
+                            const invItem = inventoryItems.find(
+                              (i) => i.materialId === assoc.materialId,
+                            );
+                            const rate = invItem
+                              ? Number(invItem.unitPrice)
+                              : null;
+                            return rate != null && !isNaN(rate)
+                              ? `₹${rate.toLocaleString("en-IN")}`
+                              : "—";
+                          })()}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">
+                          Item Rate
+                        </div>
                       </div>
                     </div>
-                    <div className="text-right shrink-0">
-                      <div className="text-sm font-bold text-[#137333]">
-                        {(() => {
-                          const invItem = inventoryItems.find(i => i.materialId === assoc.materialId);
-                          const rate = invItem ? Number(invItem.unitPrice) : null;
-                          return rate != null && !isNaN(rate) ? `₹${rate.toLocaleString('en-IN')}` : '—';
-                        })()}
-                      </div>
-                      <div className="text-[10px] text-muted-foreground">Item Rate</div>
-                    </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
           )}
@@ -2064,19 +2758,29 @@ export function VendorsPage() {
 
       {/* ── REVISIONS PANEL MODAL ── */}
       {selectedVendorForRevisions && (
-        <div className="rev-panel-overlay" onClick={() => setSelectedVendorForRevisions(null)}>
+        <div
+          className="rev-panel-overlay"
+          onClick={() => setSelectedVendorForRevisions(null)}
+        >
           <div className="rev-panel" onClick={(e) => e.stopPropagation()}>
-
             <div className="rev-panel-header">
               <h3>📋 Revision History</h3>
-              <button className="de-close-btn" onClick={() => setSelectedVendorForRevisions(null)}>✕</button>
+              <button
+                className="de-close-btn"
+                onClick={() => setSelectedVendorForRevisions(null)}
+              >
+                ✕
+              </button>
             </div>
 
             {/* Vendor info */}
             <div className="rev-vinfo">
-              <div className="rev-vinfo-name">{selectedVendorForRevisions.name}</div>
+              <div className="rev-vinfo-name">
+                {selectedVendorForRevisions.name}
+              </div>
               <div className="rev-vinfo-sub">
-                {selectedVendorForRevisions.category} &bull; GSTIN: {selectedVendorForRevisions.gstNumber}
+                {selectedVendorForRevisions.category} &bull; GSTIN:{" "}
+                {selectedVendorForRevisions.gstNumber}
               </div>
             </div>
 
@@ -2088,7 +2792,12 @@ export function VendorsPage() {
               </div>
               <div className="rev-sum-card">
                 <div className="rev-sum-label">Revisions</div>
-                <div className="rev-sum-val" style={{ color: 'var(--primary, #3b82f6)' }}>{revisionStats.revisionCount}</div>
+                <div
+                  className="rev-sum-val"
+                  style={{ color: "var(--primary, #3b82f6)" }}
+                >
+                  {revisionStats.revisionCount}
+                </div>
               </div>
             </div>
 
@@ -2115,11 +2824,25 @@ export function VendorsPage() {
                       <span>Status: {rev.poStatus}</span>
                     </div>
                     <div className="rev-meta">
-                      <span>Created By: {rev.createdBy || 'Unknown User'}</span>
-                      <span>Created On: {rev.createdAt ? new Date(rev.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</span>
+                      <span>Created By: {rev.createdBy || "Unknown User"}</span>
+                      <span>
+                        Created On:{" "}
+                        {rev.createdAt
+                          ? new Date(rev.createdAt).toLocaleString("en-IN", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                          : "—"}
+                      </span>
                     </div>
                     <div className="rev-amount">
-                      ₹{rev.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      ₹
+                      {rev.grandTotal.toLocaleString("en-IN", {
+                        minimumFractionDigits: 2,
+                      })}
                     </div>
                   </div>
                   <div className="rev-actions">
@@ -2147,13 +2870,20 @@ export function VendorsPage() {
               {vendorRevisions.length === 0 && (
                 <div className="rev-empty">
                   <div className="rev-empty-icon">📂</div>
-                  <span>No revisions found. Create a PO data entry revision first.</span>
+                  <span>
+                    No revisions found. Create a PO data entry revision first.
+                  </span>
                 </div>
               )}
             </div>
 
             <div className="rev-panel-footer">
-              <Button variant="outline" onClick={() => setSelectedVendorForRevisions(null)}>Close</Button>
+              <Button
+                variant="outline"
+                onClick={() => setSelectedVendorForRevisions(null)}
+              >
+                Close
+              </Button>
               <button
                 className="bg-primary text-white font-semibold hover:bg-primary/95 px-4 py-2 rounded-lg text-xs"
                 onClick={() => {
@@ -2170,488 +2900,1065 @@ export function VendorsPage() {
 
       {/* ── DATA ENTRY MODAL ── */}
       {isDataEntryOpen && activePoVendor && (
-        <div className="de-overlay" style={deMaximized ? { padding: 0 } : undefined}>
+        <div
+          className="de-overlay"
+          style={deMaximized ? { padding: 0 } : undefined}
+        >
+          <div
+            className={`de-modal ${deMaximized ? "rounded-none" : ""}`}
+            style={
+              deMaximized
+                ? {
+                    width: "100vw",
+                    height: "100vh",
+                    maxWidth: "100vw",
+                    maxHeight: "100vh",
+                  }
+                : undefined
+            }
+          >
+            {/* Restore bar if maximized */}
+            {deMaximized && (
+              <div className="de-restore-bar">
+                <span>
+                  ⛶ Table Maximized —{" "}
+                  <strong id="de-restore-vendor-name">
+                    {activePoVendor.name}
+                  </strong>
+                </span>
+                <button
+                  className="de-restore-btn"
+                  onClick={() => setDeMaximized(false)}
+                >
+                  ✕ Restore
+                </button>
+              </div>
+            )}
 
-                  <div
-                    className={`de-modal ${deMaximized ? 'rounded-none' : ''}`}
-                    style={deMaximized ? { width: '100vw', height: '100vh', maxWidth: '100vw', maxHeight: '100vh' } : undefined}
-                  >
-
-                    {/* Restore bar if maximized */}
-                    {deMaximized && (
-                      <div className="de-restore-bar">
-                        <span>⛶ Table Maximized — <strong id="de-restore-vendor-name">{activePoVendor.name}</strong></span>
-                        <button className="de-restore-btn" onClick={() => setDeMaximized(false)}>✕ Restore</button>
-                      </div>
-                    )}
-
-                    {/* de-header */}
-                    <div className="de-header">
-                      <div className="de-header-left">
-                        <div className="de-header-icon">📋</div>
-                        <div>
-                          <div className="de-header-title">Data Entry — Purchase Order</div>
-                          <div className="de-header-sub">Vendor: <strong className="de-vendor-accent">{activePoVendor.name}</strong></div>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span className="de-status-pill">Draft</span>
-                        <button className="de-close-btn" onClick={() => setIsDataEntryOpen(false)}>✕</button>
-                      </div>
-                    </div>
-
-                    {/* de-steps */}
-                    <div className="de-steps">
-                      <div className="de-step done"><span className="de-step-dot done-dot">✓</span><span>Vendor Saved</span></div>
-                      <div className="de-step-line done-line"></div>
-                      <div className="de-step active"><span className="de-step-dot active-dot">2</span><span>Data Entry</span></div>
-                      <div className="de-step-line"></div>
-                      <div className="de-step inactive"><span className="de-step-dot inactive-dot">3</span><span>Export</span></div>
-                    </div>
-
-                    {/* de-revision-bar */}
-                    <div className="de-revision-bar">
-                      <span className="de-rev-label">📁 REVISIONS:</span>
-                      <div className="de-rev-pills">
-                        {revisions.filter(r => r.vendorId === activePoVendor.id && r.poNumber === poNumber).map((rev) => (
-                          <span
-                            key={rev.id}
-                            onClick={() => loadRevision(rev)}
-                            className={`de-rev-pill ${selectedRevisionId === rev.id ? 'active' : ''}`}
-                          >
-                            R{rev.revisionNo}
-                          </span>
-                        ))}
-                        {revisions.filter(r => r.vendorId === activePoVendor.id && r.poNumber === poNumber).length === 0 && (
-                          <span className="de-rev-pill">R0</span>
-                        )}
-                      </div>
-                      <button
-                        className="btn-view-all"
-                        style={{ marginLeft: 'auto' }}
-                        onClick={() => {
-                          setSelectedVendorForRevisions(activePoVendor);
-                          setIsDataEntryOpen(false);
-                        }}
-                      >
-                        📄 View All
-                      </button>
-                    </div>
-
-                    {/* Form body */}
-                    <div className="flex-1 overflow-y-auto">
-
-                      {/* de-company-section */}
-                      <div className="de-company-section">
-                        <div className="de-company-section-title">🏢 OUR COMPANY DETAILS (FOR PO HEADER)</div>
-                        <div className="de-company-grid">
-                          <div className="de-po-field">
-                            <label>Company Name</label>
-                            <input type="text" value={companyDetails.name} onChange={e => setCompanyDetails({ ...companyDetails, name: e.target.value })} placeholder="e.g. D.V. Electromatic Pvt. Ltd." />
-                          </div>
-                          <div className="de-po-field">
-                            <label>Company Address</label>
-                            <input type="text" value={companyDetails.address} onChange={e => setCompanyDetails({ ...companyDetails, address: e.target.value })} placeholder="F-003, Industrial Growth Centre…" />
-                          </div>
-                          <div className="de-po-field">
-                            <label>Company Phone</label>
-                            <input type="text" value={companyDetails.phone} onChange={e => setCompanyDetails({ ...companyDetails, phone: e.target.value })} placeholder="+91 92572-17609" />
-                          </div>
-                          <div className="de-po-field">
-                            <label>Company Email</label>
-                            <input type="text" value={companyDetails.email} onChange={e => setCompanyDetails({ ...companyDetails, email: e.target.value })} placeholder="office@dvepl.com" />
-                          </div>
-                          <div className="de-po-field">
-                            <label>Company GSTIN</label>
-                            <input type="text" value={companyDetails.gstin} onChange={e => setCompanyDetails({ ...companyDetails, gstin: e.target.value })} placeholder="03AABCD4308A1ZL" />
-                          </div>
-                          <div className="de-po-field">
-                            <label>ISO / Certification</label>
-                            <input type="text" value={companyDetails.iso} onChange={e => setCompanyDetails({ ...companyDetails, iso: e.target.value })} placeholder="AN ISO 9001:2008 CERTIFIED CO." />
-                          </div>
-                          <div className="de-po-field">
-                            <label>Authorized Signatory</label>
-                            <input type="text" value={companyDetails.signatory} onChange={e => setCompanyDetails({ ...companyDetails, signatory: e.target.value })} placeholder="Name of signatory" />
-                          </div>
-                          <div className="de-po-field">
-                            <label>Division / Dept</label>
-                            <input type="text" value={companyDetails.division} onChange={e => setCompanyDetails({ ...companyDetails, division: e.target.value })} placeholder="Industrial Division" />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* de-po-header */}
-                      <div className="de-po-header">
-                        <div className="de-po-field">
-                          <label>Order Place To</label>
-                          <input type="text" value={activePoVendor.name} disabled style={{ background: '#f1f5f9', border: '1px solid #cbd5e1' }} />
-                        </div>
-                        <div className="de-po-field">
-                          <label>PO Number *</label>
-                          <input
-                            type="text"
-                            value={poNumber}
-                            onChange={e => setPoNumber(e.target.value)}
-                            placeholder="e.g. PO-2025-001"
-                            style={!poNumber.trim() ? { borderColor: '#f59e0b' } : undefined}
-                          />
-                          {!poNumber.trim() && (
-                            <span style={{ color: '#f59e0b', fontSize: '11px', marginTop: '2px' }}>PO Number is required</span>
-                          )}
-                        </div>
-                        <div className="de-po-field">
-                          <label>PO Date *</label>
-                          <input
-                            type="date"
-                            value={poDate}
-                            onChange={e => setPoDate(e.target.value)}
-                            style={!poDate ? { borderColor: '#f59e0b' } : undefined}
-                          />
-                          {!poDate && (
-                            <span style={{ color: '#f59e0b', fontSize: '11px', marginTop: '2px' }}>PO Date is required</span>
-                          )}
-                        </div>
-                        <div className="de-po-field">
-                          <label>PO Status</label>
-                          <select value={poStatus} onChange={e => setPoStatus(e.target.value)}>
-                            <option value="Pending">Pending</option>
-                            <option value="Ordered">Ordered</option>
-                            <option value="Partially Received">Partially Received</option>
-                            <option value="Received">Received</option>
-                          </select>
-                        </div>
-                        <div className="de-po-field">
-                          <label>Payment Terms</label>
-                          <input type="text" value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} placeholder="e.g. 30 days net / 50% Advance" />
-                        </div>
-                        <div className="de-po-field">
-                          <label>Material Status</label>
-                          <select value={materialStatus} onChange={e => setMaterialStatus(e.target.value)}>
-                            <option value="Pending">Pending</option>
-                            <option value="Ordered">Ordered</option>
-                            <option value="In Transit">In Transit</option>
-                            <option value="Received">Received</option>
-                            <option value="Ready for Dispatch">Ready for Dispatch</option>
-                          </select>
-                        </div>
-                        <div className="de-po-field">
-                          <label>Advance (₹)</label>
-                          <input
-                            type="number"
-                            min={0}
-                            value={advance}
-                            onChange={e => {
-                              const val = Math.max(0, Number(e.target.value) || 0);
-                              setAdvance(val);
-                            }}
-                            placeholder="0.00"
-                            style={advance > totals.grandTotal && totals.grandTotal > 0 ? { borderColor: '#ef4444' } : undefined}
-                          />
-                          {advance > totals.grandTotal && totals.grandTotal > 0 && (
-                            <span style={{ color: '#ef4444', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>⚠ Advance exceeds grand total</span>
-                          )}
-                        </div>
-                        <div className="de-po-field">
-                          <label>Remarks</label>
-                          <input type="text" value={remarks} onChange={e => setRemarks(e.target.value)} placeholder="Any remarks…" />
-                        </div>
-                      </div>
-
-                      {/* de-tax-section */}
-                      <div className="de-tax-section">
-                        <span className="de-tax-label">📊 TAX:</span>
-                        <div className="de-tax-field">
-                          <label>CGST %</label>
-                          <input type="number" min={0} max={100} value={cgstPercent} onChange={e => setCgstPercent(Math.min(100, Math.max(0, Number(e.target.value) || 0)))} />
-                        </div>
-                        <div className="de-tax-field">
-                          <label>SGST %</label>
-                          <input type="number" min={0} max={100} value={sgstPercent} onChange={e => setSgstPercent(Math.min(100, Math.max(0, Number(e.target.value) || 0)))} />
-                        </div>
-                        <div className="de-tax-field">
-                          <label>IGST %</label>
-                          <input type="number" min={0} max={100} value={igstPercent} onChange={e => setIgstPercent(Math.min(100, Math.max(0, Number(e.target.value) || 0)))} />
-                        </div>
-                        <div className="de-fin-sep"></div>
-                        <div className="de-fin-item"><span>Subtotal:</span> <strong>₹{totals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></div>
-                        <div className="de-fin-sep"></div>
-                        <div className="de-fin-item"><span>CGST:</span> <strong>₹{totals.cgstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></div>
-                        <div className="de-fin-item"><span>SGST:</span> <strong>₹{totals.sgstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></div>
-                        <div className="de-fin-item"><span>IGST:</span> <strong>₹{totals.igstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></div>
-                        <div className="de-fin-sep"></div>
-                        <div className="de-fin-item"><span>Grand Total:</span> <strong style={{ color: '#1e4620', fontSize: '15px' }}>₹{totals.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></div>
-                      </div>
-
-                      {/* de-terms-section */}
-                      <div className="de-terms-section">
-                        <div className="de-terms-title">📜 TERMS &amp; CONDITIONS (SHOWN ON PO)</div>
-                        <textarea className="de-terms-textarea" value={terms} onChange={e => setTerms(e.target.value)} placeholder="Terms..."></textarea>
-                      </div>
-
-                      {/* de-toolbar */}
-                      <div className="de-toolbar">
-                        <span className="de-toolbar-label">LINE ITEMS</span>
-                        <button className="de-tbtn" onClick={handleAddPoRow}>➕ Add Row</button>
-                        <button className="de-tbtn" onClick={handleImportExcelClick} disabled={isImportingExcel}>
-                          {isImportingExcel ? '⏳ Importing...' : '📥 Import Excel'}
-                        </button>
-                        <button className="de-tbtn" onClick={handleDownloadPoItemsTemplate} title="Download an Excel template for bulk item import">📄 Template</button>
-                        <input
-                          ref={excelImportInputRef}
-                          type="file"
-                          accept=".xlsx,.xls"
-                          style={{ display: 'none' }}
-                          onChange={handleExcelFileChange}
-                        />
-                        <button className="de-tbtn" onClick={handleDuplicateLastRow}>📋 Duplicate Last</button>
-                        <div className="de-tbtn-sep"></div>
-
-                        {isAddingCol ? (
-                          <div className="flex items-center gap-1 bg-white border border-border p-1 rounded-md shadow-sm">
-                            <input
-                              placeholder="Col Name..."
-                              value={newColName}
-                              onChange={e => setNewColName(e.target.value)}
-                              style={{ fontSize: '13px', width: '120px', padding: '4px 8px', border: '1px solid var(--border)', borderRadius: '6px' }}
-                            />
-                            <button className="de-tbtn bg-primary text-white" style={{ padding: '4px 10px', fontSize: '12px' }} onClick={handleAddCustomColumn}>Add</button>
-                            <button className="de-tbtn" style={{ padding: '4px 8px', fontSize: '12px' }} onClick={() => setIsAddingCol(false)}>✕</button>
-                          </div>
-                        ) : (
-                          <button className="de-tbtn" onClick={() => setIsAddingCol(true)}>➕ Add Column</button>
-                        )}
-
-                        <div className="de-tbtn-sep"></div>
-                        <button className="de-tbtn de-tbtn-danger" onClick={handleClearAllRows}>🗑️ Clear All</button>
-                        <div style={{ flex: 1 }}></div>
-                        <span className="de-row-count">{poItems.length} items</span>
-                        <div className="de-tbtn-sep"></div>
-                        <button className="de-tbtn de-maximize-btn" onClick={() => setDeMaximized(!deMaximized)}>⛶ Maximize</button>
-                      </div>
-
-                      {/* de-table-wrap */}
-                      <div className="de-table-wrap">
-                        <table className="de-table">
-                          <thead>
-                            <tr>
-                              <th className="th-sno">S.No.</th>
-                              <th className="th-desc">Item Description</th>
-                              <th className="th-qty">Qty</th>
-                              <th className="th-unit">Unit</th>
-                              <th className="th-hsn">HSN Code</th>
-                              <th className="th-catno">CAT No.</th>
-                              {customColumns.map(c => (
-                                <th key={c} style={{ minWidth: '100px' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '4px' }}>
-                                    <span>{c}</span>
-                                    <button
-                                      onClick={() => handleRemoveCustomColumn(c)}
-                                      style={{ color: '#ef4444', fontStyle: 'normal', cursor: 'pointer', border: 'none', background: 'none', fontSize: '12px', fontWeight: 'bold' }}
-                                      title={`Remove column ${c}`}
-                                    >
-                                      ✕
-                                    </button>
-                                  </div>
-                                </th>
-                              ))}
-                              <th className="th-rate">Rate (₹)</th>
-                              <th className="th-dis">DIS (%)</th>
-                              <th className="th-net">Net (₹)</th>
-                              <th className="th-total">Total (₹)</th>
-                              <th className="th-del"></th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {poItems.map((item, idx) => (
-                              <tr key={item.id}>
-                                <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{idx + 1}</td>
-                                <td style={{ position: 'relative' }}>
-                                  <input
-                                    type="text"
-                                    value={item.description}
-                                    onChange={e => {
-                                      updatePoItemField(item.id, 'description', e.target.value);
-                                      setInventoryDropdownRowId(item.id);
-                                    }}
-                                    onFocus={() => setInventoryDropdownRowId(item.id)}
-                                    onBlur={() => setTimeout(() => setInventoryDropdownRowId(prev => prev === item.id ? null : prev), 150)}
-                                    placeholder="Type to search Inventory or enter manually..."
-                                    autoComplete="off"
-                                    style={!item.description.trim() ? { borderColor: '#f59e0b' } : undefined}
-                                  />
-                                  {inventoryDropdownRowId === item.id && (
-                                    <div
-                                      className="absolute left-0 top-full mt-1 w-72 rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 z-50"
-                                      onMouseDown={(e) => e.preventDefault()}
-                                    >
-                                      <div className="flex items-center gap-1.5 px-3 py-2 border-b bg-muted/30">
-                                        <Package className="size-3.5 text-muted-foreground" />
-                                        <span className="text-[11px] font-semibold text-muted-foreground">INVENTORY MATCHES</span>
-                                      </div>
-                                      <div className="max-h-64 overflow-y-auto divide-y">
-                                        {getInventoryMatches(item.description).length === 0 && (
-                                          <div className="p-3 text-center text-xs text-muted-foreground">No matching inventory items.</div>
-                                        )}
-                                        {getInventoryMatches(item.description).map(inv => (
-                                          <button
-                                            type="button"
-                                            key={inv.id}
-                                            onClick={() => applyInventoryItemToRow(item.id, inv)}
-                                            className="w-full flex items-center justify-between gap-2 px-3 py-2 hover:bg-muted/40 text-left transition-colors"
-                                          >
-                                            <div className="min-w-0">
-                                              <div className="text-xs font-semibold text-foreground truncate">{inv.material.name}</div>
-                                              <div className="text-[10px] text-muted-foreground truncate">
-                                                {inv.material.materialCode} • HSN: {inv.material.hsnCode || '—'} • {inv.material.unit}
-                                              </div>
-                                            </div>
-                                            <div className="text-xs font-bold text-[#137333] shrink-0">
-                                              ₹{Number(inv.unitPrice).toLocaleString('en-IN')}
-                                            </div>
-                                          </button>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-                                </td>
-                                <td><input type="number" min={0.01} step="any" value={item.qty} onChange={e => updatePoItemField(item.id, 'qty', Number(e.target.value) || 0)} style={item.qty <= 0 ? { borderColor: '#f59e0b' } : undefined} /></td>
-                                <td><input type="text" value={item.unit} onChange={e => updatePoItemField(item.id, 'unit', e.target.value)} placeholder="PCS" /></td>
-                                <td><input type="text" value={item.hsnCode} onChange={e => updatePoItemField(item.id, 'hsnCode', e.target.value)} placeholder="HSN" /></td>
-                                <td><input type="text" value={item.catNo} onChange={e => updatePoItemField(item.id, 'catNo', e.target.value)} placeholder="CAT no." /></td>
-                                {customColumns.map(c => (
-                                  <td key={c}>
-                                    <input type="text" value={item[c] || ''} onChange={e => updatePoItemField(item.id, c, e.target.value)} />
-                                  </td>
-                                ))}
-                                <td><input type="number" value={item.rate === 0 ? '' : item.rate} onChange={e => updatePoItemField(item.id, 'rate', Number(e.target.value) || 0)} placeholder="0" /></td>
-                                <td><input type="number" value={item.discountPercent === 0 ? '' : item.discountPercent} onChange={e => updatePoItemField(item.id, 'discountPercent', Number(e.target.value) || 0)} placeholder="0" /></td>
-                                <td className="td-net">₹{(item.net || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                                <td className="td-total">₹{(item.total || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                                <td style={{ textAlign: 'center' }}>
-                                  <button className="btn-row-del" onClick={() => handleDeletePoRow(item.id)}>🗑️</button>
-                                </td>
-                              </tr>
-                            ))}
-                            {poItems.length === 0 && (
-                              <tr>
-                                <td colSpan={12 + customColumns.length} style={{ padding: '24px', textAlign: 'center', color: 'var(--text2)' }}>
-                                  No items added. Click "+ Add Row" and start typing to search Inventory, or "📥 Import Excel" to bulk-add items.
-                                </td>
-                              </tr>
-                            )}
-                          </tbody>
-                          <tfoot>
-                            <tr className="de-tfoot-row">
-                              <td colSpan={2} className="tfoot-label">Total items: <span id="de-total-items">{poItems.length}</span></td>
-                              <td className="tfoot-qty" id="de-total-qty">{poItems.reduce((sum, item) => sum + (Number(item.qty) || 0), 0)}</td>
-                              <td colSpan={5 + customColumns.length} className="tfoot-grand-label">Grand Total (excl. tax):</td>
-                              <td className="tfoot-grand" colSpan={3} id="de-grand-total">₹{totals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-                              <td></td>
-                            </tr>
-                          </tfoot>
-                        </table>
-                      </div>
-
-                    </div>
-
-                    {/* de-finance-bar */}
-                    <div className="de-finance-bar">
-                      <div className="de-fin-item"><span>Total Amount:</span> <strong id="de-total-amt">₹{totals.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></div>
-                      <div className="de-fin-sep"></div>
-                      <div className="de-fin-item"><span>Advance:</span> <strong id="de-adv-display" className="de-fin-adv">₹{advance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></div>
-                      <div className="de-fin-sep"></div>
-                      <div className="de-fin-item"><span>Balance:</span> <strong id="de-bal-display" className="de-fin-bal">₹{totals.balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong></div>
-                    </div>
-
-                    {/* de-footer */}
-                    <div className="de-footer">
-                      <div className="de-export-section">
-                        <div className="de-export-label">EXPORT AS:</div>
-                        <div className="de-export-btns">
-                          <button className="de-exp-btn" onClick={() => triggerExport('pdf')}><span className="de-exp-icon">📕</span><span className="de-exp-name">PDF</span><span className="de-exp-ext">.pdf</span></button>
-                          <button className="de-exp-btn" onClick={() => triggerExport('png')}><span className="de-exp-icon">🖼️</span><span className="de-exp-name">PNG</span><span className="de-exp-ext">.png</span></button>
-                          <button className="de-exp-btn" onClick={() => triggerExport('jpeg')}><span className="de-exp-icon">📷</span><span className="de-exp-name">JPEG</span><span className="de-exp-ext">.jpeg</span></button>
-                        </div>
-                      </div>
-                      <div className="de-footer-actions">
-                        <button className="de-tbtn" style={{ padding: '10px 18px', fontSize: '13.5px' }} onClick={() => toast.success('Skipped')}>⏭️ Skip</button>
-                        <button className="de-tbtn" style={{ padding: '10px 18px', fontSize: '13.5px' }} onClick={() => setIsDataEntryOpen(false)}>Cancel</button>
-                        <button className="de-tbtn" style={{ padding: '10px 18px', fontSize: '13.5px' }} onClick={openPoPreview}>👁️ View PO</button>
-                        <button className="btn-save-rev" onClick={handleSavePoRevision}>✅ PO Ready</button>
-                        <button className="btn-export-pdf" style={{ background: '#0f766e' }} onClick={openPoPlacedDialog}>📨 PO Placed</button>
-                        <button className="btn-export-pdf" onClick={() => triggerExport('pdf')}>📘 Export PDF</button>
-                      </div>
-                    </div>
-
+            {/* de-header */}
+            <div className="de-header">
+              <div className="de-header-left">
+                <div className="de-header-icon">📋</div>
+                <div>
+                  <div className="de-header-title">
+                    Data Entry — Purchase Order
+                  </div>
+                  <div className="de-header-sub">
+                    Vendor:{" "}
+                    <strong className="de-vendor-accent">
+                      {activePoVendor.name}
+                    </strong>
                   </div>
                 </div>
-              )}
-              <ConfirmDialog
-                open={deleteConfirmOpen}
-                onOpenChange={setDeleteConfirmOpen}
-                title="Move Vendor to Recycle Bin?"
-                description="This vendor will be moved to the Recycle Bin. You can restore it anytime from Settings → Recycle Bin."
-                confirmText="Move to Bin"
-                onConfirm={confirmDeleteVendor}
-              />
-
-              <ConfirmDialog
-                open={clearRowsConfirmOpen}
-                onOpenChange={setClearRowsConfirmOpen}
-                title="Clear All Line Items?"
-                description="All line items in this PO draft will be removed. This only affects the current draft and can be re-added before saving."
-                confirmText="Clear All"
-                variant="warning"
-                onConfirm={() => {
-                  setPoItems([]);
-                }}
-              />
-
-              <ConfirmDialog
-                open={removeColConfirmOpen}
-                onOpenChange={setRemoveColConfirmOpen}
-                title="Remove Column?"
-                description={`The column "${colToRemove}" will be removed from this PO draft. Column data in unsaved rows will be lost.`}
-                confirmText="Remove Column"
-                variant="warning"
-                onConfirm={() => {
-                  if (!colToRemove) return;
-                  setCustomColumns(prev => prev.filter(c => c !== colToRemove));
-                  setPoItems(prev => prev.map(item => {
-                    const updated = { ...item };
-                    delete updated[colToRemove];
-                    return updated;
-                  }));
-                  toast.success(`Column "${colToRemove}" removed`);
-                  setColToRemove(null);
-                }}
-              />
-
-              <ConfirmDialog
-                open={deleteRevisionConfirmOpen}
-                onOpenChange={setDeleteRevisionConfirmOpen}
-                title="Delete PO Revision?"
-                description="This saved PO revision will be removed. Only the revision record is deleted — the vendor remains in the system."
-                confirmText="Delete Revision"
-                onConfirm={async () => {
-                  if (!revisionToDelete) return;
-                  try {
-                    await apiService.revisions.delete(revisionToDelete);
-                    const list = await apiService.revisions.list();
-                    setRevisions(list);
-                    if (selectedRevisionId === revisionToDelete) {
-                      setSelectedRevisionId(null);
-                    }
-                    toast.success('Revision deleted successfully.');
-                  } catch (err: any) {
-                    toast.error('Failed to delete revision.');
-                  } finally {
-                    setRevisionToDelete(null);
-                  }
-                }}
-              />
+              </div>
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "8px" }}
+              >
+                <span className="de-status-pill">Draft</span>
+                <button
+                  className="de-close-btn"
+                  onClick={() => setIsDataEntryOpen(false)}
+                >
+                  ✕
+                </button>
+              </div>
             </div>
-            );
+
+            {/* de-steps */}
+            <div className="de-steps">
+              <div className="de-step done">
+                <span className="de-step-dot done-dot">✓</span>
+                <span>Vendor Saved</span>
+              </div>
+              <div className="de-step-line done-line"></div>
+              <div className="de-step active">
+                <span className="de-step-dot active-dot">2</span>
+                <span>Data Entry</span>
+              </div>
+              <div className="de-step-line"></div>
+              <div className="de-step inactive">
+                <span className="de-step-dot inactive-dot">3</span>
+                <span>Export</span>
+              </div>
+            </div>
+
+            {/* de-revision-bar */}
+            <div className="de-revision-bar">
+              <span className="de-rev-label">📁 REVISIONS:</span>
+              <div className="de-rev-pills">
+                {revisions
+                  .filter(
+                    (r) =>
+                      r.vendorId === activePoVendor.id &&
+                      r.poNumber === poNumber,
+                  )
+                  .map((rev) => (
+                    <span
+                      key={rev.id}
+                      onClick={() => loadRevision(rev)}
+                      className={`de-rev-pill ${selectedRevisionId === rev.id ? "active" : ""}`}
+                    >
+                      R{rev.revisionNo}
+                    </span>
+                  ))}
+                {revisions.filter(
+                  (r) =>
+                    r.vendorId === activePoVendor.id && r.poNumber === poNumber,
+                ).length === 0 && <span className="de-rev-pill">R0</span>}
+              </div>
+              <button
+                className="btn-view-all"
+                style={{ marginLeft: "auto" }}
+                onClick={() => {
+                  setSelectedVendorForRevisions(activePoVendor);
+                  setIsDataEntryOpen(false);
+                }}
+              >
+                📄 View All
+              </button>
+            </div>
+
+            {/* Form body */}
+            <div className="flex-1 overflow-y-auto">
+              {/* de-company-section */}
+              <div className="de-company-section">
+                <div className="de-company-section-title">
+                  🏢 OUR COMPANY DETAILS (FOR PO HEADER)
+                </div>
+                <div className="de-company-grid">
+                  <div className="de-po-field">
+                    <label>Company Name</label>
+                    <input
+                      type="text"
+                      value={companyDetails.name}
+                      onChange={(e) =>
+                        setCompanyDetails({
+                          ...companyDetails,
+                          name: e.target.value,
+                        })
+                      }
+                      placeholder="e.g. D.V. Electromatic Pvt. Ltd."
+                    />
+                  </div>
+                  <div className="de-po-field">
+                    <label>Company Address</label>
+                    <input
+                      type="text"
+                      value={companyDetails.address}
+                      onChange={(e) =>
+                        setCompanyDetails({
+                          ...companyDetails,
+                          address: e.target.value,
+                        })
+                      }
+                      placeholder="F-003, Industrial Growth Centre…"
+                    />
+                  </div>
+                  <div className="de-po-field">
+                    <label>Company Phone</label>
+                    <input
+                      type="text"
+                      value={companyDetails.phone}
+                      onChange={(e) =>
+                        setCompanyDetails({
+                          ...companyDetails,
+                          phone: e.target.value,
+                        })
+                      }
+                      placeholder="+91 92572-17609"
+                    />
+                  </div>
+                  <div className="de-po-field">
+                    <label>Company Email</label>
+                    <input
+                      type="text"
+                      value={companyDetails.email}
+                      onChange={(e) =>
+                        setCompanyDetails({
+                          ...companyDetails,
+                          email: e.target.value,
+                        })
+                      }
+                      placeholder="office@dvepl.com"
+                    />
+                  </div>
+                  <div className="de-po-field">
+                    <label>Company GSTIN</label>
+                    <input
+                      type="text"
+                      value={companyDetails.gstin}
+                      onChange={(e) =>
+                        setCompanyDetails({
+                          ...companyDetails,
+                          gstin: e.target.value,
+                        })
+                      }
+                      placeholder="03AABCD4308A1ZL"
+                    />
+                  </div>
+                  <div className="de-po-field">
+                    <label>ISO / Certification</label>
+                    <input
+                      type="text"
+                      value={companyDetails.iso}
+                      onChange={(e) =>
+                        setCompanyDetails({
+                          ...companyDetails,
+                          iso: e.target.value,
+                        })
+                      }
+                      placeholder="AN ISO 9001:2008 CERTIFIED CO."
+                    />
+                  </div>
+                  <div className="de-po-field">
+                    <label>Authorized Signatory</label>
+                    <input
+                      type="text"
+                      value={companyDetails.signatory}
+                      onChange={(e) =>
+                        setCompanyDetails({
+                          ...companyDetails,
+                          signatory: e.target.value,
+                        })
+                      }
+                      placeholder="Name of signatory"
+                    />
+                  </div>
+                  <div className="de-po-field">
+                    <label>Division / Dept</label>
+                    <input
+                      type="text"
+                      value={companyDetails.division}
+                      onChange={(e) =>
+                        setCompanyDetails({
+                          ...companyDetails,
+                          division: e.target.value,
+                        })
+                      }
+                      placeholder="Industrial Division"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* de-po-header */}
+              <div className="de-po-header">
+                <div className="de-po-field">
+                  <label>Order Place To</label>
+                  <input
+                    type="text"
+                    value={activePoVendor.name}
+                    disabled
+                    style={{
+                      background: "#f1f5f9",
+                      border: "1px solid #cbd5e1",
+                    }}
+                  />
+                </div>
+                <div className="de-po-field">
+                  <label>PO Number *</label>
+                  <input
+                    type="text"
+                    value={poNumber}
+                    onChange={(e) => setPoNumber(e.target.value)}
+                    placeholder="e.g. PO-2025-001"
+                    style={
+                      !poNumber.trim() ? { borderColor: "#f59e0b" } : undefined
+                    }
+                  />
+                  {!poNumber.trim() && (
+                    <span
+                      style={{
+                        color: "#f59e0b",
+                        fontSize: "11px",
+                        marginTop: "2px",
+                      }}
+                    >
+                      PO Number is required
+                    </span>
+                  )}
+                </div>
+                <div className="de-po-field">
+                  <label>PO Date *</label>
+                  <input
+                    type="date"
+                    value={poDate}
+                    onChange={(e) => setPoDate(e.target.value)}
+                    style={!poDate ? { borderColor: "#f59e0b" } : undefined}
+                  />
+                  {!poDate && (
+                    <span
+                      style={{
+                        color: "#f59e0b",
+                        fontSize: "11px",
+                        marginTop: "2px",
+                      }}
+                    >
+                      PO Date is required
+                    </span>
+                  )}
+                </div>
+                <div className="de-po-field">
+                  <label>PO Status</label>
+                  <select
+                    value={poStatus}
+                    onChange={(e) => setPoStatus(e.target.value)}
+                  >
+                    <option value="Pending">Pending</option>
+                    <option value="Ordered">Ordered</option>
+                    <option value="Partially Received">
+                      Partially Received
+                    </option>
+                    <option value="Received">Received</option>
+                  </select>
+                </div>
+                <div className="de-po-field">
+                  <label>Payment Terms</label>
+                  <input
+                    type="text"
+                    value={paymentTerms}
+                    onChange={(e) => setPaymentTerms(e.target.value)}
+                    placeholder="e.g. 30 days net / 50% Advance"
+                  />
+                </div>
+                <div className="de-po-field">
+                  <label>Material Status</label>
+                  <select
+                    value={materialStatus}
+                    onChange={(e) => setMaterialStatus(e.target.value)}
+                  >
+                    <option value="Pending">Pending</option>
+                    <option value="Ordered">Ordered</option>
+                    <option value="In Transit">In Transit</option>
+                    <option value="Received">Received</option>
+                    <option value="Ready for Dispatch">
+                      Ready for Dispatch
+                    </option>
+                  </select>
+                </div>
+                <div className="de-po-field">
+                  <label>Advance (₹)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={advance}
+                    onChange={(e) => {
+                      const val = Math.max(0, Number(e.target.value) || 0);
+                      setAdvance(val);
+                    }}
+                    placeholder="0.00"
+                    style={
+                      advance > totals.grandTotal && totals.grandTotal > 0
+                        ? { borderColor: "#ef4444" }
+                        : undefined
+                    }
+                  />
+                  {advance > totals.grandTotal && totals.grandTotal > 0 && (
+                    <span
+                      style={{
+                        color: "#ef4444",
+                        fontSize: "11px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        marginTop: "2px",
+                      }}
+                    >
+                      ⚠ Advance exceeds grand total
+                    </span>
+                  )}
+                </div>
+                <div className="de-po-field">
+                  <label>Remarks</label>
+                  <input
+                    type="text"
+                    value={remarks}
+                    onChange={(e) => setRemarks(e.target.value)}
+                    placeholder="Any remarks…"
+                  />
+                </div>
+              </div>
+
+              {/* de-tax-section */}
+              <div className="de-tax-section">
+                <span className="de-tax-label">📊 TAX:</span>
+                <div className="de-tax-field">
+                  <label>CGST %</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={cgstPercent}
+                    onChange={(e) =>
+                      setCgstPercent(
+                        Math.min(100, Math.max(0, Number(e.target.value) || 0)),
+                      )
+                    }
+                  />
+                </div>
+                <div className="de-tax-field">
+                  <label>SGST %</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={sgstPercent}
+                    onChange={(e) =>
+                      setSgstPercent(
+                        Math.min(100, Math.max(0, Number(e.target.value) || 0)),
+                      )
+                    }
+                  />
+                </div>
+                <div className="de-tax-field">
+                  <label>IGST %</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={igstPercent}
+                    onChange={(e) =>
+                      setIgstPercent(
+                        Math.min(100, Math.max(0, Number(e.target.value) || 0)),
+                      )
+                    }
+                  />
+                </div>
+                <div className="de-fin-sep"></div>
+                <div className="de-fin-item">
+                  <span>Subtotal:</span>{" "}
+                  <strong>
+                    ₹
+                    {totals.subtotal.toLocaleString("en-IN", {
+                      minimumFractionDigits: 2,
+                    })}
+                  </strong>
+                </div>
+                <div className="de-fin-sep"></div>
+                <div className="de-fin-item">
+                  <span>CGST:</span>{" "}
+                  <strong>
+                    ₹
+                    {totals.cgstAmt.toLocaleString("en-IN", {
+                      minimumFractionDigits: 2,
+                    })}
+                  </strong>
+                </div>
+                <div className="de-fin-item">
+                  <span>SGST:</span>{" "}
+                  <strong>
+                    ₹
+                    {totals.sgstAmt.toLocaleString("en-IN", {
+                      minimumFractionDigits: 2,
+                    })}
+                  </strong>
+                </div>
+                <div className="de-fin-item">
+                  <span>IGST:</span>{" "}
+                  <strong>
+                    ₹
+                    {totals.igstAmt.toLocaleString("en-IN", {
+                      minimumFractionDigits: 2,
+                    })}
+                  </strong>
+                </div>
+                <div className="de-fin-sep"></div>
+                <div className="de-fin-item">
+                  <span>Grand Total:</span>{" "}
+                  <strong style={{ color: "#1e4620", fontSize: "15px" }}>
+                    ₹
+                    {totals.grandTotal.toLocaleString("en-IN", {
+                      minimumFractionDigits: 2,
+                    })}
+                  </strong>
+                </div>
+              </div>
+
+              {/* de-terms-section */}
+              <div className="de-terms-section">
+                <div className="de-terms-title">
+                  📜 TERMS &amp; CONDITIONS (SHOWN ON PO)
+                </div>
+                <textarea
+                  className="de-terms-textarea"
+                  value={terms}
+                  onChange={(e) => setTerms(e.target.value)}
+                  placeholder="Terms..."
+                ></textarea>
+              </div>
+
+              {/* de-toolbar */}
+              <div className="de-toolbar">
+                <span className="de-toolbar-label">LINE ITEMS</span>
+                <button className="de-tbtn" onClick={handleAddPoRow}>
+                  ➕ Add Row
+                </button>
+                <button
+                  className="de-tbtn"
+                  onClick={handleImportExcelClick}
+                  disabled={isImportingExcel}
+                >
+                  {isImportingExcel ? "⏳ Importing..." : "📥 Import Excel"}
+                </button>
+                <button
+                  className="de-tbtn"
+                  onClick={handleDownloadPoItemsTemplate}
+                  title="Download an Excel template for bulk item import"
+                >
+                  📄 Template
+                </button>
+                <input
+                  ref={excelImportInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  style={{ display: "none" }}
+                  onChange={handleExcelFileChange}
+                />
+                <button className="de-tbtn" onClick={handleDuplicateLastRow}>
+                  📋 Duplicate Last
+                </button>
+                <div className="de-tbtn-sep"></div>
+
+                {isAddingCol ? (
+                  <div className="flex items-center gap-1 bg-white border border-border p-1 rounded-md shadow-sm">
+                    <input
+                      placeholder="Col Name..."
+                      value={newColName}
+                      onChange={(e) => setNewColName(e.target.value)}
+                      style={{
+                        fontSize: "13px",
+                        width: "120px",
+                        padding: "4px 8px",
+                        border: "1px solid var(--border)",
+                        borderRadius: "6px",
+                      }}
+                    />
+                    <button
+                      className="de-tbtn bg-primary text-white"
+                      style={{ padding: "4px 10px", fontSize: "12px" }}
+                      onClick={handleAddCustomColumn}
+                    >
+                      Add
+                    </button>
+                    <button
+                      className="de-tbtn"
+                      style={{ padding: "4px 8px", fontSize: "12px" }}
+                      onClick={() => setIsAddingCol(false)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    className="de-tbtn"
+                    onClick={() => setIsAddingCol(true)}
+                  >
+                    ➕ Add Column
+                  </button>
+                )}
+
+                <div className="de-tbtn-sep"></div>
+                <button
+                  className="de-tbtn de-tbtn-danger"
+                  onClick={handleClearAllRows}
+                >
+                  🗑️ Clear All
+                </button>
+                <div style={{ flex: 1 }}></div>
+                <span className="de-row-count">{poItems.length} items</span>
+                <div className="de-tbtn-sep"></div>
+                <button
+                  className="de-tbtn de-maximize-btn"
+                  onClick={() => setDeMaximized(!deMaximized)}
+                >
+                  ⛶ Maximize
+                </button>
+              </div>
+
+              {/* de-table-wrap */}
+              <div className="de-table-wrap">
+                <table className="de-table">
+                  <thead>
+                    <tr>
+                      <th className="th-sno">S.No.</th>
+                      <th className="th-desc">Item Description</th>
+                      <th className="th-qty">Qty</th>
+                      <th className="th-unit">Unit</th>
+                      <th className="th-hsn">HSN Code</th>
+                      <th className="th-catno">CAT No.</th>
+                      {customColumns.map((c) => (
+                        <th key={c} style={{ minWidth: "100px" }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              gap: "4px",
+                            }}
+                          >
+                            <span>{c}</span>
+                            <button
+                              onClick={() => handleRemoveCustomColumn(c)}
+                              style={{
+                                color: "#ef4444",
+                                fontStyle: "normal",
+                                cursor: "pointer",
+                                border: "none",
+                                background: "none",
+                                fontSize: "12px",
+                                fontWeight: "bold",
+                              }}
+                              title={`Remove column ${c}`}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </th>
+                      ))}
+                      <th className="th-rate">Rate (₹)</th>
+                      <th className="th-dis">DIS (%)</th>
+                      <th className="th-net">Net (₹)</th>
+                      <th className="th-total">Total (₹)</th>
+                      <th className="th-del"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {poItems.map((item, idx) => (
+                      <tr key={item.id}>
+                        <td style={{ textAlign: "center", fontWeight: "bold" }}>
+                          {idx + 1}
+                        </td>
+                        <td style={{ position: "relative" }}>
+                          <input
+                            type="text"
+                            value={item.description}
+                            onChange={(e) => {
+                              updatePoItemField(
+                                item.id,
+                                "description",
+                                e.target.value,
+                              );
+                              setInventoryDropdownRowId(item.id);
+                            }}
+                            onFocus={() => setInventoryDropdownRowId(item.id)}
+                            onBlur={() =>
+                              setTimeout(
+                                () =>
+                                  setInventoryDropdownRowId((prev) =>
+                                    prev === item.id ? null : prev,
+                                  ),
+                                150,
+                              )
+                            }
+                            placeholder="Type to search Inventory or enter manually..."
+                            autoComplete="off"
+                            style={
+                              !item.description.trim()
+                                ? { borderColor: "#f59e0b" }
+                                : undefined
+                            }
+                          />
+                          {inventoryDropdownRowId === item.id && (
+                            <div
+                              className="absolute left-0 top-full mt-1 w-72 rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 z-50"
+                              onMouseDown={(e) => e.preventDefault()}
+                            >
+                              <div className="flex items-center gap-1.5 px-3 py-2 border-b bg-muted/30">
+                                <Package className="size-3.5 text-muted-foreground" />
+                                <span className="text-[11px] font-semibold text-muted-foreground">
+                                  INVENTORY MATCHES
+                                </span>
+                              </div>
+                              <div className="max-h-64 overflow-y-auto divide-y">
+                                {getInventoryMatches(item.description)
+                                  .length === 0 && (
+                                  <div className="p-3 text-center text-xs text-muted-foreground">
+                                    No matching inventory items.
+                                  </div>
+                                )}
+                                {getInventoryMatches(item.description).map(
+                                  (inv) => (
+                                    <button
+                                      type="button"
+                                      key={inv.id}
+                                      onClick={() =>
+                                        applyInventoryItemToRow(item.id, inv)
+                                      }
+                                      className="w-full flex items-center justify-between gap-2 px-3 py-2 hover:bg-muted/40 text-left transition-colors"
+                                    >
+                                      <div className="min-w-0">
+                                        <div className="text-xs font-semibold text-foreground truncate">
+                                          {inv.material.name}
+                                        </div>
+                                        <div className="text-[10px] text-muted-foreground truncate">
+                                          {inv.material.materialCode} • HSN:{" "}
+                                          {inv.material.hsnCode || "—"} •{" "}
+                                          {inv.material.unit}
+                                        </div>
+                                      </div>
+                                      <div className="text-xs font-bold text-[#137333] shrink-0">
+                                        ₹
+                                        {Number(inv.unitPrice).toLocaleString(
+                                          "en-IN",
+                                        )}
+                                      </div>
+                                    </button>
+                                  ),
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            min={0.01}
+                            step="any"
+                            value={item.qty}
+                            onChange={(e) =>
+                              updatePoItemField(
+                                item.id,
+                                "qty",
+                                Number(e.target.value) || 0,
+                              )
+                            }
+                            style={
+                              item.qty <= 0
+                                ? { borderColor: "#f59e0b" }
+                                : undefined
+                            }
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            value={item.unit}
+                            onChange={(e) =>
+                              updatePoItemField(item.id, "unit", e.target.value)
+                            }
+                            placeholder="PCS"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            value={item.hsnCode}
+                            onChange={(e) =>
+                              updatePoItemField(
+                                item.id,
+                                "hsnCode",
+                                e.target.value,
+                              )
+                            }
+                            placeholder="HSN"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="text"
+                            value={item.catNo}
+                            onChange={(e) =>
+                              updatePoItemField(
+                                item.id,
+                                "catNo",
+                                e.target.value,
+                              )
+                            }
+                            placeholder="CAT no."
+                          />
+                        </td>
+                        {customColumns.map((c) => (
+                          <td key={c}>
+                            <input
+                              type="text"
+                              value={item[c] || ""}
+                              onChange={(e) =>
+                                updatePoItemField(item.id, c, e.target.value)
+                              }
+                            />
+                          </td>
+                        ))}
+                        <td>
+                          <input
+                            type="number"
+                            value={item.rate === 0 ? "" : item.rate}
+                            onChange={(e) =>
+                              updatePoItemField(
+                                item.id,
+                                "rate",
+                                Number(e.target.value) || 0,
+                              )
+                            }
+                            placeholder="0"
+                          />
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            value={
+                              item.discountPercent === 0
+                                ? ""
+                                : item.discountPercent
+                            }
+                            onChange={(e) =>
+                              updatePoItemField(
+                                item.id,
+                                "discountPercent",
+                                Number(e.target.value) || 0,
+                              )
+                            }
+                            placeholder="0"
+                          />
+                        </td>
+                        <td className="td-net">
+                          ₹
+                          {(item.net || 0).toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                          })}
+                        </td>
+                        <td className="td-total">
+                          ₹
+                          {(item.total || 0).toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                          })}
+                        </td>
+                        <td style={{ textAlign: "center" }}>
+                          <button
+                            className="btn-row-del"
+                            onClick={() => handleDeletePoRow(item.id)}
+                          >
+                            🗑️
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {poItems.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={12 + customColumns.length}
+                          style={{
+                            padding: "24px",
+                            textAlign: "center",
+                            color: "var(--text2)",
+                          }}
+                        >
+                          No items added. Click "+ Add Row" and start typing to
+                          search Inventory, or "📥 Import Excel" to bulk-add
+                          items.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                  <tfoot>
+                    <tr className="de-tfoot-row">
+                      <td colSpan={2} className="tfoot-label">
+                        Total items:{" "}
+                        <span id="de-total-items">{poItems.length}</span>
+                      </td>
+                      <td className="tfoot-qty" id="de-total-qty">
+                        {poItems.reduce(
+                          (sum, item) => sum + (Number(item.qty) || 0),
+                          0,
+                        )}
+                      </td>
+                      <td
+                        colSpan={5 + customColumns.length}
+                        className="tfoot-grand-label"
+                      >
+                        Grand Total (excl. tax):
+                      </td>
+                      <td
+                        className="tfoot-grand"
+                        colSpan={3}
+                        id="de-grand-total"
+                      >
+                        ₹
+                        {totals.subtotal.toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                        })}
+                      </td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+
+            {/* de-finance-bar */}
+            <div className="de-finance-bar">
+              <div className="de-fin-item">
+                <span>Total Amount:</span>{" "}
+                <strong id="de-total-amt">
+                  ₹
+                  {totals.grandTotal.toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                  })}
+                </strong>
+              </div>
+              <div className="de-fin-sep"></div>
+              <div className="de-fin-item">
+                <span>Advance:</span>{" "}
+                <strong id="de-adv-display" className="de-fin-adv">
+                  ₹
+                  {advance.toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                  })}
+                </strong>
+              </div>
+              <div className="de-fin-sep"></div>
+              <div className="de-fin-item">
+                <span>Balance:</span>{" "}
+                <strong id="de-bal-display" className="de-fin-bal">
+                  ₹
+                  {totals.balance.toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                  })}
+                </strong>
+              </div>
+            </div>
+
+            {/* de-footer */}
+            <div className="de-footer">
+              <div className="de-export-section">
+                <div className="de-export-label">EXPORT AS:</div>
+                <div className="de-export-btns">
+                  <button
+                    className="de-exp-btn"
+                    onClick={() => triggerExport("pdf")}
+                  >
+                    <span className="de-exp-icon">📕</span>
+                    <span className="de-exp-name">PDF</span>
+                    <span className="de-exp-ext">.pdf</span>
+                  </button>
+                  <button
+                    className="de-exp-btn"
+                    onClick={() => triggerExport("png")}
+                  >
+                    <span className="de-exp-icon">🖼️</span>
+                    <span className="de-exp-name">PNG</span>
+                    <span className="de-exp-ext">.png</span>
+                  </button>
+                  <button
+                    className="de-exp-btn"
+                    onClick={() => triggerExport("jpeg")}
+                  >
+                    <span className="de-exp-icon">📷</span>
+                    <span className="de-exp-name">JPEG</span>
+                    <span className="de-exp-ext">.jpeg</span>
+                  </button>
+                </div>
+              </div>
+              <div className="de-footer-actions">
+                <button
+                  className="de-tbtn"
+                  style={{ padding: "10px 18px", fontSize: "13.5px" }}
+                  onClick={() => toast.success("Skipped")}
+                >
+                  ⏭️ Skip
+                </button>
+                <button
+                  className="de-tbtn"
+                  style={{ padding: "10px 18px", fontSize: "13.5px" }}
+                  onClick={() => setIsDataEntryOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="de-tbtn"
+                  style={{ padding: "10px 18px", fontSize: "13.5px" }}
+                  onClick={openPoPreview}
+                >
+                  👁️ View PO
+                </button>
+                <button className="btn-save-rev" onClick={handleSavePoRevision}>
+                  ✅ PO Ready
+                </button>
+                <button
+                  className="btn-export-pdf"
+                  style={{ background: "#0f766e" }}
+                  onClick={openPoPlacedDialog}
+                >
+                  📨 PO Placed
+                </button>
+                <button
+                  className="btn-export-pdf"
+                  onClick={() => triggerExport("pdf")}
+                >
+                  📘 Export PDF
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        title="Move Vendor to Recycle Bin?"
+        description="This vendor will be moved to the Recycle Bin. You can restore it anytime from Settings → Recycle Bin."
+        confirmText="Move to Bin"
+        onConfirm={confirmDeleteVendor}
+      />
+
+      <ConfirmDialog
+        open={clearRowsConfirmOpen}
+        onOpenChange={setClearRowsConfirmOpen}
+        title="Clear All Line Items?"
+        description="All line items in this PO draft will be removed. This only affects the current draft and can be re-added before saving."
+        confirmText="Clear All"
+        variant="warning"
+        onConfirm={() => {
+          setPoItems([]);
+        }}
+      />
+
+      <ConfirmDialog
+        open={removeColConfirmOpen}
+        onOpenChange={setRemoveColConfirmOpen}
+        title="Remove Column?"
+        description={`The column "${colToRemove}" will be removed from this PO draft. Column data in unsaved rows will be lost.`}
+        confirmText="Remove Column"
+        variant="warning"
+        onConfirm={() => {
+          if (!colToRemove) return;
+          setCustomColumns((prev) => prev.filter((c) => c !== colToRemove));
+          setPoItems((prev) =>
+            prev.map((item) => {
+              const updated = { ...item };
+              delete updated[colToRemove];
+              return updated;
+            }),
+          );
+          toast.success(`Column "${colToRemove}" removed`);
+          setColToRemove(null);
+        }}
+      />
+
+      <ConfirmDialog
+        open={deleteRevisionConfirmOpen}
+        onOpenChange={setDeleteRevisionConfirmOpen}
+        title="Delete PO Revision?"
+        description="This saved PO revision will be removed. Only the revision record is deleted — the vendor remains in the system."
+        confirmText="Delete Revision"
+        onConfirm={async () => {
+          if (!revisionToDelete) return;
+          try {
+            await apiService.revisions.delete(revisionToDelete);
+            const list = await apiService.revisions.list();
+            setRevisions(list);
+            if (selectedRevisionId === revisionToDelete) {
+              setSelectedRevisionId(null);
+            }
+            toast.success("Revision deleted successfully.");
+          } catch (err: any) {
+            toast.error("Failed to delete revision.");
+          } finally {
+            setRevisionToDelete(null);
+          }
+        }}
+      />
+    </div>
+  );
 }
 
 export default VendorsPage;
