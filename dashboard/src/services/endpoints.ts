@@ -245,26 +245,28 @@ export const API_ENDPOINTS = {
     },
   },
   security: {
-    users: {
-      list: '/user/read/',
-      create: '/user/create/',
-      update: (id: string) => `/user/update/${id}`,
-      remove: (id: string) => `/user/delete/${id}`,
-    },
     roles: {
       list: '/role/read/',
       create: '/role/create/',
       update: (id: string) => `/role/update/${id}`,
       remove: (id: string) => `/role/delete/${id}`,
     },
-    permissions: {
-      list: '/permission/read/',
+    users: {
+      list: '/user/read/',
+      create: '/user/create/',
+      update: (id: string) => `/user/update/${id}`,
+      remove: (id: string) => `/user/delete/${id}`,
+      bulkImport: '/user/bulk-import/',
     },
-    permissionGroups: {
-      list: '/permission-group/read/',
-      create: '/permission-group/create/',
-      update: (id: string) => `/permission-group/update/${id}`,
-      remove: (id: string) => `/permission-group/delete/${id}`,
+    settings: {
+      read: '/settings/read/',
+      update: '/settings/update/',
+      testSmtp: '/settings/test-smtp',
+      sendTestEmail: '/settings/send-test-email',
+      sendPoEmail: '/settings/send-po-email',
+      testWhatsapp: '/settings/test-whatsapp/',
+      exportBackup: '/settings/backup/export',
+      importBackup: '/settings/backup/import',
     },
   },
   engineering: {

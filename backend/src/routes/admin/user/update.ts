@@ -4,9 +4,9 @@ import {
   FastifyReply,
   FastifyRequest,
 } from "fastify";
-
+import fs from "fs";
+import path from "path";
 import { adminLogs } from "../../../services/logger/contextLogger";
-import { updateUserSchema } from "../../../schemas/user/auth/update-user.schema";
 
 async function updateUserRoute(
   fastify: FastifyInstance,
@@ -30,23 +30,6 @@ async function updateUserRoute(
       reply: FastifyReply
     ) => {
       try {
-        //----------------------------------------
-        // Validate Request
-        //----------------------------------------
-
-        const validationResult = updateUserSchema.safeParse(request.body);
-
-        if (!validationResult.success) {
-          return reply.status(400).send({
-            success: false,
-            message: "Invalid request data.",
-            error:
-              process.env.NODE_ENV === "development"
-                ? validationResult.error.issues
-                : "Validation failed.",
-          });
-        }
-
         const companyId = (request.admin as any)?.companyId;
 
         if (!companyId) {
@@ -57,14 +40,9 @@ async function updateUserRoute(
         }
 
         const { id } = request.params as { id: string };
+        const { name, email, phone, isActive, role, designation, pageAccess, fieldPermissions, actionPermissions } = request.body as any;
 
-        const { name, email, phone, isActive, roleIds } =
-          validationResult.data;
-
-        //----------------------------------------
         // Check User Exists
-        //----------------------------------------
-
         const existingUser = await fastify.prisma.user.findFirst({
           where: {
             id,
@@ -80,35 +58,11 @@ async function updateUserRoute(
           });
         }
 
-        //----------------------------------------
-        // Duplicate Email
-        //----------------------------------------
-
-        const duplicateEmail = await fastify.prisma.user.findFirst({
-          where: {
-            email,
-            NOT: {
-              id,
-            },
-            deletedAt: null,
-          },
-        });
-
-        if (duplicateEmail) {
-          return reply.status(409).send({
-            success: false,
-            message: "Email already exists.",
-          });
-        }
-
-        //----------------------------------------
-        // Duplicate Phone
-        //----------------------------------------
-
-        if (phone) {
-          const duplicatePhone = await fastify.prisma.user.findFirst({
+        // Duplicate Email Check
+        if (email) {
+          const duplicateEmail = await fastify.prisma.user.findFirst({
             where: {
-              phone,
+              email,
               NOT: {
                 id,
               },
@@ -116,40 +70,33 @@ async function updateUserRoute(
             },
           });
 
-          if (duplicatePhone) {
+          if (duplicateEmail) {
             return reply.status(409).send({
               success: false,
-              message: "Phone number already exists.",
+              message: "Email already exists.",
             });
           }
         }
 
-        //----------------------------------------
-        // Validate Roles (Optional)
-        //----------------------------------------
-        if (roleIds) {
-          const roles = await fastify.prisma.role.findMany({
+        // Resolve role ID if passed as string name or ID
+        let roleIds = (request.body as any).roleIds;
+        if (role && !roleIds) {
+          const foundRole = await fastify.prisma.role.findFirst({
             where: {
-              id: {
-                in: roleIds,
-              },
+              OR: [
+                { id: role },
+                { name: { equals: role, mode: "insensitive" } }
+              ],
               companyId,
-              deletedAt: null,
-            },
+              deletedAt: null
+            }
           });
-
-          if (roles.length !== roleIds.length) {
-            return reply.status(400).send({
-              success: false,
-              message: "One or more selected roles are invalid.",
-            });
+          if (foundRole) {
+            roleIds = [foundRole.id];
           }
         }
 
-        //----------------------------------------
-        // Transaction
-        //----------------------------------------
-
+        // Transaction for User Table
         await fastify.prisma.$transaction(async (tx) => {
           await tx.user.update({
             where: {
@@ -157,13 +104,13 @@ async function updateUserRoute(
             },
             data: {
               name: name || undefined,
-              email,
-              phone: phone || null,
-              isActive,
+              email: email || undefined,
+              phone: phone || undefined,
+              isActive: isActive !== undefined ? !!isActive : undefined,
             },
           });
 
-          if (roleIds) {
+          if (roleIds && roleIds.length > 0) {
             await tx.userRole.deleteMany({
               where: {
                 userId: id,
@@ -171,13 +118,97 @@ async function updateUserRoute(
             });
 
             await tx.userRole.createMany({
-              data: roleIds.map((roleId) => ({
+              data: roleIds.map((roleId: string) => ({
                 userId: id,
                 roleId,
               })),
             });
           }
+
+          // Find employee record associated with this user
+          const employee = await tx.employee.findFirst({
+            where: { userId: id }
+          });
+
+          if (employee) {
+            const updateData: any = {};
+            if (name) {
+              const nameParts = name.trim().split(/\s+/);
+              updateData.firstName = nameParts[0] || "Employee";
+              updateData.lastName = nameParts.slice(1).join(" ") || "Member";
+            }
+            if (designation !== undefined) {
+              let designationId: string | null = null;
+              if (designation) {
+                const foundDes = await tx.designation.findFirst({
+                  where: {
+                    title: { equals: designation, mode: "insensitive" },
+                    deletedAt: null
+                  }
+                });
+                if (foundDes) {
+                  designationId = foundDes.id;
+                }
+              }
+              updateData.designationId = designationId;
+            }
+
+            await tx.employee.update({
+              where: { id: employee.id },
+              data: updateData
+            });
+
+            if (email) {
+              await tx.employeeContact.updateMany({
+                where: {
+                  employeeId: employee.id,
+                  type: "EMAIL",
+                  isPrimary: true
+                },
+                data: {
+                  value: email
+                }
+              });
+            }
+
+            if (phone) {
+              await tx.employeeContact.updateMany({
+                where: {
+                  employeeId: employee.id,
+                  type: "PHONE",
+                  isPrimary: true
+                },
+                data: {
+                  value: phone
+                }
+              });
+            }
+          }
         });
+
+        // Save Custom Permissions if provided
+        if (pageAccess || fieldPermissions || actionPermissions || designation !== undefined) {
+          const permissionsFilePath = path.join(__dirname, "../../../../data/user_permissions.json");
+          const dirPath = path.dirname(permissionsFilePath);
+          if (!fs.existsSync(dirPath)) {
+            fs.mkdirSync(dirPath, { recursive: true });
+          }
+          let permissionsData: Record<string, any> = {};
+          if (fs.existsSync(permissionsFilePath)) {
+            try {
+              permissionsData = JSON.parse(fs.readFileSync(permissionsFilePath, "utf-8"));
+            } catch (e) {
+              permissionsData = {};
+            }
+          }
+          if (!permissionsData[id]) permissionsData[id] = {};
+          if (pageAccess !== undefined) permissionsData[id].pageAccess = pageAccess;
+          if (fieldPermissions !== undefined) permissionsData[id].fieldPermissions = fieldPermissions;
+          if (actionPermissions !== undefined) permissionsData[id].actionPermissions = actionPermissions;
+          if (designation !== undefined) permissionsData[id].designation = designation;
+
+          fs.writeFileSync(permissionsFilePath, JSON.stringify(permissionsData, null, 2), "utf-8");
+        }
 
         return reply.status(200).send({
           success: true,

@@ -74,6 +74,29 @@ const recycleBinModels: RecycleBinModelConfig[] = [
     delegate: "user",
     select: { id: true, name: true, email: true, deletedAt: true, updatedAt: true },
     formatName: (record) => `${record.name || "User"}${record.email ? ` (${record.email})` : ""}`,
+    permanentDelete: async (fastify, id) => {
+      await fastify.prisma.userRole.deleteMany({ where: { userId: id } });
+      await fastify.prisma.userPermission.deleteMany({ where: { userId: id } });
+      await fastify.prisma.employee.updateMany({
+        where: { userId: id },
+        data: { userId: null },
+      });
+      try {
+        const path = require("path");
+        const fs = require("fs");
+        const permissionsFilePath = path.join(__dirname, "../../../../data/user_permissions.json");
+        if (fs.existsSync(permissionsFilePath)) {
+          const permissionsData = JSON.parse(fs.readFileSync(permissionsFilePath, "utf-8"));
+          if (permissionsData[id]) {
+            delete permissionsData[id];
+            fs.writeFileSync(permissionsFilePath, JSON.stringify(permissionsData, null, 2), "utf-8");
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+      await (fastify.prisma as any).user.deleteMany({ where: { id } });
+    },
   },
   {
     module: "role",
@@ -88,6 +111,15 @@ const recycleBinModels: RecycleBinModelConfig[] = [
     delegate: "employee",
     select: { id: true, employeeCode: true, firstName: true, lastName: true, deletedAt: true, updatedAt: true },
     formatName: (record) => `${[record.firstName, record.lastName].filter(Boolean).join(" ") || "Employee"}${record.employeeCode ? ` (${record.employeeCode})` : ""}`,
+    permanentDelete: async (fastify, id) => {
+      await fastify.prisma.employeeContact.deleteMany({ where: { employeeId: id } });
+      await fastify.prisma.employeeEmergencyContact.deleteMany({ where: { employeeId: id } });
+      await fastify.prisma.employeeEducation.deleteMany({ where: { employeeId: id } });
+      await fastify.prisma.employeeExperience.deleteMany({ where: { employeeId: id } });
+      await fastify.prisma.employeeDocument.deleteMany({ where: { employeeId: id } });
+      await fastify.prisma.employeeShift.deleteMany({ where: { employeeId: id } });
+      await (fastify.prisma as any).employee.deleteMany({ where: { id } });
+    },
   },
   {
     module: "shift",

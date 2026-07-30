@@ -14,12 +14,13 @@ export const createRoleSchema = z.object({
 
   permissionIds: z
     .array(z.string().uuid())
-    .min(1, "Select at least one permission"),
+    .optional()
+    .default([]),
 });
 
 
 export const updateRoleSchema = z.object({
   name: z.string().min(2).max(100),
-  description: z.string().optional(),
-  permissionIds: z.array(z.string().uuid()).min(1),
+  description: z.string().optional().nullable(),
+  permissionIds: z.array(z.string().uuid()).optional().default([]),
 });

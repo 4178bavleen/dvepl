@@ -8,7 +8,7 @@ import {
 import { adminLogs } from "../../../services/logger/contextLogger";
 
 import {
-  vendorSchema,
+  updateVendorSchema,
 } from "../../../schemas/admin/vendor/vendor.schema";
 
 
@@ -54,7 +54,7 @@ const {id}=request.params;
 
 
 const validationResult =
-vendorSchema.safeParse(request.body);
+updateVendorSchema.safeParse(request.body);
 
 
 

@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useERPStore } from '@/store/erpStore';
 import { securityApi } from '@/services/modules';
+import { organizationApi } from '@/services/organization';
 import { toast } from 'react-hot-toast';
+import * as XLSX from 'xlsx';
+import { Eye, EyeOff } from 'lucide-react';
 import '../../styles/settings.css';
 
 // Hex to HSL space-separated string converter for Tailwind HSL variables compatibility
@@ -52,6 +55,59 @@ interface UserItem {
   };
 }
 
+const defaultWaSettings = {
+  masterToggle: true,
+  number: '',
+  phoneId: '',
+  businessId: '',
+  accessToken: '',
+  orderConfirmation: true,
+  lowStock: false,
+};
+
+const defaultEmailSettings = {
+  address: '',
+  orders: true,
+  tasks: false,
+  payments: true,
+  delivery: false,
+};
+
+const defaultSmtpSettings = {
+  title: '',
+  email: '',
+  password: '',
+  host: 'smtp.gmail.com',
+  port: 465,
+  supportEmail: '',
+  supportPhone: '',
+  address: '',
+};
+
+const defaultCaptchaSettings = {
+  siteKey: '',
+  secretKey: '',
+  enabled: true,
+};
+
+const defaultGatewaySettings = {
+  baseUrl: '',
+  apiKey: '',
+  secretKey: '',
+  enabled: false,
+};
+
+const sanitizeObject = (obj: any, defaults: any) => {
+  if (!obj || typeof obj !== 'object') return { ...defaults };
+  const result = { ...defaults, ...obj };
+  for (const key of Object.keys(result)) {
+    if (result[key] === null || result[key] === undefined) {
+      result[key] = defaults[key] !== undefined ? defaults[key] : '';
+    }
+  }
+  return result;
+};
+
 export function SettingsPage() {
   const store = useERPStore();
 
@@ -85,9 +141,11 @@ export function SettingsPage() {
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
+  const [showNewUserPassword, setShowNewUserPassword] = useState(false);
   const [newUserDesignation, setNewUserDesignation] = useState('');
   const [newUserPhone, setNewUserPhone] = useState('');
   const [newUserRole, setNewUserRole] = useState('');
+  const [formErrors, setFormErrors] = useState<Record<string, boolean>>({});
 
   // Create bulk users state
   const [bulkTab, setBulkTab] = useState<'single' | 'bulk'>('single');
@@ -117,25 +175,11 @@ export function SettingsPage() {
   const [notifTab, setNotifTab] = useState<'contacts' | 'smtp' | 'templates' | 'captcha' | 'gateway'>('contacts');
 
   // WhatsApp settings state
-  const [waSettings, setWaSettings] = useState({
-    masterToggle: true,
-    number: '',
-    phoneId: '',
-    businessId: '',
-    accessToken: '',
-    orderConfirmation: true,
-    lowStock: false,
-  });
+  const [waSettings, setWaSettings] = useState(defaultWaSettings);
   const [showWaConfig, setShowWaConfig] = useState(false);
 
   // Email notifications state
-  const [emailSettings, setEmailSettings] = useState({
-    address: '',
-    orders: true,
-    tasks: false,
-    payments: true,
-    delivery: false,
-  });
+  const [emailSettings, setEmailSettings] = useState(defaultEmailSettings);
 
   // Alert events toggles
   const [alertEvents, setAlertEvents] = useState<Record<string, { wa: boolean; email: boolean }>>({
@@ -153,35 +197,20 @@ export function SettingsPage() {
   });
 
   // SMTP Settings
-  const [smtpSettings, setSmtpSettings] = useState({
-    title: '',
-    email: '',
-    password: '',
-    host: '',
-    port: 587,
-    supportEmail: '',
-    supportPhone: '',
-    address: '',
-  });
+  const [smtpSettings, setSmtpSettings] = useState(defaultSmtpSettings);
   const [showSmtpPass, setShowSmtpPass] = useState(false);
+  const [isEditingSmtp, setIsEditingSmtp] = useState(true);
 
   // Captcha settings
-  const [captchaSettings, setCaptchaSettings] = useState({
-    siteKey: '',
-    secretKey: '',
-    enabled: true,
-  });
+  const [captchaSettings, setCaptchaSettings] = useState(defaultCaptchaSettings);
 
   // WhatsApp Gateway Settings
-  const [gatewaySettings, setGatewaySettings] = useState({
-    baseUrl: '',
-    apiKey: '',
-    secretKey: '',
-    enabled: false,
-  });
+  const [gatewaySettings, setGatewaySettings] = useState(defaultGatewaySettings);
+  const [isEditingGateway, setIsEditingGateway] = useState(true);
 
   // Email Templates
   const [templates, setTemplates] = useState<any[]>([]);
+  const [selectedTestTemplateId, setSelectedTestTemplateId] = useState('');
   const [editingTemplate, setEditingTemplate] = useState<any | null>(null);
   const [showTemplateForm, setShowTemplateForm] = useState(false);
   const [templateName, setTemplateName] = useState('');
@@ -201,6 +230,7 @@ export function SettingsPage() {
   const [backupHistory, setBackupHistory] = useState<any[]>([]);
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
   const [restoreMode, setRestoreMode] = useState<'merge' | 'overwrite'>('merge');
+  const [designationsList, setDesignationsList] = useState<any[]>([]);
 
 
 
@@ -208,15 +238,22 @@ export function SettingsPage() {
   const loadUsersList = async () => {
     setLoadingUsers(true);
     try {
+      const rolesList = await securityApi.roles.list().catch(() => []);
+      useERPStore.setState({ roles: rolesList });
+
+      // Fetch designations list from organization API
+      const desList = await organizationApi.designations.list().catch(() => []);
+      setDesignationsList(desList);
+
       // Fetch users from API endpoint
       const list = await securityApi.users.list();
       if (Array.isArray(list) && list.length > 0) {
         const mapped: UserItem[] = list.map((u: any) => ({
           id: u.id,
-          name: u.name,
-          email: u.email,
+          name: u.name || `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'No Name',
+          email: u.email || '',
           phone: u.phone || '',
-          designation: u.designation || 'Team Member',
+          designation: typeof u.designation === 'object' && u.designation ? (u.designation.title || 'Team Member') : (u.designation || 'Team Member'),
           role: u.role || 'user',
           pageAccess: u.pageAccess || ['dashboard', 'vendors', 'orders'],
           fieldPermissions: u.fieldPermissions || {},
@@ -260,79 +297,155 @@ export function SettingsPage() {
   useEffect(() => {
     loadUsersList();
 
-    // Load configs from local storage
-    const savedOrderFields = localStorage.getItem('dvepl_order_fields');
-    if (savedOrderFields) setOrderFields(JSON.parse(savedOrderFields));
+    const initSettings = async () => {
+      // First read local storage for fast paint
+      const savedOrderFields = localStorage.getItem('dvepl_order_fields');
+      if (savedOrderFields) setOrderFields(JSON.parse(savedOrderFields));
 
-    const savedPersons = localStorage.getItem('dvepl_concerned_persons');
-    if (savedPersons) {
-      setConcernedPersons(JSON.parse(savedPersons));
-    } else {
-      const defaultPersons = [' राहुल शर्मा (Sales)', ' अमन प्रीत (Procurement)', ' जसकीरत सिंह (Accounts)', ' गुरमीत सिंह (Production)'];
-      setConcernedPersons(defaultPersons);
-      localStorage.setItem('dvepl_concerned_persons', JSON.stringify(defaultPersons));
-    }
+      const savedPersons = localStorage.getItem('dvepl_concerned_persons');
+      if (savedPersons) {
+        setConcernedPersons(JSON.parse(savedPersons));
+      } else {
+        const defaultPersons = [' राहुल शर्मा (Sales)', ' अमन प्रीत (Procurement)', ' जसकीरत सिंह (Accounts)', ' गुरमीत सिंह (Production)'];
+        setConcernedPersons(defaultPersons);
+      }
 
-    const savedWa = localStorage.getItem('dvepl_whatsapp_settings');
-    if (savedWa) setWaSettings(JSON.parse(savedWa));
+      const savedWa = localStorage.getItem('dvepl_whatsapp_settings');
+      if (savedWa) setWaSettings(sanitizeObject(JSON.parse(savedWa), defaultWaSettings));
 
-    const savedEmail = localStorage.getItem('dvepl_email_settings');
-    if (savedEmail) setEmailSettings(JSON.parse(savedEmail));
+      const savedEmail = localStorage.getItem('dvepl_email_settings');
+      if (savedEmail) setEmailSettings(sanitizeObject(JSON.parse(savedEmail), defaultEmailSettings));
 
-    const savedEvents = localStorage.getItem('dvepl_alert_events');
-    if (savedEvents) setAlertEvents(JSON.parse(savedEvents));
+      const savedEvents = localStorage.getItem('dvepl_alert_events');
+      if (savedEvents) setAlertEvents(JSON.parse(savedEvents));
 
-    const savedAutoSend = localStorage.getItem('dvepl_auto_send_defaults');
-    if (savedAutoSend) setAutoSendDefaults(JSON.parse(savedAutoSend));
+      const savedAutoSend = localStorage.getItem('dvepl_auto_send_defaults');
+      if (savedAutoSend) setAutoSendDefaults(JSON.parse(savedAutoSend));
 
-    const savedSmtp = localStorage.getItem('dvepl_smtp_settings');
-    if (savedSmtp) setSmtpSettings(JSON.parse(savedSmtp));
+      const savedSmtp = localStorage.getItem('dvepl_smtp_settings');
+      if (savedSmtp) {
+        const smtp = JSON.parse(savedSmtp);
+        const mappedSmtp = {
+          ...smtp,
+          email: smtp.email || smtp.username || '',
+        };
+        setSmtpSettings(sanitizeObject(mappedSmtp, defaultSmtpSettings));
+        if (mappedSmtp.host) {
+          setIsEditingSmtp(false);
+        } else {
+          setIsEditingSmtp(true);
+        }
+      } else {
+        setIsEditingSmtp(true);
+      }
 
-    const savedCaptcha = localStorage.getItem('dvepl_captcha_settings');
-    if (savedCaptcha) setCaptchaSettings(JSON.parse(savedCaptcha));
+      const savedCaptcha = localStorage.getItem('dvepl_captcha_settings');
+      if (savedCaptcha) setCaptchaSettings(sanitizeObject(JSON.parse(savedCaptcha), defaultCaptchaSettings));
 
-    const savedGateway = localStorage.getItem('dvepl_whatsapp_gateway');
-    if (savedGateway) setGatewaySettings(JSON.parse(savedGateway));
+      const savedGateway = localStorage.getItem('dvepl_whatsapp_gateway');
+      if (savedGateway) {
+        const parsed = JSON.parse(savedGateway);
+        setGatewaySettings(sanitizeObject(parsed, defaultGatewaySettings));
+        if (parsed.baseUrl) {
+          setIsEditingGateway(false);
+        } else {
+          setIsEditingGateway(true);
+        }
+      } else {
+        setIsEditingGateway(true);
+      }
 
-    const savedTemplates = localStorage.getItem('dvepl_email_templates');
-    if (savedTemplates) {
-      setTemplates(JSON.parse(savedTemplates));
-    } else {
-      const defaultTemplates = [
-        { id: '1', name: 'Order Confirmation', subject: 'Your Order #{$poNumber} Placed', content1: 'Hi {$name},\n\nThank you for your order. We are processing it.', content2: 'Support: {$supportPhone}', type: 'order_created' },
-        { id: '2', name: 'Welcome Email', subject: 'Welcome to DVEPL Portal', content1: 'Dear {$name},\n\nYour account has been registered successfully.', content2: 'Regards,\nDVEPL Admin', type: 'welcome' }
-      ];
-      setTemplates(defaultTemplates);
-      localStorage.setItem('dvepl_email_templates', JSON.stringify(defaultTemplates));
-    }
+      const savedTemplates = localStorage.getItem('dvepl_email_templates');
+      if (savedTemplates) {
+        setTemplates(JSON.parse(savedTemplates));
+      } else {
+        const defaultTemplates = [
+          { id: '1', name: 'Order Confirmation', subject: 'Your Order #{$poNumber} Placed', content1: 'Hi {$name},\n\nThank you for your order. We are processing it.', content2: 'Support: {$supportPhone}', type: 'order_created' },
+          { id: '2', name: 'Welcome Email', subject: 'Welcome to DVEPL Portal', content1: 'Dear {$name},\n\nYour account has been registered successfully.', content2: 'Regards,\nDVEPL Admin', type: 'welcome' }
+        ];
+        setTemplates(defaultTemplates);
+      }
 
-    const savedThemePos = localStorage.getItem('dvepl_theme_sidebar_pos');
-    if (savedThemePos) setSidebarPos(savedThemePos as any);
+      const savedThemePos = localStorage.getItem('dvepl_theme_sidebar_pos');
+      if (savedThemePos) setSidebarPos(savedThemePos as any);
 
-    const savedBrandColor = localStorage.getItem('dvepl_brand_color') || '#33cc33';
-    setBrandColor(savedBrandColor);
-    try {
-      const hslVal = hexToHslString(savedBrandColor);
-      document.documentElement.style.setProperty('--primary', hslVal);
-    } catch (e) {
-      document.documentElement.style.setProperty('--primary', savedBrandColor);
-    }
+      const savedBrandColor = localStorage.getItem('dvepl_brand_color') || '#33cc33';
+      setBrandColor(savedBrandColor);
+      try {
+        const hslVal = hexToHslString(savedBrandColor);
+        document.documentElement.style.setProperty('--primary', hslVal);
+      } catch (e) {
+        document.documentElement.style.setProperty('--primary', savedBrandColor);
+      }
 
-    const savedBgColor = localStorage.getItem('dvepl_bg_color');
-    if (savedBgColor) setBgColor(savedBgColor);
+      const savedBgColor = localStorage.getItem('dvepl_bg_color');
+      if (savedBgColor) setBgColor(savedBgColor);
 
-    const savedBackupHistory = localStorage.getItem('dvepl_backup_history');
-    if (savedBackupHistory) setBackupHistory(JSON.parse(savedBackupHistory));
+      const savedBackupHistory = localStorage.getItem('dvepl_backup_history');
+      if (savedBackupHistory) setBackupHistory(JSON.parse(savedBackupHistory));
 
+      // Now sync from backend store source of truth
+      try {
+        await store.fetchSettings();
+        const settings = store.settings || {};
+        if (settings.orderFields) setOrderFields(settings.orderFields);
+        if (settings.concernedPersons) setConcernedPersons(settings.concernedPersons);
+        if (settings.waSettings) setWaSettings(sanitizeObject(settings.waSettings, defaultWaSettings));
+        if (settings.emailSettings) setEmailSettings(sanitizeObject(settings.emailSettings, defaultEmailSettings));
+        if (settings.alertEvents) setAlertEvents(settings.alertEvents);
+        if (settings.autoSendDefaults) setAutoSendDefaults(settings.autoSendDefaults);
+        if (settings.smtpSettings) {
+          const mappedSmtp = {
+            ...settings.smtpSettings,
+            email: settings.smtpSettings.email || settings.smtpSettings.username || '',
+          };
+          setSmtpSettings(sanitizeObject(mappedSmtp, defaultSmtpSettings));
+          if (mappedSmtp.host) {
+            setIsEditingSmtp(false);
+          } else {
+            setIsEditingSmtp(true);
+          }
+        }
+        if (settings.captchaSettings) setCaptchaSettings(sanitizeObject(settings.captchaSettings, defaultCaptchaSettings));
+        if (settings.gatewaySettings) {
+          const mappedGateway = {
+            ...settings.gatewaySettings,
+            baseUrl: settings.gatewaySettings.baseUrl || settings.gatewaySettings.instanceId || '',
+          };
+          setGatewaySettings(sanitizeObject(mappedGateway, defaultGatewaySettings));
+          if (mappedGateway.baseUrl) {
+            setIsEditingGateway(false);
+          } else {
+            setIsEditingGateway(true);
+          }
+        }
+        if (settings.templates) setTemplates(settings.templates);
+        if (settings.brandColor) {
+          setBrandColor(settings.brandColor);
+          try {
+            const hslVal = hexToHslString(settings.brandColor);
+            document.documentElement.style.setProperty('--primary', hslVal);
+          } catch (e) {
+            document.documentElement.style.setProperty('--primary', settings.brandColor);
+          }
+        }
+        if (settings.bgColor) setBgColor(settings.bgColor);
+        if (settings.sidebarPos) setSidebarPos(settings.sidebarPos);
+        if (settings.backupHistory) setBackupHistory(settings.backupHistory);
+      } catch (err) {
+        console.error("Backend settings fetch failed", err);
+      }
+    };
 
+    initSettings();
   }, []);
 
   // Filtered Users
   const filteredUsers = useMemo(() => {
     return users.filter(u =>
-      u.name.toLowerCase().includes(userSearch.toLowerCase()) ||
-      u.email.toLowerCase().includes(userSearch.toLowerCase()) ||
-      u.role.toLowerCase().includes(userSearch.toLowerCase())
+      (u.name || '').toLowerCase().includes(userSearch.toLowerCase()) ||
+      (u.email || '').toLowerCase().includes(userSearch.toLowerCase()) ||
+      (u.role || '').toLowerCase().includes(userSearch.toLowerCase())
     );
   }, [users, userSearch]);
 
@@ -569,18 +682,44 @@ export function SettingsPage() {
 
   // 2. Create User Handlers
   const handleCreateUser = async () => {
-    if (!newUserName || !newUserEmail || !newUserPassword || !newUserRole) {
-      toast.error('Please fill in Name, Email, Password and Role');
+    const errors: Record<string, boolean> = {};
+
+    if (!newUserName.trim() || newUserName.trim().length < 2) {
+      errors.name = true;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!newUserEmail.trim() || !emailRegex.test(newUserEmail.trim())) {
+      errors.email = true;
+    }
+    if (!newUserPassword || newUserPassword.length < 4) {
+      errors.password = true;
+    }
+    if (!newUserRole) {
+      errors.role = true;
+    }
+    if (newUserPhone) {
+      const phoneRegex = /^\+?[\d\s-]{10,15}$/;
+      if (!phoneRegex.test(newUserPhone.trim())) {
+        errors.phone = true;
+      }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      toast.error('Please correct the highlighted fields');
       return;
     }
+
+    setFormErrors({});
+
     try {
       await securityApi.users.create({
-        name: newUserName,
-        email: newUserEmail,
+        name: newUserName.trim(),
+        email: newUserEmail.trim().toLowerCase(),
         password: newUserPassword,
         role: newUserRole,
-        designation: newUserDesignation || undefined,
-        phone: newUserPhone || undefined,
+        designation: newUserDesignation.trim() || undefined,
+        phone: newUserPhone.trim() || undefined,
       });
       toast.success('User created successfully');
       // Reset form
@@ -590,57 +729,129 @@ export function SettingsPage() {
       setNewUserDesignation('');
       setNewUserPhone('');
       setNewUserRole('');
+      setFormErrors({});
       loadUsersList();
       setActiveSection('manage-users');
-    } catch (err) {
-      toast.error('Failed to create user');
+    } catch (err: any) {
+      const errMsg = err.response?.data?.message || err.message || 'Failed to create user';
+      toast.error(errMsg);
     }
   };
 
-  // Bulk Excel import simulator
+  // Bulk Excel import
   const handleBulkFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setBulkFile(file);
 
-    // Simulate reading preview from file
-    setBulkPreview([
-      { name: 'Ritesh Kumar', email: 'ritesh@dvepl.com', role: 'sales', designation: 'Sales Manager', status: 'Ready' },
-      { name: 'Harpreet Kaur', email: 'harpreet@dvepl.com', role: 'accounts', designation: 'Accountant', status: 'Ready' },
-      { name: 'Vijay Verma', email: 'vijay@dvepl.com', role: 'production', designation: 'Production Supervisor', status: 'Ready' }
-    ]);
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const workbook = XLSX.read(bstr, { type: 'binary' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json<any>(worksheet);
+
+        // Map keys to preview table headers
+        const headerMap: Record<string, string> = {
+          "name": "name",
+          "email": "email",
+          "phone": "phone",
+          "password": "password",
+          "role": "role",
+          "designation": "designation",
+        };
+
+        const parsedPreview = rows.map((rawRow: any) => {
+          const row: any = {};
+          for (const key of Object.keys(rawRow)) {
+            const cleanKey = key.trim().toLowerCase();
+            const mappedKey = headerMap[cleanKey] || key;
+            row[mappedKey] = rawRow[key];
+          }
+          return {
+            name: row.name || 'N/A',
+            email: row.email || 'N/A',
+            role: row.role || 'N/A',
+            designation: row.designation || 'Team Member',
+            status: row.email ? 'Ready' : 'Invalid Row (No Email)',
+          };
+        });
+
+        setBulkPreview(parsedPreview);
+      } catch (err) {
+        toast.error('Failed to parse Excel file preview');
+      }
+    };
+    reader.readAsBinaryString(file);
   };
 
-  const handleBulkImport = () => {
+  const handleBulkImport = async () => {
     if (!bulkFile) return;
     setBulkStatus('importing');
-    setBulkProgress(0);
+    setBulkProgress(20);
 
-    const interval = setInterval(() => {
-      setBulkProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setBulkStatus('done');
-          setBulkResults({ created: 3, failed: 0 });
-          toast.success('Bulk import completed!');
-          loadUsersList();
-          return 100;
-        }
-        return prev + 25;
-      });
-    }, 400);
+    try {
+      setBulkProgress(50);
+      const res = await (securityApi.users as any).bulkImport(bulkFile);
+      setBulkProgress(100);
+
+      const successCount = res.data?.successCount || 0;
+      const failureCount = res.data?.failureCount || 0;
+
+      setBulkStatus('done');
+      setBulkResults({ created: successCount, failed: failureCount });
+
+      if (failureCount > 0) {
+        toast.error(`Import finished with ${failureCount} errors. ${successCount} imported successfully.`);
+      } else {
+        toast.success(`All ${successCount} users imported successfully!`);
+      }
+
+      loadUsersList();
+    } catch (err: any) {
+      setBulkStatus('idle');
+      toast.error(err.response?.data?.message || 'Bulk import failed.');
+    }
   };
 
   const downloadExcelTemplate = () => {
-    // Generate CSV template download link
-    const csvContent = "data:text/csv;charset=utf-8,Name,Email,Password,Role,Designation,Phone\nJohn Doe,john@dvepl.com,pass123,sales,Executive,9876543210\n";
-    const encodedUri = encodeURI(csvContent);
+    // Generate true XLSX file template using SheetJS
+    const headers = [["Name", "Email", "Password", "Role", "Designation", "Phone"]];
+    const data = [
+      ["John Doe", "john@dvepl.com", "Dvepl@2026", "admin", "Executive", "9876543210"],
+      ["Jane Smith", "jane@dvepl.com", "Dvepl@2026", "sales", "Manager", "9876543211"]
+    ];
+
+    const worksheet = XLSX.utils.aoa_to_sheet([...headers, ...data]);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Users Template");
+
+    // Write XLSX output to binary format
+    const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbout], { type: "application/octet-stream" });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "DVEPL_Users_Import_Template.csv");
+    link.href = url;
+    link.download = "DVEPL_Users_Import_Template.xlsx";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    toast.success('Excel template downloaded successfully');
+  };
+
+  const updateStoreSettings = async (partialSettings: any) => {
+    try {
+      const current = store.settings || {};
+      const payload = {
+        ...current,
+        ...partialSettings
+      };
+      await store.updateSettings(payload);
+    } catch (e) {
+      console.error("Failed to update settings:", e);
+    }
   };
 
   // 3. Manage Fields Handlers
@@ -648,6 +859,7 @@ export function SettingsPage() {
     const updated = { ...orderFields, [field]: !orderFields[field] };
     setOrderFields(updated);
     localStorage.setItem('dvepl_order_fields', JSON.stringify(updated));
+    updateStoreSettings({ orderFields: updated });
     toast.success('Fields configuration updated');
   };
 
@@ -656,6 +868,7 @@ export function SettingsPage() {
     const updated = [...concernedPersons, newPersonName.trim()];
     setConcernedPersons(updated);
     localStorage.setItem('dvepl_concerned_persons', JSON.stringify(updated));
+    updateStoreSettings({ concernedPersons: updated });
     setNewPersonName('');
     toast.success('Concerned person added');
   };
@@ -664,6 +877,7 @@ export function SettingsPage() {
     const updated = concernedPersons.filter((_, i) => i !== index);
     setConcernedPersons(updated);
     localStorage.setItem('dvepl_concerned_persons', JSON.stringify(updated));
+    updateStoreSettings({ concernedPersons: updated });
     toast.success('Concerned person removed');
   };
 
@@ -673,73 +887,156 @@ export function SettingsPage() {
     localStorage.setItem('dvepl_email_settings', JSON.stringify(emailSettings));
     localStorage.setItem('dvepl_alert_events', JSON.stringify(alertEvents));
     localStorage.setItem('dvepl_auto_send_defaults', JSON.stringify(autoSendDefaults));
+    updateStoreSettings({
+      waSettings,
+      emailSettings,
+      alertEvents,
+      autoSendDefaults
+    });
   };
 
-  const testWaConnection = () => {
+  const testWaConnection = async () => {
     if (!waSettings.number) {
       toast.error('Please enter a valid WhatsApp Number');
       return;
     }
-    toast.promise(
-      new Promise(resolve => setTimeout(resolve, 1500)),
-      {
+    try {
+      const promise = securityApi.settings.testWhatsapp({
+        provider: 'wati',
+        apiKey: gatewaySettings.apiKey,
+        instanceId: gatewaySettings.baseUrl,
+        number: waSettings.number
+      });
+      await toast.promise(promise, {
         loading: 'Sending test WhatsApp message...',
         success: 'Test WhatsApp message sent successfully!',
-        error: 'Failed to send WhatsApp message.',
-      }
-    );
+        error: (err: any) => err?.response?.data?.message || 'Failed to send WhatsApp message.',
+      });
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  const testEmailConnection = () => {
+  const testEmailConnection = async () => {
     if (!emailSettings.address) {
       toast.error('Please enter a valid Email Address');
       return;
     }
-    toast.promise(
-      new Promise(resolve => setTimeout(resolve, 1500)),
-      {
+    try {
+      let customFields = {};
+      if (selectedTestTemplateId) {
+        const template = templates.find(t => t.id === selectedTestTemplateId);
+        if (template) {
+          const replaceVars = (str: string) => {
+            return (str || '')
+              .replace(/\{\$name\}/g, 'John Doe')
+              .replace(/\{\$poNumber\}/g, 'PO-2026-0001')
+              .replace(/\{\$vendorName\}/g, 'Acme Industrial Corp')
+              .replace(/\{\$supportPhone\}/g, smtpSettings.supportPhone || '+91 9876543210')
+              .replace(/\{\$supportEmail\}/g, smtpSettings.supportEmail || 'support@dvepl.com');
+          };
+
+          const finalSubject = replaceVars(template.subject);
+          const finalContent1 = replaceVars(template.content1);
+          const finalContent2 = replaceVars(template.content2);
+
+          const emailText = `${finalContent1}\n\n${finalContent2}`;
+          const emailHtml = `<div style="font-family: sans-serif; font-size: 14px; line-height: 1.5; color: #333;">
+            <p>${finalContent1.replace(/\n/g, '<br>')}</p>
+            ${finalContent2 ? `<hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;" /><p style="color: #666; font-size: 12px;">${finalContent2.replace(/\n/g, '<br>')}</p>` : ''}
+          </div>`;
+
+          customFields = {
+            subject: finalSubject,
+            text: emailText,
+            html: emailHtml,
+          };
+        }
+      }
+
+      const promise = securityApi.settings.sendTestEmail({
+        smtpSettings: {
+          ...smtpSettings,
+          username: smtpSettings.email,
+          secure: smtpSettings.port === 465,
+        },
+        toEmail: emailSettings.address,
+        fromEmail: smtpSettings.email,
+        fromName: smtpSettings.title || "DVEPL ERP",
+        ...customFields
+      });
+      await toast.promise(promise, {
         loading: 'Sending test email...',
         success: 'Test email sent successfully!',
-        error: 'Failed to send email.',
-      }
-    );
+        error: (err: any) => err?.response?.data?.message || 'Failed to send email.',
+      });
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const saveSmtpSettings = () => {
-    localStorage.setItem('dvepl_smtp_settings', JSON.stringify(smtpSettings));
+    const updatedSmtp = {
+      ...smtpSettings,
+      username: smtpSettings.email,
+    };
+    localStorage.setItem('dvepl_smtp_settings', JSON.stringify(updatedSmtp));
+    updateStoreSettings({ smtpSettings: updatedSmtp });
     toast.success('SMTP configuration saved successfully');
+    setIsEditingSmtp(false);
   };
 
-  const testSmtpConnection = () => {
-    toast.promise(
-      new Promise(resolve => setTimeout(resolve, 1500)),
-      {
+  const testSmtpConnection = async () => {
+    try {
+      const promise = securityApi.settings.testSmtp({
+        host: smtpSettings.host,
+        port: smtpSettings.port,
+        username: smtpSettings.email,
+        password: smtpSettings.password,
+        secure: Number(smtpSettings.port) === 465,
+      });
+      await toast.promise(promise, {
         loading: 'Testing SMTP connection...',
         success: 'SMTP server connected successfully!',
-        error: 'SMTP connection failed. Check host and credentials.',
-      }
-    );
+        error: (err: any) => err?.response?.data?.message || 'SMTP connection failed. Check host and credentials.',
+      });
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const saveCaptchaSettings = () => {
     localStorage.setItem('dvepl_captcha_settings', JSON.stringify(captchaSettings));
+    updateStoreSettings({ captchaSettings });
     toast.success('Captcha settings saved');
   };
 
   const saveGatewaySettings = () => {
-    localStorage.setItem('dvepl_whatsapp_gateway', JSON.stringify(gatewaySettings));
+    const updatedGateway = {
+      ...gatewaySettings,
+      instanceId: gatewaySettings.baseUrl,
+    };
+    localStorage.setItem('dvepl_whatsapp_gateway', JSON.stringify(updatedGateway));
+    updateStoreSettings({ gatewaySettings: updatedGateway });
     toast.success('WhatsApp Gateway settings saved');
+    setIsEditingGateway(false);
   };
 
-  const testGateway = () => {
-    toast.promise(
-      new Promise(resolve => setTimeout(resolve, 1500)),
-      {
+  const testGateway = async () => {
+    try {
+      const promise = securityApi.settings.testWhatsapp({
+        provider: 'wati',
+        apiKey: gatewaySettings.apiKey,
+        instanceId: gatewaySettings.baseUrl,
+      });
+      await toast.promise(promise, {
         loading: 'Connecting to Gateway...',
         success: 'Gateway handshake successful!',
-        error: 'Gateway unreachable.',
-      }
-    );
+        error: (err: any) => err?.response?.data?.message || 'Gateway unreachable.',
+      });
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   // Template Handlers
@@ -759,6 +1056,7 @@ export function SettingsPage() {
     }
     setTemplates(updated);
     localStorage.setItem('dvepl_email_templates', JSON.stringify(updated));
+    updateStoreSettings({ templates: updated });
     cancelTemplateForm();
   };
 
@@ -777,6 +1075,7 @@ export function SettingsPage() {
     const updated = templates.filter(t => t.id !== id);
     setTemplates(updated);
     localStorage.setItem('dvepl_email_templates', JSON.stringify(updated));
+    updateStoreSettings({ templates: updated });
     toast.success('Template deleted');
   };
 
@@ -794,6 +1093,7 @@ export function SettingsPage() {
   const selectBrandColor = (color: string) => {
     setBrandColor(color);
     localStorage.setItem('dvepl_brand_color', color);
+    updateStoreSettings({ brandColor: color });
     try {
       const hslVal = hexToHslString(color);
       document.documentElement.style.setProperty('--primary', hslVal);
@@ -806,6 +1106,7 @@ export function SettingsPage() {
   const selectBgColor = (color: string) => {
     setBgColor(color);
     localStorage.setItem('dvepl_bg_color', color);
+    updateStoreSettings({ bgColor: color });
     document.documentElement.style.setProperty('--bg', color);
     toast.success('Background color updated');
   };
@@ -813,6 +1114,7 @@ export function SettingsPage() {
   const selectSidebarPos = (pos: 'left' | 'right') => {
     setSidebarPos(pos);
     localStorage.setItem('dvepl_theme_sidebar_pos', pos);
+    updateStoreSettings({ sidebarPos: pos });
     window.dispatchEvent(new Event('dvepl_sidebar_pos_changed'));
     toast.success(`Sidebar moved to the ${pos}`);
   };
@@ -824,6 +1126,11 @@ export function SettingsPage() {
     localStorage.removeItem('dvepl_brand_color');
     localStorage.removeItem('dvepl_bg_color');
     localStorage.removeItem('dvepl_theme_sidebar_pos');
+    updateStoreSettings({
+      brandColor: '#33cc33',
+      bgColor: '#f8fafc',
+      sidebarPos: 'left'
+    });
     document.documentElement.style.setProperty('--primary', '120 60% 50%'); // HSL coordinates for #33cc33
     document.documentElement.style.setProperty('--bg', '#f8fafc');
     window.dispatchEvent(new Event('dvepl_sidebar_pos_changed'));
@@ -831,40 +1138,45 @@ export function SettingsPage() {
   };
 
   // 6. Backup & Restore
-  const downloadBackup = () => {
-    // Generate JSON backup from active store data
-    const backupData = {
-      timestamp: new Date().toISOString(),
-      theme: store.theme,
-      orderFields,
-      concernedPersons,
-      waSettings,
-      emailSettings,
-      smtpSettings,
-      captchaSettings,
-      gatewaySettings,
-      templates,
-    };
+  const downloadBackup = async () => {
+    try {
+      // Fetch latest backup from backend (merging DB + json settings)
+      const backupData = await securityApi.settings.exportBackup().catch(() => ({
+        timestamp: new Date().toISOString(),
+        theme: store.theme,
+        orderFields,
+        concernedPersons,
+        waSettings,
+        emailSettings,
+        smtpSettings,
+        captchaSettings,
+        gatewaySettings,
+        templates,
+      }));
 
-    const str = JSON.stringify(backupData, null, 2);
-    const blob = new Blob([str], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${backupFilename || 'DVEPL_Backup'}_${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+      const str = JSON.stringify(backupData, null, 2);
+      const blob = new Blob([str], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${backupFilename || 'DVEPL_Backup'}_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
 
-    // Save to backup history
-    const newHistory = [
-      { id: Date.now().toString(), filename: `${backupFilename || 'DVEPL_Backup'}.json`, size: `${(str.length / 1024).toFixed(2)} KB`, date: new Date().toLocaleString(), modules: backupModules.join(', ') },
-      ...backupHistory
-    ];
-    setBackupHistory(newHistory);
-    localStorage.setItem('dvepl_backup_history', JSON.stringify(newHistory));
+      // Save to backup history
+      const newHistory = [
+        { id: Date.now().toString(), filename: `${backupFilename || 'DVEPL_Backup'}.json`, size: `${(str.length / 1024).toFixed(2)} KB`, date: new Date().toLocaleString(), modules: backupModules.join(', ') },
+        ...backupHistory
+      ];
+      setBackupHistory(newHistory);
+      localStorage.setItem('dvepl_backup_history', JSON.stringify(newHistory));
+      updateStoreSettings({ backupHistory: newHistory });
 
-    toast.success('Backup file generated and downloaded');
+      toast.success('Backup file generated and downloaded');
+    } catch (error) {
+      toast.error('Failed to generate backup.');
+    }
   };
 
   const restoreBackup = () => {
@@ -874,33 +1186,45 @@ export function SettingsPage() {
     }
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const data = JSON.parse(e.target?.result as string);
+
+        // Push the restore data to the backend settings and database
+        await securityApi.settings.importBackup(data).catch(() => { });
+
+        const payload: any = {};
         if (data.orderFields) {
           setOrderFields(data.orderFields);
+          payload.orderFields = data.orderFields;
           localStorage.setItem('dvepl_order_fields', JSON.stringify(data.orderFields));
         }
         if (data.concernedPersons) {
           setConcernedPersons(data.concernedPersons);
+          payload.concernedPersons = data.concernedPersons;
           localStorage.setItem('dvepl_concerned_persons', JSON.stringify(data.concernedPersons));
         }
         if (data.waSettings) {
           setWaSettings(data.waSettings);
+          payload.waSettings = data.waSettings;
           localStorage.setItem('dvepl_whatsapp_settings', JSON.stringify(data.waSettings));
         }
         if (data.emailSettings) {
           setEmailSettings(data.emailSettings);
+          payload.emailSettings = data.emailSettings;
           localStorage.setItem('dvepl_email_settings', JSON.stringify(data.emailSettings));
         }
         if (data.smtpSettings) {
           setSmtpSettings(data.smtpSettings);
+          payload.smtpSettings = data.smtpSettings;
           localStorage.setItem('dvepl_smtp_settings', JSON.stringify(data.smtpSettings));
         }
         if (data.templates) {
           setTemplates(data.templates);
+          payload.templates = data.templates;
           localStorage.setItem('dvepl_email_templates', JSON.stringify(data.templates));
         }
+        updateStoreSettings(payload);
         toast.success('Backup restored successfully!');
       } catch (err) {
         toast.error('Failed to parse backup file. Please use a valid DVEPL Backup JSON file.');
@@ -910,6 +1234,16 @@ export function SettingsPage() {
   };
 
 
+
+  const rolesList = store.roles && store.roles.length > 0 ? store.roles : [
+    { id: '1', name: 'Admin' },
+    { id: '2', name: 'Sales Executive' },
+    { id: '3', name: 'Project Manager' },
+    { id: '4', name: 'Procurement Manager' },
+    { id: '5', name: 'Accounts Team' },
+    { id: '6', name: 'Production Team' },
+    { id: '7', name: 'User' }
+  ];
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto px-4 pb-12">
@@ -1126,7 +1460,7 @@ export function SettingsPage() {
                       onChange={(e) => setNewUserName(e.target.value)}
                       placeholder="e.g. Rahul Sharma"
                       autoComplete="new-user-name"
-                      className="w-full px-3.5 py-2 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
+                      className={`w-full px-3.5 py-2 text-xs border bg-card rounded-lg outline-none focus:border-primary ${formErrors.name ? 'border-red-500 shake-input' : 'border-border'}`}
                     />
                   </div>
                   <div className="space-y-1">
@@ -1137,32 +1471,52 @@ export function SettingsPage() {
                       onChange={(e) => setNewUserEmail(e.target.value)}
                       placeholder="e.g. rahul@dvepl.com"
                       autoComplete="new-user-email"
-                      className="w-full px-3.5 py-2 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
+                      className={`w-full px-3.5 py-2 text-xs border bg-card rounded-lg outline-none focus:border-primary ${formErrors.email ? 'border-red-500 shake-input' : 'border-border'}`}
                     />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Password *</label>
-                    <input
-                      type="password"
-                      value={newUserPassword}
-                      onChange={(e) => setNewUserPassword(e.target.value)}
-                      placeholder="••••••••"
-                      autoComplete="new-password"
-                      className="w-full px-3.5 py-2 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showNewUserPassword ? "text" : "password"}
+                        value={newUserPassword}
+                        onChange={(e) => setNewUserPassword(e.target.value)}
+                        placeholder="••••••••"
+                        autoComplete="new-password"
+                        className={`w-full pl-3.5 pr-10 py-2 text-xs border bg-card rounded-lg outline-none focus:border-primary ${formErrors.password ? 'border-red-500 shake-input' : 'border-border'}`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowNewUserPassword(!showNewUserPassword)}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground hover:text-foreground focus:outline-none"
+                      >
+                        {showNewUserPassword ? (
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                          </svg>
+                        ) : (
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
                   </div>
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Designation</label>
-                    <input
-                      type="text"
+                    <select
                       value={newUserDesignation}
                       onChange={(e) => setNewUserDesignation(e.target.value)}
-                      placeholder="e.g. Sales Executive"
-                      autoComplete="new-user-designation"
                       className="w-full px-3.5 py-2 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
-                    />
+                    >
+                      <option value="">— Select Designation —</option>
+                      {designationsList.map((d: any) => (
+                        <option key={d.id} value={d.title}>{d.title}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1174,7 +1528,7 @@ export function SettingsPage() {
                       onChange={(e) => setNewUserPhone(e.target.value)}
                       placeholder="e.g. 9876543210"
                       autoComplete="new-user-phone"
-                      className="w-full px-3.5 py-2 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
+                      className={`w-full px-3.5 py-2 text-xs border bg-card rounded-lg outline-none focus:border-primary ${formErrors.phone ? 'border-red-500 shake-input' : 'border-border'}`}
                     />
                   </div>
                   <div className="space-y-1">
@@ -1182,23 +1536,19 @@ export function SettingsPage() {
                     <select
                       value={newUserRole}
                       onChange={(e) => setNewUserRole(e.target.value)}
-                      className="w-full px-3.5 py-2 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
+                      className={`w-full px-3.5 py-2 text-xs border bg-card rounded-lg outline-none focus:border-primary ${formErrors.role ? 'border-red-500 shake-input' : 'border-border'}`}
                     >
                       <option value="">— Select a role —</option>
-                      <option value="admin">Admin</option>
-                      <option value="sales">Sales Executive</option>
-                      <option value="project">Project Manager</option>
-                      <option value="procurement">Procurement Manager</option>
-                      <option value="accounts">Accounts Team</option>
-                      <option value="production">Production Team</option>
-                      <option value="user">User</option>
+                      {rolesList.map(r => (
+                        <option key={r.id} value={r.name.toLowerCase()}>{r.name}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
                 <div className="border-t border-border pt-4 flex justify-end gap-2">
                   <button
                     type="button"
-                    onClick={() => setActiveSection('manage-users')}
+                    onClick={() => { setActiveSection('manage-users'); setFormErrors({}); }}
                     className="px-4 py-2 border border-border rounded-lg bg-card text-xs font-bold text-muted-foreground hover:text-foreground transition"
                   >
                     Cancel
@@ -1219,7 +1569,7 @@ export function SettingsPage() {
                 <div className="section-icon">📊</div>
                 <div>
                   <div className="section-title">Bulk Import Users</div>
-                  <div className="section-desc">Create multiple accounts by uploading an Excel or CSV file.</div>
+                  <div className="section-desc">Create multiple accounts by uploading an Excel file.</div>
                 </div>
               </div>
               <div className="section-body space-y-4">
@@ -1236,10 +1586,10 @@ export function SettingsPage() {
                   </button>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Select CSV/Excel File</label>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Select Excel File</label>
                   <input
                     type="file"
-                    accept=".csv,.xls,.xlsx"
+                    accept=".xls,.xlsx"
                     onChange={handleBulkFileChange}
                     className="w-full p-2 border border-border bg-card rounded-lg text-xs"
                   />
@@ -1336,7 +1686,7 @@ export function SettingsPage() {
               Your profile — details, passwords, activity audit logs and security settings — are managed on the dedicated Profile control page.
             </div>
             <button
-              onClick={() => window.location.href = '/settings/profile'}
+              onClick={() => window.location.href = '/profile'}
               className="btn-goto-profile"
             >
               🪪 Go to My Profile &nbsp;→
@@ -1467,6 +1817,19 @@ export function SettingsPage() {
                         className="w-full px-3 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
                       />
                     </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Test Template (Optional)</label>
+                      <select
+                        value={selectedTestTemplateId}
+                        onChange={(e) => setSelectedTestTemplateId(e.target.value)}
+                        className="w-full px-3 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
+                      >
+                        <option value="">Default Test Message</option>
+                        {templates.map(t => (
+                          <option key={t.id} value={t.id}>{t.name} ({t.type})</option>
+                        ))}
+                      </select>
+                    </div>
                     <div className="space-y-2">
                       <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Channel Preferences</div>
                       <div className="space-y-1.5">
@@ -1568,116 +1931,204 @@ export function SettingsPage() {
           )}
 
           {/* SMTP settings tab */}
+          {/* SMTP settings tab */}
           {notifTab === 'smtp' && (
             <div className="section-card">
-              <div className="section-header">
-                <div className="section-icon">📧</div>
-                <div>
-                  <div className="section-title">SMTP Mail Configuration</div>
-                  <div className="section-desc">Manage credentials for outgoing server. Required for order pdf mailing.</div>
+              <div className="section-header flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="section-icon">📧</div>
+                  <div>
+                    <div className="section-title">SMTP Mail Configuration</div>
+                    <div className="section-desc">Manage credentials for outgoing server. Required for order pdf mailing.</div>
+                  </div>
                 </div>
+                {!isEditingSmtp && (
+                  <button
+                    onClick={() => setIsEditingSmtp(true)}
+                    className="px-3.5 py-1.5 bg-primary text-white font-bold rounded-lg text-xs hover:bg-primary/95 transition shadow-sm"
+                  >
+                    ✏️ Edit Configuration
+                  </button>
+                )}
               </div>
-              <div className="section-body space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Sender Name / Title *</label>
-                    <input
-                      type="text"
-                      value={smtpSettings.title}
-                      onChange={(e) => setSmtpSettings({ ...smtpSettings, title: e.target.value })}
-                      placeholder="e.g. DVEPL PO Service"
-                      className="w-full px-3 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">SMTP Email Address *</label>
-                    <input
-                      type="email"
-                      value={smtpSettings.email}
-                      onChange={(e) => setSmtpSettings({ ...smtpSettings, email: e.target.value })}
-                      placeholder="e.g. alerts@dvepl.com"
-                      className="w-full px-3 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
-                    />
+
+              {!isEditingSmtp ? (
+                <div className="overflow-x-auto p-4 space-y-4">
+                  <table className="w-full text-xs text-left border-collapse border border-border rounded-lg overflow-hidden">
+                    <thead className="bg-muted/15 border-b border-border">
+                      <tr>
+                        <th className="p-3 font-bold text-muted-foreground w-1/3">Setting Field</th>
+                        <th className="p-3 font-bold text-muted-foreground w-2/3">Configured Value</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      <tr className="hover:bg-muted/5">
+                        <td className="p-3 font-semibold">Sender Name / Title</td>
+                        <td className="p-3 text-foreground">{smtpSettings.title || <span className="text-muted-foreground italic">Not set</span>}</td>
+                      </tr>
+                      <tr className="hover:bg-muted/5">
+                        <td className="p-3 font-semibold">SMTP Email Address (Username)</td>
+                        <td className="p-3 text-foreground">{smtpSettings.email || <span className="text-muted-foreground italic">Not set</span>}</td>
+                      </tr>
+                      <tr className="hover:bg-muted/5">
+                        <td className="p-3 font-semibold">SMTP Host Server</td>
+                        <td className="p-3 text-foreground">{smtpSettings.host || <span className="text-muted-foreground italic">Not set</span>}</td>
+                      </tr>
+                      <tr className="hover:bg-muted/5">
+                        <td className="p-3 font-semibold">SMTP Port</td>
+                        <td className="p-3 text-foreground">{smtpSettings.port || <span className="text-muted-foreground italic">Not set</span>}</td>
+                      </tr>
+                      <tr className="hover:bg-muted/5">
+                        <td className="p-3 font-semibold">Security (SSL/TLS)</td>
+                        <td className="p-3 text-foreground">
+                          {Number(smtpSettings.port) === 465 ? (
+                            <span className="role-badge user">SSL/TLS (Port 465)</span>
+                          ) : (
+                            <span className="role-badge">STARTTLS (Port {smtpSettings.port || '587'})</span>
+                          )}
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-muted/5">
+                        <td className="p-3 font-semibold">Support Contact Phone</td>
+                        <td className="p-3 text-foreground">{smtpSettings.supportPhone || <span className="text-muted-foreground italic">Not set</span>}</td>
+                      </tr>
+                      <tr className="hover:bg-muted/5">
+                        <td className="p-3 font-semibold">Registered Office Address</td>
+                        <td className="p-3 text-foreground">{smtpSettings.address || <span className="text-muted-foreground italic">Not set</span>}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+
+                  <div className="pt-2 flex gap-2">
+                    <button
+                      onClick={testSmtpConnection}
+                      className="px-4 py-2 border border-border rounded-lg bg-card text-xs font-bold text-muted-foreground hover:text-foreground transition"
+                    >
+                      ✉️ Test SMTP Connection
+                    </button>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">SMTP Password *</label>
-                    <div className="relative">
+              ) : (
+                <div className="section-body space-y-4">
+                  {/* Dummy inputs to intercept and prevent browser autofill */}
+                  <input type="text" name="prevent_autofill_username" style={{ display: 'none' }} autoComplete="off" />
+                  <input type="password" name="prevent_autofill_password" style={{ display: 'none' }} autoComplete="new-password" />
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Sender Name / Title *</label>
                       <input
-                        type={showSmtpPass ? 'text' : 'password'}
-                        value={smtpSettings.password}
-                        onChange={(e) => setSmtpSettings({ ...smtpSettings, password: e.target.value })}
-                        placeholder="••••••••"
-                        className="w-full px-3 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary pr-8"
+                        type="text"
+                        name="smtp_sender_title"
+                        autoComplete="off"
+                        value={smtpSettings.title}
+                        onChange={(e) => setSmtpSettings({ ...smtpSettings, title: e.target.value })}
+                        placeholder="e.g. DVEPL PO Service"
+                        className="w-full px-3 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
                       />
-                      <button
-                        type="button"
-                        onClick={() => setShowSmtpPass(!showSmtpPass)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
-                      >
-                        {showSmtpPass ? '🙈' : '👁️'}
-                      </button>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">SMTP Email Address *</label>
+                      <input
+                        type="text"
+                        name="smtp_email_address"
+                        autoComplete="new-password"
+                        value={smtpSettings.email}
+                        onChange={(e) => setSmtpSettings({ ...smtpSettings, email: e.target.value })}
+                        placeholder="e.g. alerts@dvepl.com"
+                        className="w-full px-3 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">SMTP Password *</label>
+                      <div className="relative">
+                        <input
+                          type={showSmtpPass ? 'text' : 'password'}
+                          name="smtp_email_password"
+                          autoComplete="new-password"
+                          value={smtpSettings.password}
+                          onChange={(e) => setSmtpSettings({ ...smtpSettings, password: e.target.value })}
+                          placeholder="••••••••"
+                          className="w-full px-3 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary pr-8"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowSmtpPass(!showSmtpPass)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none flex items-center justify-center"
+                        >
+                          {showSmtpPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">SMTP Host Server *</label>
+                      <input
+                        type="text"
+                        value={smtpSettings.host}
+                        onChange={(e) => setSmtpSettings({ ...smtpSettings, host: e.target.value })}
+                        placeholder="smtp.gmail.com"
+                        className="w-full px-3 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">SMTP Port *</label>
+                      <input
+                        type="number"
+                        value={smtpSettings.port}
+                        onChange={(e) => setSmtpSettings({ ...smtpSettings, port: parseInt(e.target.value) || 587 })}
+                        placeholder="587"
+                        className="w-full px-3 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Support Contact Phone</label>
+                      <input
+                        type="text"
+                        value={smtpSettings.supportPhone}
+                        onChange={(e) => setSmtpSettings({ ...smtpSettings, supportPhone: e.target.value })}
+                        placeholder="e.g. +91 94176 01244"
+                        className="w-full px-3 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
+                      />
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">SMTP Host Server *</label>
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Registered Office Address</label>
                     <input
                       type="text"
-                      value={smtpSettings.host}
-                      onChange={(e) => setSmtpSettings({ ...smtpSettings, host: e.target.value })}
-                      placeholder="smtp.gmail.com"
+                      value={smtpSettings.address}
+                      onChange={(e) => setSmtpSettings({ ...smtpSettings, address: e.target.value })}
+                      placeholder="Ranipur, Pathankot, Punjab"
                       className="w-full px-3 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
                     />
                   </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">SMTP Port *</label>
-                    <input
-                      type="number"
-                      value={smtpSettings.port}
-                      onChange={(e) => setSmtpSettings({ ...smtpSettings, port: parseInt(e.target.value) || 587 })}
-                      placeholder="587"
-                      className="w-full px-3 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
-                    />
+                  <div className="border-t border-border pt-4 flex gap-2">
+                    <button
+                      onClick={saveSmtpSettings}
+                      className="px-4 py-2 bg-primary text-white font-bold rounded-lg text-xs hover:bg-primary/95 transition shadow-sm"
+                    >
+                      💾 Save SMTP Settings
+                    </button>
+                    {smtpSettings.host && (
+                      <button
+                        onClick={() => setIsEditingSmtp(false)}
+                        className="px-4 py-2 border border-border rounded-lg bg-card text-xs font-bold text-muted-foreground hover:text-foreground transition"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                    <button
+                      onClick={testSmtpConnection}
+                      className="px-4 py-2 border border-border rounded-lg bg-card text-xs font-bold text-muted-foreground hover:text-foreground transition"
+                    >
+                      ✉️ Test SMTP
+                    </button>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Support Contact Phone</label>
-                    <input
-                      type="text"
-                      value={smtpSettings.supportPhone}
-                      onChange={(e) => setSmtpSettings({ ...smtpSettings, supportPhone: e.target.value })}
-                      placeholder="e.g. +91 94176 01244"
-                      className="w-full px-3 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
-                    />
-                  </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Registered Office Address</label>
-                  <input
-                    type="text"
-                    value={smtpSettings.address}
-                    onChange={(e) => setSmtpSettings({ ...smtpSettings, address: e.target.value })}
-                    placeholder="Ranipur, Pathankot, Punjab"
-                    className="w-full px-3 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
-                  />
-                </div>
-                <div className="border-t border-border pt-4 flex gap-2">
-                  <button
-                    onClick={saveSmtpSettings}
-                    className="px-4 py-2 bg-primary text-white font-bold rounded-lg text-xs hover:bg-primary/95 transition shadow-sm"
-                  >
-                    💾 Save SMTP Settings
-                  </button>
-                  <button
-                    onClick={testSmtpConnection}
-                    className="px-4 py-2 border border-border rounded-lg bg-card text-xs font-bold text-muted-foreground hover:text-foreground transition"
-                  >
-                    ✉️ Test SMTP
-                  </button>
-                </div>
-              </div>
+              )}
             </div>
           )}
 
@@ -1893,72 +2344,147 @@ export function SettingsPage() {
           {/* WhatsApp Gateway settings tab */}
           {notifTab === 'gateway' && (
             <div className="section-card">
-              <div className="section-header">
-                <div className="section-icon">💬</div>
-                <div>
-                  <div className="section-title">WhatsApp Gateway Settings</div>
-                  <div className="section-desc">Manage API endpoints for sending automated WhatsApp text orders.</div>
-                </div>
-              </div>
-              <div className="section-body space-y-4">
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">API Base URL</label>
-                    <input
-                      type="text"
-                      value={gatewaySettings.baseUrl}
-                      onChange={(e) => setGatewaySettings({ ...gatewaySettings, baseUrl: e.target.value })}
-                      placeholder="e.g. https://api.whatsapp-gateway.dvepl.com"
-                      className="w-full px-3 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">API Authorization Key</label>
-                    <input
-                      type="text"
-                      value={gatewaySettings.apiKey}
-                      onChange={(e) => setGatewaySettings({ ...gatewaySettings, apiKey: e.target.value })}
-                      placeholder="ak_dvepl_whatsapp_..."
-                      className="w-full px-3 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">HMAC Signature Secret Key</label>
-                    <input
-                      type="password"
-                      value={gatewaySettings.secretKey}
-                      onChange={(e) => setGatewaySettings({ ...gatewaySettings, secretKey: e.target.value })}
-                      placeholder="••••••••••••••••••••••••••••••••"
-                      className="w-full px-3 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
-                    />
+              <div className="section-header flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <div className="section-icon">💬</div>
+                  <div>
+                    <div className="section-title">WhatsApp Gateway Settings</div>
+                    <div className="section-desc">Manage API endpoints for sending automated WhatsApp text orders.</div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <label className="toggle-wrap">
-                    <input
-                      type="checkbox"
-                      checked={gatewaySettings.enabled}
-                      onChange={(e) => setGatewaySettings({ ...gatewaySettings, enabled: e.target.checked })}
-                    />
-                    <span className="toggle-slider"></span>
-                  </label>
-                  <span className="text-xs font-semibold text-foreground">Activate custom Gateway Integration</span>
-                </div>
-                <div className="border-t border-border pt-4 flex gap-2">
+                {!isEditingGateway && gatewaySettings.baseUrl && (
                   <button
-                    onClick={saveGatewaySettings}
-                    className="px-4 py-2 bg-primary text-white font-bold rounded-lg text-xs hover:bg-primary/95 transition shadow-sm"
+                    onClick={() => setIsEditingGateway(true)}
+                    className="px-3.5 py-1.5 bg-primary text-white font-bold rounded-lg text-xs hover:bg-primary/95 transition shadow-sm"
                   >
-                    💾 Save Gateway
+                    ✏️ Edit Configuration
                   </button>
-                  <button
-                    onClick={testGateway}
-                    className="px-4 py-2 border border-border rounded-lg bg-card text-xs font-bold text-muted-foreground hover:text-foreground transition"
-                  >
-                    🔌 Test Gateway
-                  </button>
-                </div>
+                )}
               </div>
+
+              {!isEditingGateway && gatewaySettings.baseUrl ? (
+                <div className="overflow-x-auto p-4 space-y-4">
+                  <table className="w-full text-xs text-left border-collapse border border-border rounded-lg overflow-hidden">
+                    <thead className="bg-muted/15 border-b border-border">
+                      <tr>
+                        <th className="p-3 font-bold text-muted-foreground w-1/3">Setting Field</th>
+                        <th className="p-3 font-bold text-muted-foreground w-2/3">Configured Value</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      <tr className="hover:bg-muted/5">
+                        <td className="p-3 font-semibold">API Base URL</td>
+                        <td className="p-3 text-foreground">{gatewaySettings.baseUrl || <span className="text-muted-foreground italic">Not set</span>}</td>
+                      </tr>
+                      <tr className="hover:bg-muted/5">
+                        <td className="p-3 font-semibold">API Authorization Key</td>
+                        <td className="p-3 text-foreground">{gatewaySettings.apiKey || <span className="text-muted-foreground italic">Not set</span>}</td>
+                      </tr>
+                      <tr className="hover:bg-muted/5">
+                        <td className="p-3 font-semibold">HMAC Secret Key</td>
+                        <td className="p-3 text-foreground">{gatewaySettings.secretKey ? '••••••••••••••••' : <span className="text-muted-foreground italic">Not set</span>}</td>
+                      </tr>
+                      <tr className="hover:bg-muted/5">
+                        <td className="p-3 font-semibold">Status / Integration</td>
+                        <td className="p-3 text-foreground">
+                          {gatewaySettings.enabled ? (
+                            <span className="role-badge user">Active / Live</span>
+                          ) : (
+                            <span className="role-badge">Inactive / Disabled</span>
+                          )}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+
+                  <div className="pt-2 flex gap-2">
+                    <button
+                      onClick={testGateway}
+                      className="px-4 py-2 border border-border rounded-lg bg-card text-xs font-bold text-muted-foreground hover:text-foreground transition"
+                    >
+                      🔌 Test Gateway Handshake
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="section-body space-y-4">
+                  {/* Dummy inputs to intercept and prevent browser autofill */}
+                  <input type="text" name="prevent_autofill_username" style={{ display: 'none' }} autoComplete="off" />
+                  <input type="password" name="prevent_autofill_password" style={{ display: 'none' }} autoComplete="new-password" />
+
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">API Base URL</label>
+                      <input
+                        type="text"
+                        name="wa_gateway_base_url"
+                        autoComplete="off"
+                        value={gatewaySettings.baseUrl}
+                        onChange={(e) => setGatewaySettings({ ...gatewaySettings, baseUrl: e.target.value })}
+                        placeholder="e.g. https://api.whatsapp-gateway.dvepl.com"
+                        className="w-full px-3 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">API Authorization Key</label>
+                      <input
+                        type="text"
+                        name="wa_gateway_api_key"
+                        autoComplete="new-password"
+                        value={gatewaySettings.apiKey}
+                        onChange={(e) => setGatewaySettings({ ...gatewaySettings, apiKey: e.target.value })}
+                        placeholder="ak_dvepl_whatsapp_..."
+                        className="w-full px-3 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">HMAC Signature Secret Key</label>
+                      <input
+                        type="password"
+                        name="wa_gateway_secret_key"
+                        autoComplete="new-password"
+                        value={gatewaySettings.secretKey}
+                        onChange={(e) => setGatewaySettings({ ...gatewaySettings, secretKey: e.target.value })}
+                        placeholder="••••••••••••••••••••••••••••••••"
+                        className="w-full px-3 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="toggle-wrap">
+                      <input
+                        type="checkbox"
+                        checked={gatewaySettings.enabled}
+                        onChange={(e) => setGatewaySettings({ ...gatewaySettings, enabled: e.target.checked })}
+                      />
+                      <span className="toggle-slider"></span>
+                    </label>
+                    <span className="text-xs font-semibold text-foreground">Activate custom Gateway Integration</span>
+                  </div>
+                  <div className="border-t border-border pt-4 flex gap-2">
+                    <button
+                      onClick={saveGatewaySettings}
+                      className="px-4 py-2 bg-primary text-white font-bold rounded-lg text-xs hover:bg-primary/95 transition shadow-sm"
+                    >
+                      💾 Save Gateway
+                    </button>
+                    {gatewaySettings.baseUrl && (
+                      <button
+                        onClick={() => setIsEditingGateway(false)}
+                        className="px-4 py-2 border border-border rounded-lg bg-card text-xs font-bold text-muted-foreground hover:text-foreground transition"
+                      >
+                        Cancel
+                      </button>
+                    )}
+                    <button
+                      onClick={testGateway}
+                      className="px-4 py-2 border border-border rounded-lg bg-card text-xs font-bold text-muted-foreground hover:text-foreground transition"
+                    >
+                      🔌 Test Gateway
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -2277,12 +2803,16 @@ export function SettingsPage() {
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Designation</label>
-                <input
-                  type="text"
+                <select
                   value={editingUser.designation || ''}
                   onChange={(e) => setEditingUser({ ...editingUser, designation: e.target.value })}
                   className="w-full px-3 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
-                />
+                >
+                  <option value="">— Select Designation —</option>
+                  {designationsList.map((d: any) => (
+                    <option key={d.id} value={d.title}>{d.title}</option>
+                  ))}
+                </select>
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">User Role</label>
@@ -2291,13 +2821,9 @@ export function SettingsPage() {
                   onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value })}
                   className="w-full px-3 py-1.5 text-xs border border-border bg-card rounded-lg outline-none"
                 >
-                  <option value="admin">Admin</option>
-                  <option value="sales">Sales Executive</option>
-                  <option value="project">Project Manager</option>
-                  <option value="procurement">Procurement Manager</option>
-                  <option value="accounts">Accounts Team</option>
-                  <option value="production">Production Team</option>
-                  <option value="user">User</option>
+                  {rolesList.map(r => (
+                    <option key={r.id} value={r.name.toLowerCase()}>{r.name}</option>
+                  ))}
                 </select>
               </div>
             </div>
