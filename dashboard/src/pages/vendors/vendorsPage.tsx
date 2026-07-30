@@ -2100,13 +2100,14 @@ export function VendorsPage() {
 
             {formTab === "products" && (
               <div className="space-y-4">
-                <div className="flex items-center gap-2 border rounded-xl px-3 bg-background shadow-xs focus-within:ring-1 focus-within:ring-primary">
-                  <Search className="size-4 text-muted-foreground" />
-                  <Input
+                <div className="flex items-center gap-2.5 border rounded-xl px-3.5 h-10 bg-background shadow-xs focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all duration-200">
+                  <Search className="size-4 text-primary animate-pulse" />
+                  <input
+                    type="text"
                     placeholder="Search products by name, code, or category..."
                     value={productSearch}
                     onChange={(e) => setProductSearch(e.target.value)}
-                    className="h-9 border-none shadow-none focus-visible:ring-0 px-0"
+                    className="border-0 bg-transparent p-0 focus:ring-0 focus-visible:ring-0 h-full w-full placeholder:text-muted-foreground/75 text-xs text-foreground outline-none"
                   />
                 </div>
 
@@ -2231,8 +2232,9 @@ export function VendorsPage() {
 
           <div className="flex items-center gap-2.5 flex-1 px-4 h-10 bg-transparent">
             <Search className="size-4 text-primary animate-pulse" />
-            <Input
-              className="border-0 bg-transparent p-0 focus-visible:ring-0 focus-visible:ring-offset-0 h-full w-full placeholder:text-muted-foreground/75 text-xs text-foreground"
+            <input
+              type="text"
+              className="border-0 bg-transparent p-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 h-full w-full placeholder:text-muted-foreground/75 text-xs text-foreground outline-none"
               placeholder={
                 searchField === "all"
                   ? "Search vendors by name, category, GST..."
