@@ -7,9 +7,8 @@ import {
 
 async function adminInventoryVendorTrackingRoutes(
   fastify: FastifyInstance,
-  options: FastifyPluginOptions
+  options: FastifyPluginOptions,
 ) {
-
   fastify.get(
     "/",
     {
@@ -21,111 +20,61 @@ async function adminInventoryVendorTrackingRoutes(
       },
     },
 
-    async (
-      request: FastifyRequest,
-      reply: FastifyReply
-    ) => {
-
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-
         const companyId = request.user.companyId;
 
+        const poItems = await fastify.prisma.purchaseOrderItem.findMany({
+          where: {
+            po: {
+              companyId,
+              deletedAt: null,
+            },
+          },
 
-        const poItems =
-          await fastify.prisma.purchaseOrderItem.findMany({
-
-            where: {
-              purchaseOrder: {
-                companyId,
-                deletedAt: null,
+          include: {
+            po: {
+              include: {
+                vendor: true,
               },
             },
 
-
-            include: {
-
-              purchaseOrder: {
-
-                include: {
-                  vendor: true,
-                }
-
-              },
-
-
-              material: true,
-
-
-              goodsReceiptItems: true,
-
-            }
-
-          });
-
-
+            material: true,
+          },
+        });
 
         const tracking = poItems.map((item) => {
+          const orderedQty = Number(item.quantity);
 
+          const receivedQty = 0;
 
-          const orderedQty =
-            Number(item.quantity);
-
-
-
-          const receivedQty =
-            item.goodsReceiptItems.reduce(
-              (sum, grnItem) =>
-                sum + Number(grnItem.acceptedQty || 0),
-              0
-            );
-
-
-
-          const pendingQty =
-            orderedQty - receivedQty;
-
-
+          const pendingQty = orderedQty - receivedQty;
 
           let status = "PENDING";
 
-
-          if(receivedQty === 0){
-
+          if (receivedQty === 0) {
             status = "PENDING";
-
-          }
-          else if(receivedQty < orderedQty){
-
+          } else if (receivedQty < orderedQty) {
             status = "PARTIAL";
-
-          }
-          else{
-
+          } else {
             status = "COMPLETED";
-
           }
-
-
 
           return {
+            poId: item.po.id,
 
-            poId: item.purchaseOrder.id,
-
-            poNo: item.purchaseOrder.poNo,
-
+            poNo: item.po.poNo,
 
             vendor: {
-              id: item.purchaseOrder.vendor?.id,
-              name: item.purchaseOrder.vendor?.name,
+              id: item.po.vendor?.id,
+              name: item.po.vendor?.name,
             },
 
-
-            material:{
-              id:item.material.id,
-              name:item.material.name,
-              code:item.material.materialCode,
+            material: {
+              id: item.material.id,
+              name: item.material.name,
+              code: item.material.materialCode,
             },
-
 
             orderedQty,
 
@@ -133,51 +82,28 @@ async function adminInventoryVendorTrackingRoutes(
 
             pendingQty,
 
-
             status,
-
-
           };
-
-
         });
-
-
 
         return reply.send({
+          success: true,
 
-          success:true,
-
-          data:tracking,
-
+          data: tracking,
         });
-
-
-
-      } catch(error:any){
-
-
+      } catch (error: any) {
         console.error(error);
 
-
         return reply.status(500).send({
+          success: false,
 
-          success:false,
+          message: "Failed to fetch vendor tracking",
 
-          message:
-          "Failed to fetch vendor tracking",
-
-          error:error.message,
-
+          error: error.message,
         });
-
-
       }
-
-    }
+    },
   );
-
 }
-
 
 export default adminInventoryVendorTrackingRoutes;

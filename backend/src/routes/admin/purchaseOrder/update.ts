@@ -5,7 +5,20 @@ import {
   FastifyRequest,
 } from "fastify";
 
-import { Prisma } from "@prisma/client";
+import { Prisma , PurchaseOrderStatus } from "@prisma/client";
+interface UpdatePurchaseOrderBody {
+  vendorId?: string;
+  expectedDelivery?: string | null;
+  paymentTerms?: string;
+  shippingTerms?: string;
+  remarks?: string;
+  status?: PurchaseOrderStatus;
+  items?: {
+    materialId: string;
+    quantity: number;
+    unitPrice: number;
+  }[];
+}
 
 async function adminPurchaseOrderUpdateRoutes(
   fastify: FastifyInstance,
@@ -22,7 +35,7 @@ async function adminPurchaseOrderUpdateRoutes(
     async (
       request: FastifyRequest<{
         Params: { id: string };
-        Body: any;
+        Body: UpdatePurchaseOrderBody;
       }>,
       reply: FastifyReply,
     ) => {

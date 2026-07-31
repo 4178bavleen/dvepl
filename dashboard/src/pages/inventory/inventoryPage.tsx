@@ -998,21 +998,16 @@ export function InventoryPage() {
           >
             <Plus className="size-4" /> Add Item
           </Button>
-          <div className="flex gap-3 border-b mb-5">
-            <button
-              onClick={() => setMainView("inventory")}
-              className={mainView === "inventory" ? "active-tab" : ""}
-            >
-              Inventory
-            </button>
-
-            <button
+    
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setMainView("tracking")}
               className={mainView === "tracking" ? "active-tab" : ""}
             >
               Vendor Tracking
-            </button>
-          </div>
+            </Button>
+        
         </div>
       </div>
 

@@ -80,7 +80,7 @@ async function adminPurchaseOrderCreateRoutes(
         console.log("Vendor ID from payload:", vendorId);
         console.log("User Company ID:", companyId);
 
-        const vendor = await fastify.prisma.customer.findFirst({
+        const vendor = await fastify.prisma.vendor.findFirst({
           where: {
             id: vendorId,
             companyId,

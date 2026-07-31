@@ -53,13 +53,7 @@ async function adminPurchaseOrderReadRoutes(
                 },
               },
 
-              goodsReceipts: {
-                select: {
-                  id: true,
-                  grnNo: true,
-                  receivedDate: true,
-                },
-              },
+           
             },
 
             orderBy: {

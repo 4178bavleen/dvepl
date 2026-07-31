@@ -1719,7 +1719,9 @@ model PurchaseOrder {
   company          Company             @relation(fields: [companyId], references: [id])
   createdBy        User                @relation("PurchaseOrderCreatedBy", fields: [createdById], references: [id])
   request          PurchaseRequest?    @relation(fields: [requestId], references: [id])
-  vendor           Customer            @relation(fields: [vendorId], references: [id])
+  vendor           Vendor              @relation(fields: [vendorId], references: [id])
+  customer         Customer?           @relation(fields: [customerId], references: [id])
+  customerId       String?
 
   @@index([companyId])
   @@index([status])
@@ -2531,8 +2533,9 @@ model Vendor {
   company        Company         @relation(fields: [companyId], references: [id])
   vendorProducts VendorProduct[]
 
-  createdBy             User       @relation("VendorCreatedBy", fields: [createdById], references: [id])
-  preferredForMaterials Material[] @relation("MaterialPreferredVendor")
+  createdBy             User            @relation("VendorCreatedBy", fields: [createdById], references: [id])
+  preferredForMaterials Material[]      @relation("MaterialPreferredVendor")
+  purchaseOrders        PurchaseOrder[]
 
   @@index([companyId])
   @@index([name])
