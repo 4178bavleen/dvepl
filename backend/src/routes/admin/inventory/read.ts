@@ -43,10 +43,20 @@ async function adminInventoryReadRoutes(
   },
 });
 
+        const { CustomFieldService } = await import("../../../services/customFieldService");
+        const cfService = new CustomFieldService(fastify.prisma);
+        const entityIds = items.map(i => i.id);
+        const cfValuesMap = await cfService.getValuesForEntities("inventory", entityIds);
+
+        const itemsWithCF = items.map(i => ({
+          ...i,
+          customFields: cfValuesMap[i.id] || {}
+        }));
+
         return reply.status(200).send({
           success: true,
           message: "Inventory items fetched successfully.",
-          data: items,
+          data: itemsWithCF,
         });
       } catch (error: any) {
         console.error(error);
@@ -101,10 +111,19 @@ async function adminInventoryReadRoutes(
           });
         }
 
+        const { CustomFieldService } = await import("../../../services/customFieldService");
+        const cfService = new CustomFieldService(fastify.prisma);
+        const cfValues = await cfService.getValuesForEntity("inventory", item.id);
+
+        const itemWithCF = {
+          ...item,
+          customFields: cfValues || {}
+        };
+
         return reply.status(200).send({
           success: true,
           message: "Inventory item fetched successfully.",
-          data: item,
+          data: itemWithCF,
         });
       } catch (error: any) {
         console.error(error);

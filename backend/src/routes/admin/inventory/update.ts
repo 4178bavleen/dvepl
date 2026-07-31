@@ -176,11 +176,18 @@ async function adminInventoryUpdateRoutes(
                   : data.unitPrice !== undefined
                     ? new Prisma.Decimal(data.unitPrice)
                     : undefined,
+   
 
               location: data.location !== undefined ? data.location : undefined,
             },
           });
           
+
+          if ((request.body as any)?.customFields) {
+            const { CustomFieldService } = await import("../../../services/customFieldService");
+            const cfService = new CustomFieldService(tx as any);
+            await cfService.saveValues("inventory", id, (request.body as any).customFields);
+          }
 
           return inv;
         });

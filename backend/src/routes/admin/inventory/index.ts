@@ -8,6 +8,7 @@ import adminInventoryStockOutRoutes from "./stockOut";
 import adminInventoryTrackingRoutes from "./tracking";
 import adminInventoryVendorTrackingRoutes from "./vendorTracking/read";
 // import adminVendorReadByIdRoutes from "./readByID";
+import adminInventoryTransactionReadRoutes from "./transactionRead";
 
 async function adminInventoryRouteGroup(
   fastify: FastifyInstance,
@@ -26,6 +27,13 @@ async function adminInventoryRouteGroup(
   fastify.register(adminInventoryVendorTrackingRoutes, {
     prefix: "/vendor-tracking",
   });
+    fastify.register(adminInventoryCreateRoutes, { prefix: "/create" });
+    fastify.register(adminInventoryReadRoutes, { prefix: "/read" });
+    fastify.register(adminInventoryDeleteRoutes, { prefix: "/delete" });
+    fastify.register(adminInventoryUpdateRoutes, { prefix: "/update" });
+    fastify.register(adminInventoryStockInRoutes, { prefix: "/stock-in" });
+    fastify.register(adminInventoryStockOutRoutes, { prefix: "/stock-out" });
+    fastify.register(adminInventoryTransactionReadRoutes, { prefix: "/stock-movement" });
 }
 
 export default adminInventoryRouteGroup;

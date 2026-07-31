@@ -1183,6 +1183,7 @@ export function OrdersPage() {
         onDelete={handleDelete}
         isLoading={isLoading}
         showColumnVisibility={false}
+        storageKey="orders"
       />
 
       {/* Add / Edit Order Modal - matches provided UI mockup */}

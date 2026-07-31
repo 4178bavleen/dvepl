@@ -61,6 +61,7 @@ export const SUPPORTED_FIELD_TYPES = [
   { value: 'radio', label: 'Radio' },
   { value: 'file', label: 'File Upload' },
   { value: 'image', label: 'Image Upload' },
+  { value: 'vendor', label: 'Vendor Select' },
 ];
 
 export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
@@ -70,6 +71,22 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
   errors = {},
   afterFieldPosition
 }) => {
+  const [vendors, setVendors] = useState<{ id: string; vendorName: string }[]>([]);
+
+  useEffect(() => {
+    const hasVendorField = fields.some(f => f.type === 'vendor');
+    if (hasVendorField && vendors.length === 0) {
+      apiClient.get('/vendor/read').then(res => {
+        const raw = res.data?.data ?? res.data ?? [];
+        const mapped = (Array.isArray(raw) ? raw : []).map((v: any) => ({
+          id: v.id,
+          vendorName: v.vendorName ?? v.name ?? '',
+        }));
+        setVendors(mapped);
+      }).catch(err => console.error("Error loading vendors in dynamic form", err));
+    }
+  }, [fields, vendors.length]);
+
   // Filter active & form visible fields
   const filteredFields = fields
     .filter(f => f.isActive && f.showInForm)
@@ -222,7 +239,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
               </div>
             )}
 
-            {field.type === 'dropdown' && (
+             {field.type === 'dropdown' && (
               <select
                 value={value}
                 onChange={(e) => onChange(field.key, e.target.value)}
@@ -235,6 +252,24 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
                 {field.options?.map((opt, i) => (
                   <option key={i} value={typeof opt === 'string' ? opt : opt.value}>
                     {typeof opt === 'string' ? opt : opt.label}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {field.type === 'vendor' && (
+              <select
+                value={value}
+                onChange={(e) => onChange(field.key, e.target.value)}
+                aria-invalid={Boolean(error)}
+                className={`h-9 px-3 rounded-lg border bg-background text-foreground text-xs outline-none transition-colors ${
+                  error ? 'border-red-500 focus:border-red-500 ring-2 ring-red-500/20' : 'border-border focus:border-primary'
+                }`}
+              >
+                <option value="">{field.placeholder || '-- Select Vendor --'}</option>
+                {vendors.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.vendorName}
                   </option>
                 ))}
               </select>

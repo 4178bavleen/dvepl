@@ -456,6 +456,7 @@ export function QuotationsPage() {
           setDeleteConfirmOpen(true);
         }}
         isLoading={isLoading}
+        storageKey="quotations"
       />
 
       {/* 1. CREATE / EDIT SHEET */}

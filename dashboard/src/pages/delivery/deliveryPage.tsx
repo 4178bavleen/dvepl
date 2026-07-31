@@ -519,7 +519,7 @@ export function DeliveryPage() {
                 placeholder="Search delivery orders..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-9 text-xs border-slate-200 rounded-xl"
+                className="pl-9 h-9 text-xs border-slate-300 rounded-xl"
               />
             </div>
 
@@ -595,7 +595,7 @@ export function DeliveryPage() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex flex-wrap items-center gap-3">
                   {/* Page Numbers Navigation Pill */}
-                  <div className="flex items-center gap-1 bg-muted/30 border border-border/40 p-1 h-11 rounded-xl shadow-3xs">
+                  <div className="flex items-center gap-1 bg-muted/60 border border-border/70 p-1 h-11 rounded-xl shadow-xs">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -649,7 +649,7 @@ export function DeliveryPage() {
                   </div>
 
                   {/* Custom Entries Selector Pill */}
-                  <div className="flex items-center gap-2 bg-muted/30 border border-border/40 px-3 h-11 rounded-xl shadow-3xs text-xs text-muted-foreground font-medium">
+                  <div className="flex items-center gap-2 bg-muted/60 border border-border/70 px-3 h-11 rounded-xl shadow-xs text-xs text-muted-foreground font-medium">
                     <input
                       type="text"
                       inputMode="numeric"
@@ -694,7 +694,7 @@ export function DeliveryPage() {
                 </span>
               </div>
             )}
-            <div className="max-h-[70vh] overflow-auto no-scrollbar-y rounded-xl border border-slate-200/90 shadow-2xs">
+            <div className="overflow-x-auto rounded-xl border border-slate-200/90 shadow-2xs">
             <table className="w-full text-left text-xs text-slate-700">
               <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-xs text-slate-800 font-bold border-b border-slate-200 uppercase tracking-wider text-[11px] shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)]">
                 <tr>

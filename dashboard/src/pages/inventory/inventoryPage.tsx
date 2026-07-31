@@ -31,6 +31,11 @@ import {
 } from "@/components/ui/select";
 import { apiClient } from "@/services/axios";
 import VendorTracking from "./vendorTracking";
+import { DynamicFormRenderer } from "@/components/customFields/dynamicFormRenderer";
+import {
+  useDynamicCustomFields,
+  validateCustomFields,
+} from "@/hooks/useDynamicCustomFields";
 
 // ---------------------------------------------------------------------------
 // NOTE (routes assumed — verify against your actual backend route files):
@@ -96,6 +101,7 @@ export interface InventoryItem {
   preferredVendorId?: string;
   notes?: string;
   createdAt: string;
+  customFields?: Record<string, any>;
 }
 
 export interface Movement {
@@ -116,6 +122,7 @@ export interface Movement {
   reason?: string;
   addedBy: string;
   date: string;
+  customFields?: Record<string, any>;
 }
 
 // Helper to pull the useful error message out of an axios error, same
@@ -233,6 +240,8 @@ const mapItemFromBackend = (o: any): InventoryItem => {
     notes: o.material?.description ?? o.notes ?? "",
 
     createdAt: o.createdAt,
+
+    customFields: o.customFields ?? {},
   };
 };
 
@@ -260,6 +269,7 @@ const mapMovementFromBackend = (m: any): Movement => ({
     : m.createdAt
       ? String(m.createdAt).split("T")[0]
       : "",
+  customFields: m.customFields ?? {},
 });
 
 const mapVendorFromBackend = (v: any): Vendor => ({
@@ -303,6 +313,7 @@ export const apiService = {
         preferredVendorId: item.preferredVendorId || undefined,
 
         notes: item.notes,
+        customFields: item.customFields,
       };
       const response = await apiClient.post(ITEM_ENDPOINTS.create, payload);
       return mapItemFromBackend(response.data?.data ?? response.data);
@@ -332,6 +343,7 @@ export const apiService = {
         preferredVendorId: item.preferredVendorId,
         notes: item.notes,
         description: item.notes,
+        customFields: item.customFields,
       };
       // Strip undefined keys so we don't overwrite fields we didn't touch
       Object.keys(payload).forEach(
@@ -385,6 +397,7 @@ export const apiService = {
         referenceType: body.referenceType,
         referenceId: body.referenceId,
         remarks: body.reason,
+        customFields: body.customFields,
       };
 
       const response = await apiClient.post(endpoint, payload);
@@ -470,6 +483,15 @@ export const apiService = {
 };
 
 export function InventoryPage() {
+  const {
+    fields: inventoryCustomFields,
+    tableCustomColumns: inventoryTableCustomCols,
+  } = useDynamicCustomFields("inventory");
+  const [iCustomFields, setICustomFields] = useState<Record<string, any>>({});
+  const [iErrors, setIErrors] = useState<Record<string, string>>({});
+
+
+
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [movements, setMovements] = useState<Movement[]>([]);
   const [activeTab, setActiveTab] = useState<
@@ -701,6 +723,8 @@ export function InventoryPage() {
     setItemNotes("");
     setPreferredVendorId("");
     setSelectedItemId(null);
+    setICustomFields({});
+    setIErrors({});
   };
 
   // Open Modal Actions
@@ -725,6 +749,8 @@ export function InventoryPage() {
     setItemLocation(item.location || "");
     setItemNotes(item.notes || "");
     setPreferredVendorId(item.preferredVendorId || "");
+    setICustomFields(item.customFields || {});
+    setIErrors({});
     setIsItemModalOpen(true);
   };
 
@@ -732,6 +758,7 @@ export function InventoryPage() {
     id: string,
     type: "IN" | "OUT" | "ADJUST" | "RETURN",
   ) => {
+    const item = items.find((i) => i.id === id);
     setSelectedItemId(id);
     setStockMovType(type);
     setStockQty("");
@@ -742,6 +769,8 @@ export function InventoryPage() {
     setStockOrderCode("");
     setStockReason("");
     setStockDate(new Date().toISOString().split("T")[0]);
+    setICustomFields(item?.customFields || {});
+    setIErrors({});
     setIsStockModalOpen(true);
   };
 
@@ -768,6 +797,13 @@ export function InventoryPage() {
       return;
     }
 
+    const cfErrs = validateCustomFields(inventoryCustomFields, iCustomFields);
+    if (Object.keys(cfErrs).length > 0) {
+      setIErrors(cfErrs);
+      toast.error("Please fix validation errors in custom fields");
+      return;
+    }
+
     const payload = {
       name: itemName,
       code: materialCode,
@@ -786,6 +822,7 @@ export function InventoryPage() {
       preferredVendorId: preferredVendorId || undefined,
 
       notes: itemNotes,
+      customFields: iCustomFields,
     };
 
     // Build the embedded vendor snapshot from the selected master vendor,
@@ -855,6 +892,17 @@ export function InventoryPage() {
 
     if (!selectedItemData) return;
 
+    // Validate custom fields
+    const cfErrs = validateCustomFields(
+      inventoryCustomFields,
+      iCustomFields,
+    );
+    if (Object.keys(cfErrs).length > 0) {
+      setIErrors(cfErrs);
+      toast.error("Please fill in all required custom fields");
+      return;
+    }
+
     const cur = selectedItemData.currentStock;
     let after = cur;
     if (stockMovType === "IN" || stockMovType === "RETURN") after = cur + qty;
@@ -886,6 +934,7 @@ export function InventoryPage() {
       qty,
       quantity: qty,
       date: stockDate,
+      customFields: iCustomFields,
       reason: stockReason || `${stockMovType} Stock Movement`,
       referenceType: refType,
       referenceId: refId,
@@ -914,6 +963,7 @@ export function InventoryPage() {
         await apiService.stocks.update(selectedItemData.id, {
           openingStock: after,
           currentStock: after,
+          customFields: iCustomFields,
         });
       }
 
@@ -1756,6 +1806,16 @@ export function InventoryPage() {
                       <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                         Primary Vendor
                       </th>
+                      {inventoryCustomFields
+                        .filter((f) => f.showInTable)
+                        .map((f) => (
+                          <th
+                            key={f.id}
+                            className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground"
+                          >
+                            {f.name}
+                          </th>
+                        ))}
                       <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                         Status
                       </th>
@@ -1765,7 +1825,7 @@ export function InventoryPage() {
                     {valuationItems.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={10}
+                          colSpan={11 + inventoryCustomFields.filter((f) => f.showInTable).length}
                           className="p-8 text-center text-xs font-semibold text-muted-foreground"
                         >
                           No valuation records.
@@ -1816,7 +1876,30 @@ export function InventoryPage() {
                           <td className="p-4 text-sm text-muted-foreground">
                             {item.primaryVendor?.vendorName || "—"}
                           </td>
-                          <td className="p-4 flex items-center gap-1 text-sm font-medium">
+                          {inventoryCustomFields
+                            .filter((f) => f.showInTable)
+                            .map((f) => {
+                              const value = item.customFields?.[f.key];
+                              let displayValue = "—";
+                              if (value !== undefined && value !== null && value !== "") {
+                                if (f.type === "vendor") {
+                                  displayValue = vendors.find((v) => v.id === value)?.vendorName || String(value);
+                                } else if (typeof value === "boolean") {
+                                  displayValue = value ? "Yes" : "No";
+                                } else {
+                                  displayValue = String(value);
+                                }
+                              }
+                              return (
+                                <td
+                                  key={f.id}
+                                  className="p-4 text-sm text-muted-foreground"
+                                >
+                                  {displayValue}
+                                </td>
+                              );
+                            })}
+                          <td className="p-4">
                             {item.currentStock === 0 ? (
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20 uppercase tracking-wider">
                                 Out
@@ -1941,15 +2024,928 @@ export function InventoryPage() {
               </div>
             )}
           </div>
+        )}
+        {/* PANEL: MOVEMENTS LEDGER */}
+        {activeTab === "movements" && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b bg-muted/40">
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Date
+                  </th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Item
+                  </th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Type
+                  </th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Movement
+                  </th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">
+                    Qty
+                  </th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">
+                    Rate
+                  </th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">
+                    Value
+                  </th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">
+                    Before
+                  </th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">
+                    After
+                  </th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Vendor / Order Ref
+                  </th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Reason
+                  </th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Added By
+                  </th>
+                  {inventoryCustomFields
+                    .filter((f) => f.showInTable)
+                    .map((f) => (
+                      <th
+                        key={f.id}
+                        className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground"
+                      >
+                        {f.name}
+                      </th>
+                    ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {movements.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={12 + inventoryCustomFields.filter((f) => f.showInTable).length}
+                      className="p-8 text-center text-xs font-semibold text-muted-foreground"
+                    >
+                      No movements matching the criteria found. Click Load to
+                      check ledger.
+                    </td>
+                  </tr>
+                ) : (
+                  movements.map((m) => (
+                    <tr key={m.id} className="hover:bg-muted/10 text-xs">
+                      <td className="p-4 text-muted-foreground">{m.date}</td>
+                      <td className="p-4 font-semibold text-foreground">
+                        {m.itemName}
+                      </td>
+                      <td className="p-4">
+                        <span
+                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider ${
+                            m.itemType === "raw"
+                              ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                              : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                          }`}
+                        >
+                          {m.itemType}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <span
+                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider ${
+                            m.movementType === "IN"
+                              ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                              : m.movementType === "OUT"
+                                ? "bg-rose-500/10 text-rose-500 border-rose-500/20"
+                                : m.movementType === "RETURN"
+                                  ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                                  : "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                          }`}
+                        >
+                          {m.movementType}
+                        </span>
+                      </td>
+                      <td className="p-4 text-right font-semibold">
+                        {m.qty.toLocaleString("en-IN")}
+                      </td>
+                      <td className="p-4 text-right text-muted-foreground">
+                        ₹
+                        {m.rate.toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                        })}
+                      </td>
+                      <td className="p-4 text-right font-medium text-foreground">
+                        ₹
+                        {m.totalValue.toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                        })}
+                      </td>
+                      <td className="p-4 text-right text-muted-foreground">
+                        {m.stockBefore}
+                      </td>
+                      <td className="p-4 text-right font-semibold text-foreground">
+                        {m.stockAfter}
+                      </td>
+                      <td className="p-4 text-muted-foreground">
+                        {m.vendorName || m.orderCode || "—"}
+                      </td>
+                      <td className="p-4 text-muted-foreground">
+                        {m.reason || "—"}
+                      </td>
+                      <td className="p-4 text-muted-foreground">{m.addedBy}</td>
+                      {inventoryCustomFields
+                        .filter((f) => f.showInTable)
+                        .map((f) => {
+                          const value = m.customFields?.[f.key];
+                          let displayValue = "—";
+                          if (value !== undefined && value !== null && value !== "") {
+                            if (f.type === "vendor") {
+                              displayValue = vendors.find((v) => v.id === value)?.vendorName || String(value);
+                            } else if (typeof value === "boolean") {
+                              displayValue = value ? "Yes" : "No";
+                            } else {
+                              displayValue = String(value);
+                            }
+                          }
+                          return (
+                            <td key={f.id} className="p-4 text-muted-foreground">
+                              {displayValue}
+                            </td>
+                          );
+                        })}
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {/* PANEL: VALUATION REPORT */}
+        {activeTab === "valuation" && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b bg-muted/40">
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Item Name
+                  </th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Code
+                  </th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Type
+                  </th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Category
+                  </th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Unit
+                  </th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">
+                    Current Stock
+                  </th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">
+                    Rate
+                  </th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground text-right">
+                    Total Value
+                  </th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Primary Vendor
+                  </th>
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {valuationItems.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={10}
+                      className="p-8 text-center text-xs font-semibold text-muted-foreground"
+                    >
+                      No valuation records.
+                    </td>
+                  </tr>
+                ) : (
+                  valuationItems.map((item) => (
+                    <tr key={item.id} className="hover:bg-muted/10">
+                      <td className="p-4 font-semibold text-foreground">
+                        {item.name}
+                      </td>
+                      <td className="p-4 mono font-medium text-xs text-muted-foreground">
+                        {item.code}
+                      </td>
+                      <td className="p-4">
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${
+                            item.type === "raw"
+                              ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                              : "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                          }`}
+                        >
+                          {item.type}
+                        </span>
+                      </td>
+                      <td className="p-4 text-sm text-muted-foreground">
+                        {item.category || "—"}
+                      </td>
+                      <td className="p-4 text-sm text-muted-foreground">
+                        {item.unit}
+                      </td>
+                      <td className="p-4 text-right font-bold">
+                        {item.currentStock.toLocaleString("en-IN")}
+                      </td>
+                      <td className="p-4 text-right text-sm text-muted-foreground">
+                        ₹
+                        {item.unitRate.toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                        })}
+                      </td>
+                      <td className="p-4 text-right text-sm font-bold text-foreground">
+                        ₹
+                        {(item.currentStock * item.unitRate).toLocaleString(
+                          "en-IN",
+                          { minimumFractionDigits: 2 },
+                        )}
+                      </td>
+                      <td className="p-4 text-sm text-muted-foreground">
+                        {item.primaryVendor?.vendorName || "—"}
+                      </td>
+                      <td className="p-4 flex items-center gap-1 text-sm font-medium">
+                        {item.currentStock === 0 ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20 uppercase tracking-wider">
+                            Out
+                          </span>
+                        ) : item.reorderLevel > 0 &&
+                          item.currentStock <= item.reorderLevel ? (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-wider">
+                            Low
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 uppercase tracking-wider">
+                            OK
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {/* PANEL: ALERTS */}
+        {activeTab === "alerts" && (
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {alertItems.length === 0 ? (
+              <p className="text-center text-xs font-semibold text-muted-foreground col-span-full py-12">
+                ✓ No low stock levels detected. All items are above reorder
+                level thresholds.
+              </p>
+            ) : (
+              alertItems.map((item) => (
+                <div
+                  key={item.id}
+                  className={`p-4 rounded-xl border bg-card flex flex-col justify-between shadow-sm hover:shadow transition-all ${
+                    item.currentStock === 0
+                      ? "border-rose-500/30 bg-rose-500/[0.01]"
+                      : "border-amber-500/30 bg-amber-500/[0.01]"
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h4 className="font-bold text-foreground text-base">
+                          {item.name}
+                        </h4>
+                        <span className="mono text-[10px] text-muted-foreground">
+                          {item.code}
+                        </span>
+                      </div>
+                      {item.currentStock === 0 ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20">
+                          OUT OF STOCK
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                          LOW STOCK
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 mt-4 border-t pt-3">
+                      <div>
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                          Stock
+                        </span>
+                        <span className="block font-bold text-base text-rose-500">
+                          {item.currentStock} {item.unit}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                          Reorder At
+                        </span>
+                        <span className="block font-semibold text-sm text-foreground">
+                          {item.reorderLevel}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                          Suggested Qty
+                        </span>
+                        <span className="block font-semibold text-sm text-foreground">
+                          {item.reorderQty || "—"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  {item.primaryVendor?.vendorName && (
+                    <div className="mt-4 pt-3 border-t text-xs text-muted-foreground flex items-center gap-1.5">
+                      <Building className="size-3.5" />
+                      <span>
+                        {item.primaryVendor.vendorName}{" "}
+                        {item.primaryVendor.contactNo
+                          ? `· ${item.primaryVendor.contactNo}`
+                          : ""}
+                      </span>
+                    </div>
+                  )}
+                  <div className="mt-4 flex items-center justify-end gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-emerald-500"
+                      onClick={() => handleOpenStock(item.id, "IN")}
+                    >
+                      Stock IN
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedItemId(item.id);
+                        setIsDetailModalOpen(true);
+                      }}
+                    >
+                      View Details
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
 
-          {/* MODAL: ADD / EDIT ITEM */}
-          {isItemModalOpen && (
-            <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <div className="bg-card border rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
-                <div className="p-6 border-b flex justify-between items-center bg-gradient-to-br from-primary/5 to-transparent">
-                  <h2 className="text-lg font-bold tracking-tight">
-                    {selectedItemId ? "Edit Item" : "Add Item"}
-                  </h2>
+      {/* MODAL: ADD / EDIT ITEM */}
+      {isItemModalOpen && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card border rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+            <div className="p-6 border-b flex justify-between items-center bg-gradient-to-br from-primary/5 to-transparent">
+              <h2 className="text-lg font-bold tracking-tight">
+                {selectedItemId ? "Edit Item" : "Add Item"}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setIsItemModalOpen(false)}
+                className="p-1 hover:bg-muted rounded"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <form
+              onSubmit={handleSaveItem}
+              className="flex-1 overflow-y-auto p-6 space-y-6"
+            >
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Name *
+                  </label>
+                  <Input
+                    required
+                    placeholder="Item Name"
+                    value={itemName}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setItemName(e.target.value)
+                    }
+                  />
+                </div>
+                {inventoryCustomFields.some((f) => f.afterField === "name") && (
+                  <div className="col-span-2">
+                    <DynamicFormRenderer
+                      fields={inventoryCustomFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
+                      afterFieldPosition="name"
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Code
+                  </label>
+                  <Input
+                    placeholder="Internal Code"
+                    value={materialCode}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setmaterialCode(e.target.value)
+                    }
+                  />
+                </div>
+                {inventoryCustomFields.some((f) => f.afterField === "code") && (
+                  <div className="col-span-2">
+                    <DynamicFormRenderer
+                      fields={inventoryCustomFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
+                      afterFieldPosition="code"
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Type *
+                  </label>
+                  <Select
+                    value={itemType}
+                    onValueChange={(val: any) => setItemType(val)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="raw">Raw Material</SelectItem>
+                      <SelectItem value="finished">Finished Good</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {inventoryCustomFields.some((f) => f.afterField === "type") && (
+                  <div className="col-span-2">
+                    <DynamicFormRenderer
+                      fields={inventoryCustomFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
+                      afterFieldPosition="type"
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Category
+                  </label>
+                  <Input
+                    placeholder="eg : Electrical,Sheet Metal"
+                    value={itemCategory}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setItemCategory(e.target.value)
+                    }
+                  />
+                </div>
+                {inventoryCustomFields.some((f) => f.afterField === "category") && (
+                  <div className="col-span-2">
+                    <DynamicFormRenderer
+                      fields={inventoryCustomFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
+                      afterFieldPosition="category"
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Unit
+                  </label>
+                  <Select
+                    value={itemUnit}
+                    onValueChange={(val: string | null) =>
+                      setItemUnit(val || "")
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Nos" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Nos">Nos</SelectItem>
+                      <SelectItem value="Kg">Kg</SelectItem>
+                      <SelectItem value="Mtr">Mtr</SelectItem>
+                      <SelectItem value="Ltr">Ltr</SelectItem>
+                      <SelectItem value="Set">Set</SelectItem>
+                      <SelectItem value="Pcs">Pcs</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {inventoryCustomFields.some((f) => f.afterField === "unit") && (
+                  <div className="col-span-2">
+                    <DynamicFormRenderer
+                      fields={inventoryCustomFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
+                      afterFieldPosition="unit"
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    HSN/SAC Code
+                  </label>
+                  <Input
+                    placeholder="8544"
+                    value={itemHsnCode}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setItemHsnCode(e.target.value)
+                    }
+                  />
+                </div>
+                {inventoryCustomFields.some((f) => f.afterField === "hsnCode") && (
+                  <div className="col-span-2">
+                    <DynamicFormRenderer
+                      fields={inventoryCustomFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
+                      afterFieldPosition="hsnCode"
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Opening / Current Stock
+                  </label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={itemOpeningStock}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setItemOpeningStock(parseInt(e.target.value) || 0)
+                    }
+                  />
+                </div>
+                {inventoryCustomFields.some((f) => f.afterField === "openingStock") && (
+                  <div className="col-span-2">
+                    <DynamicFormRenderer
+                      fields={inventoryCustomFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
+                      afterFieldPosition="openingStock"
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Unit Rate (₹)
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={itemUnitRate}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setItemUnitRate(parseFloat(e.target.value) || 0)
+                    }
+                  />
+                </div>
+                {inventoryCustomFields.some((f) => f.afterField === "unitRate") && (
+                  <div className="col-span-2">
+                    <DynamicFormRenderer
+                      fields={inventoryCustomFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
+                      afterFieldPosition="unitRate"
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    GST %
+                  </label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={itemGstPercent}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setItemGstPercent(parseInt(e.target.value) || 0)
+                    }
+                  />
+                </div>
+                {inventoryCustomFields.some((f) => f.afterField === "gstPercent") && (
+                  <div className="col-span-2">
+                    <DynamicFormRenderer
+                      fields={inventoryCustomFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
+                      afterFieldPosition="gstPercent"
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Reorder Level
+                  </label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={itemReorderLevel}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setItemReorderLevel(parseInt(e.target.value) || 0)
+                    }
+                  />
+                </div>
+                {inventoryCustomFields.some((f) => f.afterField === "reorderLevel") && (
+                  <div className="col-span-2">
+                    <DynamicFormRenderer
+                      fields={inventoryCustomFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
+                      afterFieldPosition="reorderLevel"
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Reorder Qty
+                  </label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={itemReorderQty}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setItemReorderQty(parseInt(e.target.value) || 0)
+                    }
+                  />
+                </div>
+                {inventoryCustomFields.some((f) => f.afterField === "reorderQty") && (
+                  <div className="col-span-2">
+                    <DynamicFormRenderer
+                      fields={inventoryCustomFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
+                      afterFieldPosition="reorderQty"
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Location Shelf/Rack
+                  </label>
+                  <Input
+                    placeholder="Rack A-2"
+                    value={itemLocation}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setItemLocation(e.target.value)
+                    }
+                  />
+                </div>
+                {inventoryCustomFields.some((f) => f.afterField === "location") && (
+                  <div className="col-span-2">
+                    <DynamicFormRenderer
+                      fields={inventoryCustomFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
+                      afterFieldPosition="location"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t pt-4 space-y-4">
+                <h4 className="text-sm font-bold text-foreground uppercase tracking-wider">
+                  Primary Supplier / Vendor
+                </h4>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      Primary Vendor
+                    </label>
+
+                    <Select
+                      value={preferredVendorId}
+                      onValueChange={(val: string | null) =>
+                        setPreferredVendorId(val || "")
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Vendor" />
+                      </SelectTrigger>
+
+                      <SelectContent>
+                        {vendors.length === 0 ? (
+                          <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                            No vendors found
+                          </div>
+                        ) : (
+                          vendors.map((vendor) => (
+                            <SelectItem key={vendor.id} value={vendor.id}>
+                              {vendor.vendorName}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {selectedVendor && (
+                    <>
+                      <div className="flex flex-col gap-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                          Contact
+                        </label>
+                        <Input
+                          disabled
+                          value={selectedVendor.contactNo || "—"}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                          Lead Time (days)
+                        </label>
+                        <Input
+                          disabled
+                          value={String(selectedVendor.leadDays ?? 0)}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+               <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Description / Notes
+                </label>
+                <Textarea
+                  placeholder="Details notes..."
+                  rows={2}
+                  value={itemNotes}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                    setItemNotes(e.target.value)
+                  }
+                />
+              </div>
+              {inventoryCustomFields.some((f) => f.afterField === "notes") && (
+                <div className="col-span-2">
+                  <DynamicFormRenderer
+                    fields={inventoryCustomFields}
+                    values={iCustomFields}
+                    onChange={(key, val) => {
+                      setICustomFields((prev) => ({ ...prev, [key]: val }));
+                      if (iErrors[key])
+                        setIErrors((prev) => ({ ...prev, [key]: "" }));
+                    }}
+                    errors={iErrors}
+                    afterFieldPosition="notes"
+                  />
+                </div>
+              )}
+
+              {/* Dynamic EAV Custom Fields without specific afterField position or assigned to end */}
+              {inventoryCustomFields.some(
+                (f) =>
+                  (!f.afterField || f.afterField === "end") &&
+                  !f.afterField?.startsWith("stock"),
+              ) && (
+                <div className="border-t pt-4 space-y-4">
+                  <h4 className="text-sm font-bold text-foreground uppercase tracking-wider">
+                    Additional Information
+                  </h4>
+                  <DynamicFormRenderer
+                    fields={inventoryCustomFields.filter(
+                      (f) =>
+                        (!f.afterField || f.afterField === "end") &&
+                        !f.afterField?.startsWith("stock"),
+                    )}
+                    values={iCustomFields}
+                    onChange={(key, val) => {
+                      setICustomFields((prev) => ({ ...prev, [key]: val }));
+                      if (iErrors[key])
+                        setIErrors((prev) => ({ ...prev, [key]: "" }));
+                    }}
+                    errors={iErrors}
+                  />
+                </div>
+              )}
+
+              <div className="border-t pt-4 flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsItemModalOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit">Save Item</Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: STOCK MOVEMENT */}
+      {isStockModalOpen && selectedItemData && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card border rounded-xl shadow-2xl max-w-md w-full flex flex-col">
+            <div className="p-6 border-b flex justify-between items-center bg-gradient-to-br from-primary/5 to-transparent">
+              <h2 className="text-lg font-bold tracking-tight">
+                Stock Movement — {selectedItemData.name}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setIsStockModalOpen(false)}
+                className="p-1 hover:bg-muted rounded"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <form onSubmit={handleSaveStock} className="p-6 space-y-4">
+              <div className="p-3 bg-muted/40 border rounded-lg text-xs space-y-1">
+                <div>
+                  Item:{" "}
+                  <strong>
+                    {selectedItemData.name} ({selectedItemData.code})
+                  </strong>
+                </div>
+                <div>
+                  Current Stock Level:{" "}
+                  <strong>
+                    {selectedItemData.currentStock} {selectedItemData.unit}
+                  </strong>
+                </div>
+              </div>
+
+              {/* Movement Tabs */}
+              <div className="flex border rounded-lg p-1 bg-muted/20">
+                {(["IN", "OUT", "ADJUST", "RETURN"] as const).map((type) => (
                   <button
                     type="button"
                     onClick={() => setIsItemModalOpen(false)}
@@ -1958,11 +2954,80 @@ export function InventoryPage() {
                     <X className="size-4" />
                   </button>
                 </div>
-                <form
-                  onSubmit={handleSaveItem}
-                  className="flex-1 overflow-y-auto p-6 space-y-6"
-                >
-                  <div className="grid grid-cols-2 gap-4">
+                {inventoryCustomFields.some(
+                  (f) =>
+                    (stockMovType === "IN" && f.afterField === "stockInQty") ||
+                    (stockMovType === "OUT" && f.afterField === "stockOutQty") ||
+                    (stockMovType === "ADJUST" && f.afterField === "stockAdjustQty") ||
+                    (stockMovType === "RETURN" && f.afterField === "stockReturnQty")
+                ) && (
+                  <div className="col-span-2">
+                    <DynamicFormRenderer
+                      fields={inventoryCustomFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
+                      afterFieldPosition={
+                        stockMovType === "IN"
+                          ? "stockInQty"
+                          : stockMovType === "OUT"
+                          ? "stockOutQty"
+                          : stockMovType === "ADJUST"
+                          ? "stockAdjustQty"
+                          : "stockReturnQty"
+                      }
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Transaction Date
+                  </label>
+                  <Input
+                    type="date"
+                    value={stockDate}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                      setStockDate(e.target.value)
+                    }
+                  />
+                </div>
+                {inventoryCustomFields.some(
+                  (f) =>
+                    (stockMovType === "IN" && f.afterField === "stockInDate") ||
+                    (stockMovType === "OUT" && f.afterField === "stockOutDate") ||
+                    (stockMovType === "ADJUST" && f.afterField === "stockAdjustDate") ||
+                    (stockMovType === "RETURN" && f.afterField === "stockReturnDate")
+                ) && (
+                  <div className="col-span-2">
+                    <DynamicFormRenderer
+                      fields={inventoryCustomFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
+                      afterFieldPosition={
+                        stockMovType === "IN"
+                          ? "stockInDate"
+                          : stockMovType === "OUT"
+                          ? "stockOutDate"
+                          : stockMovType === "ADJUST"
+                          ? "stockAdjustDate"
+                          : "stockReturnDate"
+                      }
+                    />
+                  </div>
+                )}
+
+                {stockMovType === "IN" && (
+                  <>
                     <div className="flex flex-col gap-2">
                       <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                         Name *
@@ -2081,6 +3146,22 @@ export function InventoryPage() {
                         }
                       />
                     </div>
+                    {inventoryCustomFields.some((f) => f.afterField === "stockInRate") && (
+                      <div className="col-span-2">
+                        <DynamicFormRenderer
+                          fields={inventoryCustomFields}
+                          values={iCustomFields}
+                          onChange={(key, val) => {
+                            setICustomFields((prev) => ({ ...prev, [key]: val }));
+                            if (iErrors[key])
+                              setIErrors((prev) => ({ ...prev, [key]: "" }));
+                          }}
+                          errors={iErrors}
+                          afterFieldPosition="stockInRate"
+                        />
+                      </div>
+                    )}
+
                     <div className="flex flex-col gap-2">
                       <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                         GST %
@@ -2095,6 +3176,22 @@ export function InventoryPage() {
                         }
                       />
                     </div>
+                    {inventoryCustomFields.some((f) => f.afterField === "stockInVendorName") && (
+                      <div className="col-span-2">
+                        <DynamicFormRenderer
+                          fields={inventoryCustomFields}
+                          values={iCustomFields}
+                          onChange={(key, val) => {
+                            setICustomFields((prev) => ({ ...prev, [key]: val }));
+                            if (iErrors[key])
+                              setIErrors((prev) => ({ ...prev, [key]: "" }));
+                          }}
+                          errors={iErrors}
+                          afterFieldPosition="stockInVendorName"
+                        />
+                      </div>
+                    )}
+
                     <div className="flex flex-col gap-2">
                       <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                         Reorder Level
@@ -2108,6 +3205,22 @@ export function InventoryPage() {
                         }
                       />
                     </div>
+                    {inventoryCustomFields.some((f) => f.afterField === "stockInPoNumber") && (
+                      <div className="col-span-2">
+                        <DynamicFormRenderer
+                          fields={inventoryCustomFields}
+                          values={iCustomFields}
+                          onChange={(key, val) => {
+                            setICustomFields((prev) => ({ ...prev, [key]: val }));
+                            if (iErrors[key])
+                              setIErrors((prev) => ({ ...prev, [key]: "" }));
+                          }}
+                          errors={iErrors}
+                          afterFieldPosition="stockInPoNumber"
+                        />
+                      </div>
+                    )}
+
                     <div className="flex flex-col gap-2">
                       <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                         Reorder Qty
@@ -2121,107 +3234,225 @@ export function InventoryPage() {
                         }
                       />
                     </div>
-                    <div className="flex flex-col gap-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                        Location Shelf/Rack
+                    {inventoryCustomFields.some((f) => f.afterField === "stockInInvoiceNo") && (
+                      <div className="col-span-2">
+                        <DynamicFormRenderer
+                          fields={inventoryCustomFields}
+                          values={iCustomFields}
+                          onChange={(key, val) => {
+                            setICustomFields((prev) => ({ ...prev, [key]: val }));
+                            if (iErrors[key])
+                              setIErrors((prev) => ({ ...prev, [key]: "" }));
+                          }}
+                          errors={iErrors}
+                          afterFieldPosition="stockInInvoiceNo"
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {(stockMovType === "OUT" || stockMovType === "RETURN") && (
+                  <>
+                    <div className="flex flex-col gap-2 col-span-2">
+                      <label className="text-xs font-bold tracking-wider text-muted-foreground">
+                        Sales Order / Project Code Reference
                       </label>
                       <Input
-                        placeholder="Rack A-2"
-                        value={itemLocation}
+                        placeholder="DVEPL-0001"
+                        value={stockOrderCode}
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                          setItemLocation(e.target.value)
+                          setStockOrderCode(e.target.value)
                         }
                       />
                     </div>
-                  </div>
-
-                  <div className="border-t pt-4 space-y-4">
-                    <h4 className="text-sm font-bold text-foreground uppercase tracking-wider">
-                      Primary Supplier / Vendor
-                    </h4>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="flex flex-col gap-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                          Primary Vendor
-                        </label>
-
-                        <Select
-                          value={preferredVendorId}
-                          onValueChange={(val: string | null) =>
-                            setPreferredVendorId(val || "")
+                    {inventoryCustomFields.some(
+                      (f) =>
+                        (stockMovType === "OUT" && f.afterField === "stockOutOrderCode") ||
+                        (stockMovType === "RETURN" && f.afterField === "stockReturnOrderCode")
+                    ) && (
+                      <div className="col-span-2">
+                        <DynamicFormRenderer
+                          fields={inventoryCustomFields}
+                          values={iCustomFields}
+                          onChange={(key, val) => {
+                            setICustomFields((prev) => ({ ...prev, [key]: val }));
+                            if (iErrors[key])
+                              setIErrors((prev) => ({ ...prev, [key]: "" }));
+                          }}
+                          errors={iErrors}
+                          afterFieldPosition={
+                            stockMovType === "OUT" ? "stockOutOrderCode" : "stockReturnOrderCode"
                           }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select Vendor" />
-                          </SelectTrigger>
-
-                          <SelectContent>
-                            {vendors.length === 0 ? (
-                              <div className="px-2 py-1.5 text-xs text-muted-foreground">
-                                No vendors found
-                              </div>
-                            ) : (
-                              vendors.map((vendor) => (
-                                <SelectItem key={vendor.id} value={vendor.id}>
-                                  {vendor.vendorName}
-                                </SelectItem>
-                              ))
-                            )}
-                          </SelectContent>
-                        </Select>
+                        />
                       </div>
+                    )}
+                  </>
+                )}
+              </div>
 
-                      {selectedVendor && (
-                        <>
-                          <div className="flex flex-col gap-2">
-                            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                              Contact
-                            </label>
-                            <Input
-                              disabled
-                              value={selectedVendor.contactNo || "—"}
-                            />
-                          </div>
-                          <div className="flex flex-col gap-2">
-                            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                              Lead Time (days)
-                            </label>
-                            <Input
-                              disabled
-                              value={String(selectedVendor.leadDays ?? 0)}
-                            />
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Reason / Note
+                </label>
+                <Textarea
+                  placeholder="Note..."
+                  value={stockReason}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
+                    setStockReason(e.target.value)
+                  }
+                  rows={2}
+                />
+              </div>
+              {inventoryCustomFields.some(
+                (f) =>
+                  (stockMovType === "IN" && f.afterField === "stockInReason") ||
+                  (stockMovType === "OUT" && f.afterField === "stockOutReason") ||
+                  (stockMovType === "ADJUST" && f.afterField === "stockAdjustReason") ||
+                  (stockMovType === "RETURN" && f.afterField === "stockReturnReason")
+              ) && (
+                <div className="col-span-2">
+                  <DynamicFormRenderer
+                    fields={inventoryCustomFields}
+                    values={iCustomFields}
+                    onChange={(key, val) => {
+                      setICustomFields((prev) => ({ ...prev, [key]: val }));
+                      if (iErrors[key])
+                        setIErrors((prev) => ({ ...prev, [key]: "" }));
+                    }}
+                    errors={iErrors}
+                    afterFieldPosition={
+                      stockMovType === "IN"
+                        ? "stockInReason"
+                        : stockMovType === "OUT"
+                        ? "stockOutReason"
+                        : stockMovType === "ADJUST"
+                        ? "stockAdjustReason"
+                        : "stockReturnReason"
+                    }
+                  />
+                </div>
+              )}
 
-                  <div className="flex flex-col gap-2">
-                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                      Description / Notes
-                    </label>
-                    <Textarea
-                      placeholder="Details notes..."
-                      rows={2}
-                      value={itemNotes}
-                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                        setItemNotes(e.target.value)
-                      }
+              {/* Dynamic Preview */}
+              {stockQty && (
+                <div className="p-3 border rounded-lg bg-primary/5 flex flex-col gap-1 text-xs">
+                  {(() => {
+                    const qtyVal = parseFloat(stockQty) || 0;
+                    let calculatedAfter = selectedItemData.currentStock;
+                    if (stockMovType === "IN" || stockMovType === "RETURN")
+                      calculatedAfter += qtyVal;
+                    else if (stockMovType === "OUT") calculatedAfter -= qtyVal;
+                    else if (stockMovType === "ADJUST")
+                      calculatedAfter = qtyVal;
+
+                    return (
+                      <>
+                        <div className="font-semibold text-foreground">
+                          Stock Level Preview: {selectedItemData.currentStock}{" "}
+                          {selectedItemData.unit} →{" "}
+                          <strong className="text-primary">
+                            {calculatedAfter}
+                          </strong>{" "}
+                          {selectedItemData.unit}
+                        </div>
+                        {calculatedAfter < 0 && (
+                          <div className="text-rose-500 font-bold flex items-center gap-1 mt-0.5">
+                            <AlertTriangle className="size-3.5" /> Warning:
+                            Insufficient Stock!
+                          </div>
+                        )}
+                        {selectedItemData.reorderLevel > 0 &&
+                          calculatedAfter <= selectedItemData.reorderLevel &&
+                          calculatedAfter >= 0 && (
+                            <div className="text-amber-500 font-semibold flex items-center gap-1 mt-0.5">
+                              <AlertTriangle className="size-3.5" /> Warning:
+                              Level drops below Reorder threshold
+                            </div>
+                          )}
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Dynamic EAV Custom Fields without specific afterField position or assigned to end/other fields not rendered above */}
+              {(() => {
+                const prefix =
+                  stockMovType === "IN"
+                    ? "stockIn"
+                    : stockMovType === "OUT"
+                    ? "stockOut"
+                    : stockMovType === "ADJUST"
+                    ? "stockAdjust"
+                    : "stockReturn";
+
+                const inlinePositions =
+                  stockMovType === "IN"
+                    ? ["stockInQty", "stockInDate", "stockInRate", "stockInVendorName", "stockInPoNumber", "stockInInvoiceNo", "stockInReason"]
+                    : stockMovType === "OUT"
+                    ? ["stockOutQty", "stockOutDate", "stockOutOrderCode", "stockOutReason"]
+                    : stockMovType === "ADJUST"
+                    ? ["stockAdjustQty", "stockAdjustDate", "stockAdjustReason"]
+                    : ["stockReturnQty", "stockReturnDate", "stockReturnOrderCode", "stockReturnReason"];
+
+                const activeFields = inventoryCustomFields.filter(
+                  (f) =>
+                    f.afterField?.startsWith(prefix) &&
+                    (f.afterField === `${prefix}_end` || !inlinePositions.includes(f.afterField))
+                );
+
+                if (activeFields.length === 0) return null;
+
+                return (
+                  <div className="border-t pt-4 space-y-4">
+                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                      Additional Information
+                    </h4>
+                    <DynamicFormRenderer
+                      fields={activeFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
                     />
                   </div>
+                );
+              })()}
 
-                  <div className="border-t pt-4 flex items-center justify-end gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setIsItemModalOpen(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button type="submit">Save Item</Button>
-                  </div>
-                </form>
+              <div className="border-t pt-4 flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsStockModalOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit">Submit Journal</Button>
               </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ITEM DETAILS & HISTORY */}
+      {isDetailModalOpen && selectedItemData && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-card border rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+            <div className="p-6 border-b flex justify-between items-center bg-gradient-to-br from-primary/5 to-transparent">
+              <h2 className="text-lg font-bold tracking-tight">
+                Item Details — {selectedItemData.name}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setIsDetailModalOpen(false)}
+                className="p-1 hover:bg-muted rounded"
+              >
+                <X className="size-4" />
+              </button>
             </div>
           )}
 
@@ -2673,13 +3904,114 @@ export function InventoryPage() {
                     </div>
                   </div>
                 </div>
-                <div className="p-6 border-t flex justify-end gap-2 bg-muted/10">
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsDetailModalOpen(false)}
-                  >
-                    Close
-                  </Button>
+              )}
+
+              {inventoryCustomFields.length > 0 && (
+                <div className="p-4 border rounded-xl bg-card">
+                  <h4 className="text-xs font-bold text-muted-foreground uppercase mb-2">
+                    Custom Fields
+                  </h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+                    {inventoryCustomFields.map((field) => {
+                      const value = selectedItemData.customFields?.[field.key];
+                      let displayValue = "—";
+                      if (value !== undefined && value !== null && value !== "") {
+                        if (field.type === "vendor") {
+                          displayValue = vendors.find((v) => v.id === value)?.vendorName || String(value);
+                        } else if (typeof value === "boolean") {
+                          displayValue = value ? "Yes" : "No";
+                        } else {
+                          displayValue = String(value);
+                        }
+                      }
+                      return (
+                        <div key={field.id}>
+                          <strong>{field.name}:</strong> {displayValue}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {selectedItemData.notes && (
+                <div className="text-sm">
+                  <strong>Additional Notes:</strong>
+                  <p className="text-muted-foreground mt-1 bg-muted/10 p-3 border rounded-lg whitespace-pre-wrap">
+                    {selectedItemData.notes}
+                  </p>
+                </div>
+              )}
+
+              {/* Movement History SubTable */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold text-muted-foreground uppercase">
+                  Ledger History (last 50 movements)
+                </h4>
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-muted/40 border-b text-[10px] font-bold uppercase text-muted-foreground">
+                        <th className="p-3">Date</th>
+                        <th className="p-3">Type</th>
+                        <th className="p-3 text-right">Quantity</th>
+                        <th className="p-3 text-right">Balance</th>
+                        <th className="p-3">Ref</th>
+                        <th className="p-3">Reason</th>
+                        <th className="p-3">User</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y text-xs">
+                      {selectedItemMovements.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan={7}
+                            className="p-6 text-center text-muted-foreground"
+                          >
+                            No ledger movements logged for this part.
+                          </td>
+                        </tr>
+                      ) : (
+                        selectedItemMovements.map((m) => (
+                          <tr key={m.id}>
+                            <td className="p-3 text-muted-foreground">
+                              {m.date}
+                            </td>
+                            <td className="p-3">
+                              <span
+                                className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider ${
+                                  m.movementType === "IN"
+                                    ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                                    : m.movementType === "OUT"
+                                      ? "bg-rose-500/10 text-rose-500 border-rose-500/20"
+                                      : m.movementType === "RETURN"
+                                        ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                                        : "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                                }`}
+                              >
+                                {m.movementType}
+                              </span>
+                            </td>
+                            <td className="p-3 text-right font-semibold">
+                              {m.qty}
+                            </td>
+                            <td className="p-3 text-right font-medium">
+                              {m.stockBefore} → {m.stockAfter}
+                            </td>
+                            <td className="p-3 text-muted-foreground">
+                              {m.vendorName || m.orderCode || "—"}
+                            </td>
+                            <td className="p-3 text-muted-foreground">
+                              {m.reason || "—"}
+                            </td>
+                            <td className="p-3 text-muted-foreground">
+                              {m.addedBy}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>

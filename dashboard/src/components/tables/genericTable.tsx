@@ -49,7 +49,7 @@ const Table = React.forwardRef<
   HTMLTableElement,
   React.HTMLAttributes<HTMLTableElement>
 >(({ className, ...props }, ref) => (
-  <div className="relative w-full max-h-[70vh] overflow-auto no-scrollbar-y" data-slot="table-container">
+  <div className="relative w-full overflow-x-auto" data-slot="table-container">
     <table
       ref={ref}
       className={cn("w-full caption-bottom text-sm", className)}
@@ -234,6 +234,17 @@ export function GenericTable<TData extends { id: string }>({
       return [];
     }
   });
+
+  // Re-load column order from localStorage if the localStorageKey changes (e.g. after dynamic columns/custom fields load)
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const saved = window.localStorage.getItem(localStorageKey);
+      setColumnOrder(saved ? (JSON.parse(saved) as string[]) : []);
+    } catch {
+      // ignore
+    }
+  }, [localStorageKey]);
 
   const [isColumnsOpen, setIsColumnsOpen] = useState(false);
   const store = useERPStore();
@@ -443,9 +454,12 @@ export function GenericTable<TData extends { id: string }>({
   React.useEffect(() => {
     const ids = tableColumns.map((column: any) => column.id ?? column.accessorKey);
     setColumnOrder((prev) => {
-      const kept = prev.filter((id) => ids.includes(id));
-      const missing = ids.filter((id) => !kept.includes(id));
-      const merged = kept.length ? [...kept, ...missing] : ids;
+      if (prev.length === 0) return ids;
+
+      // To prevent removing columns that are temporarily missing (e.g. custom fields loading asynchronously),
+      // we keep all columns from the saved order (prev) and append any new ones from ids.
+      const newIds = ids.filter((id) => !prev.includes(id));
+      const merged = [...prev, ...newIds];
 
       const hasSelect = merged.includes("select");
       const hasActions = merged.includes("actions");
@@ -602,7 +616,7 @@ export function GenericTable<TData extends { id: string }>({
           {!isLoading && data.length > 0 && (
             <div className="flex flex-wrap items-center gap-3">
               {/* 1. Page Numbers Navigation Pill */}
-              <div className="flex items-center gap-1 bg-muted/30 border border-border/40 p-1 h-11 rounded-xl shadow-3xs">
+              <div className="flex items-center gap-1 bg-muted/60 border border-border/70 p-1 h-11 rounded-xl shadow-xs">
                 {/* Prev Arrow */}
                 <Button
                   variant="ghost"
@@ -660,7 +674,7 @@ export function GenericTable<TData extends { id: string }>({
               </div>
 
               {/* 2. Custom Entries Selector Pill */}
-              <div className="flex items-center gap-2 bg-muted/30 border border-border/40 px-3 h-11 rounded-xl shadow-3xs text-xs text-muted-foreground font-medium">
+              <div className="flex items-center gap-2 bg-muted/60 border border-border/70 px-3 h-11 rounded-xl shadow-xs text-xs text-muted-foreground font-medium">
                 <input
                   type="text"
                   inputMode="numeric"
