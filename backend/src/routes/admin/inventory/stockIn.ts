@@ -5,10 +5,7 @@ import {
   FastifyRequest,
 } from "fastify";
 
-import {
-  Prisma,
-  TransactionType,
-} from "@prisma/client";
+import { Prisma, TransactionType } from "@prisma/client";
 
 import { adminLogs } from "../../../services/logger/contextLogger";
 import { inventoryStockInSchema } from "../../../schemas/admin/inventory/inventory.schema";
@@ -42,13 +39,8 @@ async function adminInventoryStockInRoutes(
           });
         }
 
-        const {
-          inventoryId,
-          quantity,
-          referenceType,
-          referenceId,
-          remarks,
-        } = validationResult.data;
+        const { inventoryId, quantity, referenceType, referenceId, remarks } =
+          validationResult.data;
 
         const companyId = request.user.companyId;
 
@@ -99,8 +91,7 @@ async function adminInventoryStockInRoutes(
             data: {
               inventoryId: inventory.id,
 
-              transactionType:
-                TransactionType.IN,
+              transactionType: TransactionType.IN,
 
               quantity: new Prisma.Decimal(quantity),
 
@@ -117,7 +108,44 @@ async function adminInventoryStockInRoutes(
               createdById: request.user.id,
             },
           });
+          // ==========================
+          // Update Purchase Order Received Qty
+          // ==========================
+          // ==========================
+          // Update Purchase Order Received Qty
+          // ==========================
 
+          if (referenceType === "PURCHASE_ORDER_ITEM" && referenceId) {
+            const poItem = await tx.purchaseOrderItem.findUnique({
+              where: {
+                id: referenceId,
+              },
+            });
+
+            if (poItem) {
+              const newReceivedQty =
+                Number(poItem.receivedQty) + Number(quantity);
+
+              await tx.purchaseOrderItem.update({
+                where: {
+                  id: referenceId,
+                },
+
+                data: {
+                  receivedQty: new Prisma.Decimal(newReceivedQty),
+
+                  lastReceivedAt: new Date(),
+
+                  trackingStatus:
+                    newReceivedQty >= Number(poItem.quantity)
+                      ? "RECEIVED"
+                      : newReceivedQty > 0
+                        ? "PARTIAL"
+                        : "PENDING",
+                },
+              });
+            }
+          }
           return {
             inventory: updatedInventory,
             transaction,
@@ -128,21 +156,20 @@ async function adminInventoryStockInRoutes(
         // Fetch Updated Inventory
         // ==========================
 
-        const updatedInventory =
-          await fastify.prisma.inventory.findUnique({
-            where: {
-              id: result.inventory.id,
-            },
-            include: {
-              material: {
-                include: {
-                  preferredVendor: true,
-                },
+        const updatedInventory = await fastify.prisma.inventory.findUnique({
+          where: {
+            id: result.inventory.id,
+          },
+          include: {
+            material: {
+              include: {
+                preferredVendor: true,
               },
-              
-              bin: true,
             },
-          });
+
+            bin: true,
+          },
+        });
 
         adminLogs.info("Stock In completed", {
           inventoryId,

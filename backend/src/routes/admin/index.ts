@@ -41,6 +41,7 @@ import adminDeptRouteGroup from "./department/index";
 import adminTeamRouteGroup from "./team/index";
 import adminTechnicalClarificationRouteGroup from "./technicalClarification/index";
 import adminInventoryRouteGroup from "./inventory/index";
+import inventoryTrackingRoutes from "./inventoryTracking/index"
 
 import adminOrderRouteGroup from "./salesOrder/index";
 import adminVendorRouteGroup from "./vendor/index";
@@ -48,6 +49,7 @@ import adminTaskRouteGroup from "./task/index";
 import adminReportsRouteGroup from "./reports/index";
 import adminPaymentRouteGroup from "./payment/index";
 import adminVendorProductRouteGroup from "./vendorProduct/index";
+import goodsReceiptRoutes from "./goodsRecipt";
 
 // import notificationRoutes from "./notification";
 
@@ -55,6 +57,7 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 
 import adminCustomFieldRouteGroup from "./customField/index";
 import recycleBinRoutes from "./recycleBin/index";
+import purchaseOrderRoutes from './purchaseOrder'
 
 async function adminRoutes(
   fastify: FastifyInstance,
@@ -189,9 +192,15 @@ async function adminRoutes(
     fastify.register(adminVendorProductRouteGroup, {
       prefix: "/vendor-product",
     });
-    // fastify.register(notificationRoutes, {
-    //   prefix: "/notifications",
-    // });
+    fastify.register(inventoryTrackingRoutes, {
+    prefix: "/inventory-tracking",
+});
+   fastify.register(goodsReceiptRoutes, {
+  prefix: "/goods-receipt",
+});
+  fastify.register(purchaseOrderRoutes, {
+  prefix: "/purchase-order",
+});
   });
 }
 

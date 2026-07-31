@@ -240,6 +240,24 @@ export const apiService = {
       return tenderApi.vendorProducts.detach(id);
     },
   },
+  purchaseOrders: {
+  create: async (body: any) => {
+    const response = await apiClient.post(
+      "/purchase-order/create",
+      body,
+    );
+
+    return response.data?.data ?? response.data;
+  },
+
+  list: async () => {
+    const response = await apiClient.get(
+      "/purchase-order/read",
+    );
+
+    return response.data?.data ?? [];
+  },
+},
 };
 
 export function VendorsPage() {
@@ -263,6 +281,8 @@ export function VendorsPage() {
         apiService.revisions.list(),
         apiService.inventory.list(),
       ]);
+      console.log(invList[0].material);
+      console.log(invList[0].material?.name);
       setVendors(vList);
       setRevisions(rList);
       setInventoryItems(invList);
@@ -502,14 +522,16 @@ export function VendorsPage() {
   // Inline inventory matches for a PO line-item row, based on its description text
   const getInventoryMatches = (query: string): InventoryItem[] => {
     const q = query.trim().toLowerCase();
+
     const pool = !q
       ? inventoryItems
       : inventoryItems.filter(
           (i) =>
-            i.material.name.toLowerCase().includes(q) ||
-            i.material.materialCode.toLowerCase().includes(q) ||
-            (i.material.category || "").toLowerCase().includes(q),
+            i.material?.name?.toLowerCase().includes(q) ||
+            i.material?.materialCode?.toLowerCase().includes(q) ||
+            i.material?.category?.toLowerCase().includes(q),
         );
+
     return pool.slice(0, 20);
   };
 
@@ -967,6 +989,10 @@ export function VendorsPage() {
         const net = rate * (1 - disc / 100);
         return {
           ...item,
+
+          materialId: invItem.materialId, // ✅ Add this
+          inventoryId: invItem.id, // (optional but recommended)
+
           description: invItem.material.name,
           unit: invItem.material.unit || item.unit,
           hsnCode: invItem.material.hsnCode || item.hsnCode,
@@ -1299,15 +1325,38 @@ export function VendorsPage() {
     };
 
     try {
-      await apiService.revisions.create(newRevision);
-      const list = await apiService.revisions.list();
-      setRevisions(list);
-      setSelectedRevisionId(newRevision.id);
-      toast.success(`Revision R${newRevision.revisionNo} saved successfully`);
-    } catch (err: any) {
-      toast.error("Failed to save PO revision");
-    }
-  };
+
+  // 1. Create Purchase Order in Backend
+  await apiService.purchaseOrders.create({
+    poNo: poNumber,
+    vendorId: activePoVendor.id,
+    orderDate: poDate,
+    expectedDelivery: null, // ya jo date field hai
+    paymentTerms,
+    shippingTerms: "",
+    remarks,
+
+    items: poItems.map((item) => ({
+      materialId: item.materialId,
+      quantity: item.qty,
+      unitPrice: item.rate,
+    })),
+  });
+
+  // 2. Save Revision
+  await apiService.revisions.create(newRevision);
+
+  // 3. Refresh
+  const list = await apiService.revisions.list();
+  setRevisions(list);
+  setSelectedRevisionId(newRevision.id);
+
+  toast.success(`Revision R${newRevision.revisionNo} saved successfully`);
+
+} catch (err: any) {
+  toast.error("Failed to save PO revision");
+}
+  }
 
   // Load selected revision
   const loadRevision = (rev: PORevision) => {
@@ -3588,7 +3637,7 @@ export function VendorsPage() {
                                     >
                                       <div className="min-w-0">
                                         <div className="text-xs font-semibold text-foreground truncate">
-                                          {inv.material.name}
+                                          {inv.material?.name || "Unnamed Item"}
                                         </div>
                                         <div className="text-[10px] text-muted-foreground truncate">
                                           {inv.material.materialCode} • HSN:{" "}
