@@ -14,13 +14,13 @@ async function adminInventoryRouteGroup(
   fastify: FastifyInstance,
   options: FastifyPluginOptions,
 ) {
-  fastify.register(adminInventoryCreateRoutes, { prefix: "/create" });
-  fastify.register(adminInventoryReadRoutes, { prefix: "/read" });
+  // fastify.register(adminInventoryCreateRoutes, { prefix: "/create" });
+  // fastify.register(adminInventoryReadRoutes, { prefix: "/read" });
   // fastify.register(adminVendorReadByIdRoutes, { prefix: "/read" });
-  fastify.register(adminInventoryDeleteRoutes, { prefix: "/delete" });
-  fastify.register(adminInventoryUpdateRoutes, { prefix: "/update" });
-  fastify.register(adminInventoryStockInRoutes, { prefix: "/stock-in" });
-  fastify.register(adminInventoryStockOutRoutes, { prefix: "/stock-out" });
+  // fastify.register(adminInventoryDeleteRoutes, { prefix: "/delete" });
+  // fastify.register(adminInventoryUpdateRoutes, { prefix: "/update" });
+  // fastify.register(adminInventoryStockInRoutes, { prefix: "/stock-in" });
+  // fastify.register(adminInventoryStockOutRoutes, { prefix: "/stock-out" });
   fastify.register(adminInventoryTrackingRoutes, {
     prefix: "/tracking",
   });
