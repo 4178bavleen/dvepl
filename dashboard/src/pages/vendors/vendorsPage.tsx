@@ -43,6 +43,7 @@ import {
 import { toast } from "react-hot-toast";
 import { jsPDF } from "jspdf";
 import { tenderApi, inventoryApi, securityApi } from "@/services/modules";
+
 import { apiClient } from "@/services/axios";
 import { useERPStore } from "@/store/erpStore";
 import { DynamicFormRenderer } from "@/components/customFields/dynamicFormRenderer";
@@ -152,6 +153,7 @@ interface PORevision {
   createdBy: string;
   revisionNo: number;
   customColumns?: string[];
+  referenceCode?: string;
 }
 
 // ==========================================
@@ -400,6 +402,7 @@ export function VendorsPage() {
   const [poStatus, setPoStatus] = useState("Pending");
   const [paymentTerms, setPaymentTerms] = useState("30 days net");
   const [materialStatus, setMaterialStatus] = useState("Pending");
+  const [referenceCode, setReferenceCode] = useState("");
   const [advance, setAdvance] = useState(0);
   const [remarks, setRemarks] = useState("");
   const [cgstPercent, setCgstPercent] = useState(9);
@@ -1298,6 +1301,7 @@ export function VendorsPage() {
       createdBy: useERPStore.getState().currentUserName || "Unknown User",
       revisionNo: nextRevisionNo,
       customColumns: [...customColumns],
+      referenceCode,
     };
 
     try {
@@ -1328,6 +1332,7 @@ export function VendorsPage() {
     setCompanyDetails(rev.companyDetails);
     setSelectedRevisionId(rev.id);
     setCustomColumns(rev.customColumns || []);
+    setReferenceCode(rev.referenceCode || "");
     toast.success(`Loaded PO details from revision v${rev.revisionNo}`);
   };
 
@@ -1340,6 +1345,7 @@ export function VendorsPage() {
     setPoStatus("Pending");
     setPaymentTerms("30 days net");
     setMaterialStatus("Pending");
+    setReferenceCode("");
     setAdvance(0);
     setRemarks("");
     setCgstPercent(9);
@@ -1373,6 +1379,9 @@ export function VendorsPage() {
   const buildPoDocumentHtml = (): string => {
     if (!activePoVendor) return "";
 
+    const currentRevision = revisions.find((r) => r.id === selectedRevisionId);
+    const revisionNoStr = currentRevision ? `R${currentRevision.revisionNo}` : "R0";
+
     const customColsTh = customColumns.map((c) => `<th>${c}</th>`).join("");
 
     const itemsHtml = poItems
@@ -1400,9 +1409,7 @@ export function VendorsPage() {
     return `
         <html>
           <head>
-            <title>Purchase Order - ${poNumber}</title>
             <style>
-              @page { size: A4; margin: 8mm; }
               body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 0; color: #1f2937; line-height: 1.3; font-size: 11px; }
               .header { display: flex; justify-content: space-between; border-bottom: 2px solid #111827; padding-bottom: 10px; }
               .company-name { font-size: 18px; font-weight: 800; color: #1e3a8a; text-transform: uppercase; margin: 0 0 4px 0; }
@@ -1422,6 +1429,12 @@ export function VendorsPage() {
               .sig-box { border-top: 1px solid #111827; padding-top: 6px; text-align: center; width: 180px; font-size: 11px; }
               .sig-title { font-weight: 700; color: #111827; margin: 0; }
               .sig-desc { font-size: 9px; color: #4b5563; margin: 1px 0 0 0; }
+              @media print {
+                @page { size: A4; margin: 0; }
+                html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+                body { margin: 0; padding: 10mm; }
+                * { box-shadow: none !important; }
+              }
             </style>
           </head>
           <body>
@@ -1437,7 +1450,8 @@ export function VendorsPage() {
                 <h1 class="po-title">PURCHASE ORDER</h1>
                 <p style="margin: 0; font-size: 12px;"><strong>PO Number:</strong> ${poNumber}</p>
                 <p style="margin: 2px 0 0 0; font-size: 12px;"><strong>Date:</strong> ${poDate}</p>
-                <p style="margin: 2px 0 0 0; font-size: 12px;"><strong>Status:</strong> ${poStatus}</p>
+                <p style="margin: 2px 0 0 0; font-size: 12px;"><strong>Revision:</strong> ${revisionNoStr}</p>
+                ${referenceCode ? `<p style="margin: 2px 0 0 0; font-size: 12px;"><strong>Reference Code:</strong> ${referenceCode}</p>` : ""}
               </div>
             </div>
 
@@ -1514,6 +1528,9 @@ export function VendorsPage() {
   const generatePoCanvas = (): HTMLCanvasElement | null => {
     if (!activePoVendor) return null;
 
+    const currentRevision = revisions.find((r) => r.id === selectedRevisionId);
+    const revisionNoStr = currentRevision ? `R${currentRevision.revisionNo}` : "R0";
+
     const canvas = document.createElement('canvas');
     canvas.width = 1000;
     const dynamicHeight = 520 + (poItems.length * 32) + 260;
@@ -1528,7 +1545,13 @@ export function VendorsPage() {
     ctx.fillText(`Phone: ${companyDetails.phone} | Email: ${companyDetails.email}`, 40, 105);
     ctx.fillText(`GSTIN: ${companyDetails.gstin} | ${companyDetails.iso}`, 40, 125);
     ctx.fillStyle = '#111827'; ctx.font = 'bold 28px sans-serif'; ctx.fillText('PURCHASE ORDER', 620, 60);
-    ctx.font = '14px sans-serif'; ctx.fillText(`PO Number: ${poNumber}`, 620, 95); ctx.fillText(`Date: ${poDate}`, 620, 120);
+    ctx.font = '14px sans-serif';
+    ctx.fillText(`PO Number: ${poNumber}`, 620, 85);
+    ctx.fillText(`Date: ${poDate}`, 620, 105);
+    ctx.fillText(`Revision: ${revisionNoStr}`, 620, 125);
+    if (referenceCode) {
+      ctx.fillText(`Ref Code: ${referenceCode}`, 620, 142);
+    }
     ctx.strokeStyle = '#111827'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(40, 150); ctx.lineTo(960, 150); ctx.stroke();
     ctx.fillStyle = '#2563eb'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('ORDER PLACED TO (VENDOR):', 40, 180); ctx.fillText('DELIVERY & SHIPPING TERMS:', 500, 180);
     ctx.fillStyle = '#111827'; ctx.font = 'bold 14px sans-serif'; ctx.fillText(activePoVendor.name, 40, 205);
@@ -1563,27 +1586,39 @@ export function VendorsPage() {
         return;
       }
 
+      // Use an offscreen iframe to print the exact same HTML as the preview
       const iframe = document.createElement("iframe");
       iframe.style.position = "fixed";
       iframe.style.width = "0px";
       iframe.style.height = "0px";
       iframe.style.border = "none";
+      iframe.style.left = "-9999px";
       document.body.appendChild(iframe);
 
-      const doc = iframe.contentWindow?.document || iframe.contentDocument;
-      if (!doc) {
-        toast.error("Unable to create offscreen document print context.");
+      const iframeDoc = iframe.contentWindow?.document || iframe.contentDocument;
+      if (!iframeDoc) {
+        toast.error("Unable to create print context.");
+        document.body.removeChild(iframe);
         return;
       }
 
-      doc.write(html);
-      doc.close();
+      iframeDoc.open();
+      iframeDoc.write(html);
+      iframeDoc.close();
 
+      // Wait for content to render, then trigger print
       setTimeout(() => {
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-        document.body.removeChild(iframe);
-      }, 500);
+        try {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+        } catch (e) {
+          toast.error("Print failed. Please try again.");
+        }
+        // Clean up after a delay so print dialog can finish
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+        }, 1000);
+      }, 600);
     } else {
       const canvas = generatePoCanvas();
       if (!canvas) {
@@ -2209,7 +2244,7 @@ export function VendorsPage() {
         {/* Search Bars Container */}
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
           {/* 1. Global Search Bar */}
-          <div className="flex items-center w-full sm:w-72 h-10 bg-card border border-primary/15 rounded-full shadow-xs hover:border-primary/30 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all duration-200 overflow-hidden">
+          <div className="flex items-center w-full sm:w-72 h-10 bg-card border border-primary/50 rounded-sm shadow-xs hover:border-primary/30 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all duration-200 overflow-hidden">
             <Search className="size-4 text-muted-foreground ml-4 mr-2 shrink-0" />
             <input
               type="text"
@@ -2221,7 +2256,7 @@ export function VendorsPage() {
           </div>
 
           {/* 2. Column-specific Search Bar */}
-          <div className="flex items-center w-full sm:w-[360px] h-10 bg-card border border-primary/15 rounded-full shadow-xs hover:border-primary/30 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all duration-200 overflow-hidden">
+          <div className="flex items-center w-full sm:w-[360px] h-10 bg-card border border-primary/50 rounded-sm shadow-xs hover:border-primary/30 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all duration-200 overflow-hidden">
             <Select
               value={searchField}
               onValueChange={(val) => {
@@ -3089,6 +3124,15 @@ export function VendorsPage() {
                       PO Date is required
                     </span>
                   )}
+                </div>
+                <div className="de-po-field">
+                  <label>Reference Code</label>
+                  <input
+                    type="text"
+                    value={referenceCode}
+                    onChange={(e) => setReferenceCode(e.target.value)}
+                    placeholder="e.g. REF-2026-001"
+                  />
                 </div>
                 <div className="de-po-field">
                   <label>PO Status</label>
