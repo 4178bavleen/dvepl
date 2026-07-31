@@ -41,7 +41,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "react-hot-toast";
-import { tenderApi, inventoryApi } from "@/services/modules";
+import { jsPDF } from "jspdf";
+import { tenderApi, inventoryApi, securityApi } from "@/services/modules";
 import { apiClient } from "@/services/axios";
 import { useERPStore } from "@/store/erpStore";
 import { DynamicFormRenderer } from "@/components/customFields/dynamicFormRenderer";
@@ -467,44 +468,45 @@ export function VendorsPage() {
   }, [searchField, vendors]);
 
   const filteredVendors = useMemo(() => {
-    const query =
-      searchField === "all"
-        ? globalSearch.trim().toLowerCase()
-        : fieldSearch.trim().toLowerCase();
+    let result = vendors;
 
-    if (!query) return vendors;
-
-    if (searchField === "products") {
-      const matchingVendorIds = new Set(
-        allVendorProducts
-          .filter(
-            (a) =>
-              (a.material?.name ?? "").toLowerCase().includes(query) ||
-              (a.material?.materialCode ?? "").toLowerCase().includes(query) ||
-              (a.material?.category ?? "").toLowerCase().includes(query) ||
-              (a.vendorMaterialCode ?? "").toLowerCase().includes(query),
-          )
-          .map((a) => a.vendorId),
-      );
-
-      return vendors.filter((v) => matchingVendorIds.has(v.id));
-    }
-
-    if (searchField === "all") {
-      return vendors.filter(
+    // 1. Apply Global Search (searches name, category, gstNumber, contactPerson)
+    const globalQuery = globalSearch.trim().toLowerCase();
+    if (globalQuery) {
+      result = result.filter(
         (v) =>
-          (v.name ?? "").toLowerCase().includes(query) ||
-          (v.category ?? "").toLowerCase().includes(query) ||
-          (v.gstNumber ?? "").toLowerCase().includes(query) ||
-          (v.contactPerson ?? "").toLowerCase().includes(query),
+          (v.name ?? "").toLowerCase().includes(globalQuery) ||
+          (v.category ?? "").toLowerCase().includes(globalQuery) ||
+          (v.gstNumber ?? "").toLowerCase().includes(globalQuery) ||
+          (v.contactPerson ?? "").toLowerCase().includes(globalQuery),
       );
     }
 
-    const fieldValue = (v: Vendor) => (v as any)[searchField] ?? "";
+    // 2. Apply Column-specific Search
+    const columnQuery = fieldSearch.trim().toLowerCase();
+    if (columnQuery && searchField !== "all") {
+      if (searchField === "products") {
+        const matchingVendorIds = new Set(
+          allVendorProducts
+            .filter(
+              (a) =>
+                (a.material?.name ?? "").toLowerCase().includes(columnQuery) ||
+                (a.material?.materialCode ?? "").toLowerCase().includes(columnQuery) ||
+                (a.material?.category ?? "").toLowerCase().includes(columnQuery) ||
+                (a.vendorMaterialCode ?? "").toLowerCase().includes(columnQuery),
+            )
+            .map((a) => a.vendorId),
+        );
+        result = result.filter((v) => matchingVendorIds.has(v.id));
+      } else {
+        const fieldValue = (v: Vendor) => (v as any)[searchField] ?? "";
+        result = result.filter((v) =>
+          fieldValue(v).toString().toLowerCase().includes(columnQuery),
+        );
+      }
+    }
 
-    return vendors.filter((v) =>
-      fieldValue(v).toString().toLowerCase().includes(query),
-    );
+    return result;
   }, [vendors, globalSearch, fieldSearch, searchField, allVendorProducts]);
 
   // Filtered inventory for Vendor form "Products Supplied" tab
@@ -1068,10 +1070,10 @@ export function VendorsPage() {
             (inv) =>
               (catNoRaw &&
                 inv.material.materialCode?.toLowerCase() ===
-                  catNoRaw.toLowerCase()) ||
+                catNoRaw.toLowerCase()) ||
               (descriptionRaw &&
                 inv.material.name?.toLowerCase() ===
-                  descriptionRaw.toLowerCase()),
+                descriptionRaw.toLowerCase()),
           );
           if (invMatch) matchedFromInventory++;
 
@@ -1127,9 +1129,9 @@ export function VendorsPage() {
         setPoItems((prev) => [...prev, ...newItems]);
         toast.success(
           `Imported ${newItems.length} item(s) from Excel` +
-            (matchedFromInventory > 0
-              ? ` (${matchedFromInventory} matched to Inventory)`
-              : ""),
+          (matchedFromInventory > 0
+            ? ` (${matchedFromInventory} matched to Inventory)`
+            : ""),
         );
       } catch (err) {
         console.error(err);
@@ -1558,6 +1560,48 @@ export function VendorsPage() {
       `;
   };
 
+  const generatePoCanvas = (): HTMLCanvasElement | null => {
+    if (!activePoVendor) return null;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 1000;
+    const dynamicHeight = 520 + (poItems.length * 32) + 260;
+    canvas.height = Math.max(800, dynamicHeight);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#1e3a8a'; ctx.font = 'bold 22px sans-serif'; ctx.fillText(companyDetails.name, 40, 60);
+    ctx.fillStyle = '#4b5563'; ctx.font = '13px sans-serif';
+    ctx.fillText(companyDetails.address, 40, 85);
+    ctx.fillText(`Phone: ${companyDetails.phone} | Email: ${companyDetails.email}`, 40, 105);
+    ctx.fillText(`GSTIN: ${companyDetails.gstin} | ${companyDetails.iso}`, 40, 125);
+    ctx.fillStyle = '#111827'; ctx.font = 'bold 28px sans-serif'; ctx.fillText('PURCHASE ORDER', 620, 60);
+    ctx.font = '14px sans-serif'; ctx.fillText(`PO Number: ${poNumber}`, 620, 95); ctx.fillText(`Date: ${poDate}`, 620, 120);
+    ctx.strokeStyle = '#111827'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(40, 150); ctx.lineTo(960, 150); ctx.stroke();
+    ctx.fillStyle = '#2563eb'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('ORDER PLACED TO (VENDOR):', 40, 180); ctx.fillText('DELIVERY & SHIPPING TERMS:', 500, 180);
+    ctx.fillStyle = '#111827'; ctx.font = 'bold 14px sans-serif'; ctx.fillText(activePoVendor.name, 40, 205);
+    ctx.font = '13px sans-serif'; ctx.fillText(`Category: ${activePoVendor.category}`, 40, 225); ctx.fillText(`Phone: ${activePoVendor.phone} | Email: ${activePoVendor.email}`, 40, 245); ctx.fillText(`GSTIN: ${activePoVendor.gstNumber}`, 40, 265);
+    ctx.fillText(`Material Status: ${materialStatus}`, 500, 205); ctx.fillText(`Payment Terms: ${paymentTerms}`, 500, 225); ctx.fillText(`Remarks: ${remarks || 'None'}`, 500, 245);
+    let y = 300; ctx.fillStyle = '#f3f4f6'; ctx.fillRect(40, y, 920, 32); ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 1; ctx.strokeRect(40, y, 920, 32);
+    ctx.fillStyle = '#374151'; ctx.font = 'bold 11px sans-serif'; ctx.fillText('S.No.', 50, y + 20); ctx.fillText('Item Description', 100, y + 20); ctx.fillText('Qty', 440, y + 20); ctx.fillText('Unit', 500, y + 20); ctx.fillText('HSN Code', 560, y + 20); ctx.fillText('CAT No.', 650, y + 20); ctx.fillText('Rate', 740, y + 20); ctx.fillText('Total', 880, y + 20);
+    ctx.fillStyle = '#1f2937'; ctx.font = '13px sans-serif';
+    poItems.forEach((item, idx) => { y += 32; ctx.strokeRect(40, y, 920, 32); ctx.fillText(String(idx + 1), 50, y + 20); ctx.fillText(item.description || '—', 100, y + 20); ctx.fillText(String(item.qty), 440, y + 20); ctx.fillText(item.unit || 'PCS', 500, y + 20); ctx.fillText(item.hsnCode || '—', 560, y + 20); ctx.fillText(item.catNo || '—', 650, y + 20); ctx.fillText(`₹${item.rate.toFixed(2)}`, 740, y + 20); ctx.font = 'bold 13px sans-serif'; ctx.fillStyle = '#1e4620'; ctx.fillText(`₹${item.total.toFixed(2)}`, 880, y + 20); ctx.fillStyle = '#1f2937'; ctx.font = '13px sans-serif'; });
+    y += 50; const rightX = 640; ctx.font = '13px sans-serif'; ctx.fillStyle = '#4b5563'; ctx.fillText('Subtotal:', rightX, y); ctx.fillStyle = '#111827'; ctx.fillText(`₹${totals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 860, y);
+    y += 24; ctx.fillStyle = '#4b5563'; ctx.fillText(`CGST (${cgstPercent}%):`, rightX, y); ctx.fillStyle = '#111827'; ctx.fillText(`₹${totals.cgstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 860, y);
+    y += 24; ctx.fillStyle = '#4b5563'; ctx.fillText(`SGST (${sgstPercent}%):`, rightX, y); ctx.fillStyle = '#111827'; ctx.fillText(`₹${totals.sgstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 860, y);
+    y += 24; ctx.fillStyle = '#4b5563'; ctx.fillText(`IGST (${igstPercent}%):`, rightX, y); ctx.fillStyle = '#111827'; ctx.fillText(`₹${totals.igstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 860, y);
+    y += 12; ctx.strokeStyle = '#111827'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(rightX, y); ctx.lineTo(960, y); ctx.stroke();
+    y += 20; ctx.fillStyle = '#111827'; ctx.font = 'bold 14px sans-serif'; ctx.fillText('Grand Total:', rightX, y); ctx.fillStyle = '#1e4620'; ctx.fillText(`₹${totals.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 860, y);
+    y += 24; ctx.font = '13px sans-serif'; ctx.fillStyle = '#4b5563'; ctx.fillText('Advance Paid:', rightX, y); ctx.fillStyle = '#111827'; ctx.fillText(`₹${advance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 860, y);
+    y += 24; ctx.fillStyle = '#111827'; ctx.font = 'bold 13px sans-serif'; ctx.fillText('Balance Due:', rightX, y); ctx.fillStyle = '#1e4620'; ctx.fillText(`₹${totals.balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 860, y);
+    ctx.fillStyle = '#1f2937'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('TERMS & CONDITIONS:', 40, y - 100); ctx.fillStyle = '#4b5563'; ctx.font = '11px sans-serif'; const termLines = terms.split('\n'); let termY = y - 80; termLines.forEach(line => { ctx.fillText(line, 40, termY); termY += 16; });
+    y += 80; ctx.strokeStyle = '#111827'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(680, y); ctx.lineTo(920, y); ctx.stroke();
+    y += 20; ctx.fillStyle = '#111827'; ctx.font = 'bold 13px sans-serif'; ctx.fillText(companyDetails.signatory, 700, y); ctx.font = '11px sans-serif'; ctx.fillStyle = '#4b5563'; ctx.fillText('Authorized Signatory', 700, y + 16);
+
+    return canvas;
+  };
+
   const triggerExport = (format: string) => {
     if (!activePoVendor) return;
 
@@ -1590,197 +1634,11 @@ export function VendorsPage() {
         document.body.removeChild(iframe);
       }, 500);
     } else {
-      const canvas = document.createElement("canvas");
-      canvas.width = 1000;
-      const dynamicHeight = 520 + poItems.length * 32 + 260;
-      canvas.height = Math.max(800, dynamicHeight);
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
+      const canvas = generatePoCanvas();
+      if (!canvas) {
         toast.error("Unable to create canvas context.");
         return;
       }
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = "#1e3a8a";
-      ctx.font = "bold 22px sans-serif";
-      ctx.fillText(companyDetails.name, 40, 60);
-      ctx.fillStyle = "#4b5563";
-      ctx.font = "13px sans-serif";
-      ctx.fillText(companyDetails.address, 40, 85);
-      ctx.fillText(
-        `Phone: ${companyDetails.phone} | Email: ${companyDetails.email}`,
-        40,
-        105,
-      );
-      ctx.fillText(
-        `GSTIN: ${companyDetails.gstin} | ${companyDetails.iso}`,
-        40,
-        125,
-      );
-      ctx.fillStyle = "#111827";
-      ctx.font = "bold 28px sans-serif";
-      ctx.fillText("PURCHASE ORDER", 620, 60);
-      ctx.font = "14px sans-serif";
-      ctx.fillText(`PO Number: ${poNumber}`, 620, 95);
-      ctx.fillText(`Date: ${poDate}`, 620, 120);
-      ctx.strokeStyle = "#111827";
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.moveTo(40, 150);
-      ctx.lineTo(960, 150);
-      ctx.stroke();
-      ctx.fillStyle = "#2563eb";
-      ctx.font = "bold 12px sans-serif";
-      ctx.fillText("ORDER PLACED TO (VENDOR):", 40, 180);
-      ctx.fillText("DELIVERY & SHIPPING TERMS:", 500, 180);
-      ctx.fillStyle = "#111827";
-      ctx.font = "bold 14px sans-serif";
-      ctx.fillText(activePoVendor.name, 40, 205);
-      ctx.font = "13px sans-serif";
-      ctx.fillText(`Category: ${activePoVendor.category}`, 40, 225);
-      ctx.fillText(
-        `Phone: ${activePoVendor.phone} | Email: ${activePoVendor.email}`,
-        40,
-        245,
-      );
-      ctx.fillText(`GSTIN: ${activePoVendor.gstNumber}`, 40, 265);
-      ctx.fillText(`Material Status: ${materialStatus}`, 500, 205);
-      ctx.fillText(`Payment Terms: ${paymentTerms}`, 500, 225);
-      ctx.fillText(`Remarks: ${remarks || "None"}`, 500, 245);
-      let y = 300;
-      ctx.fillStyle = "#f3f4f6";
-      ctx.fillRect(40, y, 920, 32);
-      ctx.strokeStyle = "#cbd5e1";
-      ctx.lineWidth = 1;
-      ctx.strokeRect(40, y, 920, 32);
-      ctx.fillStyle = "#374151";
-      ctx.font = "bold 11px sans-serif";
-      ctx.fillText("S.No.", 50, y + 20);
-      ctx.fillText("Item Description", 100, y + 20);
-      ctx.fillText("Qty", 440, y + 20);
-      ctx.fillText("Unit", 500, y + 20);
-      ctx.fillText("HSN Code", 560, y + 20);
-      ctx.fillText("CAT No.", 650, y + 20);
-      ctx.fillText("Rate", 740, y + 20);
-      ctx.fillText("Total", 880, y + 20);
-      ctx.fillStyle = "#1f2937";
-      ctx.font = "13px sans-serif";
-      poItems.forEach((item, idx) => {
-        y += 32;
-        ctx.strokeRect(40, y, 920, 32);
-        ctx.fillText(String(idx + 1), 50, y + 20);
-        ctx.fillText(item.description || "—", 100, y + 20);
-        ctx.fillText(String(item.qty), 440, y + 20);
-        ctx.fillText(item.unit || "PCS", 500, y + 20);
-        ctx.fillText(item.hsnCode || "—", 560, y + 20);
-        ctx.fillText(item.catNo || "—", 650, y + 20);
-        ctx.fillText(`₹${item.rate.toFixed(2)}`, 740, y + 20);
-        ctx.font = "bold 13px sans-serif";
-        ctx.fillStyle = "#1e4620";
-        ctx.fillText(`₹${item.total.toFixed(2)}`, 880, y + 20);
-        ctx.fillStyle = "#1f2937";
-        ctx.font = "13px sans-serif";
-      });
-      y += 50;
-      const rightX = 640;
-      ctx.font = "13px sans-serif";
-      ctx.fillStyle = "#4b5563";
-      ctx.fillText("Subtotal:", rightX, y);
-      ctx.fillStyle = "#111827";
-      ctx.fillText(
-        `₹${totals.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
-        860,
-        y,
-      );
-      y += 24;
-      ctx.fillStyle = "#4b5563";
-      ctx.fillText(`CGST (${cgstPercent}%):`, rightX, y);
-      ctx.fillStyle = "#111827";
-      ctx.fillText(
-        `₹${totals.cgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
-        860,
-        y,
-      );
-      y += 24;
-      ctx.fillStyle = "#4b5563";
-      ctx.fillText(`SGST (${sgstPercent}%):`, rightX, y);
-      ctx.fillStyle = "#111827";
-      ctx.fillText(
-        `₹${totals.sgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
-        860,
-        y,
-      );
-      y += 24;
-      ctx.fillStyle = "#4b5563";
-      ctx.fillText(`IGST (${igstPercent}%):`, rightX, y);
-      ctx.fillStyle = "#111827";
-      ctx.fillText(
-        `₹${totals.igstAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
-        860,
-        y,
-      );
-      y += 12;
-      ctx.strokeStyle = "#111827";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(rightX, y);
-      ctx.lineTo(960, y);
-      ctx.stroke();
-      y += 20;
-      ctx.fillStyle = "#111827";
-      ctx.font = "bold 14px sans-serif";
-      ctx.fillText("Grand Total:", rightX, y);
-      ctx.fillStyle = "#1e4620";
-      ctx.fillText(
-        `₹${totals.grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
-        860,
-        y,
-      );
-      y += 24;
-      ctx.font = "13px sans-serif";
-      ctx.fillStyle = "#4b5563";
-      ctx.fillText("Advance Paid:", rightX, y);
-      ctx.fillStyle = "#111827";
-      ctx.fillText(
-        `₹${advance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
-        860,
-        y,
-      );
-      y += 24;
-      ctx.fillStyle = "#111827";
-      ctx.font = "bold 13px sans-serif";
-      ctx.fillText("Balance Due:", rightX, y);
-      ctx.fillStyle = "#1e4620";
-      ctx.fillText(
-        `₹${totals.balance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
-        860,
-        y,
-      );
-      ctx.fillStyle = "#1f2937";
-      ctx.font = "bold 12px sans-serif";
-      ctx.fillText("TERMS & CONDITIONS:", 40, y - 100);
-      ctx.fillStyle = "#4b5563";
-      ctx.font = "11px sans-serif";
-      const termLines = terms.split("\n");
-      let termY = y - 80;
-      termLines.forEach((line) => {
-        ctx.fillText(line, 40, termY);
-        termY += 16;
-      });
-      y += 80;
-      ctx.strokeStyle = "#111827";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(680, y);
-      ctx.lineTo(920, y);
-      ctx.stroke();
-      y += 20;
-      ctx.fillStyle = "#111827";
-      ctx.font = "bold 13px sans-serif";
-      ctx.fillText(companyDetails.signatory, 700, y);
-      ctx.font = "11px sans-serif";
-      ctx.fillStyle = "#4b5563";
-      ctx.fillText("Authorized Signatory", 700, y + 16);
       const downloadAnchor = document.createElement("a");
       downloadAnchor.setAttribute(
         "href",
@@ -1815,7 +1673,7 @@ export function VendorsPage() {
       "Vendor: " + (activePoVendor?.name || ""),
       "Items: " + itemsLine,
       "Grand Total: Rs. " +
-        totals.grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 }),
+      totals.grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 }),
       "Payment Terms: " + paymentTerms,
       "Material Status: " + materialStatus,
     ];
@@ -1843,7 +1701,7 @@ export function VendorsPage() {
     setIsPoPlacedDialogOpen(true);
   };
 
-  const handleConfirmPoPlaced = () => {
+  const handleConfirmPoPlaced = async () => {
     if (!placeSendWhatsapp && !placeSendEmail) {
       toast.error("Select at least one channel (WhatsApp or Email).");
       return;
@@ -1857,7 +1715,7 @@ export function VendorsPage() {
       return;
     }
 
-    // Generate the PDF PO for user to print/save and attach
+    // Generate the PDF PO for user to print/save
     triggerExport("pdf");
 
     const message = buildPoMessageText();
@@ -1871,25 +1729,58 @@ export function VendorsPage() {
       );
       sentChannels.push("WhatsApp");
     }
+
     if (placeSendEmail) {
-      const subject =
-        "Purchase Order " + poNumber + " from " + companyDetails.name;
-      window.open(
-        "mailto:" +
-          placeEmail +
-          "?subject=" +
-          encodeURIComponent(subject) +
-          "&body=" +
-          encodeURIComponent(message),
-        "_blank",
-      );
-      sentChannels.push("Email");
+      const emailToast = toast.loading("Sending PO email to vendor...");
+      const canvas = generatePoCanvas();
+      if (!canvas) {
+        toast.error("Unable to generate PO document for email attachment.", { id: emailToast });
+        return;
+      }
+      const imgData = canvas.toDataURL("image/jpeg", 0.95);
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "px",
+        format: [canvas.width, canvas.height]
+      });
+      pdf.addImage(imgData, "JPEG", 0, 0, canvas.width, canvas.height);
+      const base64Pdf = pdf.output("datauristring").split(",")[1];
+      const subject = `Purchase Order ${poNumber} from ${companyDetails.name}`;
+      const emailHtml = `
+        <p>Dear Vendor,</p>
+        <p>Please find attached our Purchase Order <strong>${poNumber}</strong> dated ${poDate}.</p>
+        <p><strong>Summary of Terms:</strong></p>
+        <ul>
+          <li><strong>Material Status:</strong> ${materialStatus}</li>
+          <li><strong>Payment Terms:</strong> ${paymentTerms}</li>
+        </ul>
+        <p>Best regards,<br>${companyDetails.name}</p>
+      `;
+
+      try {
+        const res = await securityApi.settings.sendPoEmail({
+          toEmail: placeEmail,
+          subject,
+          html: emailHtml,
+          pdfBase64: base64Pdf,
+          poNumber
+        });
+
+        if (res?.success) {
+          sentChannels.push("Email");
+          toast.success("PO email sent to vendor successfully!", { id: emailToast });
+        } else {
+          toast.error(res?.message || "Failed to send PO email.", { id: emailToast });
+        }
+      } catch (err: any) {
+        toast.error(err?.response?.data?.message || err?.message || "Error occurred while sending PO email.", { id: emailToast });
+      }
     }
 
     setPoStatus("Placed");
     toast.success(
       "PO marked as Placed - PDF generated and sent via " +
-        sentChannels.join(" & "),
+      sentChannels.join(" & "),
     );
     setIsPoPlacedDialogOpen(false);
   };
@@ -2018,20 +1909,20 @@ export function VendorsPage() {
                 {vendorCustomFields.some(
                   (f) => f.afterField === "category",
                 ) && (
-                  <div className="sm:col-span-2">
-                    <DynamicFormRenderer
-                      fields={vendorCustomFields}
-                      values={vCustomFields}
-                      onChange={(key, val) => {
-                        setVCustomFields((prev) => ({ ...prev, [key]: val }));
-                        if (vErrors[key])
-                          setVErrors((prev) => ({ ...prev, [key]: "" }));
-                      }}
-                      errors={vErrors}
-                      afterFieldPosition="category"
-                    />
-                  </div>
-                )}
+                    <div className="sm:col-span-2">
+                      <DynamicFormRenderer
+                        fields={vendorCustomFields}
+                        values={vCustomFields}
+                        onChange={(key, val) => {
+                          setVCustomFields((prev) => ({ ...prev, [key]: val }));
+                          if (vErrors[key])
+                            setVErrors((prev) => ({ ...prev, [key]: "" }));
+                        }}
+                        errors={vErrors}
+                        afterFieldPosition="category"
+                      />
+                    </div>
+                  )}
 
                 <div className="flex flex-col gap-1.5">
                   <Label className="text-xs font-semibold">
@@ -2046,20 +1937,20 @@ export function VendorsPage() {
                 {vendorCustomFields.some(
                   (f) => f.afterField === "contactPerson",
                 ) && (
-                  <div className="sm:col-span-2">
-                    <DynamicFormRenderer
-                      fields={vendorCustomFields}
-                      values={vCustomFields}
-                      onChange={(key, val) => {
-                        setVCustomFields((prev) => ({ ...prev, [key]: val }));
-                        if (vErrors[key])
-                          setVErrors((prev) => ({ ...prev, [key]: "" }));
-                      }}
-                      errors={vErrors}
-                      afterFieldPosition="contactPerson"
-                    />
-                  </div>
-                )}
+                    <div className="sm:col-span-2">
+                      <DynamicFormRenderer
+                        fields={vendorCustomFields}
+                        values={vCustomFields}
+                        onChange={(key, val) => {
+                          setVCustomFields((prev) => ({ ...prev, [key]: val }));
+                          if (vErrors[key])
+                            setVErrors((prev) => ({ ...prev, [key]: "" }));
+                        }}
+                        errors={vErrors}
+                        afterFieldPosition="contactPerson"
+                      />
+                    </div>
+                  )}
 
                 <div className="flex flex-col gap-1.5">
                   <Label className="text-xs font-semibold">Phone</Label>
@@ -2171,20 +2062,20 @@ export function VendorsPage() {
                 {vendorCustomFields.some(
                   (f) => f.afterField === "gstNumber",
                 ) && (
-                  <div className="sm:col-span-2">
-                    <DynamicFormRenderer
-                      fields={vendorCustomFields}
-                      values={vCustomFields}
-                      onChange={(key, val) => {
-                        setVCustomFields((prev) => ({ ...prev, [key]: val }));
-                        if (vErrors[key])
-                          setVErrors((prev) => ({ ...prev, [key]: "" }));
-                      }}
-                      errors={vErrors}
-                      afterFieldPosition="gstNumber"
-                    />
-                  </div>
-                )}
+                    <div className="sm:col-span-2">
+                      <DynamicFormRenderer
+                        fields={vendorCustomFields}
+                        values={vCustomFields}
+                        onChange={(key, val) => {
+                          setVCustomFields((prev) => ({ ...prev, [key]: val }));
+                          if (vErrors[key])
+                            setVErrors((prev) => ({ ...prev, [key]: "" }));
+                        }}
+                        errors={vErrors}
+                        afterFieldPosition="gstNumber"
+                      />
+                    </div>
+                  )}
 
                 <div className="flex flex-col gap-1.5 sm:col-span-2">
                   <Label className="text-xs font-semibold">Address</Label>
@@ -2239,21 +2130,21 @@ export function VendorsPage() {
                 {vendorCustomFields.some(
                   (f) => !f.afterField || f.afterField === "end",
                 ) && (
-                  <div className="sm:col-span-2">
-                    <DynamicFormRenderer
-                      fields={vendorCustomFields.filter(
-                        (f) => !f.afterField || f.afterField === "end",
-                      )}
-                      values={vCustomFields}
-                      onChange={(key, val) => {
-                        setVCustomFields((prev) => ({ ...prev, [key]: val }));
-                        if (vErrors[key])
-                          setVErrors((prev) => ({ ...prev, [key]: "" }));
-                      }}
-                      errors={vErrors}
-                    />
-                  </div>
-                )}
+                    <div className="sm:col-span-2">
+                      <DynamicFormRenderer
+                        fields={vendorCustomFields.filter(
+                          (f) => !f.afterField || f.afterField === "end",
+                        )}
+                        values={vCustomFields}
+                        onChange={(key, val) => {
+                          setVCustomFields((prev) => ({ ...prev, [key]: val }));
+                          if (vErrors[key])
+                            setVErrors((prev) => ({ ...prev, [key]: "" }));
+                        }}
+                        errors={vErrors}
+                      />
+                    </div>
+                  )}
               </div>
             )}
 
@@ -2363,19 +2254,23 @@ export function VendorsPage() {
       )}
 
       {/* ── Search Bar & Column Visibility ── */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2 max-w-md w-full border rounded-xl px-3 bg-card shadow-xs focus-within:ring-1 focus-within:ring-primary">
-          <Search className="size-4 text-muted-foreground" />
-          <Input
-            placeholder="Search vendors by name, category, GST..."
-            value={globalSearch}
-            onChange={(e) => setGlobalSearch(e.target.value)}
-          />
-        </div>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* Search Bars Container */}
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          {/* 1. Global Search Bar */}
+          <div className="flex items-center w-full sm:w-72 h-10 bg-card border border-primary/15 rounded-full shadow-xs hover:border-primary/30 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all duration-200 overflow-hidden">
+            <Search className="size-4 text-muted-foreground ml-4 mr-2 shrink-0" />
+            <input
+              type="text"
+              placeholder="Search all fields..."
+              className="flex-1 h-full bg-transparent pr-4 text-sm placeholder:text-muted-foreground focus:outline-none border-none ring-0 outline-none"
+              value={globalSearch}
+              onChange={(e) => setGlobalSearch(e.target.value)}
+            />
+          </div>
 
-        {/* new added */}
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2 max-w-md w-full">
+          {/* 2. Column-specific Search Bar */}
+          <div className="flex items-center w-full sm:w-[360px] h-10 bg-card border border-primary/15 rounded-full shadow-xs hover:border-primary/30 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all duration-200 overflow-hidden">
             <Select
               value={searchField}
               onValueChange={(val) => {
@@ -2383,11 +2278,11 @@ export function VendorsPage() {
                 setFieldSearch("");
               }}
             >
-              <SelectTrigger className="w-[150px] h-9 shrink-0">
+              <SelectTrigger className="border-none shadow-none focus:ring-0 focus:ring-offset-0 w-[125px] h-full pl-4 pr-1 text-xs font-semibold text-muted-foreground bg-transparent hover:text-foreground cursor-pointer transition-colors shrink-0">
                 <SelectValue placeholder="Search in" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Fields</SelectItem>
+                <SelectItem value="all">Select Column</SelectItem>
                 <SelectItem value="name">Vendor Name</SelectItem>
                 <SelectItem value="category">Category</SelectItem>
                 <SelectItem value="contactPerson">Contact Person</SelectItem>
@@ -2398,39 +2293,35 @@ export function VendorsPage() {
               </SelectContent>
             </Select>
 
-            <div className="flex items-center gap-2 flex-1 border rounded-xl px-3 bg-card shadow-xs focus-within:ring-1 focus-within:ring-primary">
-              <Search className="size-4 text-muted-foreground" />
-              <Input
-                placeholder={
-                  searchField === "all"
-                    ? "Search vendors by name, category, GST..."
-                    : `Search by ${
-                        searchField === "gstNumber"
-                          ? "GSTIN"
-                          : searchField === "contactPerson"
-                            ? "contact person"
-                            : searchField
-                      }...`
-                }
-                value={fieldSearch}
-                onChange={(e) => setFieldSearch(e.target.value)}
-              />
-              {/* {searchField === 'products' && !vendorProductsLoaded && (
-  <p className="text-xs text-muted-foreground px-1">Loading product data for search…</p>
-)} */}
-            </div>
-          </div>
+            <div className="w-px h-5 bg-border shrink-0" />
 
-          <div className="flex items-center gap-2 shrink-0">
-            {/* existing Refresh + Customize Columns buttons stay as-is */}
+            <input
+              type="text"
+              className="flex-1 h-full bg-transparent px-3 text-sm placeholder:text-muted-foreground focus:outline-none border-none ring-0 outline-none"
+              disabled={searchField === "all"}
+              placeholder={
+                searchField === "all"
+                  ? "Select a column to filter..."
+                  : `Search by ${searchField === "gstNumber"
+                    ? "GSTIN"
+                    : searchField === "contactPerson"
+                      ? "contact person"
+                      : searchField
+                  }...`
+              }
+              value={fieldSearch}
+              onChange={(e) => setFieldSearch(e.target.value)}
+            />
           </div>
         </div>
+
+        {/* Actions Container */}
         <div className="flex items-center gap-2 shrink-0">
           <Button
             variant="outline"
             size="sm"
             onClick={() => void fetchAllData()}
-            className="gap-2 font-medium"
+            className="gap-2 font-medium h-10 rounded-lg px-4"
             title="Refresh Vendors"
           >
             <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
@@ -2443,7 +2334,7 @@ export function VendorsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-2 font-medium"
+                  className="gap-2 font-medium h-10 rounded-lg px-4"
                 >
                   <SlidersHorizontal className="size-4" />
                   Customize Columns
@@ -2878,12 +2769,12 @@ export function VendorsPage() {
                         Created On:{" "}
                         {rev.createdAt
                           ? new Date(rev.createdAt).toLocaleString("en-IN", {
-                              day: "2-digit",
-                              month: "short",
-                              year: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
                           : "—"}
                       </span>
                     </div>
@@ -2958,11 +2849,11 @@ export function VendorsPage() {
             style={
               deMaximized
                 ? {
-                    width: "100vw",
-                    height: "100vh",
-                    maxWidth: "100vw",
-                    maxHeight: "100vh",
-                  }
+                  width: "100vw",
+                  height: "100vh",
+                  maxWidth: "100vw",
+                  maxHeight: "100vh",
+                }
                 : undefined
             }
           >
@@ -3621,10 +3512,10 @@ export function VendorsPage() {
                               <div className="max-h-64 overflow-y-auto divide-y">
                                 {getInventoryMatches(item.description)
                                   .length === 0 && (
-                                  <div className="p-3 text-center text-xs text-muted-foreground">
-                                    No matching inventory items.
-                                  </div>
-                                )}
+                                    <div className="p-3 text-center text-xs text-muted-foreground">
+                                      No matching inventory items.
+                                    </div>
+                                  )}
                                 {getInventoryMatches(item.description).map(
                                   (inv) => (
                                     <button

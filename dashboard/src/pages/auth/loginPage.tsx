@@ -33,7 +33,34 @@ export function LoginPage() {
     try {
       const response = await authService.login(email, password);
 
-      useERPStore.getState().setCurrentUser(response.user.id,response.user.name);
+      const userObj = {
+        id: response.user.id,
+        name: response.user.name,
+        email: response.user.email,
+        companyId: "",
+        isEmailVerified: true,
+        isPhoneVerified: true,
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        role: response.user.roles?.[0] || "",
+        designation: response.user.designation || "Team Member",
+        pageAccess: response.user.pageAccess || [],
+        fieldPermissions: response.user.fieldPermissions || {},
+        actionPermissions: response.user.actionPermissions || { create: true, edit: true, delete: false, export: true },
+        roles: (response.user.roles || []).map((rName: string) => ({
+          id: rName,
+          name: rName
+        }))
+      };
+
+      const currentUsers = useERPStore.getState().users;
+      const updatedUsers = currentUsers.some(u => u.id === userObj.id)
+        ? currentUsers.map(u => u.id === userObj.id ? { ...u, ...userObj } : u)
+        : [...currentUsers, userObj];
+
+      useERPStore.setState({ users: updatedUsers as any });
+      useERPStore.getState().setCurrentUser(response.user.id, response.user.name);
 
       markAuthenticated();
       setIsLoading(false);

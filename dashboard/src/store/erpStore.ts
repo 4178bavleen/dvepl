@@ -1,10 +1,11 @@
 import { create } from 'zustand';
 import {
   ReferenceCodeAction, Company, Branch, Department, Team, Designation,
-  CostCenter, User, Role, PermissionGroup, Permission, Employee,
+  CostCenter, User, Role, Employee,
   Attendance, Leave, Salary, Tender, TenderRequest, GovernmentDepartment, Section, Division,
   SubDivision, ReferenceCode, AuditLog, Shift, Holiday, DeliveryOrder
 } from '../types/erp';
+import { securityApi } from '@/services/modules';
 
 import {
   initialCompanies,
@@ -15,8 +16,6 @@ import {
   initialCostCenters,
   initialUsers,
   initialRoles,
-  initialPermissionGroups,
-  initialPermissions,
   initialEmployees,
   initialAttendances,
   initialLeaves,
@@ -44,8 +43,6 @@ interface ERPStore {
   costCenters: CostCenter[];
   users: User[];
   roles: Role[];
-  permissions: Permission[];
-  permissionGroups: PermissionGroup[];
   employees: Employee[];
   attendances: Attendance[];
   leaves: Leave[];
@@ -84,6 +81,9 @@ interface ERPStore {
   updateRecord: (table: string, id: string, data: any) => void;
   deleteRecord: (table: string, id: string) => void;
   addAuditLog: (module: string, recordId: string, action: string, oldValue?: any, newValue?: any) => void;
+  settings: any;
+  fetchSettings: () => Promise<void>;
+  updateSettings: (payload: any) => Promise<void>;
 }
 // Combine into Zustand store
 export const useERPStore = create<ERPStore>((set) => ({
@@ -95,8 +95,6 @@ export const useERPStore = create<ERPStore>((set) => ({
   costCenters: initialCostCenters,
   users: initialUsers,
   roles: initialRoles,
-  permissionGroups: initialPermissionGroups,
-  permissions: initialPermissions,
   employees: initialEmployees,
   attendances: initialAttendances,
   leaves: initialLeaves,
@@ -122,7 +120,7 @@ export const useERPStore = create<ERPStore>((set) => ({
   language: 'English',
 
   setCompanyId: (id) => set({ currentCompanyId: id }),
-  setCurrentUser: (id, name) =>set({currentUserId: id,currentUserName: name}),
+  setCurrentUser: (id, name) => set({ currentUserId: id, currentUserName: name }),
   setWorkspace: (ws) => set({ currentWorkspace: ws }),
   toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
   setLanguage: (language: string) => set({ language }),
@@ -230,5 +228,24 @@ export const useERPStore = create<ERPStore>((set) => ({
     });
 
     useERPStore.getState().addAuditLog(table, id, 'DELETE', oldRecord, null);
+  },
+
+  settings: {},
+  fetchSettings: async () => {
+    try {
+      const data = await securityApi.settings.read();
+      set({ settings: data || {} });
+    } catch (e) {
+      console.error(e);
+    }
+  },
+  updateSettings: async (payload: any) => {
+    try {
+      const updated = await securityApi.settings.update(payload);
+      set({ settings: updated || {} });
+    } catch (e) {
+      console.error(e);
+      throw e;
+    }
   }
 }));

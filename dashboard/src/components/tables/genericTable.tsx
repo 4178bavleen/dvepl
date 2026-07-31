@@ -49,7 +49,7 @@ const Table = React.forwardRef<
   HTMLTableElement,
   React.HTMLAttributes<HTMLTableElement>
 >(({ className, ...props }, ref) => (
-  <div className="relative w-full overflow-x-auto" data-slot="table-container">
+  <div className="relative w-full max-h-[70vh] overflow-auto no-scrollbar-y" data-slot="table-container">
     <table
       ref={ref}
       className={cn("w-full caption-bottom text-sm", className)}
@@ -101,7 +101,7 @@ const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      "h-10 px-2 text-left align-middle font-medium whitespace-nowrap text-foreground [&:has([role=checkbox])]:pr-0",
+      "h-10 px-2 text-left align-middle font-medium whitespace-nowrap text-foreground [&:has([role=checkbox])]:pr-0 sticky top-0 bg-card/95 backdrop-blur-xs z-10 shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)]",
       className,
     )}
     {...props}
@@ -470,6 +470,18 @@ export function GenericTable<TData extends { id: string }>({
     }
   }, [columnOrder, localStorageKey]);
 
+  const localStoragePageSizeKey = `generic-table-page-size:${storageKey ?? autoKey}`;
+
+  const [initialPageSize] = useState<number>(() => {
+    if (typeof window === "undefined") return 10;
+    try {
+      const saved = window.localStorage.getItem(localStoragePageSizeKey);
+      return saved ? parseInt(saved, 10) : 10;
+    } catch {
+      return 10;
+    }
+  });
+
   const table = useReactTable({
     data,
     columns: tableColumns,
@@ -478,6 +490,11 @@ export function GenericTable<TData extends { id: string }>({
       columnVisibility,
       rowSelection,
       columnOrder,
+    },
+    initialState: {
+      pagination: {
+        pageSize: initialPageSize,
+      },
     },
     defaultColumn: {
       size: 200,
@@ -493,6 +510,20 @@ export function GenericTable<TData extends { id: string }>({
     getPaginationRowModel: getPaginationRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
   });
+
+  const [customPageSize, setCustomPageSize] = useState<string>(String(initialPageSize));
+
+  React.useEffect(() => {
+    const pSize = table.getState().pagination.pageSize;
+    setCustomPageSize(String(pSize));
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(localStoragePageSizeKey, String(pSize));
+      } catch {
+        // fail silently
+      }
+    }
+  }, [table.getState().pagination.pageSize, localStoragePageSizeKey]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -531,11 +562,145 @@ export function GenericTable<TData extends { id: string }>({
     .getFilteredSelectedRowModel()
     .rows.map((row) => row.original);
 
+  const currentPage = table.getState().pagination.pageIndex + 1;
+  const pageCount = table.getPageCount();
+
+  const getVisiblePages = () => {
+    const delta = 1; // number of pages to show before and after current page
+    const range: number[] = [];
+    const rangeWithDots: (number | string)[] = [];
+    let l: number | null = null;
+
+    for (let i = 1; i <= pageCount; i++) {
+      if (i === 1 || i === pageCount || (i >= currentPage - delta && i <= currentPage + delta)) {
+        range.push(i);
+      }
+    }
+
+    for (const i of range) {
+      if (l !== null) {
+        if (i - l === 2) {
+          rangeWithDots.push(l + 1);
+        } else if (i - l > 2) {
+          rangeWithDots.push("...");
+        }
+      }
+      rangeWithDots.push(i);
+      l = i;
+    }
+
+    return rangeWithDots;
+  };
+
   return (
     <div className="space-y-4">
       {/* Table Toolbar */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* Left Side: Pagination & Bulk Actions */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Pagination Navigation & Info */}
+          {!isLoading && data.length > 0 && (
+            <div className="flex flex-wrap items-center gap-3">
+              {/* 1. Page Numbers Navigation Pill */}
+              <div className="flex items-center gap-1 bg-muted/30 border border-border/40 p-1 h-11 rounded-xl shadow-3xs">
+                {/* Prev Arrow */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 w-9 p-0 rounded-lg text-muted-foreground hover:text-foreground hover:bg-card border border-transparent hover:border-border/30 hover:shadow-3xs transition-all duration-150 disabled:opacity-30 disabled:pointer-events-none"
+                  onClick={() => table.previousPage()}
+                  disabled={!table.getCanPreviousPage()}
+                >
+                  <ChevronLeft className="h-4.5 w-4.5" />
+                </Button>
+
+                {/* Page numbers */}
+                <div className="flex items-center gap-1">
+                  {getVisiblePages().map((page, index) => {
+                    if (page === "...") {
+                      return (
+                        <span
+                          key={`dots-${index}`}
+                          className="text-xs text-muted-foreground font-semibold px-1.5 select-none"
+                        >
+                          ...
+                        </span>
+                      );
+                    }
+                    const isCurrent = page === currentPage;
+                    return (
+                      <Button
+                        key={`page-${page}`}
+                        variant={isCurrent ? "default" : "ghost"}
+                        size="sm"
+                        className={cn(
+                          "h-9 w-9 p-0 rounded-lg text-xs font-semibold transition-all duration-150",
+                          isCurrent
+                            ? "bg-primary text-white hover:bg-primary/95 shadow-sm"
+                            : "text-muted-foreground hover:text-foreground hover:bg-card border border-transparent hover:border-border/30 hover:shadow-3xs"
+                        )}
+                        onClick={() => table.setPageIndex((page as number) - 1)}
+                      >
+                        {page}
+                      </Button>
+                    );
+                  })}
+                </div>
+
+                {/* Next Arrow */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 w-9 p-0 rounded-lg text-muted-foreground hover:text-foreground hover:bg-card border border-transparent hover:border-border/30 hover:shadow-3xs transition-all duration-150 disabled:opacity-30 disabled:pointer-events-none"
+                  onClick={() => table.nextPage()}
+                  disabled={!table.getCanNextPage()}
+                >
+                  <ChevronRight className="h-4.5 w-4.5" />
+                </Button>
+              </div>
+
+              {/* 2. Custom Entries Selector Pill */}
+              <div className="flex items-center gap-2 bg-muted/30 border border-border/40 px-3 h-11 rounded-xl shadow-3xs text-xs text-muted-foreground font-medium">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  className="w-12 h-7 text-center bg-card border border-border/70 text-foreground rounded-lg outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 font-bold text-xs"
+                  value={customPageSize}
+                  onChange={(e) => {
+                    const valStr = e.target.value.replace(/[^0-9]/g, "");
+                    setCustomPageSize(valStr);
+                    if (valStr) {
+                      const valNum = parseInt(valStr, 10);
+                      if (valNum > 0) {
+                        table.setPageSize(valNum);
+                      }
+                    }
+                  }}
+                  onBlur={() => {
+                    if (!customPageSize || parseInt(customPageSize, 10) <= 0) {
+                      table.setPageSize(10);
+                      setCustomPageSize("10");
+                    }
+                  }}
+                />
+                <span>entries per page</span>
+                <div className="w-px h-4 bg-border/80 mx-1.5" />
+                <button
+                  type="button"
+                  className="text-primary hover:text-primary/80 font-bold uppercase text-[10px] tracking-wider transition-colors"
+                  onClick={() => {
+                    table.setPageSize(data.length || Number.MAX_SAFE_INTEGER);
+                    setCustomPageSize(String(data.length || Number.MAX_SAFE_INTEGER));
+                  }}
+                >
+                  Show All
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Bulk Actions */}
           {selectedRows.length > 0 && bulkActions && (
             <div className="flex items-center gap-2 px-3 py-1 bg-primary/10 text-primary border border-primary/20 rounded-md text-xs font-medium transition-all duration-300">
               <span>{selectedRows.length} selected</span>
@@ -638,7 +803,7 @@ export function GenericTable<TData extends { id: string }>({
                               header.id === "actions" && "text-center",
                               header.id === "actions" &&
                                 freezeActions &&
-                                "sticky right-0 bg-muted border-l border-l-border z-10",
+                                "sticky top-0 right-0 bg-muted border-l border-l-border z-20 shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)]",
                             )}
                           >
                             {label}
@@ -726,62 +891,6 @@ export function GenericTable<TData extends { id: string }>({
         </DndContext>
       </div>
 
-      {/* Pagination controls */}
-      {!isLoading && data.length > 0 && (
-        <div className="flex items-center justify-between py-1">
-          <div className="text-xs text-muted-foreground font-normal">
-            Showing{" "}
-            {table.getState().pagination.pageIndex *
-              table.getState().pagination.pageSize +
-              1}{" "}
-            to{" "}
-            {Math.min(
-              (table.getState().pagination.pageIndex + 1) *
-                table.getState().pagination.pageSize,
-              data.length,
-            )}{" "}
-            of {data.length} records
-          </div>
-          <div className="flex items-center gap-2">
-            <select
-              value={table.getState().pagination.pageSize}
-              onChange={(e) => {
-                table.setPageSize(Number(e.target.value));
-              }}
-              className="text-xs bg-card border border-border text-foreground px-2 py-1.5 rounded-md outline-none"
-            >
-              {[5, 10, 20, 50].map((size) => (
-                <option key={size} value={size}>
-                  {size} per page
-                </option>
-              ))}
-              <option value={data.length || Number.MAX_SAFE_INTEGER}>
-                Show All
-              </option>
-            </select>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 w-8 p-0"
-                onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 w-8 p-0"
-                onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

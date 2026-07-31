@@ -5,9 +5,9 @@ import { PublicRoute } from "@/app/routes/public";
 import { UiConfigProvider } from "@/contexts/ui/uiConfigContext";
 import NotFound from "@/pages/notFound";
 import PageLoader from "@/components/ui/pageLoader";
-const InventoryTrackingPage = lazy(
-  () => import("@/pages/inventory/inventoryTrackingPage"),
-);
+// const InventoryTrackingPage = lazy(
+//   () => import("@/pages/inventory/inventoryTrackingPage"),
+// );
 
 // Auth
 const LoginPage = lazy(() => import("@/pages/auth/loginPage"));
@@ -83,18 +83,9 @@ const EngineeringDrawingsPage = lazy(
 const BomsPage = lazy(() => import("@/pages/engineering/bomsPage"));
 
 // Security & Audit
-const UsersPage = lazy(() => import("@/pages/roles/usersPage"));
-const RolesPage = lazy(() => import("@/pages/roles/rolesPage"));
-const PermissionsPage = lazy(
-  () => import("@/pages/permissions/permissionsPage"),
-);
-const PermissionGroupsPage = lazy(
-  () => import("@/pages/permissions/permissionGroupsPage"),
-);
-const ApprovalRequestsPage = lazy(
-  () => import("@/pages/roles/approvalRequestsPage"),
-);
-const AuditLogsPage = lazy(() => import("@/pages/audit/auditLogsPage"));
+const RolesPage = lazy(() => import('@/pages/roles/rolesPage'));
+const ApprovalRequestsPage = lazy(() => import('@/pages/roles/approvalRequestsPage'));
+const AuditLogsPage = lazy(() => import('@/pages/audit/auditLogsPage'));
 
 const SettingsPage = lazy(() => import("@/pages/settings/settingsPage"));
 const CustomFieldsPage = lazy(
@@ -219,21 +210,8 @@ export function AppRouter() {
               <Route path="/tender/orders" element={<OrdersPage />} />
               <Route path="/purchase/vendors" element={<VendorsPage />} />
               <Route path="/tender/boqs" element={<BoqsPage />} />
-              {/* Security */}
-              <Route path="/security/users" element={<UsersPage />} />
               <Route path="/security/roles" element={<RolesPage />} />
-              <Route
-                path="/security/permissions"
-                element={<PermissionsPage />}
-              />
-              <Route
-                path="/security/permission-groups"
-                element={<PermissionGroupsPage />}
-              />
-              <Route
-                path="/security/approval-requests"
-                element={<ApprovalRequestsPage />}
-              />
+              <Route path="/security/approval-requests" element={<ApprovalRequestsPage />} />
 
               {/* Engineering & Manufacturing */}
               <Route
@@ -278,10 +256,10 @@ export function AppRouter() {
                 element={<LogisticsDispatchesPage />}
               />
               <Route path="/logistics/delivery" element={<DeliveryPage />} />
-              <Route
+              {/* <Route
                 path="/inventory/tracking"
                 element={<InventoryTrackingPage />}
-              />
+              /> */}
 
               {/* Production */}
               <Route
@@ -301,28 +279,16 @@ export function AppRouter() {
 
               {/* Finance & Accounts */}
               <Route path="/finance" element={<PaymentsPage />} />
-              <Route
-                path="/finance/history/:orderId"
-                element={<PaymentHistoryPage />}
-              />
+              <Route path="/finance/history/:orderId" element={<PaymentHistoryPage />} />
 
               <Route path="/audit-logs" element={<AuditLogsPage />} />
               <Route path="/reports" element={<ReportsPage />} />
               {/* Settings */}
               <Route path="/settings" element={<SettingsPage />} />
-              <Route
-                path="/settings/custom-fields"
-                element={<CustomFieldsPage />}
-              />
-              <Route
-                path="/settings/recycle-bin"
-                element={<RecycleBinPage />}
-              />
-              <Route path="/settings/profile" element={<ProfilePage />} />
-              <Route
-                path="/settings/notifications"
-                element={<NotificationsPage />}
-              />
+              <Route path="/settings/custom-fields" element={<CustomFieldsPage />} />
+              <Route path="/settings/recycle-bin" element={<RecycleBinPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/settings/notifications" element={<NotificationsPage />} />
             </Route>
 
             {/* 404 Fallback */}

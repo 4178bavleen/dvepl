@@ -73,8 +73,54 @@ export default function PaymentHistoryPage() {
   const [editNote, setEditNote] = useState("");
 
   // Pagination
-  const PAGE_SIZE = 10;
+  const [pageSize, setPageSize] = useState<number>(() => {
+    if (typeof window === "undefined") return 10;
+    try {
+      const saved = window.localStorage.getItem("dvepl-page-size:paymenthistory");
+      return saved ? parseInt(saved, 10) : 10;
+    } catch {
+      return 10;
+    }
+  });
+  const [customPageSize, setCustomPageSize] = useState<string>(String(pageSize));
   const [historyPage, setHistoryPage] = useState(1);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem("dvepl-page-size:paymenthistory", String(pageSize));
+      } catch {
+        // fail silently
+      }
+    }
+  }, [pageSize]);
+
+  const getVisiblePages = (currPage: number, totalPgs: number) => {
+    const delta = 1;
+    const range: number[] = [];
+    const rangeWithDots: (number | string)[] = [];
+    let l: number | null = null;
+
+    for (let i = 1; i <= totalPgs; i++) {
+      if (i === 1 || i === totalPgs || (i >= currPage - delta && i <= currPage + delta)) {
+        range.push(i);
+      }
+    }
+
+    for (const i of range) {
+      if (l !== null) {
+        if (i - l === 2) {
+          rangeWithDots.push(l + 1);
+        } else if (i - l > 2) {
+          rangeWithDots.push("...");
+        }
+      }
+      rangeWithDots.push(i);
+      l = i;
+    }
+
+    return rangeWithDots;
+  };
 
   const formatCurrency = (val: number) =>
     val.toLocaleString("en-IN", { maximumFractionDigits: 0, style: "currency", currency: "INR" });
@@ -325,11 +371,11 @@ export default function PaymentHistoryPage() {
   };
 
   // Paginated history
-  const totalHistoryPages = Math.max(1, Math.ceil(payments.length / PAGE_SIZE));
+  const totalHistoryPages = Math.max(1, Math.ceil(payments.length / pageSize));
   const paginatedPayments = useMemo(() => {
-    const start = (historyPage - 1) * PAGE_SIZE;
-    return payments.slice(start, start + PAGE_SIZE);
-  }, [payments, historyPage]);
+    const start = (historyPage - 1) * pageSize;
+    return payments.slice(start, start + pageSize);
+  }, [payments, historyPage, pageSize]);
 
   if (isLoading || !orderInfo) {
     return (
@@ -530,17 +576,117 @@ export default function PaymentHistoryPage() {
 
         {/* Right Columns: Payments History Log list */}
         <div className="lg:col-span-2 space-y-4">
+          {/* Pagination Controls */}
+          {payments.length > 0 && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Page Numbers Navigation Pill */}
+                <div className="flex items-center gap-1 bg-muted/30 border border-border/40 p-1 h-11 rounded-xl shadow-3xs">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-9 w-9 p-0 rounded-lg text-muted-foreground hover:text-foreground hover:bg-card border border-transparent hover:border-border/30 hover:shadow-3xs transition-all duration-150 disabled:opacity-30 disabled:pointer-events-none"
+                    onClick={() => setHistoryPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={historyPage === 1}
+                  >
+                    <ChevronLeft className="h-4.5 w-4.5" />
+                  </Button>
+
+                  <div className="flex items-center gap-1">
+                    {getVisiblePages(historyPage, totalHistoryPages).map((page, index) => {
+                      if (page === "...") {
+                        return (
+                          <span
+                            key={`dots-${index}`}
+                            className="text-xs text-muted-foreground font-semibold px-1.5 select-none"
+                          >
+                            ...
+                          </span>
+                        );
+                      }
+                      const isCurrent = page === historyPage;
+                      return (
+                        <Button
+                          key={`page-${page}`}
+                          variant={isCurrent ? "default" : "ghost"}
+                          size="sm"
+                          className={`h-9 w-9 p-0 rounded-lg text-xs font-semibold transition-all duration-150 ${
+                            isCurrent
+                              ? "bg-primary text-white hover:bg-primary/95 shadow-sm"
+                              : "text-muted-foreground hover:text-foreground hover:bg-card border border-transparent hover:border-border/30 hover:shadow-3xs"
+                          }`}
+                          onClick={() => setHistoryPage(page as number)}
+                        >
+                          {page}
+                        </Button>
+                      );
+                    })}
+                  </div>
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-9 w-9 p-0 rounded-lg text-muted-foreground hover:text-foreground hover:bg-card border border-transparent hover:border-border/30 hover:shadow-3xs transition-all duration-150 disabled:opacity-30 disabled:pointer-events-none"
+                    onClick={() => setHistoryPage((prev) => Math.min(prev + 1, totalHistoryPages))}
+                    disabled={historyPage === totalHistoryPages}
+                  >
+                    <ChevronRight className="h-4.5 w-4.5" />
+                  </Button>
+                </div>
+
+                {/* Custom Entries Selector Pill */}
+                <div className="flex items-center gap-2 bg-muted/30 border border-border/40 px-3 h-11 rounded-xl shadow-3xs text-xs text-muted-foreground font-medium">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    className="w-12 h-7 text-center bg-card border border-border/70 text-foreground rounded-lg outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 font-bold text-xs"
+                    value={customPageSize}
+                    onChange={(e) => {
+                      const valStr = e.target.value.replace(/[^0-9]/g, "");
+                      setCustomPageSize(valStr);
+                      if (valStr) {
+                        const valNum = parseInt(valStr, 10);
+                        if (valNum > 0) {
+                          setPageSize(valNum);
+                        }
+                      }
+                    }}
+                    onBlur={() => {
+                      if (!customPageSize || parseInt(customPageSize, 10) <= 0) {
+                        setPageSize(10);
+                        setCustomPageSize("10");
+                      }
+                    }}
+                  />
+                  <span>entries per page</span>
+                  <div className="w-px h-4 bg-border/80 mx-1.5" />
+                  <button
+                    type="button"
+                    className="text-primary hover:text-primary/80 font-bold uppercase text-[10px] tracking-wider transition-colors"
+                    onClick={() => {
+                      setPageSize(payments.length || Number.MAX_SAFE_INTEGER);
+                      setCustomPageSize(String(payments.length || Number.MAX_SAFE_INTEGER));
+                    }}
+                  >
+                    Show All
+                  </button>
+                </div>
+              </div>
+
+              <span className="text-xs text-muted-foreground font-medium">
+                Showing {(historyPage - 1) * pageSize + 1} to{" "}
+                {Math.min(historyPage * pageSize, payments.length)} of {payments.length} entries
+              </span>
+            </div>
+          )}
+
           <div className="rounded-xl border bg-card p-5 space-y-4 min-h-[450px] flex flex-col">
             <div className="flex items-center justify-between border-b pb-3">
               <h3 className="text-sm font-bold text-foreground">Voucher Installment Entries</h3>
               <span className="text-[10px] font-bold uppercase bg-muted px-2 py-0.5 rounded text-muted-foreground">
                 {payments.length} Record{payments.length !== 1 ? "s" : ""}
               </span>
-              {totalHistoryPages > 1 && (
-                <span className="text-[10px] text-muted-foreground font-medium">
-                  Page {historyPage} of {totalHistoryPages}
-                </span>
-              )}
             </div>
 
             {payments.length === 0 ? (
@@ -550,22 +696,22 @@ export default function PaymentHistoryPage() {
                 <p className="text-[11px] text-muted-foreground mt-0.5">Use the installment form on the left to capture payment deposits.</p>
               </div>
             ) : (
-              <div className="overflow-x-auto border rounded-lg bg-card">
+              <div className="max-h-[70vh] overflow-auto no-scrollbar-y border rounded-lg bg-card">
                 <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-muted/40 border-b text-muted-foreground font-semibold">
-                      <th className="py-2.5 px-3.5 text-center">#</th>
-                      <th className="py-2.5 px-3.5">Settlement Date</th>
-                      <th className="py-2.5 px-3.5">Payment Mode</th>
-                      <th className="py-2.5 px-3.5">Reference No</th>
-                      <th className="py-2.5 px-3.5">Note/Remarks</th>
-                      <th className="py-2.5 px-3.5 text-right">Amount Billed</th>
-                      <th className="py-2.5 px-3.5 text-center">Actions</th>
+                  <thead className="sticky top-0 z-10 bg-card border-b text-muted-foreground font-semibold shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)]">
+                    <tr>
+                      <th className="py-2.5 px-3.5 text-center bg-muted/90 backdrop-blur-xs">#</th>
+                      <th className="py-2.5 px-3.5 bg-muted/90 backdrop-blur-xs">Settlement Date</th>
+                      <th className="py-2.5 px-3.5 bg-muted/90 backdrop-blur-xs">Payment Mode</th>
+                      <th className="py-2.5 px-3.5 bg-muted/90 backdrop-blur-xs">Reference No</th>
+                      <th className="py-2.5 px-3.5 bg-muted/90 backdrop-blur-xs">Note/Remarks</th>
+                      <th className="py-2.5 px-3.5 text-right bg-muted/90 backdrop-blur-xs">Amount Billed</th>
+                      <th className="py-2.5 px-3.5 text-center bg-muted/90 backdrop-blur-xs">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60">
                     {paginatedPayments.map((pay, i) => {
-                      const globalIdx = (historyPage - 1) * PAGE_SIZE + i + 1;
+                      const globalIdx = (historyPage - 1) * pageSize + i + 1;
                       return (
                       <tr key={pay.id} className="hover:bg-muted/20 transition-colors">
                         <td className="py-3 px-3.5 text-center text-muted-foreground font-medium">{globalIdx}</td>
@@ -612,35 +758,6 @@ export default function PaymentHistoryPage() {
               </div>
             )}
 
-            {/* Pagination Controls — same pattern as other pages */}
-            {payments.length > PAGE_SIZE && (
-              <div className="flex items-center justify-between pt-4 border-t border-border">
-                <div className="text-xs text-muted-foreground">
-                  Showing {(historyPage - 1) * PAGE_SIZE + 1} to{" "}
-                  {Math.min(historyPage * PAGE_SIZE, payments.length)} of {payments.length}
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 w-8 p-0"
-                    onClick={() => setHistoryPage((prev) => Math.max(prev - 1, 1))}
-                    disabled={historyPage === 1}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 w-8 p-0"
-                    onClick={() => setHistoryPage((prev) => Math.min(prev + 1, totalHistoryPages))}
-                    disabled={historyPage === totalHistoryPages}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>

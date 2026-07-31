@@ -7,10 +7,9 @@ export const createUserSchema = z.object({
     .email("Invalid email address")
     .trim()
     .toLowerCase(),
-    name: z 
+  name: z 
     .string()
     .optional(),
-
   phone: z
     .string()
     .trim()
@@ -20,24 +19,20 @@ export const createUserSchema = z.object({
     .refine((val) => !val || /^\+?[\d\s-]{10,15}$/.test(val), {
       message: "Invalid phone number",
     }),
-
   password: z
     .string()
-    .min(8, "Password must be at least 8 characters")
-    .max(32, "Password cannot exceed 32 characters")
-    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
-    .regex(/[0-9]/, "Password must contain at least one number")
-    .regex(
-      /[@$!%*?&#^()_\-+=]/,
-      "Password must contain at least one special character"
-    )
+    .min(4, "Password must be at least 4 characters")
     .optional(),
-
   roleIds: z
     .array(z.string().uuid("Invalid Role ID"))
     .optional()
     .default([]),
+  role: z
+    .string()
+    .optional(),
+  designation: z
+    .string()
+    .optional(),
 });
 
 export type CreateUserInput = z.infer<typeof createUserSchema>;

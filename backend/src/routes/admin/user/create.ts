@@ -4,7 +4,8 @@ import {
   FastifyReply,
   FastifyRequest,
 } from "fastify";
-
+import fs from "fs";
+import path from "path";
 import { adminLogs } from "../../../services/logger/contextLogger";
 import { createUserSchema } from "../../../schemas/user/auth/user.schema";
 import { hashPassword } from "../../../utils/hashPassword";
@@ -48,7 +49,7 @@ async function createUserRoute(
           });
         }
 
-        const { email, phone, password, roleIds ,name} =
+        const { email, phone, password, roleIds, name, designation } =
           validationResult.data;
 
         // ======================================================
@@ -101,6 +102,23 @@ async function createUserRoute(
         // Validate Roles
         // ======================================================
         let activeRoleIds = roleIds || [];
+        const roleVal = (request.body as any)?.role;
+        if (roleVal && activeRoleIds.length === 0) {
+          const foundRole = await fastify.prisma.role.findFirst({
+            where: {
+              OR: [
+                { id: roleVal },
+                { name: { equals: roleVal, mode: "insensitive" } }
+              ],
+              companyId,
+              deletedAt: null
+            }
+          });
+          if (foundRole) {
+            activeRoleIds = [foundRole.id];
+          }
+        }
+
         if (activeRoleIds.length === 0) {
           const fallbackRole = await fastify.prisma.role.findFirst({
             where: {
@@ -179,11 +197,88 @@ async function createUserRoute(
                   userId: user.id,
                 },
               });
+            } else {
+              // Create a brand new employee and contact record automatically
+              const nameParts = (name || "").trim().split(/\s+/);
+              const firstName = nameParts[0] || "Employee";
+              const lastName = nameParts.slice(1).join(" ") || "Member";
+
+              let designationId: string | null = null;
+              if (designation) {
+                const foundDes = await tx.designation.findFirst({
+                  where: {
+                    title: { equals: designation, mode: "insensitive" },
+                    deletedAt: null
+                  }
+                });
+                if (foundDes) {
+                  designationId = foundDes.id;
+                }
+              }
+
+              const employeeCount = await tx.employee.count({
+                where: { companyId }
+              });
+              const employeeCode = `EMP-${(employeeCount + 1).toString().padStart(4, "0")}`;
+
+              const newEmp = await tx.employee.create({
+                data: {
+                  companyId,
+                  userId: user.id,
+                  employeeCode,
+                  firstName,
+                  lastName,
+                  designationId,
+                  status: "ACTIVE"
+                }
+              });
+
+              await tx.employeeContact.create({
+                data: {
+                  employeeId: newEmp.id,
+                  type: "EMAIL",
+                  value: email,
+                  isPrimary: true
+                }
+              });
+
+              if (phone) {
+                await tx.employeeContact.create({
+                  data: {
+                    employeeId: newEmp.id,
+                    type: "PHONE",
+                    value: phone,
+                    isPrimary: true
+                  }
+                });
+              }
             }
 
             return user;
           }
         );
+
+        // Save designation and default permissions
+        const permissionsFilePath = path.join(__dirname, "../../../../data/user_permissions.json");
+        const dirPath = path.dirname(permissionsFilePath);
+        if (!fs.existsSync(dirPath)) {
+          fs.mkdirSync(dirPath, { recursive: true });
+        }
+        let permissionsData: Record<string, any> = {};
+        if (fs.existsSync(permissionsFilePath)) {
+          try {
+            permissionsData = JSON.parse(fs.readFileSync(permissionsFilePath, "utf-8"));
+          } catch (e) {
+            permissionsData = {};
+          }
+        }
+        permissionsData[createdUser.id] = {
+          designation: designation || "Team Member",
+          pageAccess: ["dashboard", "vendors", "orders"],
+          fieldPermissions: {},
+          actionPermissions: { create: true, edit: true, delete: false, export: true }
+        };
+        fs.writeFileSync(permissionsFilePath, JSON.stringify(permissionsData, null, 2), "utf-8");
 
         // ======================================================
         // Log

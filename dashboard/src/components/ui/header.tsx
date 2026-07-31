@@ -10,6 +10,7 @@ import {
   Moon,
   ChevronDown,
   LogOut,
+  User,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
@@ -58,6 +59,18 @@ const Header: React.FC<HeaderProps> = ({
   logout,
   navigate,
 }) => {
+  const hasSettingsAccess = React.useMemo(() => {
+    if (!currentUser) return false;
+    const user = currentUser as any;
+    
+    // Always grant full access to Admins/Super Admins
+    const isAdmin = user.role?.toLowerCase().includes('admin') || 
+                    user.name?.toLowerCase().includes('admin');
+    if (isAdmin) return true;
+
+    return Array.isArray(user.pageAccess) && user.pageAccess.includes('settings');
+  }, [currentUser]);
+
   return (
     <header className="h-16 border-b border-border bg-card/60 backdrop-blur-md sticky top-0 z-30 flex items-center justify-between px-6">
       <div className="flex items-center gap-3">
@@ -188,14 +201,26 @@ const Header: React.FC<HeaderProps> = ({
                   </div>
                   <div className="py-1">
                     <Link
-                      to="/settings"
+                      to="/profile"
                       onClick={() => setIsProfileOpen(false)}
                       className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-all"
                     >
-                      <Settings2 className="h-3.5 w-3.5" />
-                      <span>My Settings</span>
+                      <User className="h-3.5 w-3.5" />
+                      <span>My Profile</span>
                     </Link>
                   </div>
+                  {hasSettingsAccess && (
+                    <div className="py-1">
+                      <Link
+                        to="/settings"
+                        onClick={() => setIsProfileOpen(false)}
+                        className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-all"
+                      >
+                        <Settings2 className="h-3.5 w-3.5" />
+                        <span>My Settings</span>
+                      </Link>
+                    </div>
+                  )}
                   <div className="py-1">
                     <button
                       onClick={() => {

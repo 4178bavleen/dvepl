@@ -5,6 +5,7 @@ import readUsersRoute from "./read";
 import readUserbyId from "./readbyId";
 import updateUserRoute from "./update";
 import deleteUserRoute from "./delete";
+import adminUserBulkUploadRoutes from "./bulkUpload";
 
 async function adminUserRouteGroup(
   fastify: FastifyInstance,
@@ -15,6 +16,7 @@ async function adminUserRouteGroup(
   fastify.register(readUserbyId, { prefix: "/read" });
   fastify.register(updateUserRoute, { prefix: "/update" });
   fastify.register(deleteUserRoute, { prefix: "/delete" });
+  fastify.register(adminUserBulkUploadRoutes, { prefix: "/bulk-import" });
 }
 
 export default adminUserRouteGroup;

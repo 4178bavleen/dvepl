@@ -43,7 +43,53 @@ export default function PaymentsPage() {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState<number>(() => {
+    if (typeof window === "undefined") return 10;
+    try {
+      const saved = window.localStorage.getItem("dvepl-page-size:payments");
+      return saved ? parseInt(saved, 10) : 10;
+    } catch {
+      return 10;
+    }
+  });
+  const [customPageSize, setCustomPageSize] = useState<string>(String(pageSize));
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem("dvepl-page-size:payments", String(pageSize));
+      } catch {
+        // fail silently
+      }
+    }
+  }, [pageSize]);
+
+  const getVisiblePages = (currPage: number, totalPgs: number) => {
+    const delta = 1;
+    const range: number[] = [];
+    const rangeWithDots: (number | string)[] = [];
+    let l: number | null = null;
+
+    for (let i = 1; i <= totalPgs; i++) {
+      if (i === 1 || i === totalPgs || (i >= currPage - delta && i <= currPage + delta)) {
+        range.push(i);
+      }
+    }
+
+    for (const i of range) {
+      if (l !== null) {
+        if (i - l === 2) {
+          rangeWithDots.push(l + 1);
+        } else if (i - l > 2) {
+          rangeWithDots.push("...");
+        }
+      }
+      rangeWithDots.push(i);
+      l = i;
+    }
+
+    return rangeWithDots;
+  };
 
   // Load orders from API
   const loadOrders = async () => {
@@ -206,26 +252,131 @@ export default function PaymentsPage() {
         </div>
       </div>
 
+      {/* Pagination Controls */}
+      {!isLoading && filteredOrders.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Page Numbers Navigation Pill */}
+            <div className="flex items-center gap-1 bg-muted/30 border border-border/40 p-1 h-11 rounded-xl shadow-3xs">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 w-9 p-0 rounded-lg text-muted-foreground hover:text-foreground hover:bg-card border border-transparent hover:border-border/30 hover:shadow-3xs transition-all duration-150 disabled:opacity-30 disabled:pointer-events-none"
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4.5 w-4.5" />
+              </Button>
+
+              <div className="flex items-center gap-1">
+                {getVisiblePages(currentPage, totalPages).map((page, index) => {
+                  if (page === "...") {
+                    return (
+                      <span
+                        key={`dots-${index}`}
+                        className="text-xs text-muted-foreground font-semibold px-1.5 select-none"
+                      >
+                        ...
+                      </span>
+                    );
+                  }
+                  const isCurrent = page === currentPage;
+                  return (
+                    <Button
+                      key={`page-${page}`}
+                      variant={isCurrent ? "default" : "ghost"}
+                      size="sm"
+                      className={`h-9 w-9 p-0 rounded-lg text-xs font-semibold transition-all duration-150 ${
+                        isCurrent
+                          ? "bg-primary text-white hover:bg-primary/95 shadow-sm"
+                          : "text-muted-foreground hover:text-foreground hover:bg-card border border-transparent hover:border-border/30 hover:shadow-3xs"
+                      }`}
+                      onClick={() => setCurrentPage(page as number)}
+                    >
+                      {page}
+                    </Button>
+                  );
+                })}
+              </div>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 w-9 p-0 rounded-lg text-muted-foreground hover:text-foreground hover:bg-card border border-transparent hover:border-border/30 hover:shadow-3xs transition-all duration-150 disabled:opacity-30 disabled:pointer-events-none"
+                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+              >
+                <ChevronRight className="h-4.5 w-4.5" />
+              </Button>
+            </div>
+
+            {/* Custom Entries Selector Pill */}
+            <div className="flex items-center gap-2 bg-muted/30 border border-border/40 px-3 h-11 rounded-xl shadow-3xs text-xs text-muted-foreground font-medium">
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                className="w-12 h-7 text-center bg-card border border-border/70 text-foreground rounded-lg outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 font-bold text-xs"
+                value={customPageSize}
+                onChange={(e) => {
+                  const valStr = e.target.value.replace(/[^0-9]/g, "");
+                  setCustomPageSize(valStr);
+                  if (valStr) {
+                    const valNum = parseInt(valStr, 10);
+                    if (valNum > 0) {
+                      setPageSize(valNum);
+                    }
+                  }
+                }}
+                onBlur={() => {
+                  if (!customPageSize || parseInt(customPageSize, 10) <= 0) {
+                    setPageSize(10);
+                    setCustomPageSize("10");
+                  }
+                }}
+              />
+              <span>entries per page</span>
+              <div className="w-px h-4 bg-border/80 mx-1.5" />
+              <button
+                type="button"
+                className="text-primary hover:text-primary/80 font-bold uppercase text-[10px] tracking-wider transition-colors"
+                onClick={() => {
+                  setPageSize(filteredOrders.length || Number.MAX_SAFE_INTEGER);
+                  setCustomPageSize(String(filteredOrders.length || Number.MAX_SAFE_INTEGER));
+                }}
+              >
+                Show All
+              </button>
+            </div>
+          </div>
+
+          <span className="text-xs text-muted-foreground font-medium">
+            Showing {(currentPage - 1) * pageSize + 1} to{" "}
+            {Math.min(currentPage * pageSize, filteredOrders.length)} of {filteredOrders.length} records
+          </span>
+        </div>
+      )}
+
       {/* Finance Table */}
       <div className="rounded-xl border bg-card p-5 space-y-4">
         <div className="flex items-center justify-between border-b pb-3">
           <h3 className="text-sm font-bold text-foreground">Order-wise Finance Details</h3>
         </div>
-        <div className="relative overflow-x-auto border rounded-xl bg-card">
+        <div className="relative max-h-[70vh] overflow-auto no-scrollbar-y border rounded-xl bg-card">
           <table className="w-full text-left border-collapse text-sm">
-            <thead>
-              <tr className="bg-muted/40 border-b border-border/80 text-xs font-semibold text-muted-foreground">
-                <th className="py-3 px-4 text-center">#</th>
-                <th className="py-3 px-4">DVEPL Code</th>
-                <th className="py-3 px-4">Customer</th>
-                <th className="py-3 px-4">Vendor</th>
-                <th className="py-3 px-4">Order Date</th>
-                <th className="py-3 px-4 text-right">Total Amount</th>
-                <th className="py-3 px-4 text-right">Received</th>
-                <th className="py-3 px-4 text-right">Balance</th>
-                <th className="py-3 px-4 text-center">Payment</th>
-                <th className="py-3 px-4 text-center">Status</th>
-                <th className="py-3 px-4 text-center">Actions</th>
+            <thead className="sticky top-0 z-10 bg-card border-b border-border/80 text-xs font-semibold text-muted-foreground shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)]">
+              <tr>
+                <th className="py-3 px-4 text-center bg-muted/90 backdrop-blur-xs">#</th>
+                <th className="py-3 px-4 bg-muted/90 backdrop-blur-xs">DVEPL Code</th>
+                <th className="py-3 px-4 bg-muted/90 backdrop-blur-xs">Customer</th>
+                <th className="py-3 px-4 bg-muted/90 backdrop-blur-xs">Vendor</th>
+                <th className="py-3 px-4 bg-muted/90 backdrop-blur-xs">Order Date</th>
+                <th className="py-3 px-4 text-right bg-muted/90 backdrop-blur-xs">Total Amount</th>
+                <th className="py-3 px-4 text-right bg-muted/90 backdrop-blur-xs">Received</th>
+                <th className="py-3 px-4 text-right bg-muted/90 backdrop-blur-xs">Balance</th>
+                <th className="py-3 px-4 text-center bg-muted/90 backdrop-blur-xs">Payment</th>
+                <th className="py-3 px-4 text-center bg-muted/90 backdrop-blur-xs">Status</th>
+                <th className="py-3 px-4 text-center bg-muted/90 backdrop-blur-xs">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60 text-xs">
@@ -293,45 +444,6 @@ export default function PaymentsPage() {
             </tbody>
           </table>
         </div>
-
-        {/* Pagination Controls — same pattern as other pages */}
-        {!isLoading && filteredOrders.length > 0 && (
-          <div className="flex items-center justify-between pt-4 border-t border-border">
-            <div className="text-xs text-muted-foreground">
-              Showing {(currentPage - 1) * pageSize + 1} to{" "}
-              {Math.min(currentPage * pageSize, filteredOrders.length)} of {filteredOrders.length}
-            </div>
-            <div className="flex items-center gap-2">
-              <select
-                value={pageSize}
-                onChange={(e) => setPageSize(Number(e.target.value))}
-                className="text-xs bg-card border border-border text-foreground px-2 py-1.5 rounded-md outline-none"
-              >
-                {[5, 10, 20].map((size) => (
-                  <option key={size} value={size}>{size} per page</option>
-                ))}
-              </select>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 w-8 p-0"
-                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 w-8 p-0"
-                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
