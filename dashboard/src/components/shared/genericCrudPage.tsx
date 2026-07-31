@@ -604,6 +604,7 @@ export function GenericCrudPage<TRecord extends { id: string }>({
         }}
         isLoading={isLoading}
         freezeActions={freezeActions}
+        storageKey={tableName}
       />
 
       <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>

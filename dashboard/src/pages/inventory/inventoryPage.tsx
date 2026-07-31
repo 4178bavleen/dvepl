@@ -30,6 +30,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { apiClient } from "@/services/axios";
+import { DynamicFormRenderer } from "@/components/customFields/dynamicFormRenderer";
+import {
+  useDynamicCustomFields,
+  validateCustomFields,
+} from "@/hooks/useDynamicCustomFields";
 
 // ---------------------------------------------------------------------------
 // NOTE (routes assumed — verify against your actual backend route files):
@@ -95,6 +100,7 @@ export interface InventoryItem {
   preferredVendorId?: string;
   notes?: string;
   createdAt: string;
+  customFields?: Record<string, any>;
 }
 
 export interface Movement {
@@ -115,6 +121,7 @@ export interface Movement {
   reason?: string;
   addedBy: string;
   date: string;
+  customFields?: Record<string, any>;
 }
 
 // Helper to pull the useful error message out of an axios error, same
@@ -232,6 +239,8 @@ const mapItemFromBackend = (o: any): InventoryItem => {
     notes: o.material?.description ?? o.notes ?? "",
 
     createdAt: o.createdAt,
+
+    customFields: o.customFields ?? {},
   };
 };
 
@@ -259,6 +268,7 @@ const mapMovementFromBackend = (m: any): Movement => ({
     : m.createdAt
       ? String(m.createdAt).split("T")[0]
       : "",
+  customFields: m.customFields ?? {},
 });
 
 const mapVendorFromBackend = (v: any): Vendor => ({
@@ -302,6 +312,7 @@ export const apiService = {
         preferredVendorId: item.preferredVendorId || undefined,
 
         notes: item.notes,
+        customFields: item.customFields,
       };
       const response = await apiClient.post(ITEM_ENDPOINTS.create, payload);
       return mapItemFromBackend(response.data?.data ?? response.data);
@@ -331,6 +342,7 @@ export const apiService = {
         preferredVendorId: item.preferredVendorId,
         notes: item.notes,
         description: item.notes,
+        customFields: item.customFields,
       };
       // Strip undefined keys so we don't overwrite fields we didn't touch
       Object.keys(payload).forEach(
@@ -377,6 +389,7 @@ export const apiService = {
         referenceType: body.referenceType,
         referenceId: body.referenceId,
         remarks: body.reason,
+        customFields: body.customFields,
       };
 
       const response = await apiClient.post(endpoint, payload);
@@ -433,6 +446,15 @@ export const apiService = {
 };
 
 export function InventoryPage() {
+  const {
+    fields: inventoryCustomFields,
+    tableCustomColumns: inventoryTableCustomCols,
+  } = useDynamicCustomFields("inventory");
+  const [iCustomFields, setICustomFields] = useState<Record<string, any>>({});
+  const [iErrors, setIErrors] = useState<Record<string, string>>({});
+
+
+
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [movements, setMovements] = useState<Movement[]>([]);
   const [activeTab, setActiveTab] = useState<
@@ -658,6 +680,8 @@ export function InventoryPage() {
     setItemNotes("");
     setPreferredVendorId("");
     setSelectedItemId(null);
+    setICustomFields({});
+    setIErrors({});
   };
 
   // Open Modal Actions
@@ -682,6 +706,8 @@ export function InventoryPage() {
     setItemLocation(item.location || "");
     setItemNotes(item.notes || "");
     setPreferredVendorId(item.preferredVendorId || "");
+    setICustomFields(item.customFields || {});
+    setIErrors({});
     setIsItemModalOpen(true);
   };
 
@@ -689,6 +715,7 @@ export function InventoryPage() {
     id: string,
     type: "IN" | "OUT" | "ADJUST" | "RETURN",
   ) => {
+    const item = items.find((i) => i.id === id);
     setSelectedItemId(id);
     setStockMovType(type);
     setStockQty("");
@@ -699,6 +726,8 @@ export function InventoryPage() {
     setStockOrderCode("");
     setStockReason("");
     setStockDate(new Date().toISOString().split("T")[0]);
+    setICustomFields(item?.customFields || {});
+    setIErrors({});
     setIsStockModalOpen(true);
   };
 
@@ -725,6 +754,13 @@ export function InventoryPage() {
       return;
     }
 
+    const cfErrs = validateCustomFields(inventoryCustomFields, iCustomFields);
+    if (Object.keys(cfErrs).length > 0) {
+      setIErrors(cfErrs);
+      toast.error("Please fix validation errors in custom fields");
+      return;
+    }
+
     const payload = {
       name: itemName,
       code: materialCode,
@@ -743,6 +779,7 @@ export function InventoryPage() {
       preferredVendorId: preferredVendorId || undefined,
 
       notes: itemNotes,
+      customFields: iCustomFields,
     };
 
     // Build the embedded vendor snapshot from the selected master vendor,
@@ -815,6 +852,17 @@ export function InventoryPage() {
 
     if (!selectedItemData) return;
 
+    // Validate custom fields
+    const cfErrs = validateCustomFields(
+      inventoryCustomFields,
+      iCustomFields,
+    );
+    if (Object.keys(cfErrs).length > 0) {
+      setIErrors(cfErrs);
+      toast.error("Please fill in all required custom fields");
+      return;
+    }
+
     const cur = selectedItemData.currentStock;
     let after = cur;
     if (stockMovType === "IN" || stockMovType === "RETURN") after = cur + qty;
@@ -846,6 +894,7 @@ export function InventoryPage() {
       qty,
       quantity: qty,
       date: stockDate,
+      customFields: iCustomFields,
       reason: stockReason || `${stockMovType} Stock Movement`,
       referenceType: refType,
       referenceId: refId,
@@ -874,6 +923,7 @@ export function InventoryPage() {
         await apiService.stocks.update(selectedItemData.id, {
           openingStock: after,
           currentStock: after,
+          customFields: iCustomFields,
         });
       }
 
@@ -1275,6 +1325,16 @@ export function InventoryPage() {
                       <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                         Vendor
                       </th>
+                      {inventoryCustomFields
+                        .filter((f) => f.showInTable)
+                        .map((f) => (
+                          <th
+                            key={f.id}
+                            className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground"
+                          >
+                            {f.name}
+                          </th>
+                        ))}
                       <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                         Status
                       </th>
@@ -1287,7 +1347,7 @@ export function InventoryPage() {
                     {filteredItems.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={11}
+                          colSpan={11 + inventoryCustomFields.filter((f) => f.showInTable).length}
                           className="p-8 text-center text-xs font-semibold text-muted-foreground"
                         >
                           No inventory items found.
@@ -1343,6 +1403,29 @@ export function InventoryPage() {
                           <td className="p-4 text-sm text-muted-foreground">
                             {item.primaryVendor?.vendorName || "—"}
                           </td>
+                          {inventoryCustomFields
+                            .filter((f) => f.showInTable)
+                            .map((f) => {
+                              const value = item.customFields?.[f.key];
+                              let displayValue = "—";
+                              if (value !== undefined && value !== null && value !== "") {
+                                if (f.type === "vendor") {
+                                  displayValue = vendors.find((v) => v.id === value)?.vendorName || String(value);
+                                } else if (typeof value === "boolean") {
+                                  displayValue = value ? "Yes" : "No";
+                                } else {
+                                  displayValue = String(value);
+                                }
+                              }
+                              return (
+                                <td
+                                  key={f.id}
+                                  className="p-4 text-sm text-muted-foreground"
+                                >
+                                  {displayValue}
+                                </td>
+                              );
+                            })}
                           <td className="p-4">
                             {item.currentStock === 0 ? (
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20 uppercase tracking-wider">
@@ -1574,13 +1657,23 @@ export function InventoryPage() {
                   <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     Added By
                   </th>
+                  {inventoryCustomFields
+                    .filter((f) => f.showInTable)
+                    .map((f) => (
+                      <th
+                        key={f.id}
+                        className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground"
+                      >
+                        {f.name}
+                      </th>
+                    ))}
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {movements.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={12}
+                      colSpan={12 + inventoryCustomFields.filter((f) => f.showInTable).length}
                       className="p-8 text-center text-xs font-semibold text-muted-foreground"
                     >
                       No movements matching the criteria found. Click Load to
@@ -1648,6 +1741,26 @@ export function InventoryPage() {
                         {m.reason || "—"}
                       </td>
                       <td className="p-4 text-muted-foreground">{m.addedBy}</td>
+                      {inventoryCustomFields
+                        .filter((f) => f.showInTable)
+                        .map((f) => {
+                          const value = m.customFields?.[f.key];
+                          let displayValue = "—";
+                          if (value !== undefined && value !== null && value !== "") {
+                            if (f.type === "vendor") {
+                              displayValue = vendors.find((v) => v.id === value)?.vendorName || String(value);
+                            } else if (typeof value === "boolean") {
+                              displayValue = value ? "Yes" : "No";
+                            } else {
+                              displayValue = String(value);
+                            }
+                          }
+                          return (
+                            <td key={f.id} className="p-4 text-muted-foreground">
+                              {displayValue}
+                            </td>
+                          );
+                        })}
                     </tr>
                   ))
                 )}
@@ -1908,6 +2021,22 @@ export function InventoryPage() {
                     }
                   />
                 </div>
+                {inventoryCustomFields.some((f) => f.afterField === "name") && (
+                  <div className="col-span-2">
+                    <DynamicFormRenderer
+                      fields={inventoryCustomFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
+                      afterFieldPosition="name"
+                    />
+                  </div>
+                )}
+
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     Code
@@ -1920,6 +2049,22 @@ export function InventoryPage() {
                     }
                   />
                 </div>
+                {inventoryCustomFields.some((f) => f.afterField === "code") && (
+                  <div className="col-span-2">
+                    <DynamicFormRenderer
+                      fields={inventoryCustomFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
+                      afterFieldPosition="code"
+                    />
+                  </div>
+                )}
+
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     Type *
@@ -1937,6 +2082,22 @@ export function InventoryPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                {inventoryCustomFields.some((f) => f.afterField === "type") && (
+                  <div className="col-span-2">
+                    <DynamicFormRenderer
+                      fields={inventoryCustomFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
+                      afterFieldPosition="type"
+                    />
+                  </div>
+                )}
+
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     Category
@@ -1949,6 +2110,22 @@ export function InventoryPage() {
                     }
                   />
                 </div>
+                {inventoryCustomFields.some((f) => f.afterField === "category") && (
+                  <div className="col-span-2">
+                    <DynamicFormRenderer
+                      fields={inventoryCustomFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
+                      afterFieldPosition="category"
+                    />
+                  </div>
+                )}
+
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     Unit
@@ -1972,6 +2149,22 @@ export function InventoryPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                {inventoryCustomFields.some((f) => f.afterField === "unit") && (
+                  <div className="col-span-2">
+                    <DynamicFormRenderer
+                      fields={inventoryCustomFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
+                      afterFieldPosition="unit"
+                    />
+                  </div>
+                )}
+
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     HSN/SAC Code
@@ -1984,6 +2177,22 @@ export function InventoryPage() {
                     }
                   />
                 </div>
+                {inventoryCustomFields.some((f) => f.afterField === "hsnCode") && (
+                  <div className="col-span-2">
+                    <DynamicFormRenderer
+                      fields={inventoryCustomFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
+                      afterFieldPosition="hsnCode"
+                    />
+                  </div>
+                )}
+
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     Opening / Current Stock
@@ -1997,6 +2206,22 @@ export function InventoryPage() {
                     }
                   />
                 </div>
+                {inventoryCustomFields.some((f) => f.afterField === "openingStock") && (
+                  <div className="col-span-2">
+                    <DynamicFormRenderer
+                      fields={inventoryCustomFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
+                      afterFieldPosition="openingStock"
+                    />
+                  </div>
+                )}
+
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     Unit Rate (₹)
@@ -2011,6 +2236,22 @@ export function InventoryPage() {
                     }
                   />
                 </div>
+                {inventoryCustomFields.some((f) => f.afterField === "unitRate") && (
+                  <div className="col-span-2">
+                    <DynamicFormRenderer
+                      fields={inventoryCustomFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
+                      afterFieldPosition="unitRate"
+                    />
+                  </div>
+                )}
+
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     GST %
@@ -2025,6 +2266,22 @@ export function InventoryPage() {
                     }
                   />
                 </div>
+                {inventoryCustomFields.some((f) => f.afterField === "gstPercent") && (
+                  <div className="col-span-2">
+                    <DynamicFormRenderer
+                      fields={inventoryCustomFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
+                      afterFieldPosition="gstPercent"
+                    />
+                  </div>
+                )}
+
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     Reorder Level
@@ -2038,6 +2295,22 @@ export function InventoryPage() {
                     }
                   />
                 </div>
+                {inventoryCustomFields.some((f) => f.afterField === "reorderLevel") && (
+                  <div className="col-span-2">
+                    <DynamicFormRenderer
+                      fields={inventoryCustomFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
+                      afterFieldPosition="reorderLevel"
+                    />
+                  </div>
+                )}
+
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     Reorder Qty
@@ -2051,6 +2324,22 @@ export function InventoryPage() {
                     }
                   />
                 </div>
+                {inventoryCustomFields.some((f) => f.afterField === "reorderQty") && (
+                  <div className="col-span-2">
+                    <DynamicFormRenderer
+                      fields={inventoryCustomFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
+                      afterFieldPosition="reorderQty"
+                    />
+                  </div>
+                )}
+
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     Location Shelf/Rack
@@ -2063,6 +2352,21 @@ export function InventoryPage() {
                     }
                   />
                 </div>
+                {inventoryCustomFields.some((f) => f.afterField === "location") && (
+                  <div className="col-span-2">
+                    <DynamicFormRenderer
+                      fields={inventoryCustomFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
+                      afterFieldPosition="location"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="border-t pt-4 space-y-4">
@@ -2126,7 +2430,7 @@ export function InventoryPage() {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2">
+               <div className="flex flex-col gap-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   Description / Notes
                 </label>
@@ -2139,6 +2443,48 @@ export function InventoryPage() {
                   }
                 />
               </div>
+              {inventoryCustomFields.some((f) => f.afterField === "notes") && (
+                <div className="col-span-2">
+                  <DynamicFormRenderer
+                    fields={inventoryCustomFields}
+                    values={iCustomFields}
+                    onChange={(key, val) => {
+                      setICustomFields((prev) => ({ ...prev, [key]: val }));
+                      if (iErrors[key])
+                        setIErrors((prev) => ({ ...prev, [key]: "" }));
+                    }}
+                    errors={iErrors}
+                    afterFieldPosition="notes"
+                  />
+                </div>
+              )}
+
+              {/* Dynamic EAV Custom Fields without specific afterField position or assigned to end */}
+              {inventoryCustomFields.some(
+                (f) =>
+                  (!f.afterField || f.afterField === "end") &&
+                  !f.afterField?.startsWith("stock"),
+              ) && (
+                <div className="border-t pt-4 space-y-4">
+                  <h4 className="text-sm font-bold text-foreground uppercase tracking-wider">
+                    Additional Information
+                  </h4>
+                  <DynamicFormRenderer
+                    fields={inventoryCustomFields.filter(
+                      (f) =>
+                        (!f.afterField || f.afterField === "end") &&
+                        !f.afterField?.startsWith("stock"),
+                    )}
+                    values={iCustomFields}
+                    onChange={(key, val) => {
+                      setICustomFields((prev) => ({ ...prev, [key]: val }));
+                      if (iErrors[key])
+                        setIErrors((prev) => ({ ...prev, [key]: "" }));
+                    }}
+                    errors={iErrors}
+                  />
+                </div>
+              )}
 
               <div className="border-t pt-4 flex items-center justify-end gap-2">
                 <Button
@@ -2222,6 +2568,36 @@ export function InventoryPage() {
                     }
                   />
                 </div>
+                {inventoryCustomFields.some(
+                  (f) =>
+                    (stockMovType === "IN" && f.afterField === "stockInQty") ||
+                    (stockMovType === "OUT" && f.afterField === "stockOutQty") ||
+                    (stockMovType === "ADJUST" && f.afterField === "stockAdjustQty") ||
+                    (stockMovType === "RETURN" && f.afterField === "stockReturnQty")
+                ) && (
+                  <div className="col-span-2">
+                    <DynamicFormRenderer
+                      fields={inventoryCustomFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
+                      afterFieldPosition={
+                        stockMovType === "IN"
+                          ? "stockInQty"
+                          : stockMovType === "OUT"
+                          ? "stockOutQty"
+                          : stockMovType === "ADJUST"
+                          ? "stockAdjustQty"
+                          : "stockReturnQty"
+                      }
+                    />
+                  </div>
+                )}
+
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     Transaction Date
@@ -2234,6 +2610,35 @@ export function InventoryPage() {
                     }
                   />
                 </div>
+                {inventoryCustomFields.some(
+                  (f) =>
+                    (stockMovType === "IN" && f.afterField === "stockInDate") ||
+                    (stockMovType === "OUT" && f.afterField === "stockOutDate") ||
+                    (stockMovType === "ADJUST" && f.afterField === "stockAdjustDate") ||
+                    (stockMovType === "RETURN" && f.afterField === "stockReturnDate")
+                ) && (
+                  <div className="col-span-2">
+                    <DynamicFormRenderer
+                      fields={inventoryCustomFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
+                      afterFieldPosition={
+                        stockMovType === "IN"
+                          ? "stockInDate"
+                          : stockMovType === "OUT"
+                          ? "stockOutDate"
+                          : stockMovType === "ADJUST"
+                          ? "stockAdjustDate"
+                          : "stockReturnDate"
+                      }
+                    />
+                  </div>
+                )}
 
                 {stockMovType === "IN" && (
                   <>
@@ -2251,6 +2656,22 @@ export function InventoryPage() {
                         }
                       />
                     </div>
+                    {inventoryCustomFields.some((f) => f.afterField === "stockInRate") && (
+                      <div className="col-span-2">
+                        <DynamicFormRenderer
+                          fields={inventoryCustomFields}
+                          values={iCustomFields}
+                          onChange={(key, val) => {
+                            setICustomFields((prev) => ({ ...prev, [key]: val }));
+                            if (iErrors[key])
+                              setIErrors((prev) => ({ ...prev, [key]: "" }));
+                          }}
+                          errors={iErrors}
+                          afterFieldPosition="stockInRate"
+                        />
+                      </div>
+                    )}
+
                     <div className="flex flex-col gap-2">
                       <label className="text-xs font-bold tracking-wider text-muted-foreground">
                         Supplier Name
@@ -2263,6 +2684,22 @@ export function InventoryPage() {
                         }
                       />
                     </div>
+                    {inventoryCustomFields.some((f) => f.afterField === "stockInVendorName") && (
+                      <div className="col-span-2">
+                        <DynamicFormRenderer
+                          fields={inventoryCustomFields}
+                          values={iCustomFields}
+                          onChange={(key, val) => {
+                            setICustomFields((prev) => ({ ...prev, [key]: val }));
+                            if (iErrors[key])
+                              setIErrors((prev) => ({ ...prev, [key]: "" }));
+                          }}
+                          errors={iErrors}
+                          afterFieldPosition="stockInVendorName"
+                        />
+                      </div>
+                    )}
+
                     <div className="flex flex-col gap-2">
                       <label className="text-xs font-bold tracking-wider text-muted-foreground">
                         PO Number
@@ -2275,6 +2712,22 @@ export function InventoryPage() {
                         }
                       />
                     </div>
+                    {inventoryCustomFields.some((f) => f.afterField === "stockInPoNumber") && (
+                      <div className="col-span-2">
+                        <DynamicFormRenderer
+                          fields={inventoryCustomFields}
+                          values={iCustomFields}
+                          onChange={(key, val) => {
+                            setICustomFields((prev) => ({ ...prev, [key]: val }));
+                            if (iErrors[key])
+                              setIErrors((prev) => ({ ...prev, [key]: "" }));
+                          }}
+                          errors={iErrors}
+                          afterFieldPosition="stockInPoNumber"
+                        />
+                      </div>
+                    )}
+
                     <div className="flex flex-col gap-2">
                       <label className="text-xs font-bold tracking-wider text-muted-foreground">
                         Invoice No
@@ -2287,22 +2740,60 @@ export function InventoryPage() {
                         }
                       />
                     </div>
+                    {inventoryCustomFields.some((f) => f.afterField === "stockInInvoiceNo") && (
+                      <div className="col-span-2">
+                        <DynamicFormRenderer
+                          fields={inventoryCustomFields}
+                          values={iCustomFields}
+                          onChange={(key, val) => {
+                            setICustomFields((prev) => ({ ...prev, [key]: val }));
+                            if (iErrors[key])
+                              setIErrors((prev) => ({ ...prev, [key]: "" }));
+                          }}
+                          errors={iErrors}
+                          afterFieldPosition="stockInInvoiceNo"
+                        />
+                      </div>
+                    )}
                   </>
                 )}
 
                 {(stockMovType === "OUT" || stockMovType === "RETURN") && (
-                  <div className="flex flex-col gap-2 col-span-2">
-                    <label className="text-xs font-bold tracking-wider text-muted-foreground">
-                      Sales Order / Project Code Reference
-                    </label>
-                    <Input
-                      placeholder="DVEPL-0001"
-                      value={stockOrderCode}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setStockOrderCode(e.target.value)
-                      }
-                    />
-                  </div>
+                  <>
+                    <div className="flex flex-col gap-2 col-span-2">
+                      <label className="text-xs font-bold tracking-wider text-muted-foreground">
+                        Sales Order / Project Code Reference
+                      </label>
+                      <Input
+                        placeholder="DVEPL-0001"
+                        value={stockOrderCode}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                          setStockOrderCode(e.target.value)
+                        }
+                      />
+                    </div>
+                    {inventoryCustomFields.some(
+                      (f) =>
+                        (stockMovType === "OUT" && f.afterField === "stockOutOrderCode") ||
+                        (stockMovType === "RETURN" && f.afterField === "stockReturnOrderCode")
+                    ) && (
+                      <div className="col-span-2">
+                        <DynamicFormRenderer
+                          fields={inventoryCustomFields}
+                          values={iCustomFields}
+                          onChange={(key, val) => {
+                            setICustomFields((prev) => ({ ...prev, [key]: val }));
+                            if (iErrors[key])
+                              setIErrors((prev) => ({ ...prev, [key]: "" }));
+                          }}
+                          errors={iErrors}
+                          afterFieldPosition={
+                            stockMovType === "OUT" ? "stockOutOrderCode" : "stockReturnOrderCode"
+                          }
+                        />
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -2319,6 +2810,35 @@ export function InventoryPage() {
                   rows={2}
                 />
               </div>
+              {inventoryCustomFields.some(
+                (f) =>
+                  (stockMovType === "IN" && f.afterField === "stockInReason") ||
+                  (stockMovType === "OUT" && f.afterField === "stockOutReason") ||
+                  (stockMovType === "ADJUST" && f.afterField === "stockAdjustReason") ||
+                  (stockMovType === "RETURN" && f.afterField === "stockReturnReason")
+              ) && (
+                <div className="col-span-2">
+                  <DynamicFormRenderer
+                    fields={inventoryCustomFields}
+                    values={iCustomFields}
+                    onChange={(key, val) => {
+                      setICustomFields((prev) => ({ ...prev, [key]: val }));
+                      if (iErrors[key])
+                        setIErrors((prev) => ({ ...prev, [key]: "" }));
+                    }}
+                    errors={iErrors}
+                    afterFieldPosition={
+                      stockMovType === "IN"
+                        ? "stockInReason"
+                        : stockMovType === "OUT"
+                        ? "stockOutReason"
+                        : stockMovType === "ADJUST"
+                        ? "stockAdjustReason"
+                        : "stockReturnReason"
+                    }
+                  />
+                </div>
+              )}
 
               {/* Dynamic Preview */}
               {stockQty && (
@@ -2361,6 +2881,53 @@ export function InventoryPage() {
                   })()}
                 </div>
               )}
+
+              {/* Dynamic EAV Custom Fields without specific afterField position or assigned to end/other fields not rendered above */}
+              {(() => {
+                const prefix =
+                  stockMovType === "IN"
+                    ? "stockIn"
+                    : stockMovType === "OUT"
+                    ? "stockOut"
+                    : stockMovType === "ADJUST"
+                    ? "stockAdjust"
+                    : "stockReturn";
+
+                const inlinePositions =
+                  stockMovType === "IN"
+                    ? ["stockInQty", "stockInDate", "stockInRate", "stockInVendorName", "stockInPoNumber", "stockInInvoiceNo", "stockInReason"]
+                    : stockMovType === "OUT"
+                    ? ["stockOutQty", "stockOutDate", "stockOutOrderCode", "stockOutReason"]
+                    : stockMovType === "ADJUST"
+                    ? ["stockAdjustQty", "stockAdjustDate", "stockAdjustReason"]
+                    : ["stockReturnQty", "stockReturnDate", "stockReturnOrderCode", "stockReturnReason"];
+
+                const activeFields = inventoryCustomFields.filter(
+                  (f) =>
+                    f.afterField?.startsWith(prefix) &&
+                    (f.afterField === `${prefix}_end` || !inlinePositions.includes(f.afterField))
+                );
+
+                if (activeFields.length === 0) return null;
+
+                return (
+                  <div className="border-t pt-4 space-y-4">
+                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                      Additional Information
+                    </h4>
+                    <DynamicFormRenderer
+                      fields={activeFields}
+                      values={iCustomFields}
+                      onChange={(key, val) => {
+                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                        if (iErrors[key])
+                          setIErrors((prev) => ({ ...prev, [key]: "" }));
+                      }}
+                      errors={iErrors}
+                    />
+                  </div>
+                );
+              })()}
 
               <div className="border-t pt-4 flex items-center justify-end gap-2">
                 <Button
@@ -2512,6 +3079,34 @@ export function InventoryPage() {
                       <strong>Procurement Lead Time:</strong>{" "}
                       {selectedItemData.primaryVendor.leadDays} Days
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {inventoryCustomFields.length > 0 && (
+                <div className="p-4 border rounded-xl bg-card">
+                  <h4 className="text-xs font-bold text-muted-foreground uppercase mb-2">
+                    Custom Fields
+                  </h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+                    {inventoryCustomFields.map((field) => {
+                      const value = selectedItemData.customFields?.[field.key];
+                      let displayValue = "—";
+                      if (value !== undefined && value !== null && value !== "") {
+                        if (field.type === "vendor") {
+                          displayValue = vendors.find((v) => v.id === value)?.vendorName || String(value);
+                        } else if (typeof value === "boolean") {
+                          displayValue = value ? "Yes" : "No";
+                        } else {
+                          displayValue = String(value);
+                        }
+                      }
+                      return (
+                        <div key={field.id}>
+                          <strong>{field.name}:</strong> {displayValue}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}

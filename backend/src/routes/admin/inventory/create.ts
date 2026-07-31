@@ -250,6 +250,12 @@ async function adminInventoryCreateRoutes(
             },
           });
 
+          if ((request.body as any)?.customFields) {
+            const { CustomFieldService } = await import("../../../services/customFieldService");
+            const cfService = new CustomFieldService(tx as any);
+            await cfService.saveValues("inventory", inventory.id, (request.body as any).customFields);
+          }
+
           return inventory;
         });
         // =========================================

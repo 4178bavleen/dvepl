@@ -282,7 +282,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     <div className={`flex h-screen w-screen overflow-hidden bg-background text-foreground transition-colors duration-300 ${sidebarPos === 'right' ? 'flex-row-reverse' : ''}`}>
       
       {/* 1. COLLAPSIBLE SIDEBAR */}
-      <Sidebar />
+      <Sidebar
+        isCollapsed={isSidebarCollapsed}
+        onCollapseChange={setIsSidebarCollapsed}
+        isMobileOpen={isMobileSidebarOpen}
+        onMobileOpenChange={setIsMobileSidebarOpen}
+      />
 
       {/* 2. MAIN LAYOUT CONTAINER */}
       <div 
