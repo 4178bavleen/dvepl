@@ -235,6 +235,17 @@ export function GenericTable<TData extends { id: string }>({
     }
   });
 
+  // Re-load column order from localStorage if the localStorageKey changes (e.g. after dynamic columns/custom fields load)
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const saved = window.localStorage.getItem(localStorageKey);
+      setColumnOrder(saved ? (JSON.parse(saved) as string[]) : []);
+    } catch {
+      // ignore
+    }
+  }, [localStorageKey]);
+
   const [isColumnsOpen, setIsColumnsOpen] = useState(false);
   const store = useERPStore();
 
@@ -443,9 +454,12 @@ export function GenericTable<TData extends { id: string }>({
   React.useEffect(() => {
     const ids = tableColumns.map((column: any) => column.id ?? column.accessorKey);
     setColumnOrder((prev) => {
-      const kept = prev.filter((id) => ids.includes(id));
-      const missing = ids.filter((id) => !kept.includes(id));
-      const merged = kept.length ? [...kept, ...missing] : ids;
+      if (prev.length === 0) return ids;
+
+      // To prevent removing columns that are temporarily missing (e.g. custom fields loading asynchronously),
+      // we keep all columns from the saved order (prev) and append any new ones from ids.
+      const newIds = ids.filter((id) => !prev.includes(id));
+      const merged = [...prev, ...newIds];
 
       const hasSelect = merged.includes("select");
       const hasActions = merged.includes("actions");

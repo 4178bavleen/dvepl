@@ -2362,6 +2362,7 @@ export function VendorsPage() {
         onEdit={openEditVendor}
         onDelete={(row) => handleDeleteVendor(row.id)}
         showColumnVisibility={false}
+        storageKey="vendors"
       />
 
       {/* ── OVERVIEW MODAL ── */}

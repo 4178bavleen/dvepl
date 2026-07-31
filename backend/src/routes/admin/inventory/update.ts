@@ -166,8 +166,8 @@ async function adminInventoryUpdateRoutes(
 
     quantity:
       data.currentStock !== undefined
-        ? new Prisma.Decimal(data.currentStock)
-        : data.quantity !== undefined
+         ? new Prisma.Decimal(data.currentStock)
+         : data.quantity !== undefined
           ? new Prisma.Decimal(data.quantity)
           : undefined,
 
@@ -186,6 +186,12 @@ async function adminInventoryUpdateRoutes(
         : undefined,
   },
 });
+
+          if ((request.body as any)?.customFields) {
+            const { CustomFieldService } = await import("../../../services/customFieldService");
+            const cfService = new CustomFieldService(tx as any);
+            await cfService.saveValues("inventory", id, (request.body as any).customFields);
+          }
 
           return inv;
         });

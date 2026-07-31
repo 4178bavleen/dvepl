@@ -90,6 +90,7 @@ export const inventoryStockInSchema = z.object({
   referenceId: z.string().min(1),
 
   remarks: z.string().optional().nullable(),
+  customFields: z.record(z.string(), z.any()).optional(),
 });
 export const inventoryStockOutSchema = z.object({
   inventoryId: z.string().uuid(),
@@ -98,6 +99,7 @@ export const inventoryStockOutSchema = z.object({
 
   referenceId: z.string().min(1),
   remarks: z.string().optional(),
+  customFields: z.record(z.string(), z.any()).optional(),
 });
 
 export const inventoryStockAdjustmentSchema = z.object({

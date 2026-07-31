@@ -12,6 +12,7 @@ import {
 
 import { adminLogs } from "../../../services/logger/contextLogger";
 import { inventoryStockOutSchema } from "../../../schemas/admin/inventory/inventory.schema";
+import { CustomFieldService } from "../../../services/customFieldService";
 
 async function adminInventoryStockOutRoutes(
   fastify: FastifyInstance,
@@ -49,6 +50,7 @@ async function adminInventoryStockOutRoutes(
           referenceType,
           referenceId,
           remarks,
+          customFields,
         } = validationResult.data;
 
         const companyId = request.user.companyId;
@@ -143,6 +145,12 @@ async function adminInventoryStockOutRoutes(
             transaction,
           };
         });
+
+        // Save Custom Fields for Inventory Item
+        if (customFields) {
+          const cfService = new CustomFieldService(fastify.prisma);
+          await cfService.saveValues("inventory", inventory.id, customFields);
+        }
 
         // ==========================
         // Fetch Updated Inventory

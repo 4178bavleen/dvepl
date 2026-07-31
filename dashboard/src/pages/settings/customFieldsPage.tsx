@@ -13,7 +13,7 @@ import { CustomField, SUPPORTED_FIELD_TYPES } from '@/components/customFields/dy
 import { ConfirmDialog } from '@/components/shared/confirmDialog';
 
 export default function CustomFieldsPage() {
-  const [activeModule, setActiveModule] = useState<'order' | 'task' | 'vendor'>('order');
+  const [activeModule, setActiveModule] = useState<'order' | 'task' | 'vendor' | 'inventory'>('order');
   const [fields, setFields] = useState<CustomField[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -215,6 +215,16 @@ export default function CustomFieldsPage() {
         >
           🏢 Vendors
         </button>
+        <button
+          onClick={() => setActiveModule('inventory')}
+          className={`px-5 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center gap-2 ${
+            activeModule === 'inventory'
+              ? 'bg-primary text-white shadow-md'
+              : 'bg-card text-muted-foreground hover:bg-muted border border-border'
+          }`}
+        >
+          📦 Inventory
+        </button>
       </div>
 
       {/* Form Card */}
@@ -228,6 +238,7 @@ export default function CustomFieldsPage() {
               {activeModule === 'order' && 'Extra field for Orders — select position where to add it.'}
               {activeModule === 'task' && 'Extra field that will appear in every Task form & table.'}
               {activeModule === 'vendor' && 'Extra field that will appear in every Vendor profile.'}
+              {activeModule === 'inventory' && 'Extra field that will appear in every Inventory Item.'}
             </p>
           </div>
           {editingId && (
@@ -278,87 +289,219 @@ export default function CustomFieldsPage() {
           )}
 
           {/* Position Selector for Form Field Placement */}
-          <div className="flex flex-col gap-1.5 bg-primary/5 p-3 rounded-xl border border-primary/20">
-            <Label className="text-xs font-semibold text-primary">📍 Add After Field *</Label>
-            <select
-              value={afterField}
-              onChange={(e) => setAfterField(e.target.value)}
-              className="h-9 px-3 border border-border bg-background text-foreground rounded-lg text-xs outline-none focus:border-primary"
-            >
-              <option value="">— Select Position (Default: At the End) —</option>
-
-              {activeModule === 'order' && (
-                <>
-                  <optgroup label="Assignment & Status">
-                    <option value="companyCode">DVEPL Code</option>
-                    <option value="orderStatus">Status</option>
-                    <option value="orderTakenBy">Order Taken By</option>
-                    <option value="assignedTo">Assigned To</option>
-                  </optgroup>
-                  <optgroup label="Order Information">
-                    <option value="customerName">Party Name</option>
-                    <option value="caNo">CA No</option>
-                    <option value="contact">Contact Details (Phone / Email)</option>
-                    <option value="orderTakenDate">Order Confirm Date</option>
-                    <option value="deliveryTarget">Delivery Month Target</option>
-                    <option value="poDate">PO Date</option>
-                    <option value="concernedPeople">Concerned Persons</option>
-                  </optgroup>
-                  <optgroup label="Drawing Details">
-                    <option value="drawingConcernedPerson">Drawing Concerned Person</option>
-                    <option value="drawingApprovedDate">Drawing Approved Date</option>
-                    <option value="drawingStatus">Drawing Status</option>
-                    <option value="drawingRemarks">Drawing Remarks</option>
-                  </optgroup>
-                  <optgroup label="Item & Pricing">
-                    <option value="itemCount">Items</option>
-                    <option value="total">Total Amount (₹)</option>
-                  </optgroup>
-                </>
-              )}
-
-              {activeModule === 'vendor' && (
-                <>
-                  <optgroup label="Vendor Standard Fields">
-                    <option value="name">Vendor Name</option>
+          {activeModule === 'inventory' ? (
+            <div className="flex flex-col gap-3 bg-primary/5 p-3 rounded-xl border border-primary/20">
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs font-semibold text-primary">📍 Add/Edit Item Form (Add Field After)</Label>
+                <select
+                  value={
+                    [
+                      "name", "code", "type", "category", "unit", "hsnCode",
+                      "openingStock", "reorderLevel", "reorderQty", "unitRate",
+                      "gstPercent", "location", "notes"
+                    ].includes(afterField) || afterField.startsWith("custom_")
+                      ? afterField
+                      : ""
+                  }
+                  onChange={(e) => {
+                    setAfterField(e.target.value);
+                  }}
+                  className="h-9 px-3 border border-border bg-background text-foreground rounded-lg text-xs outline-none focus:border-primary"
+                >
+                  <option value="">— Select Position —</option>
+                  <optgroup label="Inventory Item Fields">
+                    <option value="name">Item Name</option>
+                    <option value="code">Item Code</option>
+                    <option value="type">Type</option>
                     <option value="category">Category</option>
-                    <option value="contactPerson">Contact Person</option>
-                    <option value="phone font">Phone</option>
-                    <option value="email">Email</option>
-                    <option value="gstNumber">GST Number</option>
-                    <option value="address">Address</option>
+                    <option value="unit">Unit</option>
+                    <option value="hsnCode">HSN Code</option>
+                    <option value="openingStock">Opening/Current Stock</option>
+                    <option value="reorderLevel">Reorder Level</option>
+                    <option value="reorderQty">Reorder Quantity</option>
+                    <option value="unitRate">Unit Rate</option>
+                    <option value="gstPercent">GST Percent</option>
+                    <option value="location">Location</option>
                     <option value="notes">Notes</option>
                   </optgroup>
-                </>
-              )}
+                  {fields.length > 0 && (
+                    <optgroup label="Existing Custom Fields">
+                      {fields.map((f) => (
+                        <option key={f.id} value={`custom_${f.key}`}>
+                          {f.name} ({f.key})
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  <option value="end">— At the End —</option>
+                </select>
+              </div>
 
-              {activeModule === 'task' && (
-                <>
-                  <optgroup label="Task Standard Fields">
-                    <option value="title">Task Title</option>
-                    <option value="description">Description</option>
-                    <option value="priority">Priority</option>
-                    <option value="dueDate">Due Date</option>
-                    <option value="status">Status</option>
-                    <option value="assignedUsers">Assigned To</option>
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs font-semibold text-primary">📍 Stock In Form (Add Field After)</Label>
+                <select
+                  value={afterField.startsWith("stockIn") ? afterField : ""}
+                  onChange={(e) => {
+                    setAfterField(e.target.value);
+                  }}
+                  className="h-9 px-3 border border-border bg-background text-foreground rounded-lg text-xs outline-none focus:border-primary"
+                >
+                  <option value="">— Select Position —</option>
+                  <optgroup label="Stock In Fields">
+                    <option value="stockInQty">Quantity</option>
+                    <option value="stockInDate">Transaction Date</option>
+                    <option value="stockInRate">Custom Rate</option>
+                    <option value="stockInVendorName">Supplier Name</option>
+                    <option value="stockInPoNumber">PO Number</option>
+                    <option value="stockInInvoiceNo">Invoice No</option>
+                    <option value="stockInReason">Reason/Note</option>
                   </optgroup>
-                </>
-              )}
+                  <option value="stockIn_end">— At the End —</option>
+                </select>
+              </div>
 
-              {/* Render existing custom fields in this module */}
-              {fields.length > 0 && (
-                <optgroup label="Existing Custom Fields">
-                  {fields.map((f) => (
-                    <option key={f.id} value={`custom_${f.key}`}>
-                      {f.name} ({f.key})
-                    </option>
-                  ))}
-                </optgroup>
-              )}
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs font-semibold text-primary">📍 Stock Out Form (Add Field After)</Label>
+                <select
+                  value={afterField.startsWith("stockOut") ? afterField : ""}
+                  onChange={(e) => {
+                    setAfterField(e.target.value);
+                  }}
+                  className="h-9 px-3 border border-border bg-background text-foreground rounded-lg text-xs outline-none focus:border-primary"
+                >
+                  <option value="">— Select Position —</option>
+                  <optgroup label="Stock Out Fields">
+                    <option value="stockOutQty">Quantity</option>
+                    <option value="stockOutDate">Transaction Date</option>
+                    <option value="stockOutOrderCode">Sales Order Reference</option>
+                    <option value="stockOutReason">Reason/Note</option>
+                  </optgroup>
+                  <option value="stockOut_end">— At the End —</option>
+                </select>
+              </div>
 
-              <option value="end">— At the End —</option>
-            </select>
-          </div>
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs font-semibold text-primary">📍 Adjust Form (Add Field After)</Label>
+                <select
+                  value={afterField.startsWith("stockAdjust") ? afterField : ""}
+                  onChange={(e) => {
+                    setAfterField(e.target.value);
+                  }}
+                  className="h-9 px-3 border border-border bg-background text-foreground rounded-lg text-xs outline-none focus:border-primary"
+                >
+                  <option value="">— Select Position —</option>
+                  <optgroup label="Adjust Fields">
+                    <option value="stockAdjustQty">New Level</option>
+                    <option value="stockAdjustDate">Transaction Date</option>
+                    <option value="stockAdjustReason">Reason/Note</option>
+                  </optgroup>
+                  <option value="stockAdjust_end">— At the End —</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs font-semibold text-primary">📍 Return Form (Add Field After)</Label>
+                <select
+                  value={afterField.startsWith("stockReturn") ? afterField : ""}
+                  onChange={(e) => {
+                    setAfterField(e.target.value);
+                  }}
+                  className="h-9 px-3 border border-border bg-background text-foreground rounded-lg text-xs outline-none focus:border-primary"
+                >
+                  <option value="">— Select Position —</option>
+                  <optgroup label="Return Fields">
+                    <option value="stockReturnQty">Quantity</option>
+                    <option value="stockReturnDate">Transaction Date</option>
+                    <option value="stockReturnOrderCode">Sales Order Reference</option>
+                    <option value="stockReturnReason">Reason/Note</option>
+                  </optgroup>
+                  <option value="stockReturn_end">— At the End —</option>
+                </select>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1.5 bg-primary/5 p-3 rounded-xl border border-primary/20">
+              <Label className="text-xs font-semibold text-primary">📍 Add After Field *</Label>
+              <select
+                value={afterField}
+                onChange={(e) => setAfterField(e.target.value)}
+                className="h-9 px-3 border border-border bg-background text-foreground rounded-lg text-xs outline-none focus:border-primary"
+              >
+                <option value="">— Select Position (Default: At the End) —</option>
+
+                {activeModule === 'order' && (
+                  <>
+                    <optgroup label="Assignment & Status">
+                      <option value="companyCode">DVEPL Code</option>
+                      <option value="orderStatus">Status</option>
+                      <option value="orderTakenBy">Order Taken By</option>
+                      <option value="assignedTo">Assigned To</option>
+                    </optgroup>
+                    <optgroup label="Order Information">
+                      <option value="customerName">Party Name</option>
+                      <option value="caNo">CA No</option>
+                      <option value="contact">Contact Details (Phone / Email)</option>
+                      <option value="orderTakenDate">Order Confirm Date</option>
+                      <option value="deliveryTarget">Delivery Month Target</option>
+                      <option value="poDate">PO Date</option>
+                      <option value="concernedPeople">Concerned Persons</option>
+                    </optgroup>
+                    <optgroup label="Drawing Details">
+                      <option value="drawingConcernedPerson">Drawing Concerned Person</option>
+                      <option value="drawingApprovedDate">Drawing Approved Date</option>
+                      <option value="drawingStatus">Drawing Status</option>
+                      <option value="drawingRemarks">Drawing Remarks</option>
+                    </optgroup>
+                    <optgroup label="Item & Pricing">
+                      <option value="itemCount">Items</option>
+                      <option value="total">Total Amount (₹)</option>
+                    </optgroup>
+                  </>
+                )}
+
+                {activeModule === 'vendor' && (
+                  <>
+                    <optgroup label="Vendor Standard Fields">
+                      <option value="name">Vendor Name</option>
+                      <option value="category">Category</option>
+                      <option value="contactPerson">Contact Person</option>
+                      <option value="phone font">Phone</option>
+                      <option value="email">Email</option>
+                      <option value="gstNumber">GST Number</option>
+                      <option value="address">Address</option>
+                      <option value="notes">Notes</option>
+                    </optgroup>
+                  </>
+                )}
+
+                {activeModule === 'task' && (
+                  <>
+                    <optgroup label="Task Standard Fields">
+                      <option value="title">Task Title</option>
+                      <option value="description">Description</option>
+                      <option value="priority">Priority</option>
+                      <option value="dueDate">Due Date</option>
+                      <option value="status">Status</option>
+                      <option value="assignedUsers">Assigned To</option>
+                    </optgroup>
+                  </>
+                )}
+
+                {/* Render existing custom fields in this module */}
+                {fields.length > 0 && (
+                  <optgroup label="Existing Custom Fields">
+                    {fields.map((f) => (
+                      <option key={f.id} value={`custom_${f.key}`}>
+                        {f.name} ({f.key})
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+
+                <option value="end">— At the End —</option>
+              </select>
+            </div>
+          )}
 
           {/* Extra Configurations */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
