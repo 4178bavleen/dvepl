@@ -1,5 +1,5 @@
 {
-  "bgColor": "#ffffff",
+  "bgColor": "#f8fafc",
   "sidebarPos": "left",
   "waSettings": {
     "orderGen": false,
@@ -21,7 +21,7 @@
     "port": 465,
     "username": "noreply@vibrantick.in",
     "password": "7F2gaC>7jU",
-    "secure": false,
+    "secure": true,
     "supportEmail": "",
     "supportPhone": "",
     "address": ""
@@ -34,5 +34,5 @@
     "secretKey": "test-secret-key-2",
     "enabled": true
   },
-  "brandColor": "#33cc33"
+  "brandColor": "#1d5c2e"
 }

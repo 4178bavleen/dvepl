@@ -257,7 +257,7 @@ export default function PaymentsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-3">
             {/* Page Numbers Navigation Pill */}
-            <div className="flex items-center gap-1 bg-muted/30 border border-border/40 p-1 h-11 rounded-xl shadow-3xs">
+            <div className="flex items-center gap-1 bg-muted/60 border border-border/70 p-1 h-11 rounded-xl shadow-xs">
               <Button
                 variant="ghost"
                 size="sm"
@@ -311,7 +311,7 @@ export default function PaymentsPage() {
             </div>
 
             {/* Custom Entries Selector Pill */}
-            <div className="flex items-center gap-2 bg-muted/30 border border-border/40 px-3 h-11 rounded-xl shadow-3xs text-xs text-muted-foreground font-medium">
+            <div className="flex items-center gap-2 bg-muted/60 border border-border/70 px-3 h-11 rounded-xl shadow-xs text-xs text-muted-foreground font-medium">
               <input
                 type="text"
                 inputMode="numeric"
@@ -362,7 +362,7 @@ export default function PaymentsPage() {
         <div className="flex items-center justify-between border-b pb-3">
           <h3 className="text-sm font-bold text-foreground">Order-wise Finance Details</h3>
         </div>
-        <div className="relative max-h-[70vh] overflow-auto no-scrollbar-y border rounded-xl bg-card">
+        <div className="relative overflow-x-auto border rounded-xl bg-card">
           <table className="w-full text-left border-collapse text-sm">
             <thead className="sticky top-0 z-10 bg-card border-b border-border/80 text-xs font-semibold text-muted-foreground shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)]">
               <tr>
