@@ -82,4 +82,6 @@ export const ROUTES = {
   CUSTOM_FIELDS: '/settings/custom-fields',
   RECYCLE_BIN: '/settings/recycle-bin',
   SETTINGS_APPROVAL_RULES: '/settings/approval-rules',
+
+  EXPORT_ORDERS: "/export-orders",
 };

@@ -5,6 +5,7 @@ import { PublicRoute } from "@/app/routes/public";
 import { UiConfigProvider } from "@/contexts/ui/uiConfigContext";
 import NotFound from "@/pages/notFound";
 import PageLoader from "@/components/ui/pageLoader";
+import { InventoryPage } from "@/pages/inventory/inventoryPage";
 // const InventoryTrackingPage = lazy(
 //   () => import("@/pages/inventory/inventoryTrackingPage"),
 // );
@@ -83,9 +84,11 @@ const EngineeringDrawingsPage = lazy(
 const BomsPage = lazy(() => import("@/pages/engineering/bomsPage"));
 
 // Security & Audit
-const RolesPage = lazy(() => import('@/pages/roles/rolesPage'));
-const ApprovalRequestsPage = lazy(() => import('@/pages/roles/approvalRequestsPage'));
-const AuditLogsPage = lazy(() => import('@/pages/audit/auditLogsPage'));
+const RolesPage = lazy(() => import("@/pages/roles/rolesPage"));
+const ApprovalRequestsPage = lazy(
+  () => import("@/pages/roles/approvalRequestsPage"),
+);
+const AuditLogsPage = lazy(() => import("@/pages/audit/auditLogsPage"));
 
 const SettingsPage = lazy(() => import("@/pages/settings/settingsPage"));
 const CustomFieldsPage = lazy(
@@ -138,6 +141,7 @@ const NotificationsPage = lazy(
   () => import("@/pages/notifications/notificationsPage"),
 );
 const DeliveryPage = lazy(() => import("@/pages/delivery/deliveryPage"));
+const ExportOrdersPage = lazy(() => import("@/pages/exportOrders/ExportOrdersPage"));
 
 export function AppRouter() {
   return (
@@ -211,7 +215,10 @@ export function AppRouter() {
               <Route path="/purchase/vendors" element={<VendorsPage />} />
               <Route path="/tender/boqs" element={<BoqsPage />} />
               <Route path="/security/roles" element={<RolesPage />} />
-              <Route path="/security/approval-requests" element={<ApprovalRequestsPage />} />
+              <Route
+                path="/security/approval-requests"
+                element={<ApprovalRequestsPage />}
+              />
 
               {/* Engineering & Manufacturing */}
               <Route
@@ -279,16 +286,32 @@ export function AppRouter() {
 
               {/* Finance & Accounts */}
               <Route path="/finance" element={<PaymentsPage />} />
-              <Route path="/finance/history/:orderId" element={<PaymentHistoryPage />} />
+              <Route
+                path="/finance/history/:orderId"
+                element={<PaymentHistoryPage />}
+              />
 
               <Route path="/audit-logs" element={<AuditLogsPage />} />
               <Route path="/reports" element={<ReportsPage />} />
               {/* Settings */}
               <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/settings/custom-fields" element={<CustomFieldsPage />} />
-              <Route path="/settings/recycle-bin" element={<RecycleBinPage />} />
+              <Route
+                path="/settings/custom-fields"
+                element={<CustomFieldsPage />}
+              />
+              <Route
+                path="/settings/recycle-bin"
+                element={<RecycleBinPage />}
+              />
               <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/settings/notifications" element={<NotificationsPage />} />
+              <Route
+                path="/settings/notifications"
+                element={<NotificationsPage />}
+              />
+              <Route
+                path="/export-orders"
+                element={<ExportOrdersPage />}
+              />
             </Route>
 
             {/* 404 Fallback */}
