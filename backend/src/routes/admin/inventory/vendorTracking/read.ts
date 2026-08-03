@@ -88,6 +88,8 @@ const inventoryByMaterialId = new Map(
   vendor: {
     id: item.po.vendor?.id,
     name: item.po.vendor?.name,
+    phone: item.po.vendor?.phone,
+    email: item.po.vendor?.email,
   },
 
   material: {

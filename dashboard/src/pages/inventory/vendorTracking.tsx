@@ -126,6 +126,7 @@ export default function VendorTracking() {
   const [followUpPhone, setFollowUpPhone] = useState("");
   const [followUpEmail, setFollowUpEmail] = useState("");
   const [followUpMessage, setFollowUpMessage] = useState("");
+  const [followUpSending, setFollowUpSending] = useState(false);
 
   const tableRef = useRef<HTMLTableElement>(null);
 
@@ -324,7 +325,7 @@ export default function VendorTracking() {
     [vendorPendingSummary, followUpVendorId],
   );
 
-  const handleSendFollowUp = () => {
+  const handleSendFollowUp = async () => {
     if (!activeFollowUpSummary) return;
 
     if (followUpChannel === "whatsapp") {
@@ -339,16 +340,30 @@ export default function VendorTracking() {
       );
       toast.success("WhatsApp opened with follow-up message");
     } else {
-      if (!followUpEmail.trim()) {
-        toast.error("Enter an email address to send the follow-up");
+      if (!activeFollowUpSummary.email) {
+        toast.error("Add an email address to this vendor before sending the follow-up");
         return;
       }
       const subject = `Follow-up: Pending Deliveries — ${activeFollowUpSummary.vendorName}`;
-      window.open(
-        `mailto:${followUpEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(followUpMessage)}`,
-        "_blank",
-      );
-      toast.success("Email client opened with follow-up message");
+      setFollowUpSending(true);
+      try {
+        const response = await apiClient.post(
+          "/settings/send-vendor-follow-up-email",
+          {
+            vendorId: activeFollowUpSummary.vendorId,
+            subject,
+            text: followUpMessage,
+          },
+        );
+        toast.success(
+          response.data?.message || "Vendor follow-up email sent successfully",
+        );
+      } catch (err: any) {
+        toast.error(errMsg(err, "Failed to send vendor follow-up email"));
+        return;
+      } finally {
+        setFollowUpSending(false);
+      }
     }
 
     closeFollowUpModal();
@@ -1193,9 +1208,9 @@ export default function VendorTracking() {
                     Email Address
                   </label>
                   <Input
-                    value={followUpEmail}
-                    onChange={(e) => setFollowUpEmail(e.target.value)}
-                    placeholder="vendor@company.com"
+                    value={followUpEmail || "No email address saved for this vendor"}
+                    readOnly
+                    className="bg-muted"
                   />
                 </div>
               )}
@@ -1217,9 +1232,17 @@ export default function VendorTracking() {
               <Button variant="outline" onClick={closeFollowUpModal}>
                 Cancel
               </Button>
-              <Button onClick={handleSendFollowUp} className="gap-1.5">
+              <Button
+                onClick={handleSendFollowUp}
+                disabled={followUpSending}
+                className="gap-1.5"
+              >
                 <Send className="size-3.5" />
-                {followUpChannel === "whatsapp" ? "Open WhatsApp" : "Open Email"}
+                {followUpChannel === "whatsapp"
+                  ? "Open WhatsApp"
+                  : followUpSending
+                    ? "Sending..."
+                    : "Send Email"}
               </Button>
             </div>
           </div>
