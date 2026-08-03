@@ -618,7 +618,7 @@ export function VendorsPage() {
       { id: "email", label: "Email" },
       { id: "gstNumber", label: "GSTIN" },
       { id: "products", label: "Products" },
-      { id: "revisions", label: "Revision History" },
+      // { id: "revisions", label: "Revision History" },
       { id: "purchaseOrders", label: "Purchase Orders" },
       { id: "dataEntry", label: "Data Entry" },
     ];
