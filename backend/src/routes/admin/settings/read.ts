@@ -26,11 +26,7 @@ async function readSettingsRoute(
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        let companyId = (request.admin as any)?.companyId;
-        if (!companyId) {
-          const firstCompany = await fastify.prisma.company.findFirst();
-          if (firstCompany) companyId = firstCompany.id;
-        }
+        const companyId = request.user.companyId;
 
         const filePath = path.join(__dirname, "../../../../data/settings.json");
         const dirPath = path.dirname(filePath);

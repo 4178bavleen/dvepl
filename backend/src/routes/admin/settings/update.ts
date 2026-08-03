@@ -41,15 +41,16 @@ async function updateSettingsRoute(
           });
         }
 
-        let companyId = (request.admin as any)?.companyId;
-        if (!companyId) {
-          const firstCompany = await fastify.prisma.company.findFirst();
-          if (firstCompany) companyId = firstCompany.id;
-        }
+        const companyId = request.user.companyId;
 
         // Upsert database notification configuration
         if (companyId) {
           const emailEnabled = !!(
+            (validationResult.data.smtpSettings?.host && validationResult.data.smtpSettings?.port) ||
+            (validationResult.data.emailSettings as any)?.orders ||
+            (validationResult.data.emailSettings as any)?.tasks ||
+            (validationResult.data.emailSettings as any)?.payments ||
+            (validationResult.data.emailSettings as any)?.delivery ||
             validationResult.data.emailSettings?.orderGen ||
             validationResult.data.emailSettings?.gatePass ||
             validationResult.data.emailSettings?.paymentRel ||

@@ -5,7 +5,20 @@ import {
   FastifyRequest,
 } from "fastify";
 import nodemailer from "nodemailer";
+import { PurchaseOrderStatus } from "@prisma/client";
+import { z } from "zod";
+import fs from "fs";
+import path from "path";
 import { adminLogs } from "../../../services/logger/contextLogger";
+
+const sendPoEmailSchema = z.object({
+  vendorId: z.string().uuid(),
+  poNumber: z.string().min(1),
+  subject: z.string().optional(),
+  text: z.string().optional(),
+  html: z.string().optional(),
+  pdfBase64: z.string().min(1),
+});
 
 async function sendPoEmailRoute(
   fastify: FastifyInstance,
@@ -25,25 +38,41 @@ async function sendPoEmailRoute(
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { toEmail, subject, text, html, pdfBase64, poNumber } = request.body as any;
+        const validation = sendPoEmailSchema.safeParse(request.body);
 
-        if (!toEmail) {
+        if (!validation.success) {
           return reply.status(400).send({
             success: false,
-            message: "Destination email address is required.",
+            message: "A valid vendor, PO number, and PDF attachment are required.",
           });
         }
 
-        let companyId = (request.admin as any)?.companyId;
-        if (!companyId) {
-          const firstCompany = await fastify.prisma.company.findFirst();
-          if (firstCompany) companyId = firstCompany.id;
+        const { vendorId, poNumber, subject, text, html, pdfBase64 } = validation.data;
+        const companyId = request.user.companyId;
+
+        const purchaseOrder = await fastify.prisma.purchaseOrder.findFirst({
+          where: {
+            companyId,
+            vendorId,
+            poNo: poNumber,
+            deletedAt: null,
+          },
+          include: {
+            vendor: true,
+          },
+        });
+
+        if (!purchaseOrder) {
+          return reply.status(404).send({
+            success: false,
+            message: "Purchase Order not found. Save the PO before sending it.",
+          });
         }
 
-        if (!companyId) {
+        if (!purchaseOrder.vendor.email) {
           return reply.status(400).send({
             success: false,
-            message: "Company ID not found.",
+            message: "The selected vendor does not have an email address.",
           });
         }
 
@@ -51,21 +80,34 @@ async function sendPoEmailRoute(
           where: { companyId }
         });
 
-        if (!dbConfig || !dbConfig.emailEnabled || !dbConfig.smtpHost || !dbConfig.smtpPort) {
+        const settingsPath = path.join(__dirname, "../../../../data/settings.json");
+        const savedSettings = fs.existsSync(settingsPath)
+          ? JSON.parse(fs.readFileSync(settingsPath, "utf-8"))
+          : {};
+        const savedSmtp = savedSettings.smtpSettings || {};
+
+        const smtpHost = dbConfig?.smtpHost || savedSmtp.host;
+        const smtpPort = dbConfig?.smtpPort || savedSmtp.port;
+        const smtpUsername = dbConfig?.smtpUsername || savedSmtp.username || savedSmtp.email;
+        const smtpPassword = dbConfig?.smtpPassword || savedSmtp.password;
+        const smtpFromEmail = dbConfig?.smtpFromEmail || savedSettings.emailSettings?.address || smtpUsername;
+        const smtpFromName = dbConfig?.smtpFromName || savedSmtp.title || savedSettings.emailSettings?.name;
+
+        if (!smtpHost || !smtpPort) {
           return reply.status(400).send({
             success: false,
-            message: "Email notifications are not configured or disabled in settings.",
+            message: "SMTP host and port must be configured before sending a PO email.",
           });
         }
 
-        const parsedPort = parseInt(String(dbConfig.smtpPort), 10);
+        const parsedPort = parseInt(String(smtpPort), 10);
         const transporter = nodemailer.createTransport({
-          host: dbConfig.smtpHost,
+          host: smtpHost,
           port: parsedPort,
           secure: parsedPort === 465,
-          auth: dbConfig.smtpUsername && dbConfig.smtpPassword ? {
-            user: dbConfig.smtpUsername,
-            pass: dbConfig.smtpPassword,
+          auth: smtpUsername && smtpPassword ? {
+            user: smtpUsername,
+            pass: smtpPassword,
           } : undefined,
           connectionTimeout: 10000,
         });
@@ -79,17 +121,26 @@ async function sendPoEmailRoute(
         ] : [];
 
         await transporter.sendMail({
-          from: `"${dbConfig.smtpFromName || "DVEPL ERP"}" <${dbConfig.smtpFromEmail || dbConfig.smtpUsername || "no-reply@dvepl.com"}>`,
-          to: toEmail,
+          from: `"${smtpFromName || "DVEPL ERP"}" <${smtpFromEmail || "no-reply@dvepl.com"}>`,
+          to: purchaseOrder.vendor.email,
           subject: subject || `Purchase Order ${poNumber || ""}`,
           text: text || "Please find the attached Purchase Order.",
           html: html || `<p>Please find the attached Purchase Order.</p>`,
           attachments,
         });
 
+        await fastify.prisma.purchaseOrder.update({
+          where: { id: purchaseOrder.id },
+          data: {
+            status: PurchaseOrderStatus.SENT,
+            sentAt: new Date(),
+          },
+        });
+
         return reply.status(200).send({
           success: true,
           message: "PO Email sent successfully!",
+          data: { toEmail: purchaseOrder.vendor.email },
         });
       } catch (error: any) {
         adminLogs.error("Send PO Email failed", { error });

@@ -490,12 +490,11 @@ export function VendorsPage() {
   // View PO preview (frontend-only)
   const [isPoPreviewOpen, setIsPoPreviewOpen] = useState(false);
 
-  // PO Placed — send via WhatsApp/Email (frontend-only, no backend integration)
+  // PO Placed — send via WhatsApp or the configured SMTP service.
   const [isPoPlacedDialogOpen, setIsPoPlacedDialogOpen] = useState(false);
   const [placeSendWhatsapp, setPlaceSendWhatsapp] = useState(true);
   const [placeSendEmail, setPlaceSendEmail] = useState(false);
   const [placePhone, setPlacePhone] = useState("");
-  const [placeEmail, setPlaceEmail] = useState("");
 
   // Filter vendors
 
@@ -1845,13 +1844,17 @@ export function VendorsPage() {
       return;
     }
     setPlacePhone(activePoVendor.phone || "");
-    setPlaceEmail(activePoVendor.email || "");
     setPlaceSendWhatsapp(true);
     setPlaceSendEmail(false);
     setIsPoPlacedDialogOpen(true);
   };
 
   const handleConfirmPoPlaced = async () => {
+    if (!activePoVendor) {
+      toast.error("No vendor context found.");
+      return;
+    }
+
     if (!placeSendWhatsapp && !placeSendEmail) {
       toast.error("Select at least one channel (WhatsApp or Email).");
       return;
@@ -1860,8 +1863,8 @@ export function VendorsPage() {
       toast.error("Enter a WhatsApp number to send the PO.");
       return;
     }
-    if (placeSendEmail && !placeEmail.trim()) {
-      toast.error("Enter an email address to send the PO.");
+    if (placeSendEmail && !activePoVendor?.email?.trim()) {
+      toast.error("Add an email address to the vendor before sending the PO.");
       return;
     }
 
@@ -1909,7 +1912,7 @@ export function VendorsPage() {
 
       try {
         const res = await securityApi.settings.sendPoEmail({
-          toEmail: placeEmail,
+          vendorId: activePoVendor.id,
           subject,
           html: emailHtml,
           pdfBase64: base64Pdf,
@@ -1925,6 +1928,10 @@ export function VendorsPage() {
       } catch (err: any) {
         toast.error(err?.response?.data?.message || err?.message || "Error occurred while sending PO email.", { id: emailToast });
       }
+    }
+
+    if (sentChannels.length === 0) {
+      return;
     }
 
     setPoStatus("Placed");
@@ -2684,7 +2691,7 @@ export function VendorsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ── PO PLACED — send via WhatsApp/Email (frontend-only) ── */}
+      {/* ── PO PLACED — send via WhatsApp/Email ── */}
       <Dialog
         open={isPoPlacedDialogOpen}
         onOpenChange={setIsPoPlacedDialogOpen}
@@ -2723,17 +2730,16 @@ export function VendorsPage() {
               </label>
               {placeSendEmail && (
                 <Input
-                  placeholder="Vendor email address"
-                  value={placeEmail}
-                  onChange={(e) => setPlaceEmail(e.target.value)}
-                  className="ml-6 h-9 text-xs"
+                  value={activePoVendor?.email || "No email address saved for this vendor"}
+                  readOnly
+                  className="ml-6 h-9 text-xs bg-muted"
                 />
               )}
             </div>
             <p className="text-[11px] text-muted-foreground">
-              This will generate the PDF purchase order for you to save/print,
-              and open WhatsApp/Email with a pre-filled message where you can
-              attach the PDF.
+              This will generate the PDF purchase order for you to save or print.
+              When Email is selected, the PDF is sent to the email address saved
+              on the vendor profile.
             </p>
             <div className="flex justify-end gap-2 pt-2 border-t">
               <Button
