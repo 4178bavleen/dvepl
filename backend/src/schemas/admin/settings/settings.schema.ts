@@ -11,6 +11,10 @@ export const settingsSchema = z.object({
     number: z.string().optional()
   }).optional(),
   emailSettings: z.object({
+    orders: z.boolean().optional(),
+    tasks: z.boolean().optional(),
+    payments: z.boolean().optional(),
+    delivery: z.boolean().optional(),
     orderGen: z.boolean().optional(),
     gatePass: z.boolean().optional(),
     paymentRel: z.boolean().optional(),
