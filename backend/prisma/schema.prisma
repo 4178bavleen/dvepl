@@ -271,7 +271,7 @@ model VendorProduct {
   material  Material @relation(fields: [materialId], references: [id])
   createdBy User     @relation(fields: [createdById], references: [id])
 
-  @@unique([vendorId, materialId])
+  // @@unique([vendorId, materialId])
   @@index([vendorId])
   @@index([materialId])
   @@map("vendor_products")
