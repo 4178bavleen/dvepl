@@ -304,6 +304,7 @@ export function VendorsPage() {
   // UI States
   const [globalSearch, setGlobalSearch] = useState("");
   const [fieldSearch, setFieldSearch] = useState("");
+  const [productOnlySearch, setProductOnlySearch] = useState("");
 
   const [searchField, setSearchField] = useState<
     | "all"
@@ -385,18 +386,20 @@ export function VendorsPage() {
     if (!vName.trim() || vName.trim().length < 2) {
       errs.name = "Vendor name must be at least 2 characters";
     }
-    if (vEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(vEmail.trim())) {
+    const email = (vEmail ?? "").trim();
+
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       errs.email = "Enter a valid email address";
     }
-    if (vPhone.trim() && !/^[6-9]\d{9}$/.test(vPhone.trim())) {
+    const phone = (vPhone ?? "").trim();
+
+    if (phone && !/^[6-9]\d{9}$/.test(phone)) {
       errs.phone = "Enter a valid 10-digit Indian mobile number";
     }
-    if (
-      vGst.trim() &&
-      !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(
-        vGst.trim().toUpperCase(),
-      )
-    ) {
+
+    const gstin = (vGst ?? "").trim().toUpperCase();
+
+    if (gstin && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(gstin)) {
       errs.gst = "Enter a valid 15-character GSTIN (e.g. 22AAAAA0000A1Z5)";
     }
 
@@ -465,10 +468,13 @@ export function VendorsPage() {
   // Filter vendors
 
   useEffect(() => {
-    if (searchField === "products") {
+    if (
+      searchField === "products" ||
+      productOnlySearch.trim()
+    ) {
       loadAllVendorProducts();
     }
-  }, [searchField, vendors]);
+  }, [searchField, productOnlySearch, vendors]);
 
   const filteredVendors = useMemo(() => {
     let result = vendors;
@@ -509,8 +515,39 @@ export function VendorsPage() {
       }
     }
 
+    // 3. Product Search
+    const productQuery = productOnlySearch.trim().toLowerCase();
+
+    if (productQuery) {
+      const matchingVendorIds = new Set(
+        allVendorProducts
+          .filter(
+            (a) =>
+              (a.material?.name ?? "")
+                .toLowerCase()
+                .includes(productQuery) ||
+
+              (a.material?.materialCode ?? "")
+                .toLowerCase()
+                .includes(productQuery) ||
+
+              (a.material?.category ?? "")
+                .toLowerCase()
+                .includes(productQuery) ||
+
+              (a.vendorMaterialCode ?? "")
+                .toLowerCase()
+                .includes(productQuery)
+          )
+          .map((a) => a.vendorId)
+      );
+
+      result = result.filter((vendor) =>
+        matchingVendorIds.has(vendor.id)
+      );
+    }
     return result;
-  }, [vendors, globalSearch, fieldSearch, searchField, allVendorProducts]);
+  }, [vendors, globalSearch, fieldSearch, searchField, allVendorProducts, productOnlySearch]);
 
   // Filtered inventory for Vendor form "Products Supplied" tab
   const filteredInventoryForForm = useMemo(() => {
@@ -2348,6 +2385,28 @@ export function VendorsPage() {
               onChange={(e) => setFieldSearch(e.target.value)}
             />
           </div>
+          <div className="flex items-center w-full sm:w-80 h-10 bg-card border border-primary/50 rounded-sm shadow-xs hover:border-primary/30 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all duration-200 overflow-hidden">
+            <Package className="size-4 text-muted-foreground ml-4 mr-2 shrink-0" />
+
+            <input
+              type="text"
+              placeholder="Search Products..."
+              className="flex-1 h-full bg-transparent pr-4 text-sm placeholder:text-muted-foreground focus:outline-none border-none ring-0 outline-none"
+              value={productOnlySearch}
+              onChange={(e) => setProductOnlySearch(e.target.value)}
+            />
+
+            {productOnlySearch && (
+              <button
+                type="button"
+                onClick={() => setProductOnlySearch("")}
+                className="mr-3 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="size-4" />
+              </button>
+            )}
+          </div>
+
         </div>
 
         {/* Actions Container */}
