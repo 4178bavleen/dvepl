@@ -20,12 +20,13 @@ async function adminPurchaseOrderReadRoutes(
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         const companyId = request.user.companyId;
-
+ const { vendorId } = request.query as { vendorId?: string };
         const purchaseOrders =
           await fastify.prisma.purchaseOrder.findMany({
             where: {
               companyId,
               deletedAt: null,
+               ...(vendorId ? { vendorId } : {}), 
             },
 
             include: {

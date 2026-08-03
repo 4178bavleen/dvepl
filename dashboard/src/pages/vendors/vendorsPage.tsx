@@ -155,7 +155,29 @@ interface PORevision {
   customColumns?: string[];
   referenceCode?: string;
 }
-
+interface PurchaseOrderRecord {
+  id: string;
+  poNo: string;
+  vendorId: string;
+  orderDate: string;
+  expectedDelivery?: string | null;
+  status?: string; // PurchaseOrderStatus enum e.g. DRAFT, ORDERED, RECEIVED
+  paymentTerms?: string;
+  shippingTerms?: string;
+  remarks?: string;
+  subtotal?: number;
+  tax?: number;
+  total?: number;
+  items?: {
+    id?: string;
+    materialId: string;
+    quantity: number;
+    unitPrice: number;
+    totalPrice?: number;
+    material?: { name: string; materialCode?: string; unit?: string; hsnCode?: string };
+  }[];
+  createdAt?: string;
+}
 // ==========================================
 // API ADAPTERS (EASILY REPLACE WITH AXIOS/FETCH LATER)
 // ==========================================
@@ -244,23 +266,33 @@ export const apiService = {
     },
   },
   purchaseOrders: {
-  create: async (body: any) => {
-    const response = await apiClient.post(
-      "/purchase-order/create",
-      body,
-    );
+    create: async (body: any) => {
+      const response = await apiClient.post(
+        "/purchase-order/create",
+        body,
+      );
 
-    return response.data?.data ?? response.data;
+      return response.data?.data ?? response.data;
+    },
+
+    list: async () => {
+      const response = await apiClient.get(
+        "/purchase-order/read",
+      );
+
+      return response.data?.data ?? [];
+    },
+
+    // NEW: fetch all POs and filter client-side by vendorId (works regardless of
+    // whether the backend route supports a vendorId query filter yet)
+    listByVendor: async (vendorId: string): Promise<PurchaseOrderRecord[]> => {
+      const response = await apiClient.get("/purchase-order/read", {
+        params: { vendorId },
+      });
+      const all = (response.data?.data ?? []) as PurchaseOrderRecord[];
+      return all.filter((po) => po.vendorId === vendorId);
+    },
   },
-
-  list: async () => {
-    const response = await apiClient.get(
-      "/purchase-order/read",
-    );
-
-    return response.data?.data ?? [];
-  },
-},
 };
 
 export function VendorsPage() {
@@ -587,6 +619,7 @@ export function VendorsPage() {
       { id: "gstNumber", label: "GSTIN" },
       { id: "products", label: "Products" },
       { id: "revisions", label: "Revision History" },
+      { id: "purchaseOrders", label: "Purchase Orders" },
       { id: "dataEntry", label: "Data Entry" },
     ];
     const cfCols = vendorCustomFields
@@ -671,6 +704,32 @@ export function VendorsPage() {
     }
   };
 
+  // ── NEW: Purchase Orders (backend) quick-view dialog ──
+  const [vendorPosViewVendor, setVendorPosViewVendor] =
+    useState<Vendor | null>(null);
+  const [vendorPosViewList, setVendorPosViewList] = useState<
+    PurchaseOrderRecord[]
+  >([]);
+  const [vendorPosViewLoading, setVendorPosViewLoading] = useState(false);
+  const [vendorPoCounts, setVendorPoCounts] = useState<
+    Record<string, number>
+  >({});
+
+  const openVendorPurchaseOrders = async (vendor: Vendor) => {
+    setVendorPosViewVendor(vendor);
+    setVendorPosViewList([]);
+    setVendorPosViewLoading(true);
+    try {
+      const list = await apiService.purchaseOrders.listByVendor(vendor.id);
+      setVendorPosViewList(list);
+      setVendorPoCounts((prev) => ({ ...prev, [vendor.id]: list.length }));
+    } catch {
+      toast.error("Failed to load purchase orders for this vendor");
+    } finally {
+      setVendorPosViewLoading(false);
+    }
+  };
+
   // Column definitions for GenericTable
   const allTableColumns = useMemo<ColumnDef<Vendor>[]>(
     () => [
@@ -750,6 +809,25 @@ export function VendorsPage() {
         },
       },
       {
+        id: "purchaseOrders",
+        header: "Purchase Orders",
+        cell: ({ row }) => {
+          const vendor = row.original;
+          const count = vendorPoCounts[vendor.id];
+          return (
+            <button
+              onClick={() => openVendorPurchaseOrders(vendor)}
+              className="bg-[#e8f0fe] hover:bg-[#d5e4fd] text-[#1a56db] border border-[#b6cffb] px-2.5 py-1 rounded-md text-xs font-semibold cursor-pointer transition-colors duration-150 inline-flex items-center gap-1"
+            >
+              <FileText className="size-3" />
+              {count !== undefined
+                ? `${count} PO${count === 1 ? "" : "s"}`
+                : "View POs"}
+            </button>
+          );
+        },
+      },
+      {
         id: "dataEntry",
         header: "Data Entry",
         cell: ({ row }) => {
@@ -765,7 +843,7 @@ export function VendorsPage() {
         },
       },
     ],
-    [revisions, vendorProductCounts],
+    [revisions, vendorProductCounts, vendorPoCounts],
   );
 
   const activeColumns = useMemo<ColumnDef<Vendor>[]>(() => {
@@ -1369,36 +1447,36 @@ export function VendorsPage() {
 
     try {
 
-  // 1. Create Purchase Order in Backend
-  await apiService.purchaseOrders.create({
-    poNo: poNumber,
-    vendorId: activePoVendor.id,
-    orderDate: poDate,
-    expectedDelivery: null, // ya jo date field hai
-    paymentTerms,
-    shippingTerms: "",
-    remarks,
+      // 1. Create Purchase Order in Backend
+      await apiService.purchaseOrders.create({
+        poNo: poNumber,
+        vendorId: activePoVendor.id,
+        orderDate: poDate,
+        expectedDelivery: null, // ya jo date field hai
+        paymentTerms,
+        shippingTerms: "",
+        remarks,
 
-    items: poItems.map((item) => ({
-      materialId: item.materialId,
-      quantity: item.qty,
-      unitPrice: item.rate,
-    })),
-  });
+        items: poItems.map((item) => ({
+          materialId: item.materialId,
+          quantity: item.qty,
+          unitPrice: item.rate,
+        })),
+      });
 
-  // 2. Save Revision
-  await apiService.revisions.create(newRevision);
+      // 2. Save Revision
+      await apiService.revisions.create(newRevision);
 
-  // 3. Refresh
-  const list = await apiService.revisions.list();
-  setRevisions(list);
-  setSelectedRevisionId(newRevision.id);
+      // 3. Refresh
+      const list = await apiService.revisions.list();
+      setRevisions(list);
+      setSelectedRevisionId(newRevision.id);
 
-  toast.success(`Revision R${newRevision.revisionNo} saved successfully`);
+      toast.success(`Revision R${newRevision.revisionNo} saved successfully`);
 
-} catch (err: any) {
-  toast.error("Failed to save PO revision");
-}
+    } catch (err: any) {
+      toast.error("Failed to save PO revision");
+    }
   }
 
   // Load selected revision
@@ -2783,6 +2861,131 @@ export function VendorsPage() {
                           Item Rate
                         </div>
                       </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── PURCHASE ORDERS VIEW MODAL (NEW) ── */}
+      <Dialog
+        open={!!vendorPosViewVendor}
+        onOpenChange={(open) => {
+          if (!open) setVendorPosViewVendor(null);
+        }}
+      >
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-primary">
+              <FileText className="size-5" />
+              Purchase Orders
+            </DialogTitle>
+          </DialogHeader>
+          {vendorPosViewVendor && (
+            <div className="space-y-3 pt-1">
+              <div className="flex items-center justify-between border rounded-lg px-3 py-2 bg-muted/30">
+                <div>
+                  <div className="text-sm font-semibold text-foreground">
+                    {vendorPosViewVendor.name}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {vendorPosViewVendor.category} • GSTIN:{" "}
+                    {vendorPosViewVendor.gstNumber || "—"}
+                  </div>
+                </div>
+                <span className="text-xs font-semibold text-[#1a56db] bg-[#e8f0fe] border border-[#b6cffb] px-2.5 py-1 rounded-md">
+                  {vendorPosViewList.length} PO
+                  {vendorPosViewList.length === 1 ? "" : "s"}
+                </span>
+              </div>
+
+              <div className="border rounded-xl max-h-[28rem] overflow-y-auto divide-y">
+                {vendorPosViewLoading && (
+                  <div className="p-6 text-center text-xs text-muted-foreground">
+                    Loading purchase orders...
+                  </div>
+                )}
+
+                {!vendorPosViewLoading && vendorPosViewList.length === 0 && (
+                  <div className="p-6 flex flex-col items-center gap-2 text-center">
+                    <span className="text-xs text-muted-foreground">
+                      No purchase orders found for this vendor yet.
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5 h-8 text-xs cursor-pointer"
+                      onClick={() => {
+                        const vendor = vendorPosViewVendor;
+                        setVendorPosViewVendor(null);
+                        if (vendor) openNewDataEntry(vendor);
+                      }}
+                    >
+                      <Plus className="size-3.5" /> Generate PO
+                    </Button>
+                  </div>
+                )}
+
+                {!vendorPosViewLoading &&
+                  vendorPosViewList.map((po) => (
+                    <div key={po.id} className="px-3 py-2.5">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-semibold text-foreground truncate">
+                              {po.poNo}
+                            </span>
+                            {po.status && (
+                              <span className="text-[10px] font-semibold text-[#5b33b5] bg-[#f3f0ff] border border-[#cbbff5] px-1.5 py-0.5 rounded">
+                                {po.status}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            Date:{" "}
+                            {po.orderDate
+                              ? new Date(po.orderDate).toLocaleDateString(
+                                  "en-IN",
+                                )
+                              : "—"}{" "}
+                            • Items: {po.items?.length ?? 0} • Payment:{" "}
+                            {po.paymentTerms || "—"}
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="text-sm font-bold text-[#137333]">
+                            {po.total != null
+                              ? `₹${Number(po.total).toLocaleString("en-IN", {
+                                  minimumFractionDigits: 2,
+                                })}`
+                              : "—"}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">
+                            Grand Total
+                          </div>
+                        </div>
+                      </div>
+
+                      {po.items && po.items.length > 0 && (
+                        <div className="mt-2 rounded-md bg-muted/30 divide-y">
+                          {po.items.map((it, idx) => (
+                            <div
+                              key={it.id || idx}
+                              className="flex items-center justify-between px-2 py-1.5 text-xs"
+                            >
+                              <span className="truncate">
+                                {it.material?.name || it.materialId}
+                              </span>
+                              <span className="text-muted-foreground shrink-0">
+                                {it.quantity} {it.material?.unit || ""} × ₹
+                                {Number(it.unitPrice).toLocaleString("en-IN")}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
               </div>
