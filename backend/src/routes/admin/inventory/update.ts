@@ -158,34 +158,30 @@ async function adminInventoryUpdateRoutes(
           });
 
           // Update Inventory stock data
-       const inv = await tx.inventory.update({
-  where: {
-    id,
-  },
-  data: {
+          const inv = await tx.inventory.update({
+            where: {
+              id,
+            },
+            data: {
+              quantity:
+                data.currentStock !== undefined
+                  ? new Prisma.Decimal(data.currentStock)
+                  : data.quantity !== undefined
+                    ? new Prisma.Decimal(data.quantity)
+                    : undefined,
 
-    quantity:
-      data.currentStock !== undefined
-         ? new Prisma.Decimal(data.currentStock)
-         : data.quantity !== undefined
-          ? new Prisma.Decimal(data.quantity)
-          : undefined,
+              unitPrice:
+                data.unitRate !== undefined
+                  ? new Prisma.Decimal(data.unitRate)
+                  : data.unitPrice !== undefined
+                    ? new Prisma.Decimal(data.unitPrice)
+                    : undefined,
+   
 
-
-    unitPrice:
-      data.unitRate !== undefined
-        ? new Prisma.Decimal(data.unitRate)
-        : data.unitPrice !== undefined
-          ? new Prisma.Decimal(data.unitPrice)
-          : undefined,
-
-
-    location:
-      data.location !== undefined
-        ? data.location
-        : undefined,
-  },
-});
+              location: data.location !== undefined ? data.location : undefined,
+            },
+          });
+          
 
           if ((request.body as any)?.customFields) {
             const { CustomFieldService } = await import("../../../services/customFieldService");

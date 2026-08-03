@@ -1719,7 +1719,9 @@ model PurchaseOrder {
   company          Company             @relation(fields: [companyId], references: [id])
   createdBy        User                @relation("PurchaseOrderCreatedBy", fields: [createdById], references: [id])
   request          PurchaseRequest?    @relation(fields: [requestId], references: [id])
-  vendor           Customer            @relation(fields: [vendorId], references: [id])
+  vendor           Vendor              @relation(fields: [vendorId], references: [id])
+  customer         Customer?           @relation(fields: [customerId], references: [id])
+  customerId       String?
 
   @@index([companyId])
   @@index([status])
@@ -1728,23 +1730,38 @@ model PurchaseOrder {
 }
 
 model PurchaseOrderItem {
-  id                String             @id @default(uuid())
-  poId              String
-  materialId        String
-  quantity          Decimal            @db.Decimal(15, 3)
-  unitPrice         Decimal            @db.Decimal(15, 2)
-  totalPrice        Decimal            @db.Decimal(15, 2)
-  receivedQty       Decimal            @default(0) @db.Decimal(15, 3)
-  remarks           String?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  deletedAt         DateTime?
+  id               String    @id @default(uuid())
+  poId             String
+  materialId       String
+  quantity         Decimal   @db.Decimal(15, 3)
+  unitPrice        Decimal   @db.Decimal(15, 2)
+  totalPrice       Decimal   @db.Decimal(15, 2)
+  receivedQty      Decimal   @default(0) @db.Decimal(15, 3)
+  remarks          String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+  expectedDelivery DateTime?
+
+  lastReceivedAt DateTime?
+
+  trackingRemarks String?
+
+  trackingStatus    TrackingStatus     @default(PENDING)
   goodsReceiptItems GoodsReceiptItem[]
   material          Material           @relation(fields: [materialId], references: [id])
   po                PurchaseOrder      @relation(fields: [poId], references: [id])
 
   @@index([poId])
   @@map("purchase_order_items")
+}
+
+enum TrackingStatus {
+  PENDING
+  PARTIAL
+  RECEIVED
+  OVERDUE
+  CANCELLED
 }
 
 model GoodsReceipt {
@@ -2516,8 +2533,9 @@ model Vendor {
   company        Company         @relation(fields: [companyId], references: [id])
   vendorProducts VendorProduct[]
 
-  createdBy             User       @relation("VendorCreatedBy", fields: [createdById], references: [id])
-  preferredForMaterials Material[] @relation("MaterialPreferredVendor")
+  createdBy             User            @relation("VendorCreatedBy", fields: [createdById], references: [id])
+  preferredForMaterials Material[]      @relation("MaterialPreferredVendor")
+  purchaseOrders        PurchaseOrder[]
 
   @@index([companyId])
   @@index([name])

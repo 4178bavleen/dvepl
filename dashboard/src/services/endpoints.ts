@@ -344,31 +344,40 @@ export const API_ENDPOINTS = {
     },
   },
   inventory: {
-    warehouses: {
-      list: '/warehouse/read/',
-      create: '/warehouse/create/',
-      update: (id: string) => `/warehouse/update/${id}`,
-      remove: (id: string) => `/warehouse/delete/${id}`,
-    },
-    bins: {
-      list: '/bin/read/',
-      create: '/bin/create/',
-      update: (id: string) => `/bin/update/${id}`,
-      remove: (id: string) => `/bin/delete/${id}`,
-    },
-    stocks: {
-      list: '/inventory/read/',
-      create: '/inventory/create/',
-      update: (id: string) => `/inventory/update/${id}`,
-      remove: (id: string) => `/inventory/delete/${id}`,
-    },
-    transfers: {
-      list: '/stock-transfer/read/',
-      create: '/stock-transfer/create/',
-      update: (id: string) => `/stock-transfer/update/${id}`,
-      remove: (id: string) => `/stock-transfer/delete/${id}`,
-    },
+  warehouses: {
+    list: '/warehouse/read/',
+    create: '/warehouse/create/',
+    update: (id: string) => `/warehouse/update/${id}`,
+    remove: (id: string) => `/warehouse/delete/${id}`,
   },
+
+  bins: {
+    list: '/bin/read/',
+    create: '/bin/create/',
+    update: (id: string) => `/bin/update/${id}`,
+    remove: (id: string) => `/bin/delete/${id}`,
+  },
+
+  stocks: {
+    list: '/inventory/read/',
+    create: '/inventory/create/',
+    update: (id: string) => `/inventory/update/${id}`,
+    remove: (id: string) => `/inventory/delete/${id}`,
+  },
+
+  transfers: {
+    list: '/stock-transfer/read/',
+    create: '/stock-transfer/create/',
+    update: (id: string) => `/stock-transfer/update/${id}`,
+    remove: (id: string) => `/stock-transfer/delete/${id}`,
+  },
+
+  // ⭐ ADD THIS
+  tracking: {
+    list: '/inventory-tracking/read/',
+    receive: '/inventory-tracking/receive/',
+  },
+},
   production: {
     plans: {
       list: '/production-plan/read/',
