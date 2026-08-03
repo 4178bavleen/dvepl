@@ -208,7 +208,6 @@ export function GenericTable<TData extends { id: string }>({
   storageKey,
 }: GenericTableProps<TData>) {
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
 
   // Auto-derive a stable key from the column ids/accessorKeys so persistence
@@ -223,6 +222,17 @@ export function GenericTable<TData extends { id: string }>({
     [columns],
   );
   const localStorageKey = `generic-table-column-order:${storageKey ?? autoKey}`;
+  const localStorageVisibilityKey = `generic-table-column-visibility:${storageKey ?? autoKey}`;
+
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const saved = window.localStorage.getItem(localStorageVisibilityKey);
+      return saved ? (JSON.parse(saved) as VisibilityState) : {};
+    } catch {
+      return {};
+    }
+  });
 
   // Load any previously saved column order (lazy init, runs once)
   const [columnOrder, setColumnOrder] = useState<string[]>(() => {
@@ -245,6 +255,16 @@ export function GenericTable<TData extends { id: string }>({
       // ignore
     }
   }, [localStorageKey]);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const saved = window.localStorage.getItem(localStorageVisibilityKey);
+      setColumnVisibility(saved ? (JSON.parse(saved) as VisibilityState) : {});
+    } catch {
+      setColumnVisibility({});
+    }
+  }, [localStorageVisibilityKey]);
 
   const [isColumnsOpen, setIsColumnsOpen] = useState(false);
   const store = useERPStore();
@@ -483,6 +503,18 @@ export function GenericTable<TData extends { id: string }>({
       // localStorage may be unavailable (private browsing, quota, etc.) — fail silently
     }
   }, [columnOrder, localStorageKey]);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(
+        localStorageVisibilityKey,
+        JSON.stringify(columnVisibility),
+      );
+    } catch {
+      // localStorage may be unavailable (private browsing, quota, etc.) — fail silently
+    }
+  }, [columnVisibility, localStorageVisibilityKey]);
 
   const localStoragePageSizeKey = `generic-table-page-size:${storageKey ?? autoKey}`;
 

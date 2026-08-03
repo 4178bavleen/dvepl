@@ -142,6 +142,12 @@ export function OrdersPage() {
   // Column Visibility State - Defaulting all to visible
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(
     () => {
+      try {
+        const saved = localStorage.getItem("orders-table-column-visibility");
+        if (saved) return JSON.parse(saved);
+      } catch {
+        // Use the default visibility below when localStorage is unavailable.
+      }
       const initial: Record<string, boolean> = {};
       ALL_COLUMN_KEYS.forEach((col) => {
         initial[col.id] = true;
@@ -149,6 +155,13 @@ export function OrdersPage() {
       return initial;
     },
   );
+
+  useEffect(() => {
+    localStorage.setItem(
+      "orders-table-column-visibility",
+      JSON.stringify(visibleColumns),
+    );
+  }, [visibleColumns]);
 
   // Dynamic Custom Fields for Orders
   const { fields: orderCustomFields, tableCustomColumns: orderTableCustomCols } = useDynamicCustomFields("order");
