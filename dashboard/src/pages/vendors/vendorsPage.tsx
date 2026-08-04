@@ -629,7 +629,14 @@ export function VendorsPage() {
 
   // Column Visibility State
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(
-    {},
+    () => {
+      try {
+        const saved = localStorage.getItem("vendors-table-column-visibility");
+        return saved ? JSON.parse(saved) : {};
+      } catch {
+        return {};
+      }
+    },
   );
 
   useEffect(() => {
@@ -643,6 +650,13 @@ export function VendorsPage() {
       return next;
     });
   }, [ALL_VENDOR_COLUMNS]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      "vendors-table-column-visibility",
+      JSON.stringify(visibleColumns),
+    );
+  }, [visibleColumns]);
 
   const toggleColumn = (key: string) => {
     setVisibleColumns((prev) => ({ ...prev, [key]: !prev[key] }));
