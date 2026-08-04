@@ -1549,7 +1549,7 @@ export function SettingsPage() {
             <div className="hub-arrow">→</div>
           </div>
 
-          <div className="hub-card" onClick={() => setActiveSection("profile")}>
+          {/* <div className="hub-card" onClick={() => setActiveSection("profile")}>
             <div className="hub-icon-wrap teal">🪪</div>
             <div className="hub-card-body">
               <div className="hub-card-title">My Profile</div>
@@ -1558,7 +1558,7 @@ export function SettingsPage() {
               </div>
             </div>
             <div className="hub-arrow">→</div>
-          </div>
+          </div> */}
 
           <div
             className="hub-card"
@@ -2077,7 +2077,7 @@ export function SettingsPage() {
       )}
 
       {/* ─── SECTION 4: MY PROFILE REDIRECT ─── */}
-      {activeSection === "profile" && (
+      {/* {activeSection === "profile" && (
         <div className="max-w-md mx-auto">
           <div className="profile-redirect-card">
             <div className="profile-redirect-avatar">
@@ -2104,7 +2104,7 @@ export function SettingsPage() {
             </button>
           </div>
         </div>
-      )}
+      )} */}
 
       {/* ─── SECTION 6: NOTIFICATIONS & SMTP ─── */}
       {activeSection === "notifications" && (
