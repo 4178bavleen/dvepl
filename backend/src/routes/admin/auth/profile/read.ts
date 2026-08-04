@@ -4,8 +4,6 @@ import {
   FastifyReply,
   FastifyRequest,
 } from "fastify";
-import fs from "fs";
-import path from "path";
 
 import { adminLogs } from "../../../../services/logger/contextLogger";
 
@@ -47,6 +45,7 @@ async function readProfileRoute(
                 role: true,
               },
             },
+            accessProfile: true,
           },
         });
 
@@ -57,17 +56,7 @@ async function readProfileRoute(
           });
         }
 
-        // Load saved custom permissions
-        const permissionsFilePath = path.join(__dirname, "../../../../../data/user_permissions.json");
-        let permissionsData: Record<string, any> = {};
-        if (fs.existsSync(permissionsFilePath)) {
-          try {
-            permissionsData = JSON.parse(fs.readFileSync(permissionsFilePath, "utf-8"));
-          } catch (e) {
-            permissionsData = {};
-          }
-        }
-        const up = permissionsData[user.id] || {};
+        const up = user.accessProfile;
 
         adminLogs.info("Profile fetched", {
           userId,
@@ -84,12 +73,12 @@ async function readProfileRoute(
             employeeCode: user.employee?.employeeCode || null,
             company: user.company,
             branch: user.employee?.branch || null,
-            designation: up.designation || user.employee?.designation?.title || "Team Member",
+            designation: up?.designation || user.employee?.designation?.title || "Team Member",
             department: user.employee?.department || null,
             roles: user.userRoles.map((r) => r.role.name),
-            pageAccess: up.pageAccess || [],
-            fieldPermissions: up.fieldPermissions || {},
-            actionPermissions: up.actionPermissions || { create: true, edit: true, delete: false, export: true },
+            pageAccess: up?.pageAccess || [],
+            fieldPermissions: up?.fieldPermissions || {},
+            actionPermissions: up?.actionPermissions || { create: true, edit: true, delete: false, export: true },
           },
         });
       } catch (error: any) {

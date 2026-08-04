@@ -4,8 +4,6 @@ import {
   FastifyReply,
   FastifyRequest,
 } from "fastify";
-import fs from "fs";
-import path from "path";
 import { adminLogs } from "../../../services/logger/contextLogger";
 
 async function updateUserRoute(
@@ -186,28 +184,24 @@ async function updateUserRoute(
           }
         });
 
-        // Save Custom Permissions if provided
+        // Save custom access metadata in the database.
         if (pageAccess || fieldPermissions || actionPermissions || designation !== undefined) {
-          const permissionsFilePath = path.join(__dirname, "../../../../data/user_permissions.json");
-          const dirPath = path.dirname(permissionsFilePath);
-          if (!fs.existsSync(dirPath)) {
-            fs.mkdirSync(dirPath, { recursive: true });
-          }
-          let permissionsData: Record<string, any> = {};
-          if (fs.existsSync(permissionsFilePath)) {
-            try {
-              permissionsData = JSON.parse(fs.readFileSync(permissionsFilePath, "utf-8"));
-            } catch (e) {
-              permissionsData = {};
-            }
-          }
-          if (!permissionsData[id]) permissionsData[id] = {};
-          if (pageAccess !== undefined) permissionsData[id].pageAccess = pageAccess;
-          if (fieldPermissions !== undefined) permissionsData[id].fieldPermissions = fieldPermissions;
-          if (actionPermissions !== undefined) permissionsData[id].actionPermissions = actionPermissions;
-          if (designation !== undefined) permissionsData[id].designation = designation;
-
-          fs.writeFileSync(permissionsFilePath, JSON.stringify(permissionsData, null, 2), "utf-8");
+          await fastify.prisma.userAccessProfile.upsert({
+            where: { userId: id },
+            create: {
+              userId: id,
+              designation: designation || "Team Member",
+              pageAccess: pageAccess || [],
+              fieldPermissions: fieldPermissions || {},
+              actionPermissions: actionPermissions || { create: true, edit: true, delete: false, export: true },
+            },
+            update: {
+              ...(pageAccess !== undefined ? { pageAccess } : {}),
+              ...(fieldPermissions !== undefined ? { fieldPermissions } : {}),
+              ...(actionPermissions !== undefined ? { actionPermissions } : {}),
+              ...(designation !== undefined ? { designation } : {}),
+            },
+          });
         }
 
         return reply.status(200).send({

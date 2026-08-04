@@ -5,8 +5,6 @@ import {
   FastifyRequest,
 } from "fastify";
 import * as XLSX from "xlsx";
-import fs from "fs";
-import path from "path";
 import { adminLogs } from "../../../services/logger/contextLogger";
 import { hashPassword } from "../../../utils/hashPassword";
 
@@ -102,21 +100,6 @@ async function adminUserBulkUploadRoutes(
           errors: [] as Array<{ email: string; error: string }>,
           createdUsers: [] as string[],
         };
-
-        // Load permissions file to write new metadata
-        const permissionsFilePath = path.join(__dirname, "../../../../data/user_permissions.json");
-        const dirPath = path.dirname(permissionsFilePath);
-        if (!fs.existsSync(dirPath)) {
-          fs.mkdirSync(dirPath, { recursive: true });
-        }
-        let permissionsData: Record<string, any> = {};
-        if (fs.existsSync(permissionsFilePath)) {
-          try {
-            permissionsData = JSON.parse(fs.readFileSync(permissionsFilePath, "utf-8"));
-          } catch (e) {
-            permissionsData = {};
-          }
-        }
 
         const fallbackRole = await fastify.prisma.role.findFirst({
           where: {
@@ -239,13 +222,13 @@ async function adminUserBulkUploadRoutes(
               return user;
             });
 
-            // Write metadata to permissions file
-            permissionsData[createdUser.id] = {
+            await fastify.prisma.userAccessProfile.create({ data: {
+              userId: createdUser.id,
               designation: userData.designation,
               pageAccess: ["dashboard", "vendors", "orders"],
               fieldPermissions: {},
               actionPermissions: { create: true, edit: true, delete: false, export: true }
-            };
+            }});
 
             results.createdUsers.push(createdUser.email);
             results.successCount++;
@@ -257,8 +240,6 @@ async function adminUserBulkUploadRoutes(
             });
           }
         }
-
-        fs.writeFileSync(permissionsFilePath, JSON.stringify(permissionsData, null, 2), "utf-8");
 
         adminLogs.info("Bulk user upload processed", {
           successCount: results.successCount,

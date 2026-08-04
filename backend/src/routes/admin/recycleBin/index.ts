@@ -81,20 +81,7 @@ const recycleBinModels: RecycleBinModelConfig[] = [
         where: { userId: id },
         data: { userId: null },
       });
-      try {
-        const path = require("path");
-        const fs = require("fs");
-        const permissionsFilePath = path.join(__dirname, "../../../../data/user_permissions.json");
-        if (fs.existsSync(permissionsFilePath)) {
-          const permissionsData = JSON.parse(fs.readFileSync(permissionsFilePath, "utf-8"));
-          if (permissionsData[id]) {
-            delete permissionsData[id];
-            fs.writeFileSync(permissionsFilePath, JSON.stringify(permissionsData, null, 2), "utf-8");
-          }
-        }
-      } catch (e) {
-        // ignore
-      }
+      await fastify.prisma.userAccessProfile.deleteMany({ where: { userId: id } });
       await (fastify.prisma as any).user.deleteMany({ where: { id } });
     },
   },

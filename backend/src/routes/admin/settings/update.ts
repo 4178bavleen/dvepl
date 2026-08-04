@@ -4,8 +4,6 @@ import {
   FastifyReply,
   FastifyRequest,
 } from "fastify";
-import fs from "fs";
-import path from "path";
 import { adminLogs } from "../../../services/logger/contextLogger";
 import { settingsSchema } from "../../../schemas/admin/settings/settings.schema";
 
@@ -105,29 +103,16 @@ async function updateSettingsRoute(
           });
         }
 
-        const filePath = path.join(__dirname, "../../../../data/settings.json");
-        const dirPath = path.dirname(filePath);
-
-        if (!fs.existsSync(dirPath)) {
-          fs.mkdirSync(dirPath, { recursive: true });
-        }
-
-        let existingSettings = {};
-        if (fs.existsSync(filePath)) {
-          const fileData = fs.readFileSync(filePath, "utf-8");
-          try {
-            existingSettings = JSON.parse(fileData);
-          } catch (e) {
-            existingSettings = {};
-          }
-        }
-
+        const existingSettings = await fastify.prisma.companySettings.findUnique({ where: { companyId } });
         const updatedSettings = {
-          ...existingSettings,
+          ...((existingSettings?.data as object) || {}),
           ...validationResult.data,
         };
-
-        fs.writeFileSync(filePath, JSON.stringify(updatedSettings, null, 2), "utf-8");
+        await fastify.prisma.companySettings.upsert({
+          where: { companyId },
+          create: { companyId, data: updatedSettings },
+          update: { data: updatedSettings },
+        });
 
         adminLogs.info("Settings updated successfully");
 

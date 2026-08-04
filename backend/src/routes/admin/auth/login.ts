@@ -73,6 +73,7 @@ async function adminLoginRoutes(
                 permission: true,
               },
             },
+            accessProfile: true,
           },
         });
 
@@ -134,19 +135,7 @@ async function adminLoginRoutes(
           email: existingUser.email,
         });
 
-        // Load saved custom permissions
-        const fs = require("fs");
-        const path = require("path");
-        const permissionsFilePath = path.join(__dirname, "../../../../../data/user_permissions.json");
-        let permissionsData: Record<string, any> = {};
-        if (fs.existsSync(permissionsFilePath)) {
-          try {
-            permissionsData = JSON.parse(fs.readFileSync(permissionsFilePath, "utf-8"));
-          } catch (e) {
-            permissionsData = {};
-          }
-        }
-        const up = permissionsData[existingUser.id] || {};
+        const up = existingUser.accessProfile;
 
         return reply.status(200).send({
           success: true,
@@ -161,10 +150,10 @@ async function adminLoginRoutes(
             company: existingUser.company?.name ?? null,
             roles,
             permissions,
-            designation: up.designation || "Team Member",
-            pageAccess: up.pageAccess || [],
-            fieldPermissions: up.fieldPermissions || {},
-            actionPermissions: up.actionPermissions || { create: true, edit: true, delete: false, export: true },
+            designation: up?.designation || "Team Member",
+            pageAccess: up?.pageAccess || [],
+            fieldPermissions: up?.fieldPermissions || {},
+            actionPermissions: up?.actionPermissions || { create: true, edit: true, delete: false, export: true },
           },
         });
       } catch (error: any) {
