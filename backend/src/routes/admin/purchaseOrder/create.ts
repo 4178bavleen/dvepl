@@ -33,6 +33,8 @@ const purchaseOrderSchema = z.object({
         quantity: z.coerce.number().positive(),
 
         unitPrice: z.coerce.number().positive(),
+
+        remarks: z.string().optional().nullable(),
       }),
     )
     .min(1),
@@ -161,6 +163,8 @@ async function adminPurchaseOrderCreateRoutes(
                 unitPrice: new Prisma.Decimal(item.unitPrice),
 
                 totalPrice: new Prisma.Decimal(item.quantity * item.unitPrice),
+
+                remarks: item.remarks,
               },
             });
           }

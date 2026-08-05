@@ -1191,17 +1191,42 @@ export function VendorsPage() {
     return result;
   }, [vendors, globalSearch, fieldSearch, searchField, allVendorProducts, productOnlySearch]);
 
+  const dynamicInventoryWithMaterial = useMemo(() => {
+    return inventoryRecords.map((rec) => {
+      const invItem = inventoryItems.find((inv) => inv.id === rec.id);
+      return {
+        ...rec,
+        materialId: invItem?.materialId || "",
+        materialCode: invItem?.material?.materialCode || "",
+        category: invItem?.material?.category || "Uncategorized",
+        unit: invItem?.material?.unit || "",
+        quantity: invItem?.quantity || 0,
+      };
+    });
+  }, [inventoryRecords, inventoryItems]);
+
   // Filtered inventory for Vendor form "Products Supplied" tab
   const filteredInventoryForForm = useMemo(() => {
-    if (!productSearch.trim()) return inventoryItems;
+    const primaryField = inventoryFields[0];
+    const pool = dynamicInventoryWithMaterial;
+
+    if (!productSearch.trim()) return pool;
     const q = productSearch.toLowerCase();
-    return inventoryItems.filter(
-      (i) =>
-        (i.material.name ?? "").toLowerCase().includes(q) ||
-        (i.material.materialCode ?? "").toLowerCase().includes(q) ||
-        (i.material.category ?? "").toLowerCase().includes(q),
-    );
-  }, [inventoryItems, productSearch]);
+
+    return pool.filter((rec) => {
+      const nameVal = String(rec.values?.[primaryField?.fieldName] || "").toLowerCase();
+      const codeVal = String(rec.materialCode || "").toLowerCase();
+      const catVal = String(rec.category || "").toLowerCase();
+
+      if (nameVal.includes(q) || codeVal.includes(q) || catVal.includes(q)) {
+        return true;
+      }
+
+      return Object.values(rec.values || {}).some((val) =>
+        String(val || "").toLowerCase().includes(q)
+      );
+    });
+  }, [dynamicInventoryWithMaterial, productSearch, inventoryFields]);
 
   // Inline inventory matches for a PO line-item row, based on its description text
   // Inline inventory matches for a PO line-item row, based on its description text
@@ -1795,11 +1820,10 @@ export function VendorsPage() {
       prev.map((item) => {
         if (item.id !== rowId) return item;
 
-        const invItem = inventoryItems.find((inv) => inv.id === invRecord.id);
         const updatedItem: POItem = {
           ...item,
           inventoryId: invRecord.id,
-          materialId: invItem?.materialId,
+          materialId: invRecord.id,
         };
 
         inventoryFields.forEach((f) => {
@@ -1919,10 +1943,7 @@ export function VendorsPage() {
           if (invMatch) {
             matchedFromInventory++;
             newItem.inventoryId = invMatch.id;
-            const invItem = inventoryItems.find((inv) => inv.id === invMatch.id);
-            if (invItem) {
-              newItem.materialId = invItem.materialId;
-            }
+            newItem.materialId = invMatch.id;
           }
 
           // Populate the dynamic inventoryFields on the newItem
@@ -2193,10 +2214,17 @@ export function VendorsPage() {
         remarks,
 
         items: poItems.map((item) => {
-          let resolvedMaterialId = item.materialId;
-          if (!resolvedMaterialId && item.inventoryId) {
-            const matched = inventoryItems.find((inv) => inv.id === item.inventoryId);
-            if (matched?.materialId) resolvedMaterialId = matched.materialId;
+          let resolvedMaterialId = item.materialId || item.inventoryId;
+          if (!resolvedMaterialId && item.description && inventoryFields.length > 0) {
+            const primaryFieldName = inventoryFields[0]?.fieldName;
+            const descLower = item.description.trim().toLowerCase();
+            const matchedRecord = inventoryRecords.find((rec) => {
+              const recName = String(rec.values?.[primaryFieldName] || "").trim().toLowerCase();
+              return recName === descLower;
+            });
+            if (matchedRecord) {
+              resolvedMaterialId = matchedRecord.id;
+            }
           }
           if (!resolvedMaterialId && item.description) {
             const descLower = item.description.trim().toLowerCase();
@@ -2212,6 +2240,7 @@ export function VendorsPage() {
             materialId: resolvedMaterialId || "",
             quantity: (Number(item.qty) || 0) > 0 ? Number(item.qty) : 1,
             unitPrice: item.rate > 0 ? item.rate : 0.01,
+            remarks: item.description || "",
           };
         }),
       });
@@ -3153,32 +3182,41 @@ export function VendorsPage() {
 
                 {selectedMaterialIds.size > 0 && (
                   <div className="flex flex-wrap gap-1.5">
-                    {inventoryItems
-                      .filter((i) => selectedMaterialIds.has(i.materialId))
-                      .map((i) => {
-                        const existing = existingVendorProducts.find(
-                          (a) => a.materialId === i.materialId,
-                        );
-                        return (
-                          <span
-                            key={i.materialId}
-                            className="inline-flex items-center gap-1.5 bg-[#f3f0ff] text-[#5b33b5] border border-[#cbbff5] px-2 py-1 rounded-md text-xs font-medium"
+                    {Array.from(selectedMaterialIds).map((matId) => {
+                      const dynamicItem = dynamicInventoryWithMaterial.find(
+                        (rec) => rec.materialId === matId
+                      );
+                      const staticItem = inventoryItems.find(
+                        (i) => i.materialId === matId
+                      );
+                      
+                      const primaryField = inventoryFields[0];
+                      const dynamicName = dynamicItem?.values?.[primaryField?.fieldName];
+                      const name = dynamicName || staticItem?.material?.name || "Unnamed Product";
+
+                      const existing = existingVendorProducts.find(
+                        (a) => a.materialId === matId,
+                      );
+                      return (
+                        <span
+                          key={matId}
+                          className="inline-flex items-center gap-1.5 bg-[#f3f0ff] text-[#5b33b5] border border-[#cbbff5] px-2 py-1 rounded-md text-xs font-medium"
+                        >
+                          {name}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              existing
+                                ? handleDetachExistingProduct(existing)
+                                : toggleMaterialSelection(matId)
+                            }
+                            className="hover:text-red-600"
                           >
-                            {i.material.name}
-                            <button
-                              type="button"
-                              onClick={() =>
-                                existing
-                                  ? handleDetachExistingProduct(existing)
-                                  : toggleMaterialSelection(i.materialId)
-                              }
-                              className="hover:text-red-600"
-                            >
-                              <X className="size-3" />
-                            </button>
-                          </span>
-                        );
-                      })}
+                            <X className="size-3" />
+                          </button>
+                        </span>
+                      );
+                    })}
                   </div>
                 )}
 
@@ -3196,9 +3234,30 @@ export function VendorsPage() {
                     )}
                   {!inventoryLoading &&
                     filteredInventoryForForm.map((item) => {
-                      const isSelected = selectedMaterialIds.has(
-                        item.materialId,
+                      const isSelected = item.materialId ? selectedMaterialIds.has(item.materialId) : false;
+
+                      const primaryField = inventoryFields[0];
+                      const nameVal = item.values?.[primaryField?.fieldName];
+                      const displayName = nameVal || Object.values(item.values || {})[0] || "Unnamed Item";
+
+                      const subtitleParts = inventoryFields
+                        .filter((f) => f.fieldName !== primaryField?.fieldName)
+                        .map((f) => {
+                          const val = item.values?.[f.fieldName];
+                          if (val === undefined || val === null || val === "") return null;
+                          return `${f.label}: ${val}`;
+                        })
+                        .filter(Boolean);
+
+                      const priceField = inventoryFields.find(
+                        (f) =>
+                          f.label.toLowerCase().includes("price") ||
+                          f.label.toLowerCase().includes("rate"),
                       );
+                      const priceVal = priceField
+                        ? Number(item.values?.[priceField.fieldName]) || 0
+                        : 0;
+
                       return (
                         <label
                           key={item.id}
@@ -3206,23 +3265,27 @@ export function VendorsPage() {
                         >
                           <Checkbox
                             checked={isSelected}
-                            onCheckedChange={() =>
-                              toggleMaterialSelection(item.materialId)
-                            }
+                            disabled={!item.materialId}
+                            onCheckedChange={() => {
+                              if (item.materialId) {
+                                toggleMaterialSelection(item.materialId);
+                              }
+                            }}
                           />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="text-sm font-semibold text-foreground truncate">
-                                {item.material.name}
+                                {displayName}
                               </span>
-                              <span className="text-[10px] text-muted-foreground font-mono">
-                                {item.material.materialCode}
-                              </span>
+                              {item.materialCode && (
+                                <span className="text-[10px] text-muted-foreground font-mono">
+                                  {item.materialCode}
+                                </span>
+                              )}
                             </div>
-                            <div className="text-xs text-muted-foreground">
-                              {item.material.category || "Uncategorized"} •{" "}
-                              {item.material.unit} • Stock: {item.quantity} • ₹
-                              {Number(item.unitPrice).toLocaleString("en-IN")}
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              {item.category || "Uncategorized"} • Stock: {item.quantity} • ₹{priceVal.toLocaleString("en-IN")}
+                              {subtitleParts.length > 0 && ` • ${subtitleParts.join(" • ")}`}
                             </div>
                           </div>
                         </label>

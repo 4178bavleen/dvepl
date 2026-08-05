@@ -48,6 +48,25 @@ export default async function deleteRecordRoute(
         },
       });
 
+      const module = await fastify.prisma.dynamicModule.findUnique({
+        where: { id: exists.moduleId },
+      });
+
+      if (module?.moduleKey === "inventory") {
+        try {
+          await fastify.prisma.inventory.updateMany({
+            where: { id },
+            data: { deletedAt: new Date() },
+          });
+          await fastify.prisma.material.updateMany({
+            where: { id },
+            data: { deletedAt: new Date() },
+          });
+        } catch (syncErr) {
+          console.error("Failed to sync delete to static tables:", syncErr);
+        }
+      }
+
       return reply.send({
         success: true,
         message: "Record deleted successfully",

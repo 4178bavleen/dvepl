@@ -17,6 +17,7 @@ interface UpdatePurchaseOrderBody {
     materialId: string;
     quantity: number;
     unitPrice: number;
+    remarks?: string;
   }[];
 }
 
@@ -114,6 +115,7 @@ async function adminPurchaseOrderUpdateRoutes(
                   totalPrice: new Prisma.Decimal(
                     Number(item.quantity) * Number(item.unitPrice),
                   ),
+                  remarks: item.remarks,
                 },
               });
             }

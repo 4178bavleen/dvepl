@@ -94,7 +94,7 @@ const inventoryByMaterialId = new Map(
 
   material: {
     id: item.material.id,
-    name: item.material.name,
+    name: item.remarks || item.material.name,
     code: item.material.materialCode,
   },
 
