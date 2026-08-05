@@ -159,7 +159,7 @@ interface POItem {
   materialId?: string;
   inventoryId?: string;
   description: string;
-  qty: number;
+  qty: number | "";
   unit: string;
   hsnCode: string;
   catNo: string;
@@ -478,9 +478,14 @@ export function VendorsPage() {
   const [vCustomFields, setVCustomFields] = useState<Record<string, any>>({});
 
   const poDefaultColumnIds = useMemo(() => {
+    const dynFields = inventoryFields
+      .map((f) => f.fieldName)
+      .filter((name) => name !== "qty" && name !== "discountPercent" && name !== "total");
     return [
       "sno",
-      ...inventoryFields.map((f) => f.fieldName),
+      ...dynFields,
+      "qty",
+      "discountPercent",
       "total",
       "delete",
     ];
@@ -520,13 +525,33 @@ export function VendorsPage() {
         ? [...poDefaultColumnIds]
         : mergeOrder(poColumnOrder);
 
-    // Always pin "sno" first, "total" before delete, and "delete" last, regardless of saved order.
+    // Filter out sno, qty, discountPercent, total, delete from the middle (draggable) columns.
+    const middleColumns = merged.filter(
+      (id) =>
+        id !== "sno" &&
+        id !== "qty" &&
+        id !== "discountPercent" &&
+        id !== "total" &&
+        id !== "delete"
+    );
+
+    // Always pin "sno" first, middle draggable columns, then static qty, discountPercent, total, delete.
     return [
       "sno",
-      ...merged.filter((id) => id !== "sno" && id !== "delete" && id !== "total"),
+      ...middleColumns,
+      "qty",
+      "discountPercent",
       "total",
       "delete",
-    ].filter((id) => poDefaultColumnIds.includes(id) || id === "sno" || id === "delete" || id === "total");
+    ].filter(
+      (id) =>
+        poDefaultColumnIds.includes(id) ||
+        id === "sno" ||
+        id === "qty" ||
+        id === "discountPercent" ||
+        id === "total" ||
+        id === "delete"
+    );
   }, [poColumnOrder, poDefaultColumnIds]);
 
   const inventoryFieldsMap = useMemo(
@@ -645,7 +670,13 @@ export function VendorsPage() {
     const className = getPoColumnClassName(id);
     const width = getPoColumnWidth(id);
 
-    if (id === "sno" || id === "delete") {
+    if (
+      id === "sno" ||
+      id === "delete" ||
+      id === "qty" ||
+      id === "discountPercent" ||
+      id === "total"
+    ) {
       return (
         <th key={id} className={className} style={{ width, minWidth: width }}>
           {label}
@@ -831,9 +862,9 @@ export function VendorsPage() {
             type="number"
             min={0.01}
             step="any"
-            value={item.qty}
+            value={item.qty === "" ? "" : item.qty}
             onChange={(e) =>
-              updatePoItemField(item.id, "qty", Number(e.target.value) || 0)
+              updatePoItemField(item.id, "qty", e.target.value)
             }
           />
         </td>
@@ -946,7 +977,12 @@ export function VendorsPage() {
     })
   );
 
-  const isPoColumnDraggable = (id: string) => id !== "sno" && id !== "delete";
+  const isPoColumnDraggable = (id: string) =>
+    id !== "sno" &&
+    id !== "delete" &&
+    id !== "qty" &&
+    id !== "discountPercent" &&
+    id !== "total";
 
   const handlePoColumnDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -1735,7 +1771,7 @@ export function VendorsPage() {
     const newItem: POItem = {
       id: `row-${Date.now()}`,
       description: "",
-      qty: 1,
+      qty: "",
       rate: 0,
       discountPercent: 0,
       net: 0,
@@ -1855,7 +1891,7 @@ export function VendorsPage() {
           const newItem: POItem = {
             id: `row-${Date.now()}-${idx}`,
             description: "",
-            qty: 1,
+            qty: "",
             rate: 0,
             discountPercent: 0,
             net: 0,
@@ -2028,7 +2064,7 @@ export function VendorsPage() {
         const isDiscountField = field === "discountPercent" || inventoryFieldsMap.get(field)?.label.toLowerCase().includes("discount");
 
         if (isQtyField) {
-          updated.qty = Number(val) || 0;
+          updated.qty = val === "" ? "" : (Number(val) || 0);
         }
         if (isPriceField) {
           updated.rate = Number(val) || 0;
@@ -2174,7 +2210,7 @@ export function VendorsPage() {
           }
           return {
             materialId: resolvedMaterialId || "",
-            quantity: item.qty > 0 ? item.qty : 1,
+            quantity: (Number(item.qty) || 0) > 0 ? Number(item.qty) : 1,
             unitPrice: item.rate > 0 ? item.rate : 0.01,
           };
         }),
