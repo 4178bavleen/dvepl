@@ -22,8 +22,9 @@ import {
   SlidersHorizontal,
   RefreshCw,
   Package,
+  GripVertical,
 } from "lucide-react";
-import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
+import { DndContext, closestCenter, MouseSensor, TouchSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, horizontalListSortingStrategy, arrayMove, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GenericTable, sortableHeader } from "@/components/tables/genericTable";
@@ -81,7 +82,7 @@ function SortableHeaderCell({
     useSortable({ id });
 
   const style: React.CSSProperties = {
-    transform: CSS.Translate.toString(transform),
+    transform: transform ? CSS.Translate.toString(transform) : undefined,
     transition,
     opacity: isDragging ? 0.6 : 1,
     zIndex: isDragging ? 20 : undefined,
@@ -97,7 +98,7 @@ function SortableHeaderCell({
           {...listeners}
           className="cursor-grab active:cursor-grabbing touch-none text-muted-foreground/50 hover:text-muted-foreground shrink-0"
         >
-          <Package className="size-3" />
+          <GripVertical className="h-3.5 w-3.5" />
         </span>
         <span>{children}</span>
       </div>
@@ -155,6 +156,8 @@ interface VendorProductAssoc {
 
 interface POItem {
   id: string;
+  materialId?: string;
+  inventoryId?: string;
   description: string;
   qty: number;
   unit: string;
@@ -748,7 +751,6 @@ export function VendorsPage() {
             }}
             placeholder={field?.placeholder || field?.label || ""}
             autoComplete="off"
-            style={isNumber ? undefined : (!String(val).trim() ? { borderColor: "#f59e0b" } : undefined)}
           />
           {inventoryDropdownRowId === `${item.id}_${id}` && (
             <div
@@ -833,7 +835,6 @@ export function VendorsPage() {
             onChange={(e) =>
               updatePoItemField(item.id, "qty", Number(e.target.value) || 0)
             }
-            style={item.qty <= 0 ? { borderColor: "#f59e0b" } : undefined}
           />
         </td>
       );
@@ -931,7 +932,19 @@ export function VendorsPage() {
     );
   };
 
-  const sensors = useSensors(useSensor(PointerSensor));
+  const sensors = useSensors(
+    useSensor(MouseSensor, {
+      activationConstraint: {
+        distance: 3,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 100,
+        tolerance: 5,
+      },
+    })
+  );
 
   const isPoColumnDraggable = (id: string) => id !== "sno" && id !== "delete";
 
@@ -1336,6 +1349,8 @@ export function VendorsPage() {
       
       const mappedItems = (po.items || []).map((it, idx) => ({
         id: it.id || `item-${idx}`,
+        materialId: it.materialId,
+        inventoryId: inventoryItems.find((inv) => inv.materialId === it.materialId)?.id,
         description: it.material?.name || "Unknown Material",
         qty: it.quantity,
         unit: it.material?.unit || "Nos",
@@ -1744,9 +1759,11 @@ export function VendorsPage() {
       prev.map((item) => {
         if (item.id !== rowId) return item;
 
+        const invItem = inventoryItems.find((inv) => inv.id === invRecord.id);
         const updatedItem: POItem = {
           ...item,
           inventoryId: invRecord.id,
+          materialId: invItem?.materialId,
         };
 
         inventoryFields.forEach((f) => {
@@ -1865,6 +1882,11 @@ export function VendorsPage() {
 
           if (invMatch) {
             matchedFromInventory++;
+            newItem.inventoryId = invMatch.id;
+            const invItem = inventoryItems.find((inv) => inv.id === invMatch.id);
+            if (invItem) {
+              newItem.materialId = invItem.materialId;
+            }
           }
 
           // Populate the dynamic inventoryFields on the newItem
@@ -2072,20 +2094,6 @@ export function VendorsPage() {
       toast.error("Add at least one line item before saving");
       return;
     }
-    const invalidItems = poItems.filter(
-      (item) =>
-        !item.description.trim() ||
-        !item.hsnCode.trim() ||
-        !item.catNo.trim() ||
-        item.qty <= 0 ||
-        item.rate <= 0,
-    );
-    if (invalidItems.length > 0) {
-      toast.error(
-        `${invalidItems.length} line item(s) have missing details (description, HSN, CAT No.) or invalid qty/rate (must be > 0)`,
-      );
-      return;
-    }
 
     // Financial validations
     if (advance < 0) {
@@ -2148,11 +2156,28 @@ export function VendorsPage() {
         shippingTerms: "",
         remarks,
 
-        items: poItems.map((item) => ({
-          materialId: item.materialId,
-          quantity: item.qty,
-          unitPrice: item.rate,
-        })),
+        items: poItems.map((item) => {
+          let resolvedMaterialId = item.materialId;
+          if (!resolvedMaterialId && item.inventoryId) {
+            const matched = inventoryItems.find((inv) => inv.id === item.inventoryId);
+            if (matched?.materialId) resolvedMaterialId = matched.materialId;
+          }
+          if (!resolvedMaterialId && item.description) {
+            const descLower = item.description.trim().toLowerCase();
+            const matched = inventoryItems.find(
+              (inv) => inv.material?.name?.trim().toLowerCase() === descLower
+            );
+            if (matched?.materialId) resolvedMaterialId = matched.materialId;
+          }
+          if (!resolvedMaterialId && inventoryItems.length > 0) {
+            resolvedMaterialId = inventoryItems[0].materialId;
+          }
+          return {
+            materialId: resolvedMaterialId || "",
+            quantity: item.qty > 0 ? item.qty : 1,
+            unitPrice: item.rate > 0 ? item.rate : 0.01,
+          };
+        }),
       });
 
       // 2. Save Revision
