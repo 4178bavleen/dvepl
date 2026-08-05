@@ -49,6 +49,8 @@ import adminPaymentRouteGroup from "./payment/index";
 import adminVendorProductRouteGroup from "./vendorProduct/index";
 import goodsReceiptRoutes from "./goodsRecipt";
 
+import dynamicRoutes from "./dynamic";
+
 // import notificationRoutes from "./notification";
 
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
@@ -239,6 +241,10 @@ async function adminRoutes(
 });
   fastify.register(purchaseOrderRoutes, {
   prefix: "/purchase-order",
+});
+
+fastify.register(dynamicRoutes, {
+  prefix: "/dynamic",
 });
   });
 }
