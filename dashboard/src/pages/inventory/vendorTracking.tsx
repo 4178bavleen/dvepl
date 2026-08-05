@@ -544,7 +544,7 @@ export default function VendorTracking() {
     if (!activeFollowUpSummary) return;
 
     if (followUpChannel === "whatsapp") {
-      if (!followUpPhone.trim()) {
+if (!followUpPhone.trim()) {
         toast.error("Enter a WhatsApp number to send the follow-up");
         return;
       }
@@ -562,12 +562,55 @@ export default function VendorTracking() {
       const subject = `Follow-up: Pending Deliveries — ${activeFollowUpSummary.vendorName}`;
       setFollowUpSending(true);
       try {
+        const rows = buildFollowUpReport();
+        if (rows.length === 0) {
+          setFollowUpSending(false);
+          toast.error("No pending items to attach to the email");
+          return;
+        }
+
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Follow Up");
+        ws["!cols"] = [
+          { wch: 14 },
+          { wch: 22 },
+          { wch: 24 },
+          { wch: 14 },
+          { wch: 12 },
+          { wch: 12 },
+          { wch: 12 },
+          { wch: 12 },
+        ];
+        const excelBase64 = XLSX.write(wb, {
+          type: "base64",
+          bookType: "xlsx",
+        });
+
+        const safeVendor = (
+          activeFollowUpSummary.vendorName || "Vendor"
+        ).replace(/[^\w]+/g, "_");
+        const scope =
+          followUpMode === "SINGLE" && selectedPurchaseOrder
+            ? selectedPurchaseOrder.replace(/[^\w]+/g, "_")
+            : "All";
+        const filename = `FollowUp_${safeVendor}_${scope}_${new Date()
+          .toISOString()
+          .split("T")[0]}.xlsx`;
+
         const response = await apiClient.post(
           "/settings/send-vendor-follow-up-email",
           {
             vendorId: activeFollowUpSummary.vendorId,
             subject,
             text: followUpMessage,
+            attachments: [
+              {
+                filename,
+                content: excelBase64,
+                encoding: "base64",
+              },
+            ],
           },
         );
         toast.success(
