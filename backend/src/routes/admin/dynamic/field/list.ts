@@ -30,18 +30,21 @@ export default async function listFieldRoute(
       let resolvedModuleId = moduleId;
 
       if (!resolvedModuleId && moduleKey) {
-        const module = await fastify.prisma.dynamicModule.findUnique({
+        const module = await fastify.prisma.dynamicModule.upsert({
           where: {
             moduleKey,
           },
+          update: {},
+          create: {
+            moduleKey,
+            moduleName: moduleKey
+              .split("-")
+              .map(
+                word => word.charAt(0).toUpperCase() + word.slice(1)
+              )
+              .join(" "),
+          },
         });
-
-        if (!module) {
-          return reply.code(404).send({
-            success: false,
-            message: "Module not found",
-          });
-        }
 
         resolvedModuleId = module.id;
       }

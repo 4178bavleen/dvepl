@@ -54,6 +54,8 @@ import {
   useDynamicCustomFields,
   validateCustomFields,
 } from "@/hooks/useDynamicCustomFields";
+import dynamicApi from "@/services/dynamicApi";
+import { DynamicField, DynamicRecord } from "@/types/dynamic";
 import {
   Select,
   SelectTrigger,
@@ -346,6 +348,8 @@ export function VendorsPage() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [revisions, setRevisions] = useState<PORevision[]>([]);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [inventoryFields, setInventoryFields] = useState<DynamicField[]>([]);
+  const [inventoryRecords, setInventoryRecords] = useState<DynamicRecord[]>([]);
   const [inventoryLoading, setInventoryLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [allVendorProducts, setAllVendorProducts] = useState<
@@ -357,16 +361,22 @@ export function VendorsPage() {
     setLoading(true);
     setInventoryLoading(true);
     try {
-      const [vList, rList, invList] = await Promise.all([
+      const [vList, rList, invList, dynFieldsRes, dynRecordsRes] = await Promise.all([
         apiService.vendors.list(),
         apiService.revisions.list(),
         apiService.inventory.list(),
+        dynamicApi.getFields("inventory"),
+        dynamicApi.getRecords("inventory"),
       ]);
-      console.log(invList[0].material);
-      console.log(invList[0].material?.name);
+      if (invList[0]) {
+        console.log(invList[0].material);
+        console.log(invList[0].material?.name);
+      }
       setVendors(vList);
       setRevisions(rList);
       setInventoryItems(invList);
+      setInventoryFields((dynFieldsRes.data?.data || []).sort((a: any, b: any) => a.orderNo - b.orderNo));
+      setInventoryRecords(dynRecordsRes.data?.data || []);
       console.log("Inventory Loaded");
       console.log(invList);
       console.log(invList.length);
@@ -464,37 +474,14 @@ export function VendorsPage() {
   } = useDynamicCustomFields("vendor");
   const [vCustomFields, setVCustomFields] = useState<Record<string, any>>({});
 
-  const { fields: inventoryCustomFields } = useDynamicCustomFields(
-    "inventory",
-  );
-  const inventoryVisibleCustomFields = useMemo(
-    () => inventoryCustomFields.filter((f) => f.showInTable),
-    [inventoryCustomFields],
-  );
-
   const poDefaultColumnIds = useMemo(() => {
     return [
       "sno",
-      "description",
-      "qty",
-      "unit",
-      "hsnCode",
-      "catNo",
-      "type",
-      "category",
-      "vendor",
-      "stock",
-      "reorderLevel",
-      "status",
-      ...inventoryVisibleCustomFields.map((f) => f.key),
-      ...customColumns.map((c) => `custom_${c}`),
-      "rate",
-      "discountPercent",
-      "net",
+      ...inventoryFields.map((f) => f.fieldName),
       "total",
       "delete",
     ];
-  }, [inventoryVisibleCustomFields, customColumns]);
+  }, [inventoryFields]);
 
   const orderedPoColumnIds = useMemo(() => {
     const mergeOrder = (order: string[]) => {
@@ -530,18 +517,18 @@ export function VendorsPage() {
         ? [...poDefaultColumnIds]
         : mergeOrder(poColumnOrder);
 
-    // Always pin "sno" first and "delete" last, regardless of saved order.
+    // Always pin "sno" first, "total" before delete, and "delete" last, regardless of saved order.
     return [
-      ...merged.filter((id) => id === "sno"),
-      ...merged.filter((id) => id !== "sno" && id !== "delete"),
-      ...merged.filter((id) => id === "delete"),
-    ];
+      "sno",
+      ...merged.filter((id) => id !== "sno" && id !== "delete" && id !== "total"),
+      "total",
+      "delete",
+    ].filter((id) => poDefaultColumnIds.includes(id) || id === "sno" || id === "delete" || id === "total");
   }, [poColumnOrder, poDefaultColumnIds]);
 
-  const inventoryCustomFieldMap = useMemo(
-    () =>
-      new Map(inventoryVisibleCustomFields.map((field) => [field.key, field])),
-    [inventoryVisibleCustomFields],
+  const inventoryFieldsMap = useMemo(
+    () => new Map(inventoryFields.map((field) => [field.fieldName, field])),
+    [inventoryFields],
   );
 
   const getCustomColumnName = (id: string) => id.replace(/^custom_/, "");
@@ -550,28 +537,16 @@ export function VendorsPage() {
     switch (id) {
       case "sno":
         return "S.No.";
-      case "description":
-        return "Item Description";
+      case "description": {
+        const nameField = inventoryFields.find(
+          (f) =>
+            f.label.toLowerCase().includes("name") ||
+            f.label.toLowerCase().includes("desc"),
+        );
+        return nameField ? nameField.label : "Item Description";
+      }
       case "qty":
         return "Qty";
-      case "unit":
-        return "Unit";
-      case "hsnCode":
-        return "HSN Code";
-      case "catNo":
-        return "CAT No.";
-      case "type":
-        return "Type";
-      case "category":
-        return "Category";
-      case "vendor":
-        return "Vendor";
-      case "stock":
-        return "Stock";
-      case "reorderLevel":
-        return "Reorder";
-      case "status":
-        return "Status";
       case "rate":
         return "Rate (₹)";
       case "discountPercent":
@@ -582,8 +557,11 @@ export function VendorsPage() {
         return "Total (₹)";
       case "delete":
         return "";
-      default:
-        return inventoryCustomFieldMap.get(id)?.name ?? getCustomColumnName(id);
+      default: {
+        const dynField = inventoryFieldsMap.get(id);
+        if (dynField) return dynField.label;
+        return getCustomColumnName(id);
+      }
     }
   };
 
@@ -722,40 +700,57 @@ export function VendorsPage() {
       );
     }
 
-    if (id === "description") {
+    if (inventoryFieldsMap.has(id)) {
+      const field = inventoryFieldsMap.get(id);
+      const val = item[id] || "";
+      const isNumber = field?.type === "NUMBER";
       return (
-        <td key={id} style={{ position: "relative" }}>
+        <td key={id} style={{ position: "relative", overflow: "visible" }}>
           <input
-            type="text"
-            value={item.description}
+            type={isNumber ? "number" : "text"}
+            value={val}
             onChange={(e) => {
-              console.log("Setting dropdown row:", item.id);
-              updatePoItemField(item.id, "description", e.target.value);
-              setInventoryDropdownRowId(item.id);
+              const typedVal = e.target.value;
+              updatePoItemField(item.id, id, typedVal);
+              setInventoryDropdownRowId(`${item.id}_${id}`);
+
+              if (typedVal.trim()) {
+                const matches = getInventoryMatches(typedVal);
+                const exactMatch = matches.find(inv => {
+                  const fieldVal = inv.values?.[id];
+                  return String(fieldVal || "").trim().toLowerCase() === typedVal.trim().toLowerCase();
+                });
+                if (exactMatch) {
+                  applyInventoryItemToRow(item.id, exactMatch);
+                }
+              }
             }}
-            onFocus={() => setInventoryDropdownRowId(item.id)}
-            onBlur={() =>
+            onFocus={() => setInventoryDropdownRowId(`${item.id}_${id}`)}
+            onBlur={() => {
+              const currentVal = item[id] || "";
+              if (String(currentVal).trim()) {
+                const matches = getInventoryMatches(String(currentVal));
+                const exactMatch = matches.find(inv => {
+                  const fieldVal = inv.values?.[id];
+                  return String(fieldVal || "").trim().toLowerCase() === String(currentVal).trim().toLowerCase();
+                });
+                if (exactMatch) {
+                  applyInventoryItemToRow(item.id, exactMatch);
+                }
+              }
               setTimeout(
                 () =>
                   setInventoryDropdownRowId((prev) =>
-                    prev === item.id ? null : prev,
+                    prev === `${item.id}_${id}` ? null : prev,
                   ),
                 150,
-              )
-            }
-            placeholder="Type to search Inventory or enter manually..."
+              );
+            }}
+            placeholder={field?.placeholder || field?.label || ""}
             autoComplete="off"
-            style={!item.description.trim() ? { borderColor: "#f59e0b" } : undefined}
+            style={isNumber ? undefined : (!String(val).trim() ? { borderColor: "#f59e0b" } : undefined)}
           />
-          {(() => {
-  console.log({
-    itemId: item.id,
-    dropdownRowId: inventoryDropdownRowId,
-    equal: inventoryDropdownRowId === item.id,
-  });
-  return null;
-})()}
-          {inventoryDropdownRowId === item.id && (
+          {inventoryDropdownRowId === `${item.id}_${id}` && (
             <div
               className="absolute left-0 top-full mt-1 w-72 rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 z-50"
               onMouseDown={(e) => e.preventDefault()}
@@ -767,31 +762,59 @@ export function VendorsPage() {
                 </span>
               </div>
               <div className="max-h-64 overflow-y-auto divide-y">
-                {getInventoryMatches(item.description).length === 0 && (
+                {getInventoryMatches(String(val)).length === 0 && (
                   <div className="p-3 text-center text-xs text-muted-foreground">
                     No matching inventory items.
                   </div>
                 )}
-                {getInventoryMatches(item.description).map((inv) => (
-                  <button
-                    type="button"
-                    key={inv.id}
-                    onClick={() => applyInventoryItemToRow(item.id, inv)}
-                    className="w-full flex items-center justify-between gap-2 px-3 py-2 hover:bg-muted/40 text-left transition-colors"
-                  >
-                    <div className="min-w-0">
-                      <div className="text-xs font-semibold text-foreground truncate">
-                        {inv.material?.name || "Unnamed Item"}
+                {getInventoryMatches(String(val)).map((inv) => {
+                  const primaryField = inventoryFields[0];
+                  const nameVal = inv.values?.[primaryField?.fieldName];
+                  const displayName = nameVal || Object.values(inv.values || {})[0] || "Unnamed Item";
+
+                  const subtitleParts = inventoryFields
+                    .filter((f) => f.fieldName !== primaryField?.fieldName)
+                    .map((f) => {
+                      const val = inv.values?.[f.fieldName];
+                      if (val === undefined || val === null || val === "") return null;
+                      return `${f.label}: ${val}`;
+                    })
+                    .filter(Boolean);
+
+                  const priceField = inventoryFields.find(
+                    (f) =>
+                      f.label.toLowerCase().includes("price") ||
+                      f.label.toLowerCase().includes("rate"),
+                  );
+                  const priceVal = priceField
+                    ? Number(inv.values?.[priceField.fieldName]) || 0
+                    : 0;
+
+                  return (
+                    <button
+                      type="button"
+                      key={inv.id}
+                      onClick={() => applyInventoryItemToRow(item.id, inv)}
+                      className="w-full flex items-center justify-between gap-2 px-3 py-2 hover:bg-muted/40 text-left transition-colors"
+                    >
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold text-foreground truncate">
+                          {displayName}
+                        </div>
+                        {subtitleParts.length > 0 && (
+                          <div className="text-[10px] text-muted-foreground truncate">
+                            {subtitleParts.join(" • ")}
+                          </div>
+                        )}
                       </div>
-                      <div className="text-[10px] text-muted-foreground truncate">
-                        {inv.material.materialCode} • HSN: {inv.material.hsnCode || "—"} • {inv.material.unit}
-                      </div>
-                    </div>
-                    <div className="text-xs font-bold text-[#137333] shrink-0">
-                      ₹{Number(inv.unitPrice).toLocaleString("en-IN")}
-                    </div>
-                  </button>
-                ))}
+                      {priceVal > 0 && (
+                        <div className="text-xs font-bold text-[#137333] shrink-0">
+                          ₹{priceVal.toLocaleString("en-IN")}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -812,122 +835,6 @@ export function VendorsPage() {
             }
             style={item.qty <= 0 ? { borderColor: "#f59e0b" } : undefined}
           />
-        </td>
-      );
-    }
-
-    if (id === "unit") {
-      return (
-        <td key={id}>
-          <input
-            type="text"
-            value={item.unit}
-            onChange={(e) => updatePoItemField(item.id, "unit", e.target.value)}
-            placeholder="PCS"
-          />
-        </td>
-      );
-    }
-
-    if (id === "hsnCode") {
-      return (
-        <td key={id}>
-          <input
-            type="text"
-            value={item.hsnCode}
-            onChange={(e) => updatePoItemField(item.id, "hsnCode", e.target.value)}
-            placeholder="HSN"
-          />
-        </td>
-      );
-    }
-
-    if (id === "catNo") {
-      return (
-        <td key={id}>
-          <input
-            type="text"
-            value={item.catNo}
-            onChange={(e) => updatePoItemField(item.id, "catNo", e.target.value)}
-            placeholder="CAT no."
-          />
-        </td>
-      );
-    }
-
-    if (id === "type") {
-      return (
-        <td key={id}>
-          <input
-            type="text"
-            value={item.type || ""}
-            onChange={(e) => updatePoItemField(item.id, "type", e.target.value)}
-            placeholder="Type"
-          />
-        </td>
-      );
-    }
-
-    if (id === "category") {
-      return (
-        <td key={id}>
-          <input
-            type="text"
-            value={item.category || ""}
-            onChange={(e) => updatePoItemField(item.id, "category", e.target.value)}
-            placeholder="Category"
-          />
-        </td>
-      );
-    }
-
-    if (id === "vendor") {
-      return (
-        <td key={id}>
-          <input
-            type="text"
-            value={item.vendor || ""}
-            onChange={(e) => updatePoItemField(item.id, "vendor", e.target.value)}
-            placeholder="Vendor"
-          />
-        </td>
-      );
-    }
-
-    if (id === "stock") {
-      return (
-        <td key={id}>
-          <input
-            type="number"
-            min={0}
-            step="any"
-            value={item.stock || ""}
-            onChange={(e) => updatePoItemField(item.id, "stock", Number(e.target.value) || 0)}
-            placeholder="Stock"
-          />
-        </td>
-      );
-    }
-
-    if (id === "reorderLevel") {
-      return (
-        <td key={id}>
-          <input
-            type="number"
-            min={0}
-            step="any"
-            value={item.reorderLevel || ""}
-            onChange={(e) => updatePoItemField(item.id, "reorderLevel", Number(e.target.value) || 0)}
-            placeholder="Reorder"
-          />
-        </td>
-      );
-    }
-
-    if (id === "status") {
-      return (
-        <td key={id} style={{ textAlign: "center" }}>
-          {item.status || "—"}
         </td>
       );
     }
@@ -988,10 +895,17 @@ export function VendorsPage() {
       return (
         <td key={id} style={{ textAlign: "center" }}>
           <button
-            className="btn-row-del"
+            type="button"
+            className="text-red-500 hover:text-red-700 transition-colors p-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-md inline-flex items-center justify-center cursor-pointer"
             onClick={() => handleDeletePoRow(item.id)}
+            title="Delete row"
+            style={{
+              border: "none",
+              background: "transparent",
+              cursor: "pointer",
+            }}
           >
-            🗑️
+            <Trash2 className="size-4" />
           </button>
         </td>
       );
@@ -1005,18 +919,6 @@ export function VendorsPage() {
             type="text"
             value={item[key] || ""}
             onChange={(e) => updatePoItemField(item.id, key, e.target.value)}
-          />
-        </td>
-      );
-    }
-
-    if (inventoryCustomFieldMap.has(id)) {
-      return (
-        <td key={id}>
-          <input
-            type="text"
-            value={item[id] || ""}
-            onChange={(e) => updatePoItemField(item.id, id, e.target.value)}
           />
         </td>
       );
@@ -1253,17 +1155,17 @@ export function VendorsPage() {
   }, [inventoryItems, productSearch]);
 
   // Inline inventory matches for a PO line-item row, based on its description text
-  const getInventoryMatches = (query: string): InventoryItem[] => {
+  // Inline inventory matches for a PO line-item row, based on its description text
+  const getInventoryMatches = (query: string): DynamicRecord[] => {
     const q = query.trim().toLowerCase();
 
     const pool = !q
-      ? inventoryItems
-      : inventoryItems.filter(
-        (i) =>
-          i.material?.name?.toLowerCase().includes(q) ||
-          i.material?.materialCode?.toLowerCase().includes(q) ||
-          i.material?.category?.toLowerCase().includes(q),
-      );
+      ? inventoryRecords
+      : inventoryRecords.filter((rec) => {
+          return Object.values(rec.values || {}).some((val) =>
+            String(val || "").toLowerCase().includes(q)
+          );
+        });
 
     console.log("Search:", query);
     console.log("Pool:", pool);
@@ -1403,6 +1305,66 @@ export function VendorsPage() {
     } finally {
       setVendorPosViewLoading(false);
     }
+  };
+
+  const viewPoFromRecord = (po: PurchaseOrderRecord) => {
+    const localRev = revisions.find((r) => r.poNumber === po.poNo);
+    if (localRev) {
+      loadRevision(localRev);
+    } else {
+      setPoNumber(po.poNo);
+      setPoDate(po.orderDate ? new Date(po.orderDate).toISOString().split("T")[0] : "");
+      setPoStatus(po.status || "SENT");
+      setPaymentTerms(po.paymentTerms || "");
+      setMaterialStatus(po.shippingTerms || "");
+      setAdvance(0);
+      setRemarks(po.remarks || "");
+      
+      const subVal = po.subtotal ? Number(po.subtotal) : 0;
+      const taxVal = po.tax ? Number(po.tax) : 0;
+      if (subVal > 0 && taxVal > 0) {
+        setCgstPercent(9);
+        setSgstPercent(9);
+        setIgstPercent(0);
+      } else {
+        setCgstPercent(0);
+        setSgstPercent(0);
+        setIgstPercent(0);
+      }
+      
+      setTerms("");
+      
+      const mappedItems = (po.items || []).map((it, idx) => ({
+        id: it.id || `item-${idx}`,
+        description: it.material?.name || "Unknown Material",
+        qty: it.quantity,
+        unit: it.material?.unit || "Nos",
+        hsnCode: it.material?.hsnCode || "",
+        catNo: "",
+        rate: Number(it.unitPrice),
+        discountPercent: 0,
+        net: it.quantity * Number(it.unitPrice),
+        total: it.quantity * Number(it.unitPrice),
+      }));
+      setPoItems(mappedItems);
+      setSelectedRevisionId("");
+      setReferenceCode("");
+      
+      const activeCompany = companies.find((c) => c.id === currentCompanyId);
+      setCompanyDetails({
+        name: activeCompany?.name || "",
+        address: activeCompany?.address || "",
+        phone: activeCompany?.phone || "",
+        email: activeCompany?.email || "",
+        gstin: activeCompany?.gst || "",
+        iso: "",
+        signatory: "",
+        division: "",
+      });
+      setCustomColumns([]);
+    }
+    setActivePoVendor(vendorPosViewVendor);
+    setIsPoPreviewOpen(true);
   };
 
   // Column definitions for GenericTable
@@ -1759,22 +1721,16 @@ export function VendorsPage() {
       id: `row-${Date.now()}`,
       description: "",
       qty: 1,
-      unit: "Nos",
-      hsnCode: "",
-      catNo: "",
       rate: 0,
       discountPercent: 0,
       net: 0,
       total: 0,
-      type: "",
-      category: "",
-      vendor: "",
-      stock: 0,
-      reorderLevel: 0,
-      status: "",
+      unit: "",
+      hsnCode: "",
+      catNo: ""
     };
-    inventoryVisibleCustomFields.forEach((f) => {
-      newItem[f.key] = "";
+    inventoryFields.forEach((f) => {
+      newItem[f.fieldName] = "";
     });
     customColumns.forEach((c) => {
       newItem[c] = "";
@@ -1783,52 +1739,58 @@ export function VendorsPage() {
   };
 
   // Fills an existing PO line-item row in-place with the selected inventory item's details.
-  const applyInventoryItemToRow = (rowId: string, invItem: InventoryItem) => {
+  const applyInventoryItemToRow = (rowId: string, invRecord: DynamicRecord) => {
     setPoItems((prev) =>
       prev.map((item) => {
         if (item.id !== rowId) return item;
-        const qty = Number(item.qty) || 1;
-        const rate = Number(invItem.unitPrice) || 0;
-        const disc = Number(item.discountPercent) || 0;
-        const net = rate * (1 - disc / 100);
-        const currentStock =
-          Number(invItem.quantity) || invItem.currentStock || 0;
-        const reorderLevel = invItem.reorderLevel ?? 0;
-        const status =
-          currentStock === 0
-            ? "Out"
-            : reorderLevel > 0 && currentStock <= reorderLevel
-              ? "Low"
-              : "OK";
+
         const updatedItem: POItem = {
           ...item,
-          materialId: invItem.materialId,
-          inventoryId: invItem.id,
-          description: invItem.material.name,
-          unit: invItem.material.unit || item.unit,
-          type: invItem.material.type || item.type,
-          category: invItem.material.category || item.category,
-          vendor:
-            (invItem as any).material?.preferredVendor?.name ||
-            item.vendor ||
-            "",
-          stock: currentStock,
-          reorderLevel,
-          status,
-          hsnCode: invItem.material.hsnCode || item.hsnCode,
-          catNo: invItem.material.materialCode || item.catNo,
-          rate,
-          net,
-          total: qty * net,
+          inventoryId: invRecord.id,
         };
-        inventoryVisibleCustomFields.forEach((f) => {
-          updatedItem[f.key] =
-            invItem.customFields?.[f.key] ?? item[f.key] ?? "";
+
+        inventoryFields.forEach((f) => {
+          updatedItem[f.fieldName] = invRecord.values?.[f.fieldName] ?? item[f.fieldName] ?? "";
         });
+
+        const primaryField = inventoryFields[0];
+        if (primaryField) {
+          updatedItem.description = String(updatedItem[primaryField.fieldName] || "");
+        }
+
+        const qtyField = inventoryFields.find(
+          (f) =>
+            f.label.toLowerCase().includes("qty") ||
+            f.label.toLowerCase().includes("quantity"),
+        );
+        const priceField = inventoryFields.find(
+          (f) =>
+            f.label.toLowerCase().includes("price") ||
+            f.label.toLowerCase().includes("rate"),
+        );
+        const discountField = inventoryFields.find(
+          (f) => f.label.toLowerCase().includes("discount"),
+        );
+
+        updatedItem.qty = qtyField ? (Number(updatedItem[qtyField.fieldName]) || 1) : (Number(item.qty) || 1);
+        updatedItem.rate = priceField ? (Number(updatedItem[priceField.fieldName]) || 0) : (Number(item.rate) || 0);
+        updatedItem.discountPercent = discountField ? (Number(updatedItem[discountField.fieldName]) || 0) : (Number(item.discountPercent) || 0);
+
+        const qty = Number(updatedItem.qty) || 1;
+        const rate = Number(updatedItem.rate) || 0;
+        const disc = Number(updatedItem.discountPercent) || 0;
+        const net = rate * (1 - disc / 100);
+
+        updatedItem.net = net;
+        updatedItem.total = qty * net;
+
         return updatedItem;
       }),
     );
-    toast.success(`${invItem.material.name} applied from inventory`);
+
+    const primaryField = inventoryFields[0];
+    const nameVal = primaryField ? invRecord.values?.[primaryField.fieldName] : "";
+    toast.success(`Loaded "${nameVal || "Item"}" details from inventory`);
     setInventoryDropdownRowId(null);
   };
 
@@ -1873,78 +1835,96 @@ export function VendorsPage() {
         const newItems: POItem[] = [];
 
         rows.forEach((row, idx) => {
-          const catNoRaw = getCellValue(row, [
-            "cat no",
-            "cat no.",
-            "catno",
-            "material code",
-            "code",
-          ]);
-          const descriptionRaw = getCellValue(row, [
-            "description",
-            "item",
-            "item description",
-            "name",
-            "material name",
-          ]);
-
-          // Try to match against Inventory by material code first, then by name
-          const invMatch = inventoryItems.find(
-            (inv) =>
-              (catNoRaw &&
-                inv.material.materialCode?.toLowerCase() ===
-                catNoRaw.toLowerCase()) ||
-              (descriptionRaw &&
-                inv.material.name?.toLowerCase() ===
-                descriptionRaw.toLowerCase()),
-          );
-          if (invMatch) matchedFromInventory++;
-
-          const description = descriptionRaw || invMatch?.material.name || "";
-          if (!description) return; // skip empty rows
-
-          const qty = Number(getCellValue(row, ["qty", "quantity"])) || 1;
-          const rate =
-            Number(getCellValue(row, ["rate", "unit price", "price"])) ||
-            Number(invMatch?.unitPrice) ||
-            0;
-          const discountPercent =
-            Number(
-              getCellValue(row, ["discount %", "discount", "discount percent"]),
-            ) || 0;
-          const unit =
-            getCellValue(row, ["unit", "uom"]) ||
-            invMatch?.material.unit ||
-            "Nos";
-          const hsnCode =
-            getCellValue(row, ["hsn code", "hsn"]) ||
-            invMatch?.material.hsnCode ||
-            "";
-          const catNo = catNoRaw || invMatch?.material.materialCode || "";
-          const net = rate * (1 - discountPercent / 100);
-          const total = qty * net;
-
           const newItem: POItem = {
             id: `row-${Date.now()}-${idx}`,
-            description,
-            qty,
-            unit,
-            hsnCode,
-            catNo,
-            rate,
-            discountPercent,
-            net,
-            total,
+            description: "",
+            qty: 1,
+            rate: 0,
+            discountPercent: 0,
+            net: 0,
+            total: 0,
+            unit: "",
+            hsnCode: "",
+            catNo: ""
           };
-          customColumns.forEach((c) => {
-            newItem[c] = getCellValue(row, [c.trim().toLowerCase()]);
+
+          // Collect cell values of all columns present in this row
+          const cellValues = Object.values(row).map(v => String(v || "").trim()).filter(Boolean);
+
+          // Find if any cell value matches any field value in inventoryRecords
+          let invMatch: DynamicRecord | undefined;
+          if (cellValues.length > 0) {
+            invMatch = inventoryRecords.find(rec => {
+              return Object.values(rec.values || {}).some(val => {
+                const valStr = String(val || "").trim().toLowerCase();
+                if (!valStr) return false;
+                return cellValues.some(cellVal => cellVal.toLowerCase() === valStr);
+              });
+            });
+          }
+
+          if (invMatch) {
+            matchedFromInventory++;
+          }
+
+          // Populate the dynamic inventoryFields on the newItem
+          inventoryFields.forEach((f) => {
+            const cellVal = getCellValue(row, [
+              f.label.trim().toLowerCase(),
+              f.fieldName.trim().toLowerCase(),
+            ]);
+
+            if (cellVal !== "") {
+              newItem[f.fieldName] = f.type === "NUMBER" ? (Number(cellVal) || 0) : cellVal;
+            } else if (invMatch && invMatch.values?.[f.fieldName] !== undefined) {
+              const invVal = invMatch.values[f.fieldName];
+              newItem[f.fieldName] = f.type === "NUMBER" ? (Number(invVal) || 0) : String(invVal);
+            } else {
+              newItem[f.fieldName] = f.type === "NUMBER" ? 0 : "";
+            }
           });
-          newItems.push(newItem);
+
+          // Sync description, qty, rate, net, total from the populated fields
+          const nameField = inventoryFields.find(
+            (f) =>
+              f.label.toLowerCase().includes("name") ||
+              f.label.toLowerCase().includes("desc"),
+          );
+          if (nameField) {
+            newItem.description = String(newItem[nameField.fieldName] || "");
+          } else {
+            const firstField = inventoryFields[0];
+            if (firstField) {
+              newItem.description = String(newItem[firstField.fieldName] || "");
+            }
+          }
+
+          const qtyField = inventoryFields.find(
+            (f) =>
+              f.label.toLowerCase().includes("qty") ||
+              f.label.toLowerCase().includes("quantity"),
+          );
+          const priceField = inventoryFields.find(
+            (f) =>
+              f.label.toLowerCase().includes("price") ||
+              f.label.toLowerCase().includes("rate") ||
+              f.label.toLowerCase().includes("cost"),
+          );
+
+          newItem.qty = qtyField ? (Number(newItem[qtyField.fieldName]) || 1) : 1;
+          newItem.rate = priceField ? (Number(newItem[priceField.fieldName]) || 0) : 0;
+          newItem.net = newItem.rate;
+          newItem.total = newItem.qty * newItem.net;
+
+          const hasContent = inventoryFields.some(f => String(newItem[f.fieldName] || "").trim() !== "");
+          if (hasContent) {
+            newItems.push(newItem);
+          }
         });
 
         if (newItems.length === 0) {
           toast.error(
-            'No valid rows found. Ensure the file has a "Description" column.',
+            'No valid rows found in the selected Excel file.'
           );
           return;
         }
@@ -1954,12 +1934,12 @@ export function VendorsPage() {
           `Imported ${newItems.length} item(s) from Excel` +
           (matchedFromInventory > 0
             ? ` (${matchedFromInventory} matched to Inventory)`
-            : ""),
+            : "")
         );
       } catch (err) {
         console.error(err);
         toast.error(
-          "Failed to read the Excel file. Please check the file format and try again.",
+          "Failed to read the Excel file. Please check the file format and try again."
         );
       } finally {
         setIsImportingExcel(false);
@@ -1974,26 +1954,18 @@ export function VendorsPage() {
   };
 
   const handleDownloadPoItemsTemplate = () => {
-    const headers = [
-      "Description",
-      "CAT No",
-      "HSN Code",
-      "Qty",
-      "Unit",
-      "Rate",
-      "Discount %",
-      ...customColumns,
-    ];
-    const sampleRow = [
-      "Sample Item Name",
-      "MAT-001",
-      "8536",
-      10,
-      "Nos",
-      100,
-      0,
-      ...customColumns.map(() => ""),
-    ];
+    const headers = inventoryFields.map((f) => f.label);
+    const sampleRow = inventoryFields.map((f) => {
+      if (f.type === "NUMBER") {
+        if (f.label.toLowerCase().includes("qty") || f.label.toLowerCase().includes("quantity")) return 10;
+        if (f.label.toLowerCase().includes("price") || f.label.toLowerCase().includes("rate")) return 100;
+        return 123;
+      }
+      if (f.label.toLowerCase().includes("unit") || f.label.toLowerCase().includes("uom")) return "Nos";
+      if (f.label.toLowerCase().includes("hsn")) return "8536";
+      return `Sample ${f.label}`;
+    });
+
     const ws = XLSX.utils.aoa_to_sheet([headers, sampleRow]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "PO Items");
@@ -2024,18 +1996,32 @@ export function VendorsPage() {
         if (item.id !== id) return item;
         const updated = { ...item, [field]: val };
 
-        if (
-          field === "qty" ||
-          field === "rate" ||
-          field === "discountPercent"
-        ) {
-          const qty = Number(updated.qty) || 0;
-          const rate = Number(updated.rate) || 0;
-          const disc = Number(updated.discountPercent) || 0;
-          const net = rate * (1 - disc / 100);
-          updated.net = net;
-          updated.total = qty * net;
+        const primaryField = inventoryFields[0];
+        if (primaryField && field === primaryField.fieldName) {
+          updated.description = String(val || "");
         }
+
+        const isQtyField = field === "qty" || inventoryFieldsMap.get(field)?.label.toLowerCase().includes("qty") || inventoryFieldsMap.get(field)?.label.toLowerCase().includes("quantity");
+        const isPriceField = field === "rate" || inventoryFieldsMap.get(field)?.label.toLowerCase().includes("price") || inventoryFieldsMap.get(field)?.label.toLowerCase().includes("rate");
+        const isDiscountField = field === "discountPercent" || inventoryFieldsMap.get(field)?.label.toLowerCase().includes("discount");
+
+        if (isQtyField) {
+          updated.qty = Number(val) || 0;
+        }
+        if (isPriceField) {
+          updated.rate = Number(val) || 0;
+        }
+        if (isDiscountField) {
+          updated.discountPercent = Number(val) || 0;
+        }
+
+        const qty = Number(updated.qty) || 0;
+        const rate = Number(updated.rate) || 0;
+        const disc = Number(updated.discountPercent) || 0;
+        const net = rate * (1 - disc / 100);
+        updated.net = net;
+        updated.total = qty * net;
+
         return updated;
       }),
     );
@@ -2251,29 +2237,51 @@ export function VendorsPage() {
     const currentRevision = revisions.find((r) => r.id === selectedRevisionId);
     const revisionNoStr = currentRevision ? `R${currentRevision.revisionNo}` : "R0";
 
-    const customColsTh = customColumns.map((c) => `<th>${c}</th>`).join("");
+    const printColumns = orderedPoColumnIds.filter((id) => id !== "delete");
+    const headersHtml = printColumns
+      .map((id) => {
+        const label = getPoColumnLabel(id);
+        return `<th>${label}</th>`;
+      })
+      .join("");
 
     const itemsHtml = poItems
       .map((item, idx) => {
-        const customColsTd = customColumns
-          .map((c) => `<td>${item[c] || "—"}</td>`)
+        const tdsHtml = printColumns
+          .map((id) => {
+            if (id === "sno") {
+              return `<td style="text-align: center;">${idx + 1}</td>`;
+            }
+            const field = inventoryFieldsMap.get(id);
+            const val = item[id];
+            const isPrice =
+              id === "net" ||
+              id === "total" ||
+              id === "rate" ||
+              (field?.label.toLowerCase().includes("price") && typeof val === "number");
+            
+            const isNumber =
+              field?.type === "NUMBER" ||
+              id === "qty" ||
+              id === "rate" ||
+              id === "discountPercent" ||
+              id === "net" ||
+              id === "total";
+
+            const displayVal = isPrice
+              ? `₹${Number(val || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
+              : val !== undefined && val !== null
+              ? String(val)
+              : "—";
+
+            return `<td style="${isNumber ? "text-align: right;" : ""}">${displayVal}</td>`;
+          })
           .join("");
-        return `
-          <tr>
-            <td style="text-align: center;">${idx + 1}</td>
-            <td>${item.description || "—"}</td>
-            <td style="text-align: center;">${item.qty}</td>
-            <td style="text-align: center;">${item.unit}</td>
-            <td>${item.hsnCode || "—"}</td>
-            <td>${item.catNo || "—"}</td>
-            ${customColsTd}
-            <td style="text-align: right;">₹${(item.rate || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
-            <td style="text-align: center;">${item.discountPercent}%</td>
-            <td style="text-align: right; font-weight: bold;">₹${(item.total || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
-          </tr>
-        `;
+        return `<tr>${tdsHtml}</tr>`;
       })
       .join("");
+
+    const colSpan = printColumns.length;
 
     return `
         <html>
@@ -2347,21 +2355,12 @@ export function VendorsPage() {
             <table>
               <thead>
                 <tr>
-                  <th style="width: 35px; text-align: center;">S.No.</th>
-                  <th>Item Description</th>
-                  <th style="width: 45px; text-align: center;">Qty</th>
-                  <th style="width: 55px; text-align: center;">Unit</th>
-                  <th style="width: 75px;">HSN Code</th>
-                  <th style="width: 75px;">CAT No.</th>
-                  ${customColsTh}
-                  <th style="width: 85px; text-align: right;">Rate</th>
-                  <th style="width: 55px; text-align: center;">Dis (%)</th>
-                  <th style="width: 95px; text-align: right;">Total</th>
+                  ${headersHtml}
                 </tr>
               </thead>
               <tbody>
                 ${itemsHtml}
-                ${poItems.length === 0 ? '<tr><td colspan="10" style="text-align: center; padding: 15px; color: #6b7280;">No items added to this purchase order.</td></tr>' : ""}
+                ${poItems.length === 0 ? `<tr><td colspan="${colSpan}" style="text-align: center; padding: 15px; color: #6b7280;">No items added to this purchase order.</td></tr>` : ""}
               </tbody>
             </table>
 
@@ -2426,10 +2425,78 @@ export function VendorsPage() {
     ctx.fillStyle = '#111827'; ctx.font = 'bold 14px sans-serif'; ctx.fillText(activePoVendor.name, 40, 205);
     ctx.font = '13px sans-serif'; ctx.fillText(`Category: ${activePoVendor.category}`, 40, 225); ctx.fillText(`Phone: ${activePoVendor.phone} | Email: ${activePoVendor.email}`, 40, 245); ctx.fillText(`GSTIN: ${activePoVendor.gstNumber}`, 40, 265);
     ctx.fillText(`Material Status: ${materialStatus}`, 500, 205); ctx.fillText(`Payment Terms: ${paymentTerms}`, 500, 225); ctx.fillText(`Remarks: ${remarks || 'None'}`, 500, 245);
+
+    const printColumns = orderedPoColumnIds.filter((id) => id !== "delete");
+    const colWidths: Record<string, number> = {
+      sno: 50,
+      qty: 60,
+      rate: 80,
+      discountPercent: 60,
+      net: 90,
+      total: 100,
+    };
+    
+    const fixedWidthSum = printColumns.reduce((sum, colId) => sum + (colWidths[colId] || 0), 0);
+    const dynamicColsCount = printColumns.filter((colId) => !colWidths[colId]).length;
+    const defaultColWidth = dynamicColsCount > 0 ? (920 - fixedWidthSum) / dynamicColsCount : 100;
+    
+    let currentX = 40;
+    const colPositions = printColumns.map((colId) => {
+      const w = colWidths[colId] || defaultColWidth;
+      const x = currentX;
+      currentX += w;
+      return { id: colId, x, w };
+    });
+
     let y = 300; ctx.fillStyle = '#f3f4f6'; ctx.fillRect(40, y, 920, 32); ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 1; ctx.strokeRect(40, y, 920, 32);
-    ctx.fillStyle = '#374151'; ctx.font = 'bold 11px sans-serif'; ctx.fillText('S.No.', 50, y + 20); ctx.fillText('Item Description', 100, y + 20); ctx.fillText('Qty', 440, y + 20); ctx.fillText('Unit', 500, y + 20); ctx.fillText('HSN Code', 560, y + 20); ctx.fillText('CAT No.', 650, y + 20); ctx.fillText('Rate', 740, y + 20); ctx.fillText('Total', 880, y + 20);
+    
+    ctx.fillStyle = '#374151'; ctx.font = 'bold 11px sans-serif';
+    colPositions.forEach((col) => {
+      const label = getPoColumnLabel(col.id);
+      const isRight = col.id === "rate" || col.id === "total" || col.id === "net" || inventoryFieldsMap.get(col.id)?.label.toLowerCase().includes("price");
+      if (isRight) {
+        ctx.textAlign = 'right';
+        ctx.fillText(label, col.x + col.w - 10, y + 20);
+      } else {
+        ctx.textAlign = 'left';
+        ctx.fillText(label, col.x + 10, y + 20);
+      }
+    });
+    ctx.textAlign = 'left';
+
     ctx.fillStyle = '#1f2937'; ctx.font = '13px sans-serif';
-    poItems.forEach((item, idx) => { y += 32; ctx.strokeRect(40, y, 920, 32); ctx.fillText(String(idx + 1), 50, y + 20); ctx.fillText(item.description || '—', 100, y + 20); ctx.fillText(String(item.qty), 440, y + 20); ctx.fillText(item.unit || 'PCS', 500, y + 20); ctx.fillText(item.hsnCode || '—', 560, y + 20); ctx.fillText(item.catNo || '—', 650, y + 20); ctx.fillText(`₹${item.rate.toFixed(2)}`, 740, y + 20); ctx.font = 'bold 13px sans-serif'; ctx.fillStyle = '#1e4620'; ctx.fillText(`₹${item.total.toFixed(2)}`, 880, y + 20); ctx.fillStyle = '#1f2937'; ctx.font = '13px sans-serif'; });
+    poItems.forEach((item, idx) => {
+      y += 32;
+      ctx.strokeRect(40, y, 920, 32);
+      colPositions.forEach((col) => {
+        const val = item[col.id];
+        const field = inventoryFieldsMap.get(col.id);
+        const isPrice = col.id === "net" || col.id === "total" || (field?.label.toLowerCase().includes("price") && typeof val === "number");
+        const displayVal = col.id === "sno"
+          ? String(idx + 1)
+          : isPrice
+            ? `₹${Number(val || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
+            : val !== undefined && val !== null ? String(val) : "—";
+            
+        const isRight = col.id === "rate" || col.id === "total" || col.id === "net" || field?.label.toLowerCase().includes("price");
+        
+        if (isRight) {
+          ctx.textAlign = 'right';
+          if (col.id === "total") {
+            ctx.font = 'bold 13px sans-serif';
+            ctx.fillStyle = '#1e4620';
+          }
+          ctx.fillText(displayVal, col.x + col.w - 10, y + 20);
+          ctx.font = '13px sans-serif';
+          ctx.fillStyle = '#1f2937';
+        } else {
+          ctx.textAlign = 'left';
+          ctx.fillText(displayVal, col.x + 10, y + 20);
+        }
+      });
+      ctx.textAlign = 'left';
+    });
+
     y += 50; const rightX = 640; ctx.font = '13px sans-serif'; ctx.fillStyle = '#4b5563'; ctx.fillText('Subtotal:', rightX, y); ctx.fillStyle = '#111827'; ctx.fillText(`₹${totals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 860, y);
     y += 24; ctx.fillStyle = '#4b5563'; ctx.fillText(`CGST (${cgstPercent}%):`, rightX, y); ctx.fillStyle = '#111827'; ctx.fillText(`₹${totals.cgstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 860, y);
     y += 24; ctx.fillStyle = '#4b5563'; ctx.fillText(`SGST (${sgstPercent}%):`, rightX, y); ctx.fillStyle = '#111827'; ctx.fillText(`₹${totals.sgstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 860, y);
@@ -3666,17 +3733,27 @@ export function VendorsPage() {
                             {po.paymentTerms || "—"}
                           </div>
                         </div>
-                        <div className="text-right shrink-0">
-                          <div className="text-sm font-bold text-[#137333]">
-                            {po.total != null
-                              ? `₹${Number(po.total).toLocaleString("en-IN", {
-                                minimumFractionDigits: 2,
-                              })}`
-                              : "—"}
+                        <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                          <div>
+                            <div className="text-sm font-bold text-[#137333]">
+                              {po.total != null
+                                ? `₹${Number(po.total).toLocaleString("en-IN", {
+                                  minimumFractionDigits: 2,
+                                })}`
+                                : "—"}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground leading-none">
+                              Grand Total
+                            </div>
                           </div>
-                          <div className="text-[10px] text-muted-foreground">
-                            Grand Total
-                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-xs text-primary hover:text-primary hover:bg-primary/10 px-2 py-0.5 mt-1 flex items-center gap-1 cursor-pointer"
+                            onClick={() => viewPoFromRecord(po)}
+                          >
+                            <Eye className="size-3.5" /> View Details
+                          </Button>
                         </div>
                       </div>
 
@@ -4376,45 +4453,7 @@ export function VendorsPage() {
                 <button className="de-tbtn" onClick={handleDuplicateLastRow}>
                   📋 Duplicate Last
                 </button>
-                <div className="de-tbtn-sep"></div>
 
-                {isAddingCol ? (
-                  <div className="flex items-center gap-1 bg-white border border-border p-1 rounded-md shadow-sm">
-                    <input
-                      placeholder="Col Name..."
-                      value={newColName}
-                      onChange={(e) => setNewColName(e.target.value)}
-                      style={{
-                        fontSize: "13px",
-                        width: "120px",
-                        padding: "4px 8px",
-                        border: "1px solid var(--border)",
-                        borderRadius: "6px",
-                      }}
-                    />
-                    <button
-                      className="de-tbtn bg-primary text-white"
-                      style={{ padding: "4px 10px", fontSize: "12px" }}
-                      onClick={handleAddCustomColumn}
-                    >
-                      Add
-                    </button>
-                    <button
-                      className="de-tbtn"
-                      style={{ padding: "4px 8px", fontSize: "12px" }}
-                      onClick={() => setIsAddingCol(false)}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    className="de-tbtn"
-                    onClick={() => setIsAddingCol(true)}
-                  >
-                    ➕ Add Column
-                  </button>
-                )}
 
                 <div className="de-tbtn-sep"></div>
                 <button
@@ -4455,339 +4494,45 @@ export function VendorsPage() {
                       <tbody>
                         {poItems.map((item, idx) => (
                           <tr key={item.id}>
-                            <td style={{ textAlign: "center", fontWeight: "bold" }}>
-                              {idx + 1}
-                            </td>
-                            <td style={{ position: "relative" }}>
-                              <input
-                                type="text"
-                                value={item.description}
-                                onChange={(e) => {
-                                  updatePoItemField(
-                                    item.id,
-                                    "description",
-                                    e.target.value,
-                                  );
-                                  setInventoryDropdownRowId(item.id);
-                                }}
-                                onFocus={() => setInventoryDropdownRowId(item.id)}
-                                onBlur={() => {
-  console.log("Blur disabled");
-}}
-                                placeholder="Type to search Inventory or enter manually..."
-                                autoComplete="off"
-                                style={
-                                  !item.description.trim()
-                                    ? { borderColor: "#f59e0b" }
-                                    : undefined
-                                }
-                              />
-                              {inventoryDropdownRowId === item.id && (
-                                <>
-                                  {console.log("DROPDOWN IS RENDERING")}
-                                  <div
-                                    className="absolute left-0 top-full mt-1 w-72 rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 z-50"
-                                    onMouseDown={(e) => e.preventDefault()}
-                                  >
-                                    <div className="flex items-center gap-1.5 px-3 py-2 border-b bg-muted/30">
-                                      <Package className="size-3.5 text-muted-foreground" />
-                                      <span className="text-[11px] font-semibold text-muted-foreground">
-                                        INVENTORY MATCHES
-                                      </span>
-                                    </div>
-                                    <div className="max-h-64 overflow-y-auto divide-y">
-                                      {getInventoryMatches(item.description)
-                                        .length === 0 && (
-                                          <div className="p-3 text-center text-xs text-muted-foreground">
-                                            No matching inventory items.
-                                          </div>
-                                        )}
-                                      {getInventoryMatches(item.description).map((inv) => (
-                                        <button
-                                          type="button"
-                                          key={inv.id}
-                                          onClick={() => {
-                                            console.log("========== BUTTON CLICKED ==========");
-                                            console.log("Row ID:", item.id);
-                                            console.log("Inventory:", inv);
-
-                                            applyInventoryItemToRow(item.id, inv);
-                                          }}
-                                          className="w-full flex items-center justify-between gap-2 px-3 py-2 hover:bg-muted/40 text-left transition-colors"
-                                        >
-                                          <div className="min-w-0">
-                                            <div className="text-xs font-semibold text-foreground truncate">
-                                              {inv.material?.name || "Unnamed Item"}
-                                            </div>
-                                            <div className="text-[10px] text-muted-foreground truncate">
-                                              {inv.material.materialCode} • HSN:{" "}
-                                              {inv.material.hsnCode || "—"} •{" "}
-                                              {inv.material.unit}
-                                            </div>
-                                          </div>
-                                          <div className="text-xs font-bold text-[#137333] shrink-0">
-                                            ₹
-                                            {Number(inv.unitPrice).toLocaleString(
-                                              "en-IN",
-                                            )}
-                                          </div>
-                                        </button>
-                                      ),
-                                      )}
-                                    </div>
-                                  </div>
-                                </>
-                              )}
-                            </td>
-                            <td>
-                              <input
-                                type="number"
-                                min={0.01}
-                                step="any"
-                                value={item.qty}
-                                onChange={(e) =>
-                                  updatePoItemField(
-                                    item.id,
-                                    "qty",
-                                    Number(e.target.value) || 0,
-                                  )
-                                }
-                                style={
-                                  item.qty <= 0
-                                    ? { borderColor: "#f59e0b" }
-                                    : undefined
-                                }
-                              />
-                            </td>
-                            <td>
-                              <input
-                                type="text"
-                                value={item.unit}
-                                onChange={(e) =>
-                                  updatePoItemField(item.id, "unit", e.target.value)
-                                }
-                                placeholder="PCS"
-                              />
-                            </td>
-                            <td>
-                              <input
-                                type="text"
-                                value={item.hsnCode}
-                                onChange={(e) =>
-                                  updatePoItemField(
-                                    item.id,
-                                    "hsnCode",
-                                    e.target.value,
-                                  )
-                                }
-                                placeholder="HSN"
-                              />
-                            </td>
-                            <td>
-                              <input
-                                type="text"
-                                value={item.catNo}
-                                onChange={(e) =>
-                                  updatePoItemField(
-                                    item.id,
-                                    "catNo",
-                                    e.target.value,
-                                  )
-                                }
-                                placeholder="CAT no."
-                              />
-                            </td>
-                            <td>
-                              <input
-                                type="text"
-                                value={item.type || ""}
-                                onChange={(e) =>
-                                  updatePoItemField(item.id, "type", e.target.value)
-                                }
-                                placeholder="Type"
-                              />
-                            </td>
-                            <td>
-                              <input
-                                type="text"
-                                value={item.category || ""}
-                                onChange={(e) =>
-                                  updatePoItemField(
-                                    item.id,
-                                    "category",
-                                    e.target.value,
-                                  )
-                                }
-                                placeholder="Category"
-                              />
-                            </td>
-                            <td>
-                              <input
-                                type="text"
-                                value={item.vendor || ""}
-                                onChange={(e) =>
-                                  updatePoItemField(item.id, "vendor", e.target.value)
-                                }
-                                placeholder="Vendor"
-                              />
-                            </td>
-                            <td>
-                              <input
-                                type="number"
-                                min={0}
-                                step="any"
-                                value={item.stock || ""}
-                                onChange={(e) =>
-                                  updatePoItemField(
-                                    item.id,
-                                    "stock",
-                                    Number(e.target.value) || 0,
-                                  )
-                                }
-                                placeholder="Stock"
-                              />
-                            </td>
-                            <td>
-                              <input
-                                type="number"
-                                min={0}
-                                step="any"
-                                value={item.reorderLevel || ""}
-                                onChange={(e) =>
-                                  updatePoItemField(
-                                    item.id,
-                                    "reorderLevel",
-                                    Number(e.target.value) || 0,
-                                  )
-                                }
-                                placeholder="Reorder"
-                              />
-                            </td>
-                            <td style={{ textAlign: "center" }}>
-                              {item.status || "—"}
-                            </td>
-                            {inventoryVisibleCustomFields.map((f) => (
-                              <td key={f.key}>
-                                <input
-                                  type="text"
-                                  value={item[f.key] || ""}
-                                  onChange={(e) =>
-                                    updatePoItemField(item.id, f.key, e.target.value)
-                                  }
-                                />
-                              </td>
-                            ))}
-                            {customColumns.map((c) => (
-                              <td key={c}>
-                                <input
-                                  type="text"
-                                  value={item[c] || ""}
-                                  onChange={(e) =>
-                                    updatePoItemField(item.id, c, e.target.value)
-                                  }
-                                />
-                              </td>
-                            ))}
-                            <td>
-                              <input
-                                type="number"
-                                value={item.rate === 0 ? "" : item.rate}
-                                onChange={(e) =>
-                                  updatePoItemField(
-                                    item.id,
-                                    "rate",
-                                    Number(e.target.value) || 0,
-                                  )
-                                }
-                                placeholder="0"
-                              />
-                            </td>
-                            <td>
-                              <input
-                                type="number"
-                                value={
-                                  item.discountPercent === 0
-                                    ? ""
-                                    : item.discountPercent
-                                }
-                                onChange={(e) =>
-                                  updatePoItemField(
-                                    item.id,
-                                    "discountPercent",
-                                    Number(e.target.value) || 0,
-                                  )
-                                }
-                                placeholder="0"
-                              />
-                            </td>
-                            <td className="td-net">
-                              ₹
-                              {(item.net || 0).toLocaleString("en-IN", {
-                                minimumFractionDigits: 2,
-                              })}
-                            </td>
-                            <td className="td-total">
-                              ₹
-                              {(item.total || 0).toLocaleString("en-IN", {
-                                minimumFractionDigits: 2,
-                              })}
-                            </td>
-                            <td style={{ textAlign: "center" }}>
-                              <button
-                                className="btn-row-del"
-                                onClick={() => handleDeletePoRow(item.id)}
-                              >
-                                🗑️
-                              </button>
-                            </td>
+                            {orderedPoColumnIds.map((id) =>
+                              renderPoCell(item, id, idx),
+                            )}
                           </tr>
                         ))}
                         {poItems.length === 0 && (
                           <tr>
                             <td
-                              colSpan={17 + customColumns.length + inventoryVisibleCustomFields.length}
+                              colSpan={orderedPoColumnIds.length}
                               style={{
                                 padding: "24px",
                                 textAlign: "center",
-                                color: "var(--text2)",
+                                color: "#9ca3af",
+                                fontSize: "14px",
                               }}
                             >
-                              No items added. Click "+ Add Row" and start typing to
-                              search Inventory, or "📥 Import Excel" to bulk-add
-                              items.
+                              No items added yet. Click "Add Item" or search/type in the description to start.
                             </td>
                           </tr>
                         )}
                       </tbody>
                       <tfoot>
                         <tr className="de-tfoot-row">
-                          <td colSpan={2} className="tfoot-label">
-                            Total items:{" "}
-                            <span id="de-total-items">{poItems.length}</span>
+                          <td colSpan={orderedPoColumnIds.length} className="p-3 text-right">
+                            <div className="flex items-center justify-end gap-6 text-sm font-bold text-foreground">
+                              <span>
+                                Total items:{" "}
+                                <span id="de-total-items" className="text-primary">{poItems.length}</span>
+                              </span>
+                              <span>
+                                Grand Total (excl. tax):{" "}
+                                <span id="de-grand-total" className="text-[#137333]">
+                                  ₹{totals.subtotal.toLocaleString("en-IN", {
+                                    minimumFractionDigits: 2,
+                                  })}
+                                </span>
+                              </span>
+                            </div>
                           </td>
-                          <td className="tfoot-qty" id="de-total-qty">
-                            {poItems.reduce(
-                              (sum, item) => sum + (Number(item.qty) || 0),
-                              0,
-                            )}
-                          </td>
-                          <td
-                            colSpan={10 + customColumns.length + inventoryVisibleCustomFields.length}
-                            className="tfoot-grand-label"
-                          >
-                            Grand Total (excl. tax):
-                          </td>
-                          <td
-                            className="tfoot-grand"
-                            colSpan={3}
-                            id="de-grand-total"
-                          >
-                            ₹
-                            {totals.subtotal.toLocaleString("en-IN", {
-                              minimumFractionDigits: 2,
-                            })}
-                          </td>
-                          <td></td>
                         </tr>
                       </tfoot>
                     </table>

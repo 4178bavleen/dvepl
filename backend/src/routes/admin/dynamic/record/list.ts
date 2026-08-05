@@ -26,18 +26,21 @@ export default async function listRecordRoute(
     ) => {
       const { moduleKey } = request.params;
 
-      const module = await fastify.prisma.dynamicModule.findUnique({
+      const module = await fastify.prisma.dynamicModule.upsert({
         where: {
           moduleKey,
         },
+        update: {},
+        create: {
+          moduleKey,
+          moduleName: moduleKey
+            .split("-")
+            .map(
+              word => word.charAt(0).toUpperCase() + word.slice(1)
+            )
+            .join(" "),
+        },
       });
-
-      if (!module) {
-        return reply.code(404).send({
-          success: false,
-          message: "Module not found",
-        });
-      }
 
       const records = await fastify.prisma.dynamicRecord.findMany({
         where: {

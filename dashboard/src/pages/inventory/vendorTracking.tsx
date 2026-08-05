@@ -1,4 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, horizontalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   Search,
   RefreshCw,
@@ -90,11 +93,76 @@ const statusMeta = (status: string) => {
   return map[status] || map.PENDING;
 };
 
+function SortableHeaderCell({
+  id,
+  children,
+  className,
+}: {
+  id: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    cursor: "grab",
+    opacity: isDragging ? 0.6 : 1,
+    zIndex: isDragging ? 100 : "auto",
+  };
+  return (
+    <th
+      ref={setNodeRef}
+      style={style}
+      className={`${className} select-none`}
+      {...attributes}
+      {...listeners}
+    >
+      {children}
+    </th>
+  );
+}
+
+const defaultColumns = [
+  { id: "poNo", label: "PO No", className: "p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground print:text-black" },
+  { id: "vendor", label: "Vendor", className: "p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground print:text-black" },
+  { id: "material", label: "Material", className: "p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground print:text-black" },
+  { id: "ordered", label: "Ordered", className: "p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground text-right print:text-black" },
+  { id: "received", label: "Received", className: "p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground text-right print:text-black" },
+  { id: "pending", label: "Pending", className: "p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground text-right print:text-black" },
+  { id: "status", label: "Status", className: "p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground print:text-black" },
+];
+
 /* ------------------------------------------------------------------ */
 /* Component                                                          */
 /* ------------------------------------------------------------------ */
 
 export default function VendorTracking() {
+  const sensors = useSensors(useSensor(PointerSensor));
+  const [orderedColumns, setOrderedColumns] = useState<string[]>(() => {
+    const saved = localStorage.getItem("vendor-tracking-table-column-order");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length === 7) return parsed;
+      } catch (e) {}
+    }
+    return ["poNo", "vendor", "material", "ordered", "received", "pending", "status"];
+  });
+
+  const handleColumnDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const oldIndex = orderedColumns.indexOf(String(active.id));
+      const newIndex = orderedColumns.indexOf(String(over.id));
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newOrder = arrayMove(orderedColumns, oldIndex, newIndex);
+        setOrderedColumns(newOrder);
+        localStorage.setItem("vendor-tracking-table-column-order", JSON.stringify(newOrder));
+      }
+    }
+  };
+
   const [data, setData] = useState<TrackingRow[]>([]);
   const [search, setSearch] = useState("");
   const [vendorFilter, setVendorFilter] = useState("");
@@ -906,140 +974,195 @@ export default function VendorTracking() {
 
       {/* Table */}
       <div className="bg-card rounded-xl border shadow-sm overflow-x-auto print:shadow-none print:border-0">
-        <table
-          ref={tableRef}
-          className="w-full text-left border-collapse print:text-sm"
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleColumnDragEnd}
         >
-          <thead className="print:table-header-group">
-            <tr className="border-b bg-muted/40 print:bg-gray-100">
-              <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground print:text-black">
-                PO No
-              </th>
-              <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground print:text-black">
-                Vendor
-              </th>
-              <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground print:text-black">
-                Material
-              </th>
-              <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground text-right print:text-black">
-                Ordered
-              </th>
-              <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground text-right print:text-black">
-                Received
-              </th>
-              <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground text-right print:text-black">
-                Pending
-              </th>
-              <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground print:text-black">
-                Status
-              </th>
-              <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground text-right print:text-black print:hidden">
-                Action
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {loading && data.length === 0 && (
-              <tr>
-                <td
-                  colSpan={8}
-                  className="p-8 text-center text-xs font-semibold text-muted-foreground"
-                >
-                  Loading tracking data…
-                </td>
-              </tr>
-            )}
-
-            {!loading && filteredData.length === 0 && (
-              <tr>
-                <td
-                  colSpan={8}
-                  className="p-8 text-center text-xs font-semibold text-muted-foreground"
-                >
-                  No vendor tracking records found.
-                </td>
-              </tr>
-            )}
-
-            {filteredData.map((item, idx) => {
-              const s = statusMeta(item.status);
-              return (
-                <tr
-                  key={item.poItemId}
-                  className={`hover:bg-muted/10 ${idx % 2 === 0 ? "bg-white" : "bg-muted/20"} print:bg-white`}
-                >
-                  <td className="p-4 font-semibold text-foreground">
-                    {item.poNo}
-                  </td>
-                  <td className="p-4 text-sm text-muted-foreground">
-                    {item.vendor?.name || "—"}
-                  </td>
-                  <td className="p-4 text-sm">
-                    <div className="font-medium text-foreground">
-                      {item.material?.name || "—"}
-                    </div>
-                    {item.material?.code && (
-                      <div className="text-[10px] text-muted-foreground font-mono">
-                        {item.material.code}
-                      </div>
-                    )}
-                  </td>
-                  <td className="p-4 text-right font-semibold">
-                    {fmtNum(item.orderedQty)}
-                  </td>
-                  <td className="p-4 text-right text-muted-foreground">
-                    {fmtNum(item.receivedQty)}
-                  </td>
-                  <td
-                    className={`p-4 text-right font-bold ${
-                      item.pendingQty > 0 ? "text-amber-600" : "text-emerald-600"
-                    }`}
-                  >
-                    {fmtNum(item.pendingQty)}
-                  </td>
-                  <td className="p-4">
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${s.cls}`}
-                    >
-                      {s.label}
-                    </span>
-                  </td>
-                  <td className="p-4 text-right print:hidden">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={item.pendingQty <= 0}
-                      onClick={() => openReceiveModal(item)}
-                      className="gap-1.5"
-                    >
-                      <PackageCheck className="size-3.5" />
-                      Receive
-                    </Button>
-                  </td>
+          <SortableContext
+            items={orderedColumns}
+            strategy={horizontalListSortingStrategy}
+          >
+            <table
+              ref={tableRef}
+              className="w-full text-left border-collapse print:text-sm"
+            >
+              <thead className="print:table-header-group">
+                <tr className="border-b bg-muted/40 print:bg-gray-100">
+                  {orderedColumns.map((colId) => {
+                    const col = defaultColumns.find((c) => c.id === colId);
+                    if (!col) return null;
+                    return (
+                      <SortableHeaderCell key={col.id} id={col.id} className={col.className}>
+                        {col.label}
+                      </SortableHeaderCell>
+                    );
+                  })}
+                  <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground text-right print:text-black print:hidden">
+                    Action
+                  </th>
                 </tr>
-              );
-            })}
+              </thead>
+              <tbody className="divide-y">
+                {loading && data.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={8}
+                      className="p-8 text-center text-xs font-semibold text-muted-foreground"
+                    >
+                      Loading tracking data…
+                    </td>
+                  </tr>
+                )}
 
-            {/* Totals row */}
-            {filteredData.length > 0 && (
-              <tr className="border-t-2 border-border bg-muted/30 font-bold print:bg-gray-100">
-                <td className="p-4" colSpan={3}>
-                  TOTAL ({filteredData.length} rows)
-                </td>
-                <td className="p-4 text-right">{fmtNum(totals.ordered)}</td>
-                <td className="p-4 text-right">{fmtNum(totals.received)}</td>
-                <td
-                  className={`p-4 text-right ${
-                    totals.pending > 0 ? "text-amber-600" : "text-emerald-600"
-                  }`}
-                >
-                  {fmtNum(totals.pending)}
-                </td>
-                <td className="p-4 print:hidden" colSpan={2}></td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                {!loading && filteredData.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={8}
+                      className="p-8 text-center text-xs font-semibold text-muted-foreground"
+                    >
+                      No vendor tracking records found.
+                    </td>
+                  </tr>
+                )}
+
+                {filteredData.map((item, idx) => {
+                  const s = statusMeta(item.status);
+                  return (
+                    <tr
+                      key={item.poItemId}
+                      className={`hover:bg-muted/10 ${idx % 2 === 0 ? "bg-white" : "bg-muted/20"} print:bg-white`}
+                    >
+                      {orderedColumns.map((colId) => {
+                        if (colId === "poNo") {
+                          return (
+                            <td key={colId} className="p-4 font-semibold text-foreground">
+                              {item.poNo}
+                            </td>
+                          );
+                        }
+                        if (colId === "vendor") {
+                          return (
+                            <td key={colId} className="p-4 text-sm text-muted-foreground">
+                              {item.vendor?.name || "—"}
+                            </td>
+                          );
+                        }
+                        if (colId === "material") {
+                          return (
+                            <td key={colId} className="p-4 text-sm">
+                              <div className="font-medium text-foreground">
+                                {item.material?.name || "—"}
+                              </div>
+                              {item.material?.code && (
+                                <div className="text-[10px] text-muted-foreground font-mono">
+                                  {item.material.code}
+                                </div>
+                              )}
+                            </td>
+                          );
+                        }
+                        if (colId === "ordered") {
+                          return (
+                            <td key={colId} className="p-4 text-right font-semibold">
+                              {fmtNum(item.orderedQty)}
+                            </td>
+                          );
+                        }
+                        if (colId === "received") {
+                          return (
+                            <td key={colId} className="p-4 text-right text-muted-foreground">
+                              {fmtNum(item.receivedQty)}
+                            </td>
+                          );
+                        }
+                        if (colId === "pending") {
+                          return (
+                            <td
+                              key={colId}
+                              className={`p-4 text-right font-bold ${
+                                item.pendingQty > 0 ? "text-amber-600" : "text-emerald-600"
+                              }`}
+                            >
+                              {fmtNum(item.pendingQty)}
+                            </td>
+                          );
+                        }
+                        if (colId === "status") {
+                          return (
+                            <td key={colId} className="p-4">
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${s.cls}`}
+                              >
+                                {s.label}
+                              </span>
+                            </td>
+                          );
+                        }
+                        return null;
+                      })}
+                      <td className="p-4 text-right print:hidden">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={item.pendingQty <= 0}
+                          onClick={() => openReceiveModal(item)}
+                          className="gap-1.5"
+                        >
+                          <PackageCheck className="size-3.5" />
+                          Receive
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+
+                {/* Totals row */}
+                {filteredData.length > 0 && (
+                  <tr className="border-t-2 border-border bg-muted/30 font-bold print:bg-gray-100">
+                    {orderedColumns.map((colId, cIdx) => {
+                      if (colId === "ordered") {
+                        return (
+                          <td key={colId} className="p-4 text-right">
+                            {fmtNum(totals.ordered)}
+                          </td>
+                        );
+                      }
+                      if (colId === "received") {
+                        return (
+                          <td key={colId} className="p-4 text-right">
+                            {fmtNum(totals.received)}
+                          </td>
+                        );
+                      }
+                      if (colId === "pending") {
+                        return (
+                          <td
+                            key={colId}
+                            className={`p-4 text-right ${
+                              totals.pending > 0 ? "text-amber-600" : "text-emerald-600"
+                            }`}
+                          >
+                            {fmtNum(totals.pending)}
+                          </td>
+                        );
+                      }
+                      if (cIdx === 0) {
+                        return (
+                          <td key={colId} className="p-4">
+                            TOTAL ({filteredData.length} rows)
+                          </td>
+                        );
+                      }
+                      return <td key={colId} className="p-4"></td>;
+                    })}
+                    <td className="p-4 print:hidden"></td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </SortableContext>
+        </DndContext>
       </div>
 
       {/* Print-only footer */}
