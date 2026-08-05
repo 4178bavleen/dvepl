@@ -4,8 +4,6 @@ import {
   FastifyReply,
   FastifyRequest,
 } from "fastify";
-import fs from "fs";
-import path from "path";
 import { adminLogs } from "../../../services/logger/contextLogger";
 
 async function readUsersRoute(
@@ -42,6 +40,7 @@ async function readUsersRoute(
             deletedAt: null,
           },
           include: {
+            accessProfile: true,
             userRoles: {
               include: {
                 role: true,
@@ -53,22 +52,11 @@ async function readUsersRoute(
           },
         });
 
-        // Load saved custom permissions
-        const permissionsFilePath = path.join(__dirname, "../../../../data/user_permissions.json");
-        let permissionsData: Record<string, any> = {};
-        if (fs.existsSync(permissionsFilePath)) {
-          try {
-            permissionsData = JSON.parse(fs.readFileSync(permissionsFilePath, "utf-8"));
-          } catch (e) {
-            permissionsData = {};
-          }
-        }
-
         return reply.status(200).send({
           success: true,
           message: "Users fetched successfully.",
           data: users.map((user) => {
-            const up = permissionsData[user.id] || {};
+            const up = user.accessProfile;
             return {
               id: user.id,
               name: user.name,
@@ -80,10 +68,10 @@ async function readUsersRoute(
               createdAt: user.createdAt,
               updatedAt: user.updatedAt,
               role: user.userRoles[0]?.role?.name || "",
-              designation: up.designation || "Team Member",
-              pageAccess: up.pageAccess || [],
-              fieldPermissions: up.fieldPermissions || {},
-              actionPermissions: up.actionPermissions || { create: true, edit: true, delete: false, export: true },
+              designation: up?.designation || "Team Member",
+              pageAccess: up?.pageAccess || [],
+              fieldPermissions: up?.fieldPermissions || {},
+              actionPermissions: up?.actionPermissions || { create: true, edit: true, delete: false, export: true },
               roles: user.userRoles.map((ur) => ({
                 id: ur.role.id,
                 name: ur.role.name,

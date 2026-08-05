@@ -4,8 +4,6 @@ import {
   FastifyReply,
   FastifyRequest,
 } from "fastify";
-import fs from "fs";
-import path from "path";
 import { adminLogs } from "../../../services/logger/contextLogger";
 
 async function backupRestoreRoutes(
@@ -31,15 +29,10 @@ async function backupRestoreRoutes(
           if (firstCompany) companyId = firstCompany.id;
         }
 
-        const filePath = path.join(__dirname, "../../../../data/settings.json");
-        let settings: any = {};
-        if (fs.existsSync(filePath)) {
-          try {
-            settings = JSON.parse(fs.readFileSync(filePath, "utf-8"));
-          } catch (e) {
-            settings = {};
-          }
-        }
+        const storedSettings = companyId
+          ? await fastify.prisma.companySettings.findUnique({ where: { companyId } })
+          : null;
+        const settings: any = storedSettings?.data || {};
 
         // Merge database values
         if (companyId) {
@@ -161,14 +154,14 @@ async function backupRestoreRoutes(
           });
         }
 
-        // Save to settings.json
-        const filePath = path.join(__dirname, "../../../../data/settings.json");
-        const dirPath = path.dirname(filePath);
-        if (!fs.existsSync(dirPath)) {
-          fs.mkdirSync(dirPath, { recursive: true });
+        if (companyId) {
+          const { timestamp, ...settings } = data;
+          await fastify.prisma.companySettings.upsert({
+            where: { companyId },
+            create: { companyId, data: settings },
+            update: { data: settings },
+          });
         }
-
-        fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
 
         return reply.status(200).send({
           success: true,

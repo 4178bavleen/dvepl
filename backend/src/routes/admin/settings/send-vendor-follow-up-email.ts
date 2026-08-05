@@ -6,8 +6,6 @@ import {
 } from "fastify";
 import nodemailer from "nodemailer";
 import { z } from "zod";
-import fs from "fs";
-import path from "path";
 import { adminLogs } from "../../../services/logger/contextLogger";
 
 const sendVendorFollowUpEmailSchema = z.object({
@@ -71,10 +69,7 @@ async function sendVendorFollowUpEmailRoute(
         const dbConfig = await fastify.prisma.notificationConfiguration.findUnique({
           where: { companyId },
         });
-        const settingsPath = path.join(__dirname, "../../../../data/settings.json");
-        const savedSettings = fs.existsSync(settingsPath)
-          ? JSON.parse(fs.readFileSync(settingsPath, "utf-8"))
-          : {};
+        const savedSettings = (await fastify.prisma.companySettings.findUnique({ where: { companyId } }))?.data as any || {};
         const savedSmtp = savedSettings.smtpSettings || {};
 
         const smtpHost = dbConfig?.smtpHost || savedSmtp.host;

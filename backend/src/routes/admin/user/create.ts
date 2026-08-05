@@ -4,8 +4,6 @@ import {
   FastifyReply,
   FastifyRequest,
 } from "fastify";
-import fs from "fs";
-import path from "path";
 import { adminLogs } from "../../../services/logger/contextLogger";
 import { createUserSchema } from "../../../schemas/user/auth/user.schema";
 import { hashPassword } from "../../../utils/hashPassword";
@@ -258,27 +256,13 @@ async function createUserRoute(
           }
         );
 
-        // Save designation and default permissions
-        const permissionsFilePath = path.join(__dirname, "../../../../data/user_permissions.json");
-        const dirPath = path.dirname(permissionsFilePath);
-        if (!fs.existsSync(dirPath)) {
-          fs.mkdirSync(dirPath, { recursive: true });
-        }
-        let permissionsData: Record<string, any> = {};
-        if (fs.existsSync(permissionsFilePath)) {
-          try {
-            permissionsData = JSON.parse(fs.readFileSync(permissionsFilePath, "utf-8"));
-          } catch (e) {
-            permissionsData = {};
-          }
-        }
-        permissionsData[createdUser.id] = {
+        await fastify.prisma.userAccessProfile.create({ data: {
+          userId: createdUser.id,
           designation: designation || "Team Member",
           pageAccess: ["dashboard", "vendors", "orders"],
           fieldPermissions: {},
           actionPermissions: { create: true, edit: true, delete: false, export: true }
-        };
-        fs.writeFileSync(permissionsFilePath, JSON.stringify(permissionsData, null, 2), "utf-8");
+        }});
 
         // ======================================================
         // Log

@@ -67,6 +67,7 @@ model Company {
   warehouses                Warehouse[]
   workOrders                WorkOrder[]
   notificationConfiguration NotificationConfiguration?
+  settings                  CompanySettings?
 
   @@map("companies")
 }
@@ -246,6 +247,7 @@ model User {
   assignedWorkOrders                WorkOrder[]                        @relation("WorkOrderAssignedTo")
   createdWorkOrders                 WorkOrder[]                        @relation("WorkOrderCreatedBy")
   vendorProductsCreated             VendorProduct[]
+  accessProfile                     UserAccessProfile?
 
   @@index([companyId])
   @@map("users")
@@ -413,6 +415,31 @@ model UserPermission {
   user         User       @relation(fields: [userId], references: [id])
 
   @@unique([userId, permissionId])
+}
+
+model CompanySettings {
+  id        String   @id @default(uuid())
+  companyId String   @unique
+  data      Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("company_settings")
+}
+
+model UserAccessProfile {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  designation       String   @default("Team Member")
+  pageAccess        Json     @default("[]")
+  fieldPermissions  Json     @default("{}")
+  actionPermissions Json     @default("{\"create\":true,\"edit\":true,\"delete\":false,\"export\":true}")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_access_profiles")
 }
 
 model Employee {

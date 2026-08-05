@@ -4,8 +4,6 @@ import {
   FastifyReply,
   FastifyRequest,
 } from "fastify";
-import fs from "fs";
-import path from "path";
 import { adminLogs } from "../../../services/logger/contextLogger";
 
 async function readSettingsRoute(
@@ -28,18 +26,8 @@ async function readSettingsRoute(
       try {
         const companyId = request.user.companyId;
 
-        const filePath = path.join(__dirname, "../../../../data/settings.json");
-        const dirPath = path.dirname(filePath);
-
-        if (!fs.existsSync(dirPath)) {
-          fs.mkdirSync(dirPath, { recursive: true });
-        }
-
-        let settings: any = {};
-        if (fs.existsSync(filePath)) {
-          const fileData = fs.readFileSync(filePath, "utf-8");
-          settings = JSON.parse(fileData);
-        }
+        const storedSettings = await fastify.prisma.companySettings.findUnique({ where: { companyId } });
+        const settings: any = storedSettings?.data || {};
 
         // Query database notification configuration
         if (companyId) {

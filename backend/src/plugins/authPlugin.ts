@@ -34,18 +34,20 @@ async function authPlugin(fastify: FastifyInstance) {
           delete (request.query as any).companyId;
         }
 
-        // Load custom permissions from JSON and merge them dynamically
-        const fs = require("fs");
-        const path = require("path");
-        const permissionsFilePath = path.join(__dirname, "../../data/user_permissions.json");
+        // Load custom access metadata from the database and merge it dynamically.
         let customPermissions: string[] = [];
-        if (fs.existsSync(permissionsFilePath)) {
-          try {
-            const permissionsData = JSON.parse(fs.readFileSync(permissionsFilePath, "utf-8"));
-            const up = permissionsData[decoded.userId];
+        try {
+            const up = await fastify.prisma.userAccessProfile.findUnique({
+              where: { userId: decoded.userId },
+            });
             if (up && up.pageAccess) {
-              const pageAccess: string[] = up.pageAccess;
-              const actionPermissions = up.actionPermissions || { create: false, edit: false, delete: false, export: false };
+              const pageAccess = up.pageAccess as string[];
+              const actionPermissions = (up.actionPermissions || { create: false, edit: false, delete: false, export: false }) as {
+                create?: boolean;
+                edit?: boolean;
+                delete?: boolean;
+                export?: boolean;
+              };
               
               // Map module keys to backend permission prefixes
               const moduleToPrefixMap: Record<string, string[]> = {
@@ -111,9 +113,8 @@ async function authPlugin(fastify: FastifyInstance) {
               }
               customPermissions = Array.from(computedPermissions);
             }
-          } catch (e) {
-            console.error("Error reading custom permissions in authPlugin:", e);
-          }
+        } catch (e) {
+          console.error("Error reading custom permissions in authPlugin:", e);
         }
 
         const mergedPermissions = Array.from(new Set([
