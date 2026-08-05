@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
+import { DndContext, closestCenter, MouseSensor, TouchSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, horizontalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DynamicRecord, DynamicTableProps } from "@/types/dynamic";
 
@@ -19,21 +19,26 @@ function SortableHeaderCell({
   const style: React.CSSProperties = {
     transform: transform ? CSS.Translate.toString(transform) : undefined,
     transition,
-    cursor: "grab",
-    userSelect: "none",
     opacity: isDragging ? 0.6 : 1,
-    zIndex: isDragging ? 100 : "auto",
+    zIndex: isDragging ? 20 : undefined,
     position: "relative",
   };
   return (
     <th
       ref={setNodeRef}
       style={style}
-      className={`${className} select-none`}
-      {...attributes}
-      {...listeners}
+      className={className}
     >
-      {children}
+      <div className="flex items-center gap-1.5">
+        <span
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing touch-none text-muted-foreground/50 hover:text-muted-foreground shrink-0"
+        >
+          <GripVertical className="h-3.5 w-3.5" />
+        </span>
+        <span className="select-none">{children}</span>
+      </div>
     </th>
   );
 }
@@ -46,7 +51,19 @@ export default function DynamicTable({
   onEdit,
   onDelete,
 }: DynamicTableProps) {
-  const sensors = useSensors(useSensor(PointerSensor));
+  const sensors = useSensors(
+    useSensor(MouseSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 200,
+        tolerance: 5,
+      },
+    })
+  );
 
   const defaultOrder = useMemo(() => {
     return [...fields]
@@ -76,7 +93,19 @@ export default function DynamicTable({
   });
 
   useEffect(() => {
+    if (defaultOrder.length === 0) return;
+
     setOrderedColumnIds((prev) => {
+      const saved = localStorage.getItem("inventory-table-column-order");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved) as string[];
+          const filtered = parsed.filter((id) => defaultOrder.includes(id));
+          const missing = defaultOrder.filter((id) => !filtered.includes(id));
+          return [...filtered, ...missing];
+        } catch (e) {}
+      }
+
       const filtered = prev.filter((id) => defaultOrder.includes(id));
       const missing = defaultOrder.filter((id) => !filtered.includes(id));
       return [...filtered, ...missing];

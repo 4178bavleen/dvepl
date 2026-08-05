@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
+import { DndContext, closestCenter, MouseSensor, TouchSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, horizontalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
@@ -21,6 +21,7 @@ import {
   Send,
   MessageCircle,
   Mail,
+  GripVertical,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import * as XLSX from "xlsx";
@@ -104,22 +105,29 @@ function SortableHeaderCell({
   className?: string;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
-  const style = {
-    transform: CSS.Transform.toString(transform),
+  const style: React.CSSProperties = {
+    transform: transform ? CSS.Translate.toString(transform) : undefined,
     transition,
-    cursor: "grab",
     opacity: isDragging ? 0.6 : 1,
-    zIndex: isDragging ? 100 : "auto",
+    zIndex: isDragging ? 20 : undefined,
+    position: "relative",
   };
   return (
     <th
       ref={setNodeRef}
       style={style}
-      className={`${className} select-none`}
-      {...attributes}
-      {...listeners}
+      className={className}
     >
-      {children}
+      <div className="flex items-center gap-1.5">
+        <span
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing touch-none text-muted-foreground/50 hover:text-muted-foreground shrink-0"
+        >
+          <GripVertical className="h-3.5 w-3.5" />
+        </span>
+        <span className="select-none">{children}</span>
+      </div>
     </th>
   );
 }
@@ -139,7 +147,19 @@ const defaultColumns = [
 /* ------------------------------------------------------------------ */
 
 export default function VendorTracking() {
-  const sensors = useSensors(useSensor(PointerSensor));
+  const sensors = useSensors(
+    useSensor(MouseSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 200,
+        tolerance: 5,
+      },
+    })
+  );
   const [orderedColumns, setOrderedColumns] = useState<string[]>(() => {
     const saved = localStorage.getItem("vendor-tracking-table-column-order");
     if (saved) {
@@ -403,14 +423,21 @@ export default function VendorTracking() {
 
   const openFollowUpModal = (
     summary: (typeof vendorPendingSummary)[number],
+    initialPoNo?: string
   ) => {
     setFollowUpVendorId(summary.vendorId);
     setFollowUpChannel(summary.phone ? "whatsapp" : "email");
     setFollowUpPhone(summary.phone || "");
     setFollowUpEmail(summary.email || "");
-    setFollowUpMode("ALL");
-    setSelectedPurchaseOrder("");
-    setFollowUpMessage(generateFollowUpMessage(summary, "ALL", ""));
+    if (initialPoNo) {
+      setFollowUpMode("SINGLE");
+      setSelectedPurchaseOrder(initialPoNo);
+      setFollowUpMessage(generateFollowUpMessage(summary, "SINGLE", initialPoNo));
+    } else {
+      setFollowUpMode("ALL");
+      setSelectedPurchaseOrder("");
+      setFollowUpMessage(generateFollowUpMessage(summary, "ALL", ""));
+    }
   };
 
   const closeFollowUpModal = () => {
@@ -1119,7 +1146,7 @@ export default function VendorTracking() {
                     );
                   })}
                   <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground text-right print:text-black print:hidden">
-                    Action
+                    Actions
                   </th>
                 </tr>
               </thead>
@@ -1222,16 +1249,43 @@ export default function VendorTracking() {
                         return null;
                       })}
                       <td className="p-4 text-right print:hidden">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={item.pendingQty <= 0}
-                          onClick={() => openReceiveModal(item)}
-                          className="gap-1.5"
-                        >
-                          <PackageCheck className="size-3.5" />
-                          Receive
-                        </Button>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={item.pendingQty <= 0}
+                            onClick={() => openReceiveModal(item)}
+                            className="gap-1.5"
+                          >
+                            <PackageCheck className="size-3.5" />
+                            Receive
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={item.pendingQty <= 0}
+                            onClick={() => {
+                              const vendorId = item.vendor?.id;
+                              if (!vendorId) {
+                                toast.error("This row does not have a valid vendor ID");
+                                return;
+                              }
+                              const summary = vendorPendingSummary.find((v) => v.vendorId === vendorId) || {
+                                vendorId: vendorId,
+                                vendorName: item.vendor?.name || "",
+                                phone: item.vendor?.phone,
+                                email: item.vendor?.email,
+                                items: [item],
+                                totalPendingQty: item.pendingQty,
+                              };
+                              openFollowUpModal(summary, item.poNo);
+                            }}
+                            className="gap-1.5"
+                          >
+                            <Send className="size-3.5" />
+                            Follow Up
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   );
