@@ -24,7 +24,7 @@ import DynamicForm from "@/components/dynamic/DynamicForm";
 import DynamicFieldManager from "@/components/dynamic/DynamicFieldManager";
 
 import useDynamicModule from "@/hooks/useDynamicModule";
-import VendorTracking from "./VendorTracking";
+import VendorTracking from "./vendorTracking";
 
 import {
   DynamicRecord,
