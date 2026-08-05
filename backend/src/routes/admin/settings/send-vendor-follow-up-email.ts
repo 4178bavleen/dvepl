@@ -12,6 +12,15 @@ const sendVendorFollowUpEmailSchema = z.object({
   vendorId: z.string().uuid(),
   subject: z.string().min(1),
   text: z.string().min(1),
+  attachments: z
+    .array(
+      z.object({
+        filename: z.string().min(1),
+        content: z.string().min(1),
+        encoding: z.string().optional(),
+      }),
+    )
+    .optional(),
 });
 
 const toHtml = (text: string) =>
@@ -45,7 +54,7 @@ async function sendVendorFollowUpEmailRoute(
           });
         }
 
-        const { vendorId, subject, text } = validation.data;
+const { vendorId, subject, text, attachments } = validation.data;
         const companyId = request.user.companyId;
         const vendor = await fastify.prisma.vendor.findFirst({
           where: { id: vendorId, companyId, deletedAt: null },
@@ -97,12 +106,13 @@ async function sendVendorFollowUpEmailRoute(
           connectionTimeout: 10000,
         });
 
-        await transporter.sendMail({
+await transporter.sendMail({
           from: `"${smtpFromName || "DVEPL ERP"}" <${smtpFromEmail || "no-reply@dvepl.com"}>`,
           to: vendor.email,
           subject,
           text,
           html: `<p>${toHtml(text)}</p>`,
+          attachments: attachments || [],
         });
 
         return reply.send({

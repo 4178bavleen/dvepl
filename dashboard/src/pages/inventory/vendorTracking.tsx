@@ -33,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useERPStore } from "@/store/erpStore";
 
 // ---------------------------------------------------------------------------
 // Endpoints
@@ -95,6 +96,8 @@ const statusMeta = (status: string) => {
 /* ------------------------------------------------------------------ */
 
 export default function VendorTracking() {
+  const currentUserName = useERPStore((state) => state.currentUserName);
+
   const [data, setData] = useState<TrackingRow[]>([]);
   const [search, setSearch] = useState("");
   const [vendorFilter, setVendorFilter] = useState("");
@@ -289,48 +292,35 @@ export default function VendorTracking() {
     mode: "SINGLE" | "ALL",
     selectedPO: string,
   ) => {
+    // Short message intended for WhatsApp/email body. The detailed breakdown
+    // (per-PO items, quantities, totals) is delivered in the attached report.
     if (mode === "SINGLE" && selectedPO) {
-      const items = summary.items.filter((i) => i.poNo === selectedPO);
-      if (items.length === 0) return "";
-      const totalPending = items.reduce((sum, i) => sum + i.pendingQty, 0);
-      const lines = [
+      return [
         `Dear ${summary.vendorName},`,
         "",
-        `This is a follow-up regarding the pending delivery against Purchase Order ${selectedPO}:`,
+        `This is a follow-up regarding Purchase Order ${selectedPO}.`,
+        "Please refer to the attached report for the pending items and kindly confirm",
+        "the expected dispatch/delivery date at the earliest.",
         "",
-        ...items.map(
-          (item) =>
-            `${item.material?.name ?? "Item"} (Code: ${item.material?.code ?? "—"}): Ordered ${item.orderedQty}, Received ${item.receivedQty}, Pending ${item.pendingQty}`,
-        ),
-        "",
-        `Total Pending Quantity: ${totalPending}`,
-        "",
-        "Kindly confirm the expected dispatch/delivery date at the earliest.",
+        "Thank you for your cooperation.",
         "",
         "Regards,",
-        "DVEPL Procurement Team",
-      ];
-      return lines.join("\n");
+        currentUserName || "Procurement Team",
+      ].join("\n");
     }
 
-    const lines = [
+    return [
       `Dear ${summary.vendorName},`,
       "",
-      "This is a follow-up regarding pending deliveries against the following purchase order(s):",
+      "This is a follow-up regarding your pending deliveries against our purchase order(s).",
+      "Please refer to the attached report for the pending items and kindly confirm",
+      "the expected dispatch/delivery date at the earliest.",
       "",
-      ...summary.items.map(
-        (item) =>
-          `• PO ${item.poNo} — ${item.material?.name ?? "Item"}: Ordered ${item.orderedQty}, Received ${item.receivedQty}, Pending ${item.pendingQty}`,
-      ),
-      "",
-      `Total Pending Quantity: ${summary.totalPendingQty}`,
-      "",
-      "Kindly confirm the expected dispatch/delivery date at the earliest.",
+      "Thank you for your cooperation.",
       "",
       "Regards,",
-      "DVEPL Procurement Team",
-    ];
-    return lines.join("\n");
+      currentUserName || "Procurement Team",
+    ].join("\n");
   };
 
   const refreshFollowUpMessage = (
@@ -387,6 +377,72 @@ export default function VendorTracking() {
   const handleSelectPurchaseOrder = (poNo: string) => {
     setSelectedPurchaseOrder(poNo);
     refreshFollowUpMessage("SINGLE", poNo);
+  };
+
+  // Build the list of pending rows scoped to the selected follow-up mode
+  const followUpScopeItems = useMemo(() => {
+    if (!activeFollowUpSummary) return [];
+    if (followUpMode === "SINGLE" && selectedPurchaseOrder) {
+      return activeFollowUpSummary.items.filter(
+        (i) => i.poNo === selectedPurchaseOrder,
+      );
+    }
+    return activeFollowUpSummary.items;
+  }, [activeFollowUpSummary, followUpMode, selectedPurchaseOrder]);
+
+  // Build the follow-up report content (rows) scoped to the selected mode.
+  // Used to attach/deliver the detailed breakdown alongside the short message.
+  const buildFollowUpReport = () => {
+    if (!activeFollowUpSummary) return [];
+    return followUpScopeItems.map((item) => ({
+      "PO No": item.poNo,
+      Vendor: item.vendor?.name ?? "—",
+      "Material Name": item.material?.name ?? "—",
+      "Material Code": item.material?.code ?? "—",
+      Ordered: item.orderedQty,
+      Received: item.receivedQty,
+      Pending: item.pendingQty,
+      Status: item.status,
+    }));
+  };
+
+  const downloadFollowUpExcel = () => {
+    if (!activeFollowUpSummary) return;
+    if (followUpScopeItems.length === 0) {
+      toast.error("No pending items to export");
+      return;
+    }
+
+    const rows = buildFollowUpReport();
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Follow Up");
+
+    ws["!cols"] = [
+      { wch: 14 },
+      { wch: 22 },
+      { wch: 24 },
+      { wch: 14 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 12 },
+    ];
+
+    const safeVendor = (activeFollowUpSummary.vendorName || "Vendor").replace(
+      /[^\w]+/g,
+      "_",
+    );
+    const scope =
+      followUpMode === "SINGLE" && selectedPurchaseOrder
+        ? selectedPurchaseOrder.replace(/[^\w]+/g, "_")
+        : "All";
+    XLSX.writeFile(
+      wb,
+      `FollowUp_${safeVendor}_${scope}_${new Date().toISOString().split("T")[0]}.xlsx`,
+    );
+    toast.success("Follow-up report downloaded successfully");
   };
 
   const handleSendFollowUp = async () => {

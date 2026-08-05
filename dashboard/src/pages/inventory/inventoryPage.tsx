@@ -58,8 +58,6 @@ export default function InventoryPage() {
 });
 const [mainView, setMainView] =
     useState<"inventory" | "tracking">("inventory");
-const [selectedRecord, setSelectedRecord] =
-    useState<DynamicRecord | null>(null);
 const [formOpen, setFormOpen] =
     useState(false);
 
