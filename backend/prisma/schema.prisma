@@ -3098,3 +3098,66 @@ enum TransactionType {
   ADJUST
   RETURN
 }
+enum DynamicFieldType {
+  TEXT
+  NUMBER
+  TEXTAREA
+  SELECT
+  DATE
+}
+
+model DynamicModule {
+  id          String   @id @default(uuid())
+  moduleKey   String   @unique
+  moduleName  String
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  fields       DynamicField[]
+  records      DynamicRecord[]
+}
+
+model DynamicField {
+  id           String @id @default(uuid())
+
+  moduleId     String
+
+  fieldName    String
+  label        String
+
+  type         DynamicFieldType
+
+  required     Boolean @default(false)
+
+  visible      Boolean @default(true)
+  searchable   Boolean @default(true)
+  filterable   Boolean @default(false)
+  table        Boolean @default(true)
+
+  placeholder  String?
+  defaultValue Json?
+
+  options      Json?
+
+  orderNo      Int @default(0)
+
+  module       DynamicModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([moduleId, fieldName])
+}
+
+model DynamicRecord {
+
+  id String @id @default(uuid())
+
+  moduleId String
+
+  values Json 
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  module DynamicModule @relation(fields:[moduleId],references:[id],onDelete:Cascade)
+}
