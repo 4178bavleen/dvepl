@@ -127,6 +127,8 @@ export default function VendorTracking() {
   const [followUpEmail, setFollowUpEmail] = useState("");
   const [followUpMessage, setFollowUpMessage] = useState("");
   const [followUpSending, setFollowUpSending] = useState(false);
+  const [followUpMode, setFollowUpMode] = useState<"SINGLE" | "ALL">("ALL");
+  const [selectedPurchaseOrder, setSelectedPurchaseOrder] = useState("");
 
   const tableRef = useRef<HTMLTableElement>(null);
 
@@ -282,9 +284,35 @@ export default function VendorTracking() {
 
   /* -------------------------- Follow Up ---------------------------- */
 
-  const buildFollowUpMessage = (
+  const generateFollowUpMessage = (
     summary: (typeof vendorPendingSummary)[number],
+    mode: "SINGLE" | "ALL",
+    selectedPO: string,
   ) => {
+    if (mode === "SINGLE" && selectedPO) {
+      const items = summary.items.filter((i) => i.poNo === selectedPO);
+      if (items.length === 0) return "";
+      const totalPending = items.reduce((sum, i) => sum + i.pendingQty, 0);
+      const lines = [
+        `Dear ${summary.vendorName},`,
+        "",
+        `This is a follow-up regarding the pending delivery against Purchase Order ${selectedPO}:`,
+        "",
+        ...items.map(
+          (item) =>
+            `${item.material?.name ?? "Item"} (Code: ${item.material?.code ?? "—"}): Ordered ${item.orderedQty}, Received ${item.receivedQty}, Pending ${item.pendingQty}`,
+        ),
+        "",
+        `Total Pending Quantity: ${totalPending}`,
+        "",
+        "Kindly confirm the expected dispatch/delivery date at the earliest.",
+        "",
+        "Regards,",
+        "DVEPL Procurement Team",
+      ];
+      return lines.join("\n");
+    }
+
     const lines = [
       `Dear ${summary.vendorName},`,
       "",
@@ -305,6 +333,16 @@ export default function VendorTracking() {
     return lines.join("\n");
   };
 
+  const refreshFollowUpMessage = (
+    mode: "SINGLE" | "ALL",
+    selectedPO: string,
+  ) => {
+    if (!activeFollowUpSummary) return;
+    setFollowUpMessage(
+      generateFollowUpMessage(activeFollowUpSummary, mode, selectedPO),
+    );
+  };
+
   const openFollowUpModal = (
     summary: (typeof vendorPendingSummary)[number],
   ) => {
@@ -312,18 +350,44 @@ export default function VendorTracking() {
     setFollowUpChannel(summary.phone ? "whatsapp" : "email");
     setFollowUpPhone(summary.phone || "");
     setFollowUpEmail(summary.email || "");
-    setFollowUpMessage(buildFollowUpMessage(summary));
+    setFollowUpMode("ALL");
+    setSelectedPurchaseOrder("");
+    setFollowUpMessage(generateFollowUpMessage(summary, "ALL", ""));
   };
 
   const closeFollowUpModal = () => {
     setFollowUpVendorId(null);
     setFollowUpMessage("");
+    setSelectedPurchaseOrder("");
   };
 
   const activeFollowUpSummary = useMemo(
     () => vendorPendingSummary.find((v) => v.vendorId === followUpVendorId) || null,
     [vendorPendingSummary, followUpVendorId],
   );
+
+  // Distinct purchase orders for the selected vendor (for SINGLE mode)
+  const purchaseOrderOptions = useMemo(() => {
+    if (!activeFollowUpSummary) return [];
+    const set = new Set<string>();
+    activeFollowUpSummary.items.forEach((i) => set.add(i.poNo));
+    return Array.from(set);
+  }, [activeFollowUpSummary]);
+
+  const handleChangeMode = (mode: "SINGLE" | "ALL") => {
+    setFollowUpMode(mode);
+    if (mode === "ALL") {
+      setSelectedPurchaseOrder("");
+      refreshFollowUpMessage("ALL", "");
+    } else {
+      refreshFollowUpMessage("SINGLE", selectedPurchaseOrder);
+    }
+  };
+
+  const handleSelectPurchaseOrder = (poNo: string) => {
+    setSelectedPurchaseOrder(poNo);
+    refreshFollowUpMessage("SINGLE", poNo);
+  };
 
   const handleSendFollowUp = async () => {
     if (!activeFollowUpSummary) return;
@@ -1212,6 +1276,59 @@ export default function VendorTracking() {
                     readOnly
                     className="bg-muted"
                   />
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Follow Up Type
+                </label>
+                <div className="flex flex-col gap-2">
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      name="followUpMode"
+                      checked={followUpMode === "SINGLE"}
+                      onChange={() => handleChangeMode("SINGLE")}
+                      className="accent-primary"
+                    />
+                    Particular Purchase Order
+                  </label>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      name="followUpMode"
+                      checked={followUpMode === "ALL"}
+                      onChange={() => handleChangeMode("ALL")}
+                      className="accent-primary"
+                    />
+                    All Pending Purchase Orders
+                  </label>
+                </div>
+              </div>
+
+              {followUpMode === "SINGLE" && (
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Purchase Order
+                  </label>
+                  <Select
+                    value={selectedPurchaseOrder}
+                    onValueChange={(val: string | null) =>
+                      handleSelectPurchaseOrder(val || "")
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a purchase order" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {purchaseOrderOptions.map((poNo) => (
+                        <SelectItem key={poNo} value={poNo}>
+                          {poNo}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
 

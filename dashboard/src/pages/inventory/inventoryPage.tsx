@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { Plus, Settings } from "lucide-react";
+import { Plus, Settings, Truck, ArrowLeft } from "lucide-react";
 
 import {
   Button,
@@ -24,7 +24,7 @@ import DynamicForm from "@/components/dynamic/DynamicForm";
 import DynamicFieldManager from "@/components/dynamic/DynamicFieldManager";
 
 import useDynamicModule from "@/hooks/useDynamicModule";
-import VendorTracking from "./vendorTracking";
+import VendorTracking from "./VendorTracking";
 
 import {
   DynamicRecord,
@@ -56,6 +56,8 @@ export default function InventoryPage() {
     moduleKey: "inventory",
 
 });
+const [mainView, setMainView] =
+    useState<"inventory" | "tracking">("inventory");
 const [selectedRecord, setSelectedRecord] =
     useState<DynamicRecord | null>(null);
 const [formOpen, setFormOpen] =
@@ -105,10 +107,6 @@ record: DynamicRecord
 
 };
 
-const [trackingOpen, setTrackingOpen] = useState(false);
-
-// const [selectedRecord, setSelectedRecord] =
-//   useState<DynamicRecord | null>(null);
 const removeRecord =
 async (
 record: DynamicRecord
@@ -168,7 +166,17 @@ return (
 
       </div>
 
-      <div className="flex gap-2">
+<div className="flex gap-2">
+
+        <Button
+          variant="outline"
+          onClick={() =>
+            setMainView("tracking")
+          }
+        >
+          <Truck className="w-4 h-4 mr-2" />
+          Vendor Tracking
+        </Button>
 
         <Button
           variant="outline"
@@ -191,6 +199,8 @@ return (
 
     </div>
 
+    {mainView === "inventory" ? (
+      <>
     {/* Search */}
 
     <Input
@@ -207,17 +217,29 @@ return (
   fields={fields}
   records={records}
   loading={loading}
-  onStock={(record) => {
-    setSelectedRecord(record);
-    setTrackingOpen(true);
+  onStock={() => {
+    setMainView("tracking");
   }}
   onEdit={openEdit}
   onDelete={removeRecord}
 />
-<VendorTracking
-    // selectedRecord={selectedRecord}
-    // onRefresh={refresh}
-/>
+      </>
+    ) : (
+      <>
+    <Button
+      variant="outline"
+      onClick={() =>
+        setMainView("inventory")
+      }
+      className="gap-2"
+    >
+      <ArrowLeft className="w-4 h-4" />
+      Back to Inventory
+    </Button>
+
+    <VendorTracking />
+      </>
+    )}
     {/* Add / Edit Dialog */}
 
     <Dialog
@@ -261,15 +283,7 @@ return (
 
     </Dialog>
 
-<Dialog
-  open={trackingOpen}
-  onOpenChange={setTrackingOpen}
->
-  <DialogContent className="max-w-6xl">
-    {/* Your Inventory Tracking Component */}
-  </DialogContent>
-</Dialog>
-    {/* Field Manager */}
+{/* Field Manager */}
 
     <Dialog
       open={fieldManagerOpen}
