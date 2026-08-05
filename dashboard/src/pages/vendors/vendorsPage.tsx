@@ -2283,9 +2283,25 @@ export function VendorsPage() {
 
   const openNewDataEntry = (vendor: Vendor) => {
     setActivePoVendor(vendor);
-    setPoNumber(
-      `PO-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+    // Generate serial-wise PO number: PO-currentYear-XXXX
+    const currentYear = new Date().getFullYear();
+    const prefix = `PO-${currentYear}-`;
+    const yearRevisions = revisions.filter(
+      (r) => r.poNumber && r.poNumber.startsWith(prefix)
     );
+    let nextNum = 1;
+    if (yearRevisions.length > 0) {
+      const numbers = yearRevisions.map((r) => {
+        const parts = r.poNumber.split("-");
+        const lastPart = parts[parts.length - 1];
+        const parsed = parseInt(lastPart, 10);
+        return isNaN(parsed) ? 0 : parsed;
+      });
+      const maxNum = Math.max(...numbers);
+      nextNum = maxNum + 1;
+    }
+    const paddedNum = String(nextNum).padStart(4, "0");
+    setPoNumber(`${prefix}${paddedNum}`);
     setPoDate(new Date().toISOString().split("T")[0]);
     setPoStatus("Pending");
     setPaymentTerms("30 days net");
