@@ -5,7 +5,7 @@ import { PublicRoute } from "@/app/routes/public";
 import { UiConfigProvider } from "@/contexts/ui/uiConfigContext";
 import NotFound from "@/pages/notFound";
 import PageLoader from "@/components/ui/pageLoader";
-import { InventoryPage } from "@/pages/inventory/inventoryPage";
+import InventoryPage  from "@/pages/inventory/InventoryPage";
 // const InventoryTrackingPage = lazy(
 //   () => import("@/pages/inventory/inventoryTrackingPage"),
 // );
@@ -112,15 +112,15 @@ const PurchaseOrdersPage = lazy(
 );
 
 // Inventory & Warehousing
-const WarehousesPage = lazy(() => import("@/pages/inventory/inventoryPage"));
+const WarehousesPage = lazy(() => import("@/pages/inventory/InventoryPage"));
 const InventoryStocksPage = lazy(
-  () => import("@/pages/inventory/inventoryPage"),
+  () => import("@/pages/inventory/InventoryPage"),
 );
 const StockTransfersPage = lazy(
-  () => import("@/pages/inventory/inventoryPage"),
+  () => import("@/pages/inventory/InventoryPage"),
 );
 const LogisticsDispatchesPage = lazy(
-  () => import("@/pages/inventory/inventoryPage"),
+  () => import("@/pages/inventory/InventoryPage"),
 );
 
 // Production
