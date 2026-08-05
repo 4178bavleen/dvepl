@@ -5,6 +5,7 @@ import {
   FastifyRequest,
 } from "fastify";
 
+import { DynamicFieldType } from "@prisma/client";
 interface Params {
   id: string;
 }
@@ -12,7 +13,7 @@ interface Params {
 interface Body {
   label?: string;
   fieldName?: string;
-  type?: string;
+  type?: DynamicFieldType;
   required?: boolean;
   options?: any;
   orderNo?: number;

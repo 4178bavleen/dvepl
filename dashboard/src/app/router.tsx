@@ -5,7 +5,7 @@ import { PublicRoute } from "@/app/routes/public";
 import { UiConfigProvider } from "@/contexts/ui/uiConfigContext";
 import NotFound from "@/pages/notFound";
 import PageLoader from "@/components/ui/pageLoader";
-import { InventoryPage } from "@/pages/inventory/InventoryPage";
+import InventoryPage  from "@/pages/inventory/InventoryPage";
 // const InventoryTrackingPage = lazy(
 //   () => import("@/pages/inventory/inventoryTrackingPage"),
 // );
