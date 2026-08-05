@@ -1,49 +1,84 @@
-import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 import dynamicApi from "@/services/dynamicApi";
+import DynamicFieldRow from "@/components/dynamic/DynamicFieldRow";
 
-import {
-  DynamicField,
-  DynamicFieldManagerProps,
-} from "@/types/dynamic";
+import { DynamicField, DynamicFieldManagerProps } from "@/types/dynamic";
+import { useDebouncedCallback } from "./hooks/useDebouncedCallback";
 
 export default function DynamicFieldManager({
   moduleId,
   fields,
   onRefresh,
 }: DynamicFieldManagerProps) {
-  const [saving, setSaving] = useState(false);
-
-  const updateField = async (
+  const [localFields, setLocalFields] = useState<DynamicField[]>(fields);
+  const [dirtyFields, setDirtyFields] = useState<
+  Record<string, Partial<DynamicField>>
+>({});
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const saveField = useDebouncedCallback(
+  async (
     id: string,
-    key: keyof DynamicField,
-    value: any
+    changes: Partial<DynamicField>,
+    previous: DynamicField[],
   ) => {
-    setSaving(true);
-
     try {
-      await dynamicApi.updateField(id, {
-        [key]: value,
-      });
+      setSavingId(id);
 
-      await onRefresh();
+      await dynamicApi.updateField(id, changes);
+    } catch (err) {
+      console.error(err);
+
+      setLocalFields(previous);
     } finally {
-      setSaving(false);
+      setSavingId(null);
     }
-  };
+  },
+  700,
+);
 
+  useEffect(() => {
+    setLocalFields(fields);
+  }, [fields]);
+
+const updateField = (
+  id: string,
+  changes: Partial<DynamicField>,
+) => {
+  setLocalFields((prev) =>
+    prev.map((field) =>
+      field.id === id
+        ? {
+            ...field,
+            ...changes,
+          }
+        : field,
+    ),
+  );
+
+  setDirtyFields((prev) => ({
+    ...prev,
+    [id]: {
+      ...prev[id],
+      ...changes,
+    },
+  }));
+};
+const saveChanges = async () => {
+  try {
+    for (const [id, changes] of Object.entries(dirtyFields)) {
+      await dynamicApi.updateField(id, changes);
+    }
+
+    setDirtyFields({});
+    await onRefresh();
+  } catch (err) {
+    console.error(err);
+  }
+};
   const deleteField = async (id: string) => {
     if (!confirm("Delete field?")) return;
 
@@ -63,135 +98,44 @@ export default function DynamicFieldManager({
       searchable: true,
       filterable: false,
       table: true,
-      orderNo: fields.length + 1,
+      orderNo: localFields.length + 1,
     });
 
     await onRefresh();
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-lg font-bold">
-          Manage Fields
-        </h2>
+  <div className="space-y-6">
+    <div className="flex justify-between items-center">
+      <h2 className="text-lg font-bold">Manage Fields</h2>
+
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          disabled={Object.keys(dirtyFields).length === 0}
+          onClick={saveChanges}
+        >
+          Save Changes
+        </Button>
 
         <Button onClick={addField}>
           <Plus className="w-4 h-4 mr-2" />
           Add Field
         </Button>
       </div>
-
-      {[...fields]
-        .sort((a, b) => a.orderNo - b.orderNo)
-        .map((field) => (
-          <div
-            key={field.id}
-            className="border rounded-lg p-4 grid grid-cols-5 gap-4 items-center"
-          >
-            {/* Label */}
-            <Input
-              defaultValue={field.label}
-              disabled={saving}
-              onBlur={(e) =>
-                updateField(
-                  field.id,
-                  "label",
-                  e.target.value
-                )
-              }
-            />
-
-            {/* Type */}
-            <Select
-              value={field.type}
-              onValueChange={(v) =>
-                updateField(field.id, "type", v)
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-
-              <SelectContent>
-                <SelectItem value="TEXT">
-                  Text
-                </SelectItem>
-
-                <SelectItem value="NUMBER">
-                  Number
-                </SelectItem>
-
-                <SelectItem value="TEXTAREA">
-                  Textarea
-                </SelectItem>
-
-                <SelectItem value="SELECT">
-                  Dropdown
-                </SelectItem>
-
-                <SelectItem value="DATE">
-                  Date
-                </SelectItem>
-
-                <SelectItem value="EMAIL">
-                  Email
-                </SelectItem>
-
-                <SelectItem value="PHONE">
-                  Phone
-                </SelectItem>
-
-                <SelectItem value="CHECKBOX">
-                  Checkbox
-                </SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Required */}
-            <div className="flex items-center gap-2">
-              <Checkbox
-                checked={field.required}
-                onCheckedChange={(v) =>
-                  updateField(
-                    field.id,
-                    "required",
-                    v
-                  )
-                }
-              />
-              <span>Required</span>
-            </div>
-
-            {/* Visible */}
-            <div className="flex items-center gap-2">
-              <Checkbox
-                checked={field.visible}
-                onCheckedChange={(v) =>
-                  updateField(
-                    field.id,
-                    "visible",
-                    v
-                  )
-                }
-              />
-              <span>Visible</span>
-            </div>
-
-            {/* Delete */}
-            <div className="flex justify-end">
-              <Button
-                variant="destructive"
-                size="icon"
-                onClick={() =>
-                  deleteField(field.id)
-                }
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        ))}
     </div>
-  );
+
+    {[...localFields]
+      .sort((a, b) => a.orderNo - b.orderNo)
+      .map((field) => (
+        <DynamicFieldRow
+          key={field.id}
+          field={field}
+          saving={savingId === field.id}
+          onUpdate={updateField}
+          onDelete={deleteField}
+        />
+      ))}
+  </div>
+);
 }
