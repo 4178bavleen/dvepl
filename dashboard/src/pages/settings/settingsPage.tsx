@@ -1285,14 +1285,7 @@ export function SettingsPage() {
             <div className="hub-arrow">→</div>
           </div>
 
-          <div className="hub-card" onClick={() => setActiveSection('profile')}>
-            <div className="hub-icon-wrap teal">🪪</div>
-            <div className="hub-card-body">
-              <div className="hub-card-title">My Profile</div>
-              <div className="hub-card-desc">Update your personal profile, credentials and password.</div>
-            </div>
-            <div className="hub-arrow">→</div>
-          </div>
+          
 
 
 
@@ -1671,29 +1664,7 @@ export function SettingsPage() {
         </div>
       )}
 
-      {/* ─── SECTION 4: MY PROFILE REDIRECT ─── */}
-      {activeSection === 'profile' && (
-        <div className="max-w-md mx-auto">
-          <div className="profile-redirect-card">
-            <div className="profile-redirect-avatar">
-              {store.currentUserName ? store.currentUserName.charAt(0).toUpperCase() : 'A'}
-            </div>
-            <div>
-              <div className="profile-redirect-name">{store.currentUserName || 'System Administrator'}</div>
-            </div>
-            <div className="profile-redirect-role">Active Account</div>
-            <div className="profile-redirect-desc">
-              Your profile — details, passwords, activity audit logs and security settings — are managed on the dedicated Profile control page.
-            </div>
-            <button
-              onClick={() => window.location.href = '/profile'}
-              className="btn-goto-profile"
-            >
-              🪪 Go to My Profile &nbsp;→
-            </button>
-          </div>
-        </div>
-      )}
+      
 
 
 

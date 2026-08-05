@@ -1,341 +1,4 @@
-// import React, { useState, useEffect, useMemo } from "react";
-// import {
-//   Package,
-//   Search,
-//   Plus,
-//   Trash2,
-//   Edit,
-//   Eye,
-//   ArrowDownCircle,
-//   ArrowUpCircle,
-//   RefreshCw,
-//   BellRing,
-//   Info,
-//   FileText,
-//   Check,
-//   X,
-//   AlertTriangle,
-//   Layers,
-//   Building,
-// } from "lucide-react";
-// import { toast } from "react-hot-toast";
-// import { Button } from "@/components/ui/button";
-// import { Input } from "@/components/ui/input";
-// import { Textarea } from "@/components/ui/textarea";
-// import {
-//   Select,
-//   SelectContent,
-//   SelectItem,
-//   SelectTrigger,
-//   SelectValue,
-// } from "@/components/ui/select";
-// import { apiClient } from "@/services/axios";
-// import VendorTracking from "./vendorTracking";
-// import { DynamicFormRenderer } from "@/components/customFields/dynamicFormRenderer";
-// import {
-//   useDynamicCustomFields,
-//   validateCustomFields,
-// } from "@/hooks/useDynamicCustomFields";
-
-// // ---------------------------------------------------------------------------
-// // NOTE (routes assumed — verify against your actual backend route files):
-// //   Items:      GET /inventory/read | POST /inventory/create
-// //               PATCH /inventory/update/:id | DELETE /inventory/delete/:id
-// //   Movements:  GET /stock-movement/read | POST /stock-movement/create
-// //   Vendors:    GET /vendor/read | POST /vendor/create
-// //   Summary:    GET /inventory/summary
-// // If your backend uses different resource names (e.g. /inventory-movement),
-// // just change the constants below — nothing else needs to change.
-// // ---------------------------------------------------------------------------
-// const ITEM_ENDPOINTS = {
-//   list: "/inventory/read",
-//   create: "/inventory/create",
-//   update: (id: string) => `/inventory/update/${id}`,
-//   remove: (id: string) => `/inventory/delete/${id}`,
-// };
-// const MOVEMENT_ENDPOINTS = {
-//   list: "/inventory/stock-movement/read",
-//   stockIn: "/inventory/stock-in",
-//   stockOut: "/inventory/stock-out",
-// };
-// const VENDOR_ENDPOINTS = {
-//   list: "/vendor/read",
-//   create: "/vendor/create",
-// };
-// const SUMMARY_ENDPOINT = "/inventory/summary";
-
-// // Types
-// export interface PrimaryVendor {
-//   vendorName: string;
-//   contactNo: string;
-//   leadDays: number;
-// }
-
-// // Standalone vendor master record (separate from the embedded
-// // `primaryVendor` snapshot stored on an InventoryItem).
-// export interface Vendor {
-//   id: string;
-//   vendorName: string;
-//   contactNo?: string;
-//   email?: string;
-//   leadDays?: number;
-//   address?: string;
-// }
-
-// export interface InventoryItem {
-//   id: string;
-//   name: string;
-//   code: string;
-//   type: "raw" | "finished";
-//   category: string;
-//   unit: string;
-//   hsnCode?: string;
-//   openingStock: number;
-//   currentStock: number;
-//   reorderLevel: number;
-//   reorderQty: number;
-//   unitRate: number;
-//   gstPercent: number;
-//   location?: string;
-//   primaryVendor?: PrimaryVendor;
-//   preferredVendorId?: string;
-//   notes?: string;
-//   createdAt: string;
-//   customFields?: Record<string, any>;
-// }
-
-// export interface Movement {
-//   id: string;
-//   itemId: string;
-//   itemName: string;
-//   itemType: "raw" | "finished";
-//   movementType: "IN" | "OUT" | "ADJUST" | "RETURN";
-//   qty: number;
-//   rate: number;
-//   totalValue: number;
-//   stockBefore: number;
-//   stockAfter: number;
-//   vendorName?: string;
-//   poNumber?: string;
-//   invoiceNo?: string;
-//   orderCode?: string;
-//   reason?: string;
-//   addedBy: string;
-//   date: string;
-//   customFields?: Record<string, any>;
-// }
-
-// // Helper to pull the useful error message out of an axios error, same
-// // convention used in OrdersPage.
-// const errMsg = (err: any, fallback: string) =>
-//   err?.response?.data?.message ?? err?.message ?? fallback;
-
-// // ---------------------------------------------------------------------------
-// // Backend <-> Frontend mapping (defensive fallbacks, since field names on
-// // the Prisma side may not match 1:1 with the frontend shape — same issue we
-// // hit with `grandTotal` vs `total` on Sales Orders).
-// // ---------------------------------------------------------------------------
-// const mapItemFromBackend = (o: any): InventoryItem => {
-//   const vendorName =
-//     o.primaryVendor?.vendorName ??
-//     o.primaryVendor?.name ??
-//     o.vendorName ??
-//     o.supplierName ??
-//     o.vendor?.name ??
-//     o.vendor?.vendorName ??
-//     o.supplier?.name ??
-//     o.supplier?.supplierName ??
-//     o.material?.vendorName ??
-//     o.material?.supplierName ??
-//     o.material?.vendor?.name ??
-//     o.material?.vendor?.vendorName ??
-//     o.material?.supplier?.name ??
-//     o.material?.supplier?.supplierName ??
-//     o.material?.preferredVendor?.name ??
-//     o.material?.preferredVendor?.companyName ??
-//     o.material?.preferredVendor?.name ??
-//     o.material?.primaryVendor?.vendorName ??
-//     o.material?.primaryVendor?.name ??
-//     "";
-
-//   const contactNo =
-//     o.primaryVendor?.contactNo ??
-//     o.vendorContact ??
-//     o.supplierContact ??
-//     o.vendor?.phone ??
-//     o.vendor?.contactNo ??
-//     o.supplier?.phone ??
-//     o.supplier?.contactNo ??
-//     o.material?.vendorContact ??
-//     o.material?.supplierContact ??
-//     o.material?.vendor?.phone ??
-//     o.material?.preferredVendor?.phone ??
-//     o.material?.primaryVendor?.contactNo ??
-//     "";
-
-//   const preferredVendorId =
-//     o.preferredVendorId ??
-//     o.material?.preferredVendorId ??
-//     o.vendorId ??
-//     o.vendor?.id ??
-//     o.supplier?.id ??
-//     o.primaryVendor?.id ??
-//     o.material?.preferredVendor?.id ??
-//     "";
-
-//   const rawQty = Number(
-//     o.quantity ?? o.currentStock ?? o.openingStock ?? o.stock ?? 0,
-//   );
-//   const rawOpening = Number(
-//     o.openingStock ?? o.quantity ?? o.currentStock ?? o.stock ?? 0,
-//   );
-
-//   return {
-//     id: o.id,
-
-//     // Material
-//     name: o.material?.name ?? o.name ?? "",
-//     code: o.material?.materialCode ?? o.code ?? o.materialCode ?? "",
-//     type: String(o.material?.type ?? o.type ?? "RAW").toLowerCase() as
-//       | "raw"
-//       | "finished",
-//     category: o.material?.category ?? o.category ?? "",
-//     unit: o.material?.unit ?? o.unit ?? "Nos",
-//     hsnCode: o.material?.hsnCode ?? o.hsnCode ?? "",
-
-//     // Inventory
-//     openingStock: rawOpening,
-//     currentStock: rawQty,
-
-//     reorderLevel: Number(
-//       o.reorderLevel ?? o.material?.reorderLevel ?? o.reorderPoint ?? 0,
-//     ),
-//     reorderQty: Number(
-//       o.reorderQty ?? o.material?.reorderQty ?? o.reorderQuantity ?? 0,
-//     ),
-
-//     unitRate: Number(
-//       o.unitPrice ??
-//         o.unitRate ??
-//         o.material?.unitPrice ??
-//         o.material?.unitRate ??
-//         0,
-//     ),
-
-//     gstPercent: Number(o.gstPercent ?? o.material?.gst ?? o.gst ?? 0),
-
-//     // Warehouse / Bin
-//     location: o.bin?.name ?? o.warehouse?.name ?? o.location ?? "",
-
-//     // Vendor / Supplier details
-//     primaryVendor: {
-//       vendorName,
-//       contactNo,
-//       leadDays: Number(
-//         o.material?.leadDays ?? o.leadDays ?? o.primaryVendor?.leadDays ?? 0,
-//       ),
-//     },
-//     preferredVendorId: preferredVendorId || undefined,
-
-//     notes: o.material?.description ?? o.notes ?? "",
-
-//     createdAt: o.createdAt,
-
-//     customFields: o.customFields ?? {},
-//   };
-// };
-
-// const mapMovementFromBackend = (m: any): Movement => ({
-//   id: m.id,
-//   itemId: m.itemId ?? m.inventoryItemId ?? "",
-//   itemName: m.itemName ?? m.item?.name ?? "",
-//   itemType: String(m.itemType ?? m.item?.type ?? "raw").toLowerCase() as
-//     | "raw"
-//     | "finished",
-//   movementType: (m.movementType ?? m.type ?? "IN") as Movement["movementType"],
-//   qty: Number(m.qty ?? m.quantity ?? 0),
-//   rate: Number(m.rate ?? 0),
-//   totalValue: Number(m.totalValue ?? Number(m.qty ?? 0) * Number(m.rate ?? 0)),
-//   stockBefore: Number(m.stockBefore ?? 0),
-//   stockAfter: Number(m.stockAfter ?? 0),
-//   vendorName: m.vendorName ?? "",
-//   poNumber: m.poNumber ?? "",
-//   invoiceNo: m.invoiceNo ?? "",
-//   orderCode: m.orderCode ?? "",
-//   reason: m.reason ?? "",
-//   addedBy: m.addedBy ?? m.createdBy?.name ?? m.user?.name ?? "—",
-//   date: m.date
-//     ? String(m.date).split("T")[0]
-//     : m.createdAt
-//       ? String(m.createdAt).split("T")[0]
-//       : "",
-//   customFields: m.customFields ?? {},
-// });
-
-// const mapVendorFromBackend = (v: any): Vendor => ({
-//   id: v.id,
-//   vendorName: v.vendorName ?? v.name ?? v.companyName ?? "",
-//   contactNo: v.contactNo ?? v.phone ?? v.mobile ?? "",
-//   email: v.email ?? "",
-//   leadDays: Number(v.leadDays ?? v.leadTimeDays ?? 0),
-//   address: v.address ?? "",
-// });
-
-// // Live API service — wired to backend via apiClient
-// export const apiService = {
-//   stocks: {
-//     list: async (): Promise<InventoryItem[]> => {
-//       const response = await apiClient.get(ITEM_ENDPOINTS.list);
-//       const raw = response.data?.data ?? response.data ?? [];
-//       return (Array.isArray(raw) ? raw : []).map(mapItemFromBackend);
-//     },
-//     create: async (
-//       item: Omit<InventoryItem, "id" | "createdAt">,
-//     ): Promise<InventoryItem> => {
-//       const payload = {
-//         name: item.name,
-//         materialCode: item.code || undefined,
-//         type: item.type.toUpperCase(),
-//         category: item.category,
-//         unit: item.unit,
-//         hsnCode: item.hsnCode,
-//         openingStock: item.openingStock,
-//         quantity: item.openingStock,
-//         currentStock: item.openingStock,
-//         reorderLevel: item.reorderLevel,
-//         reorderQty: item.reorderQty,
-//         unitRate: item.unitRate,
-//         unitPrice: item.unitRate,
-//         gst: item.gstPercent,
-//         gstPercent: item.gstPercent,
-//         location: item.location,
-
-//         preferredVendorId: item.preferredVendorId || undefined,
-
-//         notes: item.notes,
-//         customFields: item.customFields,
-//       };
-//       const response = await apiClient.post(ITEM_ENDPOINTS.create, payload);
-//       return mapItemFromBackend(response.data?.data ?? response.data);
-//     },
-//     update: async (
-//       id: string,
-//       item: Partial<InventoryItem>,
-//     ): Promise<InventoryItem> => {
-//       const payload: Record<string, any> = {
-//         name: item.name,
-//         code: item.code,
-//         materialCode: item.code,
-//         type: item.type ? item.type.toUpperCase() : undefined,
-//         category: item.category,
-//         unit: item.unit,
-//         hsnCode: item.hsnCode,
-//         openingStock: item.openingStock,
-//         quantity: item.openingStock,
-//         currentStock: item.openingStock,
-//         unitPrice: item.unitRate,
-//         unitRate: item.unitRate,
-//         reorderLevel: item.reorderLevel,
+                                            
 //         reorderQty: item.reorderQty,
 //         gst: item.gstPercent,
 //         gstPercent: item.gstPercent,
@@ -349,222 +12,7 @@
 //       Object.keys(payload).forEach(
 //         (k) => payload[k] === undefined && delete payload[k],
 //       );
-//       const response = await apiClient.patch(
-//         ITEM_ENDPOINTS.update(id),
-//         payload,
-//       );
-//       const resData = response.data?.data ?? response.data;
-//       return mapItemFromBackend(resData);
-//     },
-//     delete: async (id: string): Promise<void> => {
-//       await apiClient.delete(ITEM_ENDPOINTS.remove(id));
-//     },
-//   },
-//   vendorTracking: {
-//     list: async () => {
-//       const res = await apiClient.get("/inventory/vendor-tracking");
-
-//       return res.data;
-//     },
-//   },
-//   movements: {
-//     list: async (filters?: {
-//       from?: string;
-//       to?: string;
-//       type?: string;
-//       movementType?: string;
-//     }): Promise<Movement[]> => {
-//       const response = await apiClient.get(MOVEMENT_ENDPOINTS.list, {
-//         params: {
-//           from: filters?.from || undefined,
-//           to: filters?.to || undefined,
-//           itemType: filters?.type || undefined,
-//           movementType: filters?.movementType || undefined,
-//         },
-//       });
-//       const raw = response.data?.data ?? response.data ?? [];
-//       return (Array.isArray(raw) ? raw : []).map(mapMovementFromBackend);
-//     },
-//     create: async (id: string, transactionType: "IN" | "OUT", body: any) => {
-//       const endpoint =
-//         transactionType === "IN"
-//           ? MOVEMENT_ENDPOINTS.stockIn
-//           : MOVEMENT_ENDPOINTS.stockOut;
-
-//       const payload = {
-//         inventoryId: id,
-//         quantity: body.quantity,
-//         referenceType: body.referenceType,
-//         referenceId: body.referenceId,
-//         remarks: body.reason,
-//         customFields: body.customFields,
-//       };
-
-//       const response = await apiClient.post(endpoint, payload);
-
-//       return response.data.data;
-//     },
-//   },
-//   inventoryTracking: {
-//     list: async () => {
-//       const response = await apiClient.get("/inventory-tracking/read/");
-//       return response.data?.data ?? [];
-//     },
-
-//     receive: async (body: {
-//       purchaseOrderItemId: string;
-//       inventoryId: string;
-//       receivedQty: number;
-//       remarks?: string;
-//     }) => {
-//       const response = await apiClient.post(
-//         "/inventory-tracking/receive/",
-//         body,
-//       );
-
-//       return response.data?.data ?? response.data;
-//     },
-//   },
-//   vendors: {
-//     list: async (): Promise<Vendor[]> => {
-//       try {
-//         const response = await apiClient.get(VENDOR_ENDPOINTS.list);
-//         const raw = response.data?.data ?? response.data ?? [];
-//         return (Array.isArray(raw) ? raw : []).map(mapVendorFromBackend);
-//       } catch (err: any) {
-//         toast.error(errMsg(err, "Failed to load vendors"));
-//         return [];
-//       }
-//     },
-//     create: async (vendor: Omit<Vendor, "id">): Promise<Vendor> => {
-//       const payload = {
-//         vendorName: vendor.vendorName,
-//         name: vendor.vendorName,
-//         contactNo: vendor.contactNo,
-//         phone: vendor.contactNo,
-//         email: vendor.email,
-//         leadDays: vendor.leadDays,
-//         address: vendor.address,
-//       };
-//       const response = await apiClient.post(VENDOR_ENDPOINTS.create, payload);
-//       return mapVendorFromBackend(response.data?.data ?? response.data);
-//     },
-//   },
-//   summary: {
-//     get: async (): Promise<any> => {
-//       try {
-//         const response = await apiClient.get(SUMMARY_ENDPOINT);
-//         return response.data?.data ?? response.data;
-//       } catch {
-//         // Summary endpoint is optional — page computes its own KPIs from
-//         // the items list anyway, so failure here is non-fatal.
-//         return {
-//           totalItems: 0,
-//           totalRawItems: 0,
-//           totalFinishedItems: 0,
-//           lowStockCount: 0,
-//           outOfStockCount: 0,
-//           totalInventoryValue: 0,
-//         };
-//       }
-//     },
-//   },
-//   purchaseOrders: {
-//     create: async (body: any) => {
-//       const response = await apiClient.post("/purchase-order/create", body);
-//       return response.data?.data ?? response.data;
-//     },
-
-//     list: async () => {
-//       const response = await apiClient.get("/purchase-order/read");
-//       return response.data?.data ?? [];
-//     },
-//   },
-// };
-
-// export function InventoryPage() {
-//   const {
-//     fields: inventoryCustomFields,
-//     tableCustomColumns: inventoryTableCustomCols,
-//   } = useDynamicCustomFields("inventory");
-//   const [iCustomFields, setICustomFields] = useState<Record<string, any>>({});
-//   const [iErrors, setIErrors] = useState<Record<string, string>>({});
-
-
-
-//   const [items, setItems] = useState<InventoryItem[]>([]);
-//   const [movements, setMovements] = useState<Movement[]>([]);
-//   const [activeTab, setActiveTab] = useState<
-//     "items" | "movements" | "valuation" | "alerts"
-//   >("items");
-//   const [viewMode, setViewMode] = useState<"table" | "card">("table");
-//   const [loading, setLoading] = useState(false);
-//   const [mainView, setMainView] = useState<"inventory" | "tracking">(
-//     "inventory",
-//   );
-//   const [selectedPOId, setSelectedPOId] = useState("");
-//   const [selectedPOItemId, setSelectedPOItemId] = useState("");
-//   const [poItems, setPOItems] = useState([]);
-
-//   // Search and Filters
-//   const [search, setSearch] = useState("");
-//   const [filterType, setFilterType] = useState("");
-//   const [filterCategory, setFilterCategory] = useState("");
-//   const [filterLowStock, setFilterLowStock] = useState(false);
-//   const [filterOutOfStock, setFilterOutOfStock] = useState(false);
-
-//   // Movements Tab Filters
-//   const [movFrom, setMovFrom] = useState("");
-//   const [movTo, setMovTo] = useState("");
-//   const [movType, setMovType] = useState("");
-//   const [movMovType, setMovMovType] = useState("");
-
-//   // Valuation Tab Filter
-//   const [valType, setValType] = useState("");
-
-//   // Modal States
-//   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
-//   const [isStockModalOpen, setIsStockModalOpen] = useState(false);
-//   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-//   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-
-//   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-//   const [stockMovType, setStockMovType] = useState<
-//     "IN" | "OUT" | "ADJUST" | "RETURN"
-//   >("IN");
-
-//   // Form Fields - Item
-//   const [itemName, setItemName] = useState("");
-//   const [materialCode, setmaterialCode] = useState("");
-//   const [itemType, setItemType] = useState<"raw" | "finished">("raw");
-//   const [itemCategory, setItemCategory] = useState("");
-//   const [itemUnit, setItemUnit] = useState("Nos");
-//   const [itemHsnCode, setItemHsnCode] = useState("");
-//   const [itemOpeningStock, setItemOpeningStock] = useState(0);
-//   const [itemReorderLevel, setItemReorderLevel] = useState(0);
-//   const [itemReorderQty, setItemReorderQty] = useState(0);
-//   const [itemUnitRate, setItemUnitRate] = useState(0);
-//   const [itemGstPercent, setItemGstPercent] = useState(18);
-//   const [itemLocation, setItemLocation] = useState("");
-//   const [itemNotes, setItemNotes] = useState("");
-
-//   // Form Fields - Stock Movement
-//   const [stockQty, setStockQty] = useState("");
-//   const [stockDate, setStockDate] = useState(
-//     new Date().toISOString().split("T")[0],
-//   );
-//   const [stockRate, setStockRate] = useState("");
-//   const [stockVendorName, setStockVendorName] = useState("");
-//   const [stockPoNumber, setStockPoNumber] = useState("");
-//   const [stockInvoiceNo, setStockInvoiceNo] = useState("");
-//   const [stockOrderCode, setStockOrderCode] = useState("");
-//   const [stockReason, setStockReason] = useState("");
-
-//   // Vendors (master list, loaded once, used to populate the "Primary
-//   // Vendor" dropdown on the Add/Edit Item form)
-//   const [vendors, setVendors] = useState<Vendor[]>([]);
-//   const [preferredVendorId, setPreferredVendorId] = useState("");
-
+                                
 //   useEffect(() => {
 //     loadVendors();
 //   }, []);
@@ -4055,6 +3503,8 @@
 
 
 import React, { useState, useEffect, useMemo } from "react";
+import { GenericTable } from '@/components/tables/genericTable';
+import type { ColumnDef } from '@tanstack/react-table';
 import {
     Package,
     Search,
@@ -4075,6 +3525,8 @@ import {
     Building,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { DynamicFormRenderer } from "@/components/customFields/dynamicFormRenderer";
+import { useDynamicCustomFields, validateCustomFields } from "@/hooks/useDynamicCustomFields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -4152,6 +3604,7 @@ export interface InventoryItem {
     preferredVendorId?: string;
     notes?: string;
     createdAt: string;
+    customFields?: Record<string, any>;
 }
 
 export interface Movement {
@@ -4289,6 +3742,7 @@ const mapItemFromBackend = (o: any): InventoryItem => {
         notes: o.material?.description ?? o.notes ?? "",
 
         createdAt: o.createdAt,
+        customFields: o.customFields ?? {},
     };
 };
 
@@ -4599,6 +4053,17 @@ export function InventoryPage() {
     const [vendors, setVendors] = useState<Vendor[]>([]);
     const [preferredVendorId, setPreferredVendorId] = useState("");
 
+    const { fields: inventoryCustomFields, tableCustomColumns: inventoryTableCustomCols } = useDynamicCustomFields("inventory");
+    const [iCustomFields, setICustomFields] = useState<Record<string, any>>({});
+    const [iErrors, setIErrors] = useState<Record<string, string>>({});
+
+    useEffect(() => {
+        // Debug: log loaded custom fields to verify backend data
+        // Remove or comment out in production
+        // eslint-disable-next-line no-console
+        console.debug('inventoryCustomFields loaded:', inventoryCustomFields?.length, inventoryCustomFields);
+    }, [inventoryCustomFields]);
+
     useEffect(() => {
         loadVendors();
     }, []);
@@ -4718,6 +4183,8 @@ export function InventoryPage() {
         filterOutOfStock,
     ]);
 
+    
+
     // Filtered valuation items
     const valuationItems = useMemo(() => {
         return items.filter((i) => {
@@ -4757,6 +4224,8 @@ export function InventoryPage() {
         setItemNotes("");
         setPreferredVendorId("");
         setSelectedItemId(null);
+        setICustomFields({});
+        setIErrors({});
     };
 
     // Open Modal Actions
@@ -4781,6 +4250,8 @@ export function InventoryPage() {
         setItemLocation(item.location || "");
         setItemNotes(item.notes || "");
         setPreferredVendorId(item.preferredVendorId || "");
+        setICustomFields(item.customFields || {});
+        setIErrors({});
         setIsItemModalOpen(true);
     };
 
@@ -4798,6 +4269,9 @@ export function InventoryPage() {
         setStockOrderCode("");
         setStockReason("");
         setStockDate(new Date().toISOString().split("T")[0]);
+        const item = items.find((i) => i.id === id);
+        setICustomFields(item?.customFields || {});
+        setIErrors({});
         setIsStockModalOpen(true);
     };
 
@@ -4842,6 +4316,7 @@ export function InventoryPage() {
             preferredVendorId: preferredVendorId || undefined,
 
             notes: itemNotes,
+            customFields: iCustomFields,
         };
 
         // Build the embedded vendor snapshot from the selected master vendor,
@@ -5390,6 +4865,22 @@ export function InventoryPage() {
                                                     <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                                                         Vendor
                                                     </th>
+                                                    {/* Inject custom field headers after matching base columns */}
+                                                    {(() => {
+                                                        const baseOrder = ['name','code','type','category','unit','hsnCode'];
+                                                        return baseOrder.flatMap((key) => (
+                                                            inventoryCustomFields
+                                                                .filter((f) => f.showInTable && f.afterField === key)
+                                                                .map((f) => (
+                                                                    <th
+                                                                        key={f.id}
+                                                                        className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground"
+                                                                    >
+                                                                        {f.name}
+                                                                    </th>
+                                                                ))
+                                                        ));
+                                                    })()}
                                                     <th className="p-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                                                         Status
                                                     </th>
@@ -5402,7 +4893,7 @@ export function InventoryPage() {
                                                 {filteredItems.length === 0 ? (
                                                     <tr>
                                                         <td
-                                                            colSpan={11}
+                                                            colSpan={11 + inventoryCustomFields.filter((f) => f.showInTable).length}
                                                             className="p-8 text-center text-xs font-semibold text-muted-foreground"
                                                         >
                                                             No inventory items found.
@@ -5456,7 +4947,36 @@ export function InventoryPage() {
                                                             <td className="p-4 text-sm text-muted-foreground">
                                                                 {item.primaryVendor?.vendorName || "—"}
                                                             </td>
-                                                            <td className="p-4">
+                                                                {/* Render custom field cells placed after their configured afterField */}
+                                                                {(() => {
+                                                                    const afterKeys = ['name','code','type','category','unit','hsnCode'];
+                                                                    return afterKeys.flatMap((k) => (
+                                                                        inventoryCustomFields
+                                                                            .filter((f) => f.showInTable && f.afterField === k)
+                                                                            .map((f) => {
+                                                                                const value = (item as any).customFields?.[f.key];
+                                                                                let displayValue = "—";
+                                                                                if (value !== undefined && value !== null && value !== "") {
+                                                                                    if (f.type === "vendor") {
+                                                                                        displayValue = vendors.find((v) => v.id === value)?.vendorName || String(value);
+                                                                                    } else if (typeof value === "boolean") {
+                                                                                        displayValue = value ? "Yes" : "No";
+                                                                                    } else if (Array.isArray(value)) {
+                                                                                        displayValue = value.join(", ");
+                                                                                    } else {
+                                                                                        displayValue = String(value);
+                                                                                    }
+                                                                                }
+                                                                                return (
+                                                                                    <td key={f.id} className="p-4 text-sm text-muted-foreground">
+                                                                                        {displayValue}
+                                                                                    </td>
+                                                                                );
+                                                                            })
+                                                                    ));
+                                                                })()}
+
+                                                                <td className="p-4">
                                                                 {item.currentStock === 0 ? (
                                                                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20 uppercase tracking-wider">
                                                                         Out
@@ -6023,6 +5543,20 @@ export function InventoryPage() {
                                                 }
                                             />
                                         </div>
+                                        {inventoryCustomFields.some((f) => f.afterField === "name") && (
+                                            <div className="col-span-2">
+                                                <DynamicFormRenderer
+                                                    fields={inventoryCustomFields}
+                                                    values={iCustomFields}
+                                                    onChange={(key, val) => {
+                                                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                                                        if (iErrors[key]) setIErrors((prev) => ({ ...prev, [key]: "" }));
+                                                    }}
+                                                    errors={iErrors}
+                                                    afterFieldPosition="name"
+                                                />
+                                            </div>
+                                        )}
                                         <div className="flex flex-col gap-2">
                                             <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                                                 Code
@@ -6035,6 +5569,20 @@ export function InventoryPage() {
                                                 }
                                             />
                                         </div>
+                                        {inventoryCustomFields.some((f) => f.afterField === "code") && (
+                                            <div className="col-span-2">
+                                                <DynamicFormRenderer
+                                                    fields={inventoryCustomFields}
+                                                    values={iCustomFields}
+                                                    onChange={(key, val) => {
+                                                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                                                        if (iErrors[key]) setIErrors((prev) => ({ ...prev, [key]: "" }));
+                                                    }}
+                                                    errors={iErrors}
+                                                    afterFieldPosition="code"
+                                                />
+                                            </div>
+                                        )}
                                         <div className="flex flex-col gap-2">
                                             <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                                                 Type *
@@ -6054,6 +5602,20 @@ export function InventoryPage() {
                                                 </SelectContent>
                                             </Select>
                                         </div>
+                                        {inventoryCustomFields.some((f) => f.afterField === "type") && (
+                                            <div className="col-span-2">
+                                                <DynamicFormRenderer
+                                                    fields={inventoryCustomFields}
+                                                    values={iCustomFields}
+                                                    onChange={(key, val) => {
+                                                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                                                        if (iErrors[key]) setIErrors((prev) => ({ ...prev, [key]: "" }));
+                                                    }}
+                                                    errors={iErrors}
+                                                    afterFieldPosition="type"
+                                                />
+                                            </div>
+                                        )}
                                         <div className="flex flex-col gap-2">
                                             <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                                                 Category
@@ -6066,6 +5628,20 @@ export function InventoryPage() {
                                                 }
                                             />
                                         </div>
+                                        {inventoryCustomFields.some((f) => f.afterField === "category") && (
+                                            <div className="col-span-2">
+                                                <DynamicFormRenderer
+                                                    fields={inventoryCustomFields}
+                                                    values={iCustomFields}
+                                                    onChange={(key, val) => {
+                                                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                                                        if (iErrors[key]) setIErrors((prev) => ({ ...prev, [key]: "" }));
+                                                    }}
+                                                    errors={iErrors}
+                                                    afterFieldPosition="category"
+                                                />
+                                            </div>
+                                        )}
                                         <div className="flex flex-col gap-2">
                                             <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                                                 Unit
@@ -6089,6 +5665,20 @@ export function InventoryPage() {
                                                 </SelectContent>
                                             </Select>
                                         </div>
+                                        {inventoryCustomFields.some((f) => f.afterField === "unit") && (
+                                            <div className="col-span-2">
+                                                <DynamicFormRenderer
+                                                    fields={inventoryCustomFields}
+                                                    values={iCustomFields}
+                                                    onChange={(key, val) => {
+                                                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                                                        if (iErrors[key]) setIErrors((prev) => ({ ...prev, [key]: "" }));
+                                                    }}
+                                                    errors={iErrors}
+                                                    afterFieldPosition="unit"
+                                                />
+                                            </div>
+                                        )}
                                         <div className="flex flex-col gap-2">
                                             <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                                                 HSN/SAC Code
@@ -6101,6 +5691,20 @@ export function InventoryPage() {
                                                 }
                                             />
                                         </div>
+                                        {inventoryCustomFields.some((f) => f.afterField === "hsnCode") && (
+                                            <div className="col-span-2">
+                                                <DynamicFormRenderer
+                                                    fields={inventoryCustomFields}
+                                                    values={iCustomFields}
+                                                    onChange={(key, val) => {
+                                                        setICustomFields((prev) => ({ ...prev, [key]: val }));
+                                                        if (iErrors[key]) setIErrors((prev) => ({ ...prev, [key]: "" }));
+                                                    }}
+                                                    errors={iErrors}
+                                                    afterFieldPosition="hsnCode"
+                                                />
+                                            </div>
+                                        )}
                                         <div className="flex flex-col gap-2">
                                             <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                                                 Opening / Current Stock

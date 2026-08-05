@@ -735,20 +735,26 @@
 
 /* table */
 .de-table-wrap {
-  overflow-y: auto;
+  overflow: auto;
   flex: 1;
   background: #ffffff;
   min-height: 300px;
 }
 
 .de-table {
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
   text-align: left;
   font-size: 14px;
+  table-layout: fixed;
 }
 
 .de-table th {
+  min-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   background: #f1f5f9;
   border-bottom: 1.5px solid #cbd5e1;
   border-right: 1px solid #cbd5e1;
@@ -764,6 +770,9 @@
   padding: 4px 6px;
   border-bottom: 1px solid #e2e8f0;
   border-right: 1px solid #cbd5e1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .de-table tr:hover {
