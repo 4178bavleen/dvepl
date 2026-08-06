@@ -68,33 +68,17 @@ export default function InventoryPage() {
   const [restockRecord, setRestockRecord] = useState<DynamicRecord | null>(null);
   const [importing, setImporting] = useState(false);
 
-  const buildFormValues = (recordValues?: Record<string, any> | string | null) => {
+  const buildFormValues = (recordValues?: Record<string, any> | null) => {
     const base: Record<string, any> = {};
     fields.forEach((field) => {
       base[field.fieldName] = field.defaultValue ?? "";
     });
 
-    let savedValues: Record<string, any> = {};
-    if (typeof recordValues === "string") {
-      try {
-        savedValues = JSON.parse(recordValues);
-      } catch {
-        savedValues = {};
-      }
-    } else if (recordValues && typeof recordValues === "object") {
-      savedValues = recordValues;
+    if (recordValues) {
+      Object.entries(recordValues).forEach(([key, value]) => {
+        base[key] = value;
+      });
     }
-
-    const savedEntries = Object.entries(savedValues);
-    fields.forEach((field) => {
-      const savedValue = savedEntries.find(
-        ([key]) => key.toLowerCase() === field.fieldName.toLowerCase()
-      )?.[1];
-
-      if (savedValue !== undefined) {
-        base[field.fieldName] = savedValue;
-      }
-    });
 
     return base;
   };
@@ -107,7 +91,7 @@ export default function InventoryPage() {
 
   const openEdit = (record: DynamicRecord) => {
     setEditing(record);
-    setValues(buildFormValues(record.values));
+    setValues(buildFormValues(record.values || {}));
     setFormOpen(true);
   };
 
@@ -253,9 +237,8 @@ export default function InventoryPage() {
 
   const handleCreatePo = () => {
     if (!restockRecord) return;
-    navigate("/purchase/vendors", {
-      state: { fromInventory: true, inventoryItem: restockRecord },
-    });
+    sessionStorage.setItem("inventory-restock-item", JSON.stringify(restockRecord));
+    navigate("/purchase/orders", { state: { fromInventory: true, inventoryItem: restockRecord } });
     setRestockOpen(false);
   };
 
@@ -313,10 +296,7 @@ export default function InventoryPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
 
-            <Select
-              value={searchField}
-              onValueChange={(value) => setSearchField(value ?? "all")}
-            >
+            <Select value={searchField} onValueChange={setSearchField}>
               <SelectTrigger className="w-full md:w-[240px]">
                 <SelectValue placeholder="Search field" />
               </SelectTrigger>
@@ -371,27 +351,24 @@ export default function InventoryPage() {
       )}
 
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="max-w-4xl h-[85vh] flex flex-col overflow-hidden">
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>{editing ? "Edit Record" : "Add Record"}</DialogTitle>
           </DialogHeader>
 
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            <DynamicForm
-              key={editing?.id ?? "new-record"}
-              fields={fields}
-              values={values}
-              loading={loading}
-              onChange={(field, value) =>
-                setValues((prev) => ({
-                  ...prev,
-                  [field]: value,
-                }))
-              }
-              onSubmit={saveRecord}
-              onCancel={() => setFormOpen(false)}
-            />
-          </div>
+          <DynamicForm
+            fields={fields}
+            values={values}
+            loading={loading}
+            onChange={(field, value) =>
+              setValues((prev) => ({
+                ...prev,
+                [field]: value,
+              }))
+            }
+            onSubmit={saveRecord}
+            onCancel={() => setFormOpen(false)}
+          />
         </DialogContent>
       </Dialog>
 

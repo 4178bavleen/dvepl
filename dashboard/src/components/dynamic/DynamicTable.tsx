@@ -1,6 +1,19 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { DndContext, closestCenter, MouseSensor, TouchSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
-import { SortableContext, horizontalListSortingStrategy, useSortable, arrayMove } from "@dnd-kit/sortable";
+import {
+  DndContext,
+  closestCenter,
+  MouseSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  horizontalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Pencil, Trash2, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,7 +28,14 @@ function SortableHeaderCell({
   children: React.ReactNode;
   className?: string;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
   const style: React.CSSProperties = {
     transform: transform ? CSS.Translate.toString(transform) : undefined,
     transition,
@@ -24,11 +44,7 @@ function SortableHeaderCell({
     position: "relative",
   };
   return (
-    <th
-      ref={setNodeRef}
-      style={style}
-      className={className}
-    >
+    <th ref={setNodeRef} style={style} className={className}>
       <div className="flex items-center gap-1.5">
         <span
           {...attributes}
@@ -62,7 +78,7 @@ export default function DynamicTable({
         delay: 200,
         tolerance: 5,
       },
-    })
+    }),
   );
 
   const defaultOrder = useMemo(() => {
@@ -114,7 +130,10 @@ export default function DynamicTable({
 
   const saveOrder = (newOrder: string[]) => {
     setOrderedColumnIds(newOrder);
-    localStorage.setItem("inventory-table-column-order", JSON.stringify(newOrder));
+    localStorage.setItem(
+      "inventory-table-column-order",
+      JSON.stringify(newOrder),
+    );
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -140,85 +159,99 @@ export default function DynamicTable({
   }
 
   return (
-    <div className="rounded-lg border overflow-hidden">
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={handleDragEnd}
-      >
-        <SortableContext
-          items={orderedColumnIds}
-          strategy={horizontalListSortingStrategy}
+    <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+      <div className="max-h-[70vh] overflow-auto">
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
         >
-          <table className="w-full">
-            <thead className="bg-muted">
-              <tr>
-                {orderedColumnIds.map((colId) => {
-                  const field = fieldsMap.get(colId);
-                  if (!field) return null;
-                  return (
-                    <SortableHeaderCell key={colId} id={colId} className="text-left px-4 py-3 font-semibold">
-                      {field.label}
-                    </SortableHeaderCell>
-                  );
-                })}
-                <th className="text-right px-4 py-3">Actions</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {records.length === 0 && (
+          <SortableContext
+            items={orderedColumnIds}
+            strategy={horizontalListSortingStrategy}
+          >
+            <table className="w-full min-w-[920px]">
+              <thead className="sticky top-0 z-30 bg-background shadow-sm">
                 <tr>
-                  <td
-                    colSpan={orderedColumnIds.length + 1}
-                    className="text-center py-8"
-                  >
-                    No Records Found
-                  </td>
-                </tr>
-              )}
-
-              {records.map((record: DynamicRecord) => (
-                <tr key={record.id} className="border-t hover:bg-muted/40">
                   {orderedColumnIds.map((colId) => {
                     const field = fieldsMap.get(colId);
                     if (!field) return null;
                     return (
-                      <td key={colId} className="px-4 py-3">
-                        {renderValue(record.values?.[field.fieldName])}
-                      </td>
+                      <SortableHeaderCell
+                        key={colId}
+                        id={colId}
+                        className="text-left px-4 py-3 font-semibold text-xs uppercase tracking-wide text-muted-foreground"
+                      >
+                        {field.label}
+                      </SortableHeaderCell>
                     );
                   })}
-
-                  <td className="px-4 py-3">
-                    <div className="flex justify-end gap-2">
-                      <Button variant="secondary" onClick={() => onStock(record)}>
-                        📦 Stock
-                      </Button>
-
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => onEdit(record)}
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        onClick={() => onDelete(record)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </td>
+                  <th className="px-4 py-3 text-right text-xs uppercase tracking-wide text-muted-foreground">
+                    Actions
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </SortableContext>
-      </DndContext>
+              </thead>
+
+              <tbody>
+                {records.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={orderedColumnIds.length + 1}
+                      className="py-8 text-center text-sm text-muted-foreground"
+                    >
+                      No Records Found
+                    </td>
+                  </tr>
+                )}
+
+                {records.map((record: DynamicRecord) => (
+                  <tr key={record.id} className="border-t hover:bg-muted/40">
+                    {orderedColumnIds.map((colId) => {
+                      const field = fieldsMap.get(colId);
+                      if (!field) return null;
+                      return (
+                        <td key={colId} className="px-4 py-3 align-top">
+                          {renderValue(record.values?.[field.fieldName])}
+                        </td>
+                      );
+                    })}
+
+                    <td
+                      className="sticky right-0 z-10 bg-background px-4 py-3 shadow-[-4px_0_6px_rgba(0,0,0,0.08)]"
+                    >
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => onStock(record)}
+                        >
+                          Restock
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => onEdit(record)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          onClick={() => onDelete(record)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </SortableContext>
+        </DndContext>
+      </div>
     </div>
   );
 }
