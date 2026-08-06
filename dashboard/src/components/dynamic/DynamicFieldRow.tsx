@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,7 @@ interface Props {
   onDelete: (id: string) => void;
 }
 
-export default function DynamicFieldRow({
+function DynamicFieldRow({
   field,
   saving,
   onUpdate,
@@ -122,3 +123,5 @@ export default function DynamicFieldRow({
     </div>
   );
 }
+
+export default memo(DynamicFieldRow);

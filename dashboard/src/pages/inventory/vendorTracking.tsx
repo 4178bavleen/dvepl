@@ -220,6 +220,8 @@ export default function VendorTracking() {
   const [followUpSending, setFollowUpSending] = useState(false);
   const [followUpMode, setFollowUpMode] = useState<"SINGLE" | "ALL">("ALL");
   const [selectedPurchaseOrder, setSelectedPurchaseOrder] = useState("");
+  const [selectedPoIds, setSelectedPoIds] = useState<Set<string>>(new Set());
+  const [selectedPoEmailSending, setSelectedPoEmailSending] = useState(false);
 
   const tableRef = useRef<HTMLTableElement>(null);
 
@@ -458,6 +460,127 @@ export default function VendorTracking() {
     activeFollowUpSummary.items.forEach((i) => set.add(i.poNo));
     return Array.from(set);
   }, [activeFollowUpSummary]);
+
+  const selectedPurchaseOrders = useMemo(() => {
+    const orders = new Map<string, TrackingRow[]>();
+
+    data.forEach((item) => {
+      if (!selectedPoIds.has(item.poId)) return;
+      const items = orders.get(item.poId) ?? [];
+      items.push(item);
+      orders.set(item.poId, items);
+    });
+
+    return Array.from(orders.entries()).map(([poId, items]) => ({ poId, items }));
+  }, [data, selectedPoIds]);
+
+  const selectableVisiblePoIds = useMemo(
+    () => Array.from(new Set(filteredData.filter((item) => item.pendingQty > 0).map((item) => item.poId))),
+    [filteredData],
+  );
+
+  const allVisiblePosSelected =
+    selectableVisiblePoIds.length > 0 &&
+    selectableVisiblePoIds.every((poId) => selectedPoIds.has(poId));
+
+  const togglePoSelection = (poId: string, checked: boolean) => {
+    setSelectedPoIds((previous) => {
+      const next = new Set(previous);
+      if (checked) next.add(poId);
+      else next.delete(poId);
+      return next;
+    });
+  };
+
+  const toggleAllVisiblePoSelection = (checked: boolean) => {
+    setSelectedPoIds((previous) => {
+      const next = new Set(previous);
+      selectableVisiblePoIds.forEach((poId) => {
+        if (checked) next.add(poId);
+        else next.delete(poId);
+      });
+      return next;
+    });
+  };
+
+  const handleSendSelectedPoEmails = async () => {
+    if (selectedPurchaseOrders.length === 0) {
+      toast.error("Select at least one purchase order first");
+      return;
+    }
+
+    setSelectedPoEmailSending(true);
+    let sent = 0;
+    let failed = 0;
+
+    try {
+      for (const { poId, items } of selectedPurchaseOrders) {
+        const firstItem = items[0];
+        const vendorId = firstItem.vendor?.id;
+        const poNo = firstItem.poNo;
+
+        if (!vendorId || !firstItem.vendor?.email) {
+          failed += 1;
+          continue;
+        }
+
+        const reportRows = items.map((item) => ({
+          "PO No": item.poNo,
+          Vendor: item.vendor?.name ?? "—",
+          "Material Name": item.material?.name ?? "—",
+          "Material Code": item.material?.code ?? "—",
+          Ordered: item.orderedQty,
+          Received: item.receivedQty,
+          Pending: item.pendingQty,
+          Status: item.status,
+        }));
+        const sheet = XLSX.utils.json_to_sheet(reportRows);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, sheet, "Follow Up");
+        const attachment = XLSX.write(workbook, { type: "base64", bookType: "xlsx" });
+        const vendorName = firstItem.vendor.name || "Vendor";
+        const message = [
+          `Dear ${vendorName},`,
+          "",
+          `This is a follow-up regarding Purchase Order ${poNo}.`,
+          "Please refer to the attached report for the pending items and kindly confirm",
+          "the expected dispatch/delivery date at the earliest.",
+          "",
+          "Thank you for your cooperation.",
+          "",
+          "Regards,",
+          currentUserName || "Procurement Team",
+        ].join("\n");
+
+        try {
+          await apiClient.post("/settings/send-vendor-follow-up-email", {
+            vendorId,
+            subject: `Follow-up: Purchase Order ${poNo}`,
+            text: message,
+            attachments: [{
+              filename: `FollowUp_${poNo.replace(/[^\w]+/g, "_")}_${new Date().toISOString().split("T")[0]}.xlsx`,
+              content: attachment,
+              encoding: "base64",
+            }],
+          });
+          sent += 1;
+        } catch (error) {
+          console.error(`Failed to send follow-up for PO ${poNo}`, error);
+          failed += 1;
+        }
+      }
+
+      if (sent > 0) {
+        toast.success(`${sent} purchase-order follow-up email${sent === 1 ? "" : "s"} sent`);
+        setSelectedPoIds(new Set());
+      }
+      if (failed > 0) {
+        toast.error(`${failed} email${failed === 1 ? " was" : "s were"} not sent`);
+      }
+    } finally {
+      setSelectedPoEmailSending(false);
+    }
+  };
 
   const handleChangeMode = (mode: "SINGLE" | "ALL") => {
     setFollowUpMode(mode);
@@ -1160,6 +1283,17 @@ if (!followUpPhone.trim()) {
             <X className="size-3.5" /> Clear filters
           </Button>
         )}
+        <Button
+          size="sm"
+          className="gap-1.5"
+          disabled={selectedPurchaseOrders.length === 0 || selectedPoEmailSending}
+          onClick={handleSendSelectedPoEmails}
+        >
+          <Mail className="size-3.5" />
+          {selectedPoEmailSending
+            ? "Sending..."
+            : `Send Email (${selectedPurchaseOrders.length})`}
+        </Button>
       </div>
 
       {/* Table */}
@@ -1179,6 +1313,16 @@ if (!followUpPhone.trim()) {
             >
               <thead className="print:table-header-group">
                 <tr className="border-b bg-muted/40 print:bg-gray-100">
+                  <th className="w-10 p-4 print:hidden">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all visible purchase orders"
+                      checked={allVisiblePosSelected}
+                      disabled={selectableVisiblePoIds.length === 0}
+                      onChange={(event) => toggleAllVisiblePoSelection(event.target.checked)}
+                      className="size-4 cursor-pointer accent-primary"
+                    />
+                  </th>
                   {orderedColumns.map((colId) => {
                     const col = defaultColumns.find((c) => c.id === colId);
                     if (!col) return null;
@@ -1197,7 +1341,7 @@ if (!followUpPhone.trim()) {
                 {loading && data.length === 0 && (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={9}
                       className="p-8 text-center text-xs font-semibold text-muted-foreground"
                     >
                       Loading tracking data…
@@ -1208,7 +1352,7 @@ if (!followUpPhone.trim()) {
                 {!loading && filteredData.length === 0 && (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={9}
                       className="p-8 text-center text-xs font-semibold text-muted-foreground"
                     >
                       No vendor tracking records found.
@@ -1223,6 +1367,16 @@ if (!followUpPhone.trim()) {
                       key={item.poItemId}
                       className={`hover:bg-muted/10 ${idx % 2 === 0 ? "bg-white" : "bg-muted/20"} print:bg-white`}
                     >
+                      <td className="w-10 p-4 print:hidden">
+                        <input
+                          type="checkbox"
+                          aria-label={`Select purchase order ${item.poNo}`}
+                          checked={selectedPoIds.has(item.poId)}
+                          disabled={item.pendingQty <= 0}
+                          onChange={(event) => togglePoSelection(item.poId, event.target.checked)}
+                          className="size-4 cursor-pointer accent-primary disabled:cursor-not-allowed"
+                        />
+                      </td>
                       {orderedColumns.map((colId) => {
                         if (colId === "poNo") {
                           return (
@@ -1337,6 +1491,7 @@ if (!followUpPhone.trim()) {
                 {/* Totals row */}
                 {filteredData.length > 0 && (
                   <tr className="border-t-2 border-border bg-muted/30 font-bold print:bg-gray-100">
+                    <td className="p-4 print:hidden"></td>
                     {orderedColumns.map((colId, cIdx) => {
                       if (colId === "ordered") {
                         return (

@@ -1,318 +1,447 @@
-import { useState } from "react";
-
-import { Plus, Settings, Truck, ArrowLeft } from "lucide-react";
+import { useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-hot-toast";
+import * as XLSX from "xlsx";
 
 import {
-  Button,
-} from "@/components/ui/button";
+  ArrowLeft,
+  Download,
+  Mail,
+  Package,
+  Plus,
+  Settings,
+  Truck,
+  Upload,
+} from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-
+import { Input } from "@/components/ui/input";
 import {
-  Input,
-} from "@/components/ui/input";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 import DynamicTable from "@/components/dynamic/DynamicTable";
-
 import DynamicForm from "@/components/dynamic/DynamicForm";
-
 import DynamicFieldManager from "@/components/dynamic/DynamicFieldManager";
-
 import useDynamicModule from "@/hooks/useDynamicModule";
 import VendorTracking from "./vendorTracking";
+import { DynamicRecord } from "@/types/dynamic";
 
-import {
-  DynamicRecord,
-} from "@/types/dynamic";
+type StockStatus = "all" | "in-stock" | "low-stock" | "out-of-stock";
+
 export default function InventoryPage() {
+  const navigate = useNavigate();
+  const importInputRef = useRef<HTMLInputElement>(null);
+
   const {
     module,
-
     fields,
-
     records,
-
     loading,
-
     search,
-
     setSearch,
-
     createRecord,
-
     updateRecord,
-
     deleteRecord,
-
     loadFields,
+  } = useDynamicModule({ moduleKey: "inventory" });
 
-} = useDynamicModule({
+  const [mainView, setMainView] = useState<"inventory" | "tracking">("inventory");
+  const [formOpen, setFormOpen] = useState(false);
+  const [fieldManagerOpen, setFieldManagerOpen] = useState(false);
+  const [editing, setEditing] = useState<DynamicRecord | null>(null);
+  const [values, setValues] = useState<Record<string, any>>({});
+  const [searchField, setSearchField] = useState<string>("all");
+  const [fieldSearch, setFieldSearch] = useState("");
+  const [stockFilter, setStockFilter] = useState<StockStatus>("all");
+  const [restockOpen, setRestockOpen] = useState(false);
+  const [restockRecord, setRestockRecord] = useState<DynamicRecord | null>(null);
+  const [importing, setImporting] = useState(false);
 
-    moduleKey: "inventory",
-
-});
-const [mainView, setMainView] =
-    useState<"inventory" | "tracking">("inventory");
-const [formOpen, setFormOpen] =
-    useState(false);
-
-const [fieldManagerOpen,
-setFieldManagerOpen] =
-    useState(false);
-
-const [editing,
-setEditing] =
-useState<DynamicRecord | null>(null);
-
-const [values,
-setValues] =
-useState<Record<string, any>>({});
-const openCreate = () => {
-
-    setEditing(null);
-
-    const obj:
-    Record<string, any> = {};
-
-    fields.forEach(field => {
-
-        obj[field.fieldName] =
-            field.defaultValue ?? "";
-
+  const buildFormValues = (recordValues?: Record<string, any> | string | null) => {
+    const base: Record<string, any> = {};
+    fields.forEach((field) => {
+      base[field.fieldName] = field.defaultValue ?? "";
     });
 
-    setValues(obj);
-
-    setFormOpen(true);
-
-};
-const openEdit = (
-record: DynamicRecord
-) => {
-
-    setEditing(record);
-
-    setValues(
-        record.values || {}
-    );
-
-    setFormOpen(true);
-
-};
-
-const removeRecord =
-async (
-record: DynamicRecord
-) => {
-
-    if (
-        !confirm(
-            "Delete record?"
-        )
-    )
-        return;
-
-    await deleteRecord(
-        record.id
-    );
-
-};
-const saveRecord =
-async () => {
-
-    if (editing) {
-
-        await updateRecord(
-            editing.id,
-            values
-        );
-
+    let savedValues: Record<string, any> = {};
+    if (typeof recordValues === "string") {
+      try {
+        savedValues = JSON.parse(recordValues);
+      } catch {
+        savedValues = {};
+      }
+    } else if (recordValues && typeof recordValues === "object") {
+      savedValues = recordValues;
     }
 
-    else {
+    const savedEntries = Object.entries(savedValues);
+    fields.forEach((field) => {
+      const savedValue = savedEntries.find(
+        ([key]) => key.toLowerCase() === field.fieldName.toLowerCase()
+      )?.[1];
 
-        await createRecord(
-            values
-        );
+      if (savedValue !== undefined) {
+        base[field.fieldName] = savedValue;
+      }
+    });
 
+    return base;
+  };
+
+  const openCreate = () => {
+    setEditing(null);
+    setValues(buildFormValues());
+    setFormOpen(true);
+  };
+
+  const openEdit = (record: DynamicRecord) => {
+    setEditing(record);
+    setValues(buildFormValues(record.values));
+    setFormOpen(true);
+  };
+
+  const removeRecord = async (record: DynamicRecord) => {
+    if (!confirm("Delete record?")) return;
+    await deleteRecord(record.id);
+  };
+
+  const saveRecord = async () => {
+    if (editing) {
+      await updateRecord(editing.id, values);
+    } else {
+      await createRecord(values);
     }
 
     setFormOpen(false);
+    setValues({});
+  };
 
-};
-return (
-  <div className="space-y-6 p-6">
+  const getStockStatus = (record: DynamicRecord) => {
+    const quantityField = fields.find((field) => {
+      const label = field.label.toLowerCase();
+      return label.includes("qty") || label.includes("quantity") || label.includes("stock") || label.includes("balance");
+    });
 
-    {/* Header */}
+    const quantityValue = quantityField
+      ? Number(record.values?.[quantityField.fieldName] ?? 0)
+      : Number(record.values?.quantity ?? record.values?.qty ?? 0);
 
-    <div className="flex items-center justify-between">
+    if (Number.isNaN(quantityValue)) return "in-stock" as const;
+    if (quantityValue <= 0) return "out-of-stock" as const;
+    if (quantityValue <= 5) return "low-stock" as const;
+    return "in-stock" as const;
+  };
 
-      <div>
+  const filteredRecords = useMemo(() => {
+    const searchQuery = `${search} ${fieldSearch}`.trim().toLowerCase();
+    const selectedField = fields.find((field) => field.fieldName === searchField);
 
-        <h1 className="text-3xl font-bold">
-          Inventory
-        </h1>
+    return (records || []).filter((record) => {
+      const status = getStockStatus(record);
+      if (stockFilter !== "all" && status !== stockFilter) return false;
 
-        <p className="text-muted-foreground">
-          Dynamic Inventory Management
-        </p>
+      if (!searchQuery) return true;
 
-      </div>
-
-<div className="flex gap-2">
-
-        <Button
-          variant="outline"
-          onClick={() =>
-            setMainView("tracking")
-          }
-        >
-          <Truck className="w-4 h-4 mr-2" />
-          Vendor Tracking
-        </Button>
-
-        <Button
-          variant="outline"
-          onClick={() =>
-            setFieldManagerOpen(true)
-          }
-        >
-          <Settings className="w-4 h-4 mr-2" />
-          Manage Fields
-        </Button>
-
-        <Button
-          onClick={openCreate}
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Item
-        </Button>
-
-      </div>
-
-    </div>
-
-    {mainView === "inventory" ? (
-      <>
-    {/* Search */}
-
-    <Input
-      placeholder="Search..."
-      value={search}
-      onChange={(e) =>
-        setSearch(e.target.value)
+      if (searchField !== "all" && selectedField) {
+        return String(record.values?.[selectedField.fieldName] ?? "").toLowerCase().includes(searchQuery);
       }
-    />
 
-    {/* Table */}
+      const searchableText = fields
+        .map((field) => String(record.values?.[field.fieldName] ?? ""))
+        .join(" ")
+        .toLowerCase();
 
-    <DynamicTable
-  fields={fields}
-  records={records}
-  loading={loading}
-  onStock={() => {
-    setMainView("tracking");
-  }}
-  onEdit={openEdit}
-  onDelete={removeRecord}
-/>
-      </>
-    ) : (
-      <>
-    <Button
-      variant="outline"
-      onClick={() =>
-        setMainView("inventory")
-      }
-      className="gap-2"
-    >
-      <ArrowLeft className="w-4 h-4" />
-      Back to Inventory
-    </Button>
+      return searchableText.includes(searchQuery);
+    });
+  }, [records, search, fieldSearch, searchField, stockFilter, fields]);
 
-    <VendorTracking />
-      </>
-    )}
-    {/* Add / Edit Dialog */}
+  const handleExportExcel = () => {
+    const rows = filteredRecords.map((record) => {
+      const row: Record<string, any> = {};
+      fields.forEach((field) => {
+        row[field.label] = record.values?.[field.fieldName];
+      });
+      row["Stock Status"] = getStockStatus(record);
+      return row;
+    });
 
-    <Dialog
-      open={formOpen}
-      onOpenChange={setFormOpen}
-    >
-      <DialogContent className="max-w-4xl">
+    const sheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, sheet, "Inventory");
+    XLSX.writeFile(workbook, "inventory.xlsx");
+    toast.success("Inventory exported to Excel");
+  };
 
-        <DialogHeader>
+  const handleImportExcel = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-          <DialogTitle>
+    try {
+      setImporting(true);
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: "" });
 
-            {editing
-              ? "Edit Record"
-              : "Add Record"}
+      let created = 0;
+      for (const row of rows) {
+        const values: Record<string, any> = {};
+        Object.entries(row).forEach(([key, value]) => {
+          const normalizedKey = String(key).trim().toLowerCase();
+          const field = fields.find((candidate) => {
+            const candidateName = candidate.fieldName.toLowerCase();
+            const candidateLabel = candidate.label.toLowerCase();
+            return candidateName === normalizedKey || candidateLabel === normalizedKey;
+          });
 
-          </DialogTitle>
-
-        </DialogHeader>
-
-        <DynamicForm
-          fields={fields}
-          values={values}
-          loading={loading}
-          onChange={(
-            field,
-            value
-          ) =>
-            setValues((prev) => ({
-              ...prev,
-              [field]: value,
-            }))
+          if (field) {
+            values[field.fieldName] = value;
           }
-          onSubmit={saveRecord}
-          onCancel={() =>
-            setFormOpen(false)
-          }
-        />
+        });
 
-      </DialogContent>
-
-    </Dialog>
-
-{/* Field Manager */}
-
-    <Dialog
-      open={fieldManagerOpen}
-      onOpenChange={
-        setFieldManagerOpen
+        if (Object.keys(values).length > 0) {
+          await createRecord(values);
+          created += 1;
+        }
       }
-    >
-      <DialogContent className="max-w-6xl">
 
-        <DialogHeader>
+      toast.success(`Imported ${created} inventory record${created === 1 ? "" : "s"}`);
+    } catch (error) {
+      console.error(error);
+      toast.error("Unable to import Excel file");
+    } finally {
+      setImporting(false);
+      event.target.value = "";
+    }
+  };
 
-          <DialogTitle>
+  const handleRestockAction = (record: DynamicRecord) => {
+    setRestockRecord(record);
+    setRestockOpen(true);
+  };
 
+  const handleSendVendorMail = () => {
+    if (!restockRecord) return;
+
+    const emailField = fields.find((field) => {
+      const label = field.label.toLowerCase();
+      return label.includes("email") || label.includes("mail");
+    });
+
+    const vendorEmail = restockRecord.values?.[emailField?.fieldName ?? ""];
+    if (!vendorEmail) {
+      toast.error("No vendor email found for this item");
+      return;
+    }
+
+    const subject = encodeURIComponent(`Restock request for ${restockRecord.values?.name ?? "item"}`);
+    const body = encodeURIComponent(`Hello,\n\nWe need to restock the item ${restockRecord.values?.name ?? "this item"}. Please share availability and lead time.\n\nThanks`);
+    window.open(`mailto:${vendorEmail}?subject=${subject}&body=${body}`, "_blank");
+    setRestockOpen(false);
+  };
+
+  const handleCreatePo = () => {
+    if (!restockRecord) return;
+    navigate("/purchase/vendors", {
+      state: { fromInventory: true, inventoryItem: restockRecord },
+    });
+    setRestockOpen(false);
+  };
+
+  const stockOptions: Array<{ value: StockStatus; label: string }> = [
+    { value: "all", label: "All" },
+    { value: "in-stock", label: "In Stock" },
+    { value: "low-stock", label: "Low Stock" },
+    { value: "out-of-stock", label: "Out of Stock" },
+  ];
+
+  return (
+    <div className="space-y-6 p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold">Inventory</h1>
+          <p className="text-muted-foreground">Dynamic Inventory Management</p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={handleExportExcel}>
+            <Download className="mr-2 h-4 w-4" />
+            Export Excel
+          </Button>
+
+          <Button variant="outline" onClick={() => importInputRef.current?.click()} disabled={importing}>
+            <Upload className="mr-2 h-4 w-4" />
+            {importing ? "Importing..." : "Import Excel"}
+          </Button>
+
+          <input ref={importInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImportExcel} />
+
+          <Button variant="outline" onClick={() => setMainView("tracking")}>
+            <Truck className="mr-2 h-4 w-4" />
+            Vendor Tracking
+          </Button>
+
+          <Button variant="outline" onClick={() => setFieldManagerOpen(true)}>
+            <Settings className="mr-2 h-4 w-4" />
             Manage Fields
+          </Button>
 
-          </DialogTitle>
+          <Button onClick={openCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Item
+          </Button>
+        </div>
+      </div>
 
-        </DialogHeader>
+      {mainView === "inventory" ? (
+        <>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            <Input
+              placeholder="Search inventory"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
 
-        {module && (
-          <DynamicFieldManager
-            moduleId={module.id}
+            <Select
+              value={searchField}
+              onValueChange={(value) => setSearchField(value ?? "all")}
+            >
+              <SelectTrigger className="w-full md:w-[240px]">
+                <SelectValue placeholder="Search field" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All fields</SelectItem>
+                {fields.map((field) => (
+                  <SelectItem key={field.id} value={field.fieldName}>
+                    {field.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Input
+              placeholder={searchField === "all" ? "Search in selected field" : `Search ${fields.find((field) => field.fieldName === searchField)?.label ?? "field"}`}
+              value={fieldSearch}
+              onChange={(e) => setFieldSearch(e.target.value)}
+              disabled={searchField === "all"}
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {stockOptions.map((item) => (
+              <Button
+                key={item.value}
+                variant={stockFilter === item.value ? "default" : "outline"}
+                size="sm"
+                onClick={() => setStockFilter(item.value)}
+              >
+                {item.label}
+              </Button>
+            ))}
+          </div>
+
+          <DynamicTable
             fields={fields}
-            onRefresh={loadFields}
+            records={filteredRecords}
+            loading={loading}
+            onStock={handleRestockAction}
+            onEdit={openEdit}
+            onDelete={removeRecord}
           />
-        )}
+        </>
+      ) : (
+        <>
+          <Button variant="outline" onClick={() => setMainView("inventory")} className="gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Inventory
+          </Button>
+          <VendorTracking />
+        </>
+      )}
 
-      </DialogContent>
+      <Dialog open={formOpen} onOpenChange={setFormOpen}>
+        <DialogContent className="max-w-4xl h-[85vh] flex flex-col overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Edit Record" : "Add Record"}</DialogTitle>
+          </DialogHeader>
 
-    </Dialog>
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <DynamicForm
+              key={editing?.id ?? "new-record"}
+              fields={fields}
+              values={values}
+              loading={loading}
+              onChange={(field, value) =>
+                setValues((prev) => ({
+                  ...prev,
+                  [field]: value,
+                }))
+              }
+              onSubmit={saveRecord}
+              onCancel={() => setFormOpen(false)}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
 
-  </div>
-)
+      <Dialog open={fieldManagerOpen} onOpenChange={setFieldManagerOpen}>
+        <DialogContent className="max-w-6xl max-h-[85vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>Manage Fields</DialogTitle>
+          </DialogHeader>
+
+          {module && (
+            <div className="h-[calc(85vh-8rem)]">
+              <DynamicFieldManager moduleId={module.id} fields={fields} onRefresh={loadFields} />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={restockOpen} onOpenChange={setRestockOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Restock Options</DialogTitle>
+          </DialogHeader>
+
+          {restockRecord && (
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-muted/40 p-4">
+                <div className="flex items-center gap-2">
+                  <Package className="h-4 w-4" />
+                  <p className="font-medium">{restockRecord.values?.name ?? "Selected item"}</p>
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  This item is currently {getStockStatus(restockRecord).replace(/-/g, " ")}.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Button onClick={handleSendVendorMail}>
+                  <Mail className="mr-2 h-4 w-4" />
+                  Send Mail to Vendor
+                </Button>
+
+                <Button variant="outline" onClick={handleCreatePo}>
+                  <Package className="mr-2 h-4 w-4" />
+                  Create Purchase Order
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 }

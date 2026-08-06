@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 
 import { Button } from "@/components/ui/button";
+import { toast } from "react-hot-toast";
 
 import DynamicFieldRenderer from "./DynamicFieldRenderer";
 
@@ -26,12 +27,32 @@ export default function DynamicForm({
           Number(b.orderNo)
       );
   }, [fields]);
+const validateForm = () => {
+  for (const field of sortedFields) {
+    if (!field.required) continue;
 
+    const value = values[field.fieldName];
+
+    const isEmpty =
+      value === undefined ||
+      value === null ||
+      value === "" ||
+      (Array.isArray(value) && value.length === 0);
+
+    if (isEmpty) {
+      toast.error(`${field.label} is required`);
+      return false;
+    }
+  }
+
+  return true;
+};
   return (
     <form
       className="space-y-6"
       onSubmit={(e) => {
         e.preventDefault();
+        if (!validateForm()) return;
         onSubmit();
       }}
     >
