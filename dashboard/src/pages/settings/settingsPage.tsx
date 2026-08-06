@@ -62,6 +62,9 @@ interface UserItem {
     delete: boolean;
     export: boolean;
   };
+  password?: string;
+  teamId?: string | null;
+  teamName?: string | null;
 }
 
 const defaultWaSettings = {
@@ -158,9 +161,11 @@ export function SettingsPage() {
   const [newUserEmail, setNewUserEmail] = useState("");
   const [newUserPassword, setNewUserPassword] = useState("");
   const [showNewUserPassword, setShowNewUserPassword] = useState(false);
+  const [showEditUserPassword, setShowEditUserPassword] = useState(false);
   const [newUserDesignation, setNewUserDesignation] = useState("");
   const [newUserPhone, setNewUserPhone] = useState("");
   const [newUserRole, setNewUserRole] = useState("");
+  const [newUserTeamId, setNewUserTeamId] = useState("");
   const [formErrors, setFormErrors] = useState<Record<string, boolean>>({});
 
   // Create bulk users state
@@ -264,6 +269,7 @@ export function SettingsPage() {
     "merge",
   );
   const [designationsList, setDesignationsList] = useState<any[]>([]);
+  const [teamsList, setTeamsList] = useState<any[]>([]);
 
   // 1. Initial Load of Users & Configuration from API or LocalStorage
   const loadUsersList = async () => {
@@ -275,6 +281,10 @@ export function SettingsPage() {
       // Fetch designations list from organization API
       const desList = await organizationApi.designations.list().catch(() => []);
       setDesignationsList(desList);
+
+      // Fetch teams list from organization API
+      const tList = await organizationApi.teams.list().catch(() => []);
+      setTeamsList(tList);
 
       // Fetch users from API endpoint
       const list = await securityApi.users.list();
@@ -301,6 +311,8 @@ export function SettingsPage() {
             delete: false,
             export: true,
           },
+          teamId: u.teamId || null,
+          teamName: u.teamName || null,
         }));
         setUsers(mapped);
       } else {
@@ -557,7 +569,8 @@ export function SettingsPage() {
 
   // Handle Edit User
   const handleOpenEditModal = (user: UserItem) => {
-    setEditingUser(user);
+    setEditingUser({ ...user, password: "" });
+    setShowEditUserPassword(false);
     setIsEditModalOpen(true);
   };
 
@@ -570,6 +583,8 @@ export function SettingsPage() {
           email: editingUser.email,
           role: editingUser.role,
           designation: editingUser.designation,
+          password: editingUser.password || undefined,
+          teamId: editingUser.teamId || null,
         });
       }
       toast.success("User details updated successfully");
@@ -938,6 +953,7 @@ export function SettingsPage() {
         role: newUserRole,
         designation: newUserDesignation.trim() || undefined,
         phone: newUserPhone.trim() || undefined,
+        teamId: newUserTeamId || undefined,
       });
       toast.success("User created successfully");
       // Reset form
@@ -947,6 +963,7 @@ export function SettingsPage() {
       setNewUserDesignation("");
       setNewUserPhone("");
       setNewUserRole("");
+      setNewUserTeamId("");
       setFormErrors({});
       loadUsersList();
       setActiveSection("manage-users");
@@ -1040,7 +1057,7 @@ export function SettingsPage() {
   const downloadExcelTemplate = () => {
     // Generate true XLSX file template using SheetJS
     const headers = [
-      ["Name", "Email", "Password", "Role", "Designation", "Phone"],
+      ["Name", "Email", "Password", "Role", "Designation", "Phone", "Team"],
     ];
     const data = [
       [
@@ -1050,6 +1067,7 @@ export function SettingsPage() {
         "admin",
         "Executive",
         "9876543210",
+        "Engineering",
       ],
       [
         "Jane Smith",
@@ -1058,6 +1076,7 @@ export function SettingsPage() {
         "sales",
         "Manager",
         "9876543211",
+        "Sales Team",
       ],
     ];
 
@@ -1741,7 +1760,12 @@ export function SettingsPage() {
                           {user.email}
                         </td>
                         <td className="p-3 text-muted-foreground">
-                          {user.designation || "Staff"}
+                          <div>{user.designation || "Staff"}</div>
+                          {user.teamName && (
+                            <div className="text-[10px] text-muted-foreground/75 font-semibold mt-0.5">
+                              Team: {user.teamName}
+                            </div>
+                          )}
                         </td>
                         <td className="p-3">
                           <span
@@ -1949,6 +1973,25 @@ export function SettingsPage() {
                       {rolesList.map((r) => (
                         <option key={r.id} value={r.name.toLowerCase()}>
                           {r.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                      Team (Optional)
+                    </label>
+                    <select
+                      value={newUserTeamId}
+                      onChange={(e) => setNewUserTeamId(e.target.value)}
+                      className="w-full px-3.5 py-2 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
+                    >
+                      <option value="">— Select Team —</option>
+                      {teamsList.map((t: any) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
                         </option>
                       ))}
                     </select>
@@ -3705,6 +3748,52 @@ export function SettingsPage() {
                     </option>
                   ))}
                 </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                  Team (Optional)
+                </label>
+                <select
+                  value={editingUser.teamId || ""}
+                  onChange={(e) =>
+                    setEditingUser({ ...editingUser, teamId: e.target.value })
+                  }
+                  className="w-full px-3 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
+                >
+                  <option value="">— Select Team —</option>
+                  {teamsList.map((t: any) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                  New Password (Optional)
+                </label>
+                <div className="relative">
+                  <input
+                    type={showEditUserPassword ? "text" : "password"}
+                    placeholder="Leave blank to keep current password"
+                    value={editingUser.password || ""}
+                    onChange={(e) =>
+                      setEditingUser({ ...editingUser, password: e.target.value })
+                    }
+                    className="w-full pl-3 pr-10 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowEditUserPassword(!showEditUserPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground hover:text-foreground focus:outline-none"
+                  >
+                    {showEditUserPassword ? (
+                      <EyeOff className="h-3.5 w-3.5" />
+                    ) : (
+                      <Eye className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
             <div className="modal-footer">

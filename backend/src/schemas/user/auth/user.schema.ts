@@ -33,6 +33,11 @@ export const createUserSchema = z.object({
   designation: z
     .string()
     .optional(),
+  teamId: z
+    .string()
+    .optional()
+    .nullable()
+    .or(z.literal("")),
 });
 
 export type CreateUserInput = z.infer<typeof createUserSchema>;

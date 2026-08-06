@@ -124,3 +124,40 @@ input,
 .no-scrollbar-y {
   scrollbar-width: none; /* Firefox option */
 }
+
+/* ===============================
+   Sticky / Frozen Table Headers
+================================ */
+.overflow-x-auto, .overflow-auto, [data-slot="table-container"] {
+  max-height: none !important;
+  overflow-y: clip !important;
+  overflow-x: auto !important;
+  position: relative;
+}
+
+/* Style horizontal scrollbars (for Chrome, Safari, Edge) */
+::-webkit-scrollbar:horizontal,
+.overflow-x-auto::-webkit-scrollbar:horizontal,
+.overflow-auto::-webkit-scrollbar:horizontal,
+[data-slot="table-container"]::-webkit-scrollbar:horizontal {
+  height: 6px !important;
+  display: block !important;
+}
+
+::-webkit-scrollbar:vertical,
+.overflow-x-auto::-webkit-scrollbar:vertical,
+.overflow-auto::-webkit-scrollbar:vertical,
+[data-slot="table-container"]::-webkit-scrollbar:vertical {
+  width: 0px !important;
+  display: none !important;
+}
+
+.overflow-x-auto table thead th,
+.overflow-auto table thead th,
+[data-slot="table-container"] table thead th {
+  position: sticky !important;
+  top: 0 !important; /* Stick to the top of the main scroll container */
+  z-index: 20 !important;
+  background-color: hsl(var(--card)) !important;
+  border-bottom: 1px solid hsl(var(--border)) !important;
+}

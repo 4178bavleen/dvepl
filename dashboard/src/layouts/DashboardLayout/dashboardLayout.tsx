@@ -107,14 +107,29 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let isMounted = true;
-    void Promise.all([
-      organizationApi.companies.list().catch(() => []),
-      authService.profile(),
-      securityApi.users.list().catch(() => []),
-      securityApi.roles.list().catch(() => [])
-    ])
-      .then(([companies, userProfile, usersList, rolesList]) => {
+
+    const fetchAllData = async () => {
+      try {
+        const [companies, userProfile] = await Promise.all([
+          organizationApi.companies.list().catch(() => []),
+          authService.profile()
+        ]);
+
         if (!isMounted) return;
+
+        const isAdmin = userProfile.roles?.some((r: string) => r.toLowerCase().includes('admin')) || 
+                        userProfile.name?.toLowerCase().includes('admin');
+        const pageAccess = userProfile.pageAccess || [];
+        const hasUsersAccess = isAdmin || pageAccess.includes('users');
+        const hasRolesAccess = isAdmin || pageAccess.includes('roles');
+
+        const [usersList, rolesList] = await Promise.all([
+          hasUsersAccess ? securityApi.users.list().catch(() => []) : Promise.resolve([]),
+          hasRolesAccess ? securityApi.roles.list().catch(() => []) : Promise.resolve([])
+        ]);
+
+        if (!isMounted) return;
+
         setHeaderCompanies(companies.map((company) => ({ id: company.id, name: String(company.name ?? '') })));
         
         const profileUserObj = {
@@ -147,10 +162,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         setProfile(userProfile);
         store.setCurrentUser(userProfile.id, userProfile.name);
         if (userProfile.company?.id) store.setCompanyId(userProfile.company.id);
-      })
-      .catch(() => {
-        // The page still renders with the local fallback data if the API is unavailable.
-      });
+      } catch (err) {
+        // The page still renders with local fallback if profile fails
+      }
+    };
+
+    fetchAllData();
     return () => { isMounted = false; };
   }, []);
 

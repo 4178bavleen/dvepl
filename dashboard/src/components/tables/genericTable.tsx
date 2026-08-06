@@ -101,7 +101,7 @@ const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      "h-10 px-2 text-left align-middle font-medium whitespace-nowrap text-foreground [&:has([role=checkbox])]:pr-0 sticky top-0 bg-card/95 backdrop-blur-xs z-10 shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)]",
+      "h-12 px-2 text-left align-middle font-medium whitespace-nowrap text-foreground [&:has([role=checkbox])]:pr-0 sticky top-0 bg-card/95 backdrop-blur-xs z-10 shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)]",
       className,
     )}
     {...props}
@@ -158,7 +158,7 @@ function SortableHeaderCell({
 
   return (
     <TableHead ref={setNodeRef} style={style} className={className}>
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-3">
         <span
           {...attributes}
           {...listeners}
@@ -893,8 +893,8 @@ export function GenericTable<TData extends { id: string }>({
                     ))}
                   </TableRow>
                 ))
-              ) : table.getRowModel().rows?.length ? (
-                table.getRowModel().rows.map((row) => (
+              ) : table.getPaginationRowModel().rows?.length ? (
+                table.getPaginationRowModel().rows.map((row) => (
                   <TableRow
                     key={row.id}
                     data-state={row.getIsSelected() && "selected"}
