@@ -1,12 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { toast } from 'react-hot-toast';
 import { apiClient } from '@/services/axios';
-import { SlidersHorizontal, Plus, Trash2, Edit2, Check, X, MoveUp, MoveDown, Layers, FileText, CheckCircle2 } from 'lucide-react';
 import '@/styles/vendors.css';
 
 export interface CustomFieldOption {
@@ -96,15 +93,75 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
   if (!filteredFields.length) return null;
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+    <>
       {filteredFields.map((field) => {
         const value = values[field.key] ?? field.defaultValue ?? (field.type === 'checkbox' || field.type === 'switch' ? false : field.type === 'multiselect' ? [] : '');
         const error = errors[field.key];
         const isFullWidth = ['textarea', 'file', 'image', 'multiselect'].includes(field.type);
 
+        const rawOptions = field.options;
+        const optionsList: { label: string; value: string }[] = [];
+        if (typeof rawOptions === 'string') {
+          (rawOptions as string).split(',').forEach((s) => {
+            const val = s.trim();
+            if (val) {
+              optionsList.push({ label: val, value: val });
+            }
+          });
+        } else if (Array.isArray(rawOptions)) {
+          rawOptions.forEach((opt: any) => {
+            if (typeof opt === 'string') {
+              optionsList.push({ label: opt, value: opt });
+            } else if (opt && typeof opt === 'object') {
+              optionsList.push({
+                label: opt.label || opt.value || '',
+                value: opt.value || opt.label || '',
+              });
+            }
+          });
+        }
+
+        let inputClassName = "h-9 text-xs";
+        let selectClassName = "h-9 px-3 rounded-lg border bg-background text-foreground text-xs outline-none transition-colors w-full";
+        let checkboxWrapperClassName = "flex items-center gap-2 mt-1 p-1 rounded-md";
+        let switchWrapperClassName = "flex items-center gap-3 mt-1 p-1 rounded-md";
+        let radioWrapperClassName = "flex flex-wrap gap-4 mt-1 p-1.5 rounded-lg border border-transparent";
+        let multiselectWrapperClassName = "flex flex-wrap gap-2 p-2 border rounded-lg bg-background min-h-10 border-border";
+        let textareaClassName = "text-xs";
+        let labelClassName = "text-xs font-semibold text-foreground flex items-center justify-between";
+
+        if (field.module === 'order') {
+          labelClassName = "text-[11px] font-semibold text-muted-foreground uppercase flex items-center justify-between";
+          inputClassName = "h-10 bg-muted/40 text-sm";
+          selectClassName = "h-10 px-3 rounded-md border border-input bg-muted/40 text-foreground text-sm outline-none transition-colors w-full";
+          textareaClassName = "bg-muted/40 text-sm";
+        } else if (field.module === 'task') {
+          labelClassName = "text-xs font-semibold text-muted-foreground flex items-center justify-between";
+          inputClassName = "h-9 text-xs";
+          selectClassName = "h-9 px-3 rounded-lg border border-border bg-background text-foreground text-xs outline-none transition-colors w-full";
+          textareaClassName = "text-xs";
+        } else if (field.module === 'vendor') {
+          labelClassName = "text-xs font-semibold text-foreground flex items-center justify-between";
+          inputClassName = "h-9 text-sm";
+          selectClassName = "h-9 px-3 rounded-lg border border-border bg-background text-foreground text-sm outline-none transition-colors w-full";
+          textareaClassName = "text-sm";
+        }
+
+        if (error) {
+          inputClassName += " border-red-500 focus-visible:border-red-500 focus-visible:ring-red-500/30 ring-2 ring-red-500/20";
+          selectClassName += " border-red-500 focus:border-red-500 ring-2 ring-red-500/20";
+          textareaClassName += " border-red-500 focus-visible:border-red-500 focus-visible:ring-red-500/30 ring-2 ring-red-500/20";
+          checkboxWrapperClassName += " ring-2 ring-red-500/40 border border-red-500";
+          switchWrapperClassName += " ring-2 ring-red-500/40 border border-red-500";
+          radioWrapperClassName = radioWrapperClassName.replace("border-transparent", "border-red-500 ring-2 ring-red-500/20");
+          multiselectWrapperClassName = multiselectWrapperClassName.replace("border-border", "border-red-500 ring-2 ring-red-500/20");
+        } else {
+          selectClassName += " border-border focus:border-primary";
+        }
+
         return (
-          <div key={field.id} className={`flex flex-col gap-1.5 ${isFullWidth ? 'md:col-span-2' : ''}`}>
-            <Label className="text-xs font-semibold text-foreground flex items-center justify-between">
+          <div key={field.id} className={`flex flex-col gap-1.5 ${isFullWidth ? 'sm:col-span-2' : ''}`}>
+            <Label className={labelClassName}>
               <span>
                 {field.name} {field.required && <span className="text-destructive">*</span>}
               </span>
@@ -119,7 +176,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
                 value={value}
                 onChange={(e) => onChange(field.key, e.target.value)}
                 aria-invalid={Boolean(error)}
-                className={`h-9 text-xs ${error ? 'border-red-500 focus-visible:border-red-500 focus-visible:ring-red-500/30 ring-2 ring-red-500/20' : ''}`}
+                className={inputClassName}
               />
             )}
 
@@ -130,7 +187,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
                 onChange={(e) => onChange(field.key, e.target.value)}
                 rows={3}
                 aria-invalid={Boolean(error)}
-                className={`text-xs ${error ? 'border-red-500 focus-visible:border-red-500 focus-visible:ring-red-500/30 ring-2 ring-red-500/20' : ''}`}
+                className={textareaClassName}
               />
             )}
 
@@ -142,7 +199,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
                 value={value}
                 onChange={(e) => onChange(field.key, e.target.value)}
                 aria-invalid={Boolean(error)}
-                className={`h-9 text-xs ${error ? 'border-red-500 focus-visible:border-red-500 focus-visible:ring-red-500/30 ring-2 ring-red-500/20' : ''}`}
+                className={inputClassName}
               />
             )}
 
@@ -153,7 +210,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
                 value={value}
                 onChange={(e) => onChange(field.key, e.target.value)}
                 aria-invalid={Boolean(error)}
-                className={`h-9 text-xs ${error ? 'border-red-500 focus-visible:border-red-500 focus-visible:ring-red-500/30 ring-2 ring-red-500/20' : ''}`}
+                className={inputClassName}
               />
             )}
 
@@ -164,7 +221,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
                 value={value}
                 onChange={(e) => onChange(field.key, e.target.value)}
                 aria-invalid={Boolean(error)}
-                className={`h-9 text-xs ${error ? 'border-red-500 focus-visible:border-red-500 focus-visible:ring-red-500/30 ring-2 ring-red-500/20' : ''}`}
+                className={inputClassName}
               />
             )}
 
@@ -175,7 +232,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
                 value={value}
                 onChange={(e) => onChange(field.key, e.target.value)}
                 aria-invalid={Boolean(error)}
-                className={`h-9 text-xs ${error ? 'border-red-500 focus-visible:border-red-500 focus-visible:ring-red-500/30 ring-2 ring-red-500/20' : ''}`}
+                className={inputClassName}
               />
             )}
 
@@ -185,7 +242,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
                 value={value ? String(value).split('T')[0] : ''}
                 onChange={(e) => onChange(field.key, e.target.value)}
                 aria-invalid={Boolean(error)}
-                className={`h-9 text-xs ${error ? 'border-red-500 focus-visible:border-red-500 focus-visible:ring-red-500/30 ring-2 ring-red-500/20' : ''}`}
+                className={inputClassName}
               />
             )}
 
@@ -195,7 +252,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
                 value={value}
                 onChange={(e) => onChange(field.key, e.target.value)}
                 aria-invalid={Boolean(error)}
-                className={`h-9 text-xs ${error ? 'border-red-500 focus-visible:border-red-500 focus-visible:ring-red-500/30 ring-2 ring-red-500/20' : ''}`}
+                className={inputClassName}
               />
             )}
 
@@ -205,12 +262,12 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
                 value={value}
                 onChange={(e) => onChange(field.key, e.target.value)}
                 aria-invalid={Boolean(error)}
-                className={`h-9 text-xs ${error ? 'border-red-500 focus-visible:border-red-500 focus-visible:ring-red-500/30 ring-2 ring-red-500/20' : ''}`}
+                className={inputClassName}
               />
             )}
 
             {field.type === 'checkbox' && (
-              <div className={`flex items-center gap-2 mt-1 p-1 rounded-md ${error ? 'ring-2 ring-red-500/40 border border-red-500' : ''}`}>
+              <div className={checkboxWrapperClassName}>
                 <Checkbox
                   checked={Boolean(value)}
                   onCheckedChange={(checked) => onChange(field.key, checked)}
@@ -221,7 +278,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
             )}
 
             {field.type === 'switch' && (
-              <div className={`flex items-center gap-3 mt-1 p-1 rounded-md ${error ? 'ring-2 ring-red-500/40 border border-red-500' : ''}`}>
+              <div className={switchWrapperClassName}>
                 <button
                   type="button"
                   onClick={() => onChange(field.key, !value)}
@@ -244,14 +301,12 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
                 value={value}
                 onChange={(e) => onChange(field.key, e.target.value)}
                 aria-invalid={Boolean(error)}
-                className={`h-9 px-3 rounded-lg border bg-background text-foreground text-xs outline-none transition-colors ${
-                  error ? 'border-red-500 focus:border-red-500 ring-2 ring-red-500/20' : 'border-border focus:border-primary'
-                }`}
+                className={selectClassName}
               >
                 <option value="">{field.placeholder || '-- Select Option --'}</option>
-                {field.options?.map((opt, i) => (
-                  <option key={i} value={typeof opt === 'string' ? opt : opt.value}>
-                    {typeof opt === 'string' ? opt : opt.label}
+                {optionsList.map((opt, i) => (
+                  <option key={i} value={opt.value}>
+                    {opt.label}
                   </option>
                 ))}
               </select>
@@ -262,9 +317,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
                 value={value}
                 onChange={(e) => onChange(field.key, e.target.value)}
                 aria-invalid={Boolean(error)}
-                className={`h-9 px-3 rounded-lg border bg-background text-foreground text-xs outline-none transition-colors ${
-                  error ? 'border-red-500 focus:border-red-500 ring-2 ring-red-500/20' : 'border-border focus:border-primary'
-                }`}
+                className={selectClassName}
               >
                 <option value="">{field.placeholder || '-- Select Vendor --'}</option>
                 {vendors.map((v) => (
@@ -276,37 +329,31 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
             )}
 
             {field.type === 'radio' && (
-              <div className={`flex flex-wrap gap-4 mt-1 p-1.5 rounded-lg border ${error ? 'border-red-500 ring-2 ring-red-500/20' : 'border-transparent'}`}>
-                {field.options?.map((opt, i) => {
-                  const val = typeof opt === 'string' ? opt : opt.value;
-                  const lbl = typeof opt === 'string' ? opt : opt.label;
-                  return (
-                    <label key={i} className="flex items-center gap-2 cursor-pointer text-xs font-medium">
-                      <input
-                        type="radio"
-                        name={`cf_${field.key}`}
-                        value={val}
-                        checked={value === val}
-                        onChange={() => onChange(field.key, val)}
-                        className="text-primary focus:ring-primary"
-                      />
-                      <span>{lbl}</span>
-                    </label>
-                  );
-                })}
+              <div className={radioWrapperClassName}>
+                {optionsList.map((opt, i) => (
+                  <label key={i} className="flex items-center gap-2 cursor-pointer text-xs font-medium">
+                    <input
+                      type="radio"
+                      name={`cf_${field.key}`}
+                      value={opt.value}
+                      checked={value === opt.value}
+                      onChange={() => onChange(field.key, opt.value)}
+                      className="text-primary focus:ring-primary"
+                    />
+                    <span>{opt.label}</span>
+                  </label>
+                ))}
               </div>
             )}
 
             {field.type === 'multiselect' && (
-              <div className={`flex flex-wrap gap-2 p-2 border rounded-lg bg-background min-h-10 ${error ? 'border-red-500 ring-2 ring-red-500/20' : 'border-border'}`}>
-                {field.options?.map((opt, i) => {
-                  const val = typeof opt === 'string' ? opt : opt.value;
-                  const lbl = typeof opt === 'string' ? opt : opt.label;
+              <div className={multiselectWrapperClassName}>
+                {optionsList.map((opt, i) => {
                   const selectedArray = Array.isArray(value) ? value : String(value).split(',').map(s => s.trim()).filter(Boolean);
-                  const isChecked = selectedArray.includes(val);
+                  const isChecked = selectedArray.includes(opt.value);
 
                   const toggleSelection = () => {
-                    const next = isChecked ? selectedArray.filter(s => s !== val) : [...selectedArray, val];
+                    const next = isChecked ? selectedArray.filter(s => s !== opt.value) : [...selectedArray, opt.value];
                     onChange(field.key, next);
                   };
 
@@ -321,7 +368,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
                           : 'bg-muted/40 text-muted-foreground border-border hover:bg-muted'
                       }`}
                     >
-                      {isChecked ? '✓ ' : '+ '}{lbl}
+                      {isChecked ? '✓ ' : '+ '}{opt.label}
                     </button>
                   );
                 })}
@@ -341,7 +388,7 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
                     }
                   }}
                   aria-invalid={Boolean(error)}
-                  className={`h-9 text-xs ${error ? 'border-red-500 focus-visible:border-red-500 focus-visible:ring-red-500/30 ring-2 ring-red-500/20' : ''}`}
+                  className={inputClassName}
                 />
                 {value && <span className="text-xs font-medium text-emerald-600 truncate max-w-40">Attached: {value}</span>}
               </div>
@@ -351,6 +398,6 @@ export const DynamicFormRenderer: React.FC<DynamicFormRendererProps> = ({
           </div>
         );
       })}
-    </div>
+    </>
   );
 };

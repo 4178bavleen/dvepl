@@ -465,7 +465,7 @@ export default function CustomFieldsPage() {
                       <option value="name">Vendor Name</option>
                       <option value="category">Category</option>
                       <option value="contactPerson">Contact Person</option>
-                      <option value="phone font">Phone</option>
+                      <option value="phone">Phone</option>
                       <option value="email">Email</option>
                       <option value="gstNumber">GST Number</option>
                       <option value="address">Address</option>

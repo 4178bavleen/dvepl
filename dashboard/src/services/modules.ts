@@ -113,6 +113,10 @@ export const securityApi = {
     testWhatsapp: (data: any) => apiClient.post((API_ENDPOINTS.security.settings as any).testWhatsapp, data).then(res => res.data),
     exportBackup: () => apiClient.get((API_ENDPOINTS.security.settings as any).exportBackup).then(res => res.data.data),
     importBackup: (data: any) => apiClient.post((API_ENDPOINTS.security.settings as any).importBackup, data).then(res => res.data),
+  },
+  access: {
+    read: (userId: string) => apiClient.get(`/user/access/read/${userId}`).then(res => res.data),
+    update: (userId: string, data: { permissionIds: string[] }) => apiClient.put(`/user/access/update/${userId}`, data).then(res => res.data),
   }
 };
 

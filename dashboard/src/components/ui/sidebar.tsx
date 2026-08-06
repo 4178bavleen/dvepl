@@ -91,14 +91,13 @@ export default function Sidebar({
       'reference_codes': 'reference_codes',
       'users': 'users',
       'roles': 'roles',
-      'permissions': 'permissions',
-      'permission_groups': 'permission_groups',
       'approval_requests': 'approval_requests',
       'reports': 'reports',
       'audit_logs': 'audit_logs',
       'custom_fields': 'custom_fields',
       'recycle_bin': 'recycle_bin',
-      'settings': 'settings'
+      'settings': 'settings',
+      'export_orders': 'export_orders'
     };
 
     return sidebarItems.filter(item => {
