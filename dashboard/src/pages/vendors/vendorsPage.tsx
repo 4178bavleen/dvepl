@@ -2152,6 +2152,39 @@ export function VendorsPage() {
       return;
     }
 
+    // Validate that all items can be resolved to a valid materialId (UUID)
+    for (let i = 0; i < poItems.length; i++) {
+      const item = poItems[i];
+      let resolvedMaterialId = item.materialId || item.inventoryId;
+      if (!resolvedMaterialId && item.description && inventoryFields.length > 0) {
+        const primaryFieldName = inventoryFields[0]?.fieldName;
+        const descLower = item.description.trim().toLowerCase();
+        const matchedRecord = inventoryRecords.find((rec) => {
+          const recName = String(rec.values?.[primaryFieldName] || "").trim().toLowerCase();
+          return recName === descLower;
+        });
+        if (matchedRecord) {
+          resolvedMaterialId = matchedRecord.id;
+        }
+      }
+      if (!resolvedMaterialId && item.description) {
+        const descLower = item.description.trim().toLowerCase();
+        const matched = inventoryItems.find(
+          (inv) => inv.material?.name?.trim().toLowerCase() === descLower
+        );
+        if (matched?.materialId) resolvedMaterialId = matched.materialId;
+      }
+      if (!resolvedMaterialId && inventoryItems.length > 0) {
+        resolvedMaterialId = inventoryItems[0].materialId;
+      }
+
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!resolvedMaterialId || !uuidRegex.test(resolvedMaterialId)) {
+        toast.error(`Item at row ${i + 1} (${item.description || "empty description"}) is not linked to any valid material in the inventory. Please select a valid item from the inventory dropdown.`);
+        return;
+      }
+    }
+
     // Financial validations
     if (advance < 0) {
       toast.error("Advance amount cannot be negative");
