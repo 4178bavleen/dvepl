@@ -1680,6 +1680,31 @@ export function OrdersPage() {
                 </div>
               </section>
 
+              {/* Dynamic Custom Fields at end */}
+              {orderCustomFields.some(f => !f.afterField || f.afterField === 'end' || !['customerName', 'caNo', 'contact', 'orderTakenDate'].includes(f.afterField)) && (
+                <section className="space-y-3">
+                  <div className="flex items-center gap-2 border-b border-emerald-600/30 pb-1.5">
+                    <SlidersHorizontal className="size-3.5 text-emerald-600" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-600">
+                      Additional Information
+                    </h3>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="sm:col-span-2">
+                      <DynamicFormRenderer
+                        fields={orderCustomFields.filter(f => !f.afterField || f.afterField === 'end' || !['customerName', 'caNo', 'contact', 'orderTakenDate'].includes(f.afterField))}
+                        values={orderCustomValues}
+                        onChange={(key, val) => {
+                          setOrderCustomValues((prev) => ({ ...prev, [key]: val }));
+                          if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
+                        }}
+                        errors={errors}
+                      />
+                    </div>
+                  </div>
+                </section>
+              )}
+
               {/* Item & Pricing */}
               <section className="space-y-3">
                 <div className="flex items-center justify-between border-b border-emerald-600/30 pb-1.5">

@@ -810,7 +810,7 @@ export default function TasksPage() {
                 />
               </div>
             </div>
-            {taskCustomFields.some(f => f.afterField === 'priority' || f.afterField === 'dueDate') && (
+            {taskCustomFields.some(f => f.afterField === 'priority') && (
               <DynamicFormRenderer
                 fields={taskCustomFields}
                 values={taskCustomValues}
@@ -819,7 +819,19 @@ export default function TasksPage() {
                   if (taskErrors[key]) setTaskErrors((prev) => ({ ...prev, [key]: "" }));
                 }}
                 errors={taskErrors}
-                afterFieldPosition={taskCustomFields.find(f => f.afterField === 'priority' || f.afterField === 'dueDate')?.afterField}
+                afterFieldPosition="priority"
+              />
+            )}
+            {taskCustomFields.some(f => f.afterField === 'dueDate') && (
+              <DynamicFormRenderer
+                fields={taskCustomFields}
+                values={taskCustomValues}
+                onChange={(key, val) => {
+                  setTaskCustomValues((prev) => ({ ...prev, [key]: val }));
+                  if (taskErrors[key]) setTaskErrors((prev) => ({ ...prev, [key]: "" }));
+                }}
+                errors={taskErrors}
+                afterFieldPosition="dueDate"
               />
             )}
 
@@ -851,9 +863,9 @@ export default function TasksPage() {
             )}
 
             {/* Dynamic Custom Fields at end */}
-            {taskCustomFields.some(f => !f.afterField || f.afterField === 'end' || f.afterField === 'assignedUsers') && (
+            {taskCustomFields.some(f => !f.afterField || f.afterField === 'end' || !['title', 'description', 'priority', 'dueDate', 'status'].includes(f.afterField)) && (
                 <DynamicFormRenderer
-                  fields={taskCustomFields.filter(f => !f.afterField || f.afterField === 'end' || f.afterField === 'assignedUsers')}
+                  fields={taskCustomFields.filter(f => !f.afterField || f.afterField === 'end' || !['title', 'description', 'priority', 'dueDate', 'status'].includes(f.afterField))}
                   values={taskCustomValues}
                   onChange={(key, val) => {
                     setTaskCustomValues((prev) => ({ ...prev, [key]: val }));
