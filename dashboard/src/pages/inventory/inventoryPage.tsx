@@ -372,7 +372,10 @@ export default function InventoryPage() {
         });
       } else {
         const body: Record<string, any> = {
-          inventoryId: stockRecord.id,
+          // Older records created before the DynamicRecord ↔ Inventory
+          // relationship was introduced share the same id, so retain that
+          // fallback until the migration has linked them.
+          inventoryId: stockRecord.inventory?.id ?? stockRecord.id,
           quantity: qty,
           referenceType: "MANUAL",
           referenceId: stockRecord.id,
@@ -683,6 +686,25 @@ export default function InventoryPage() {
               }
               onSubmit={saveRecord}
               onCancel={() => setFormOpen(false)}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={fieldManagerOpen} onOpenChange={setFieldManagerOpen}>
+        <DialogContent className="max-w-4xl h-[85vh] flex flex-col overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>Manage Fields</DialogTitle>
+          </DialogHeader>
+
+          <div className="flex-1 min-h-0 overflow-y-auto p-4">
+            <DynamicFieldManager
+              moduleId={module?.id ?? ""}
+              fields={fields}
+              onRefresh={async () => {
+                await loadFields();
+                await loadRecords();
+              }}
             />
           </div>
         </DialogContent>

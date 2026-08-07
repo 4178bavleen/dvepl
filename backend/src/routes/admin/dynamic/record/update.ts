@@ -145,6 +145,13 @@ export default async function updateRecordRoute(
               unitPrice: new Prisma.Decimal(unitPrice),
             },
           });
+
+          // Ensure records created before the relation was added are linked
+          // the next time they are edited.
+          await fastify.prisma.dynamicRecord.update({
+            where: { id: updated.id },
+            data: { inventoryId: updated.id },
+          });
         } catch (syncErr) {
           console.error("Failed to sync dynamic record update to static tables:", syncErr);
         }

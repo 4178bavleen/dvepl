@@ -50,16 +50,35 @@ export interface DynamicField {
   orderNo: number;
 }
 
+
 export interface DynamicRecord {
   id: string;
-
   moduleId: string;
 
   values: Record<string, any>;
 
-  createdAt: string;
+  inventory: {
+    id: string;
+    companyId: string;
+    materialId: string;
+    quantity: string;
+    reservedQty: string;
+    damagedQty: string;
+    scrapQty: string;
+    transitQty: string;
+    stockType: string;
+    unitPrice: string;
+    location?: string | null;
+    binId?: string | null;
+    batchNo?: string | null;
+    serialNo?: string | null;
+    barcode?: string | null;
+    qrCode?: string | null;
+    expiryDate?: string | null;
+  } | null;
 
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface DynamicFormProps {
