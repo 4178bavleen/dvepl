@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import * as XLSX from "xlsx";
+import {tenderApi} from "../../services/modules"
 
 import {
   ArrowLeft,
@@ -14,6 +15,7 @@ import {
   Settings,
   Truck,
   Upload,
+  Users
 } from "lucide-react";
 
 import { cn, getFieldLabel } from "@/utils/helpers";
@@ -25,6 +27,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { apiClient } from "@/services/axios";
 import {
   Select,
   SelectContent,
@@ -43,6 +47,12 @@ import { ConfirmDialog } from "@/components/shared/confirmDialog";
 
 type StockStatus = "all" | "in-stock" | "low-stock" | "out-of-stock";
 
+type SupplierMailRecipient = {
+  id: string;
+  name?: string | null;
+  email: string;
+};
+
 export default function InventoryPage() {
   const navigate = useNavigate();
   const importInputRef = useRef<HTMLInputElement>(null);
@@ -58,6 +68,7 @@ export default function InventoryPage() {
     updateRecord,
     deleteRecord,
     loadFields,
+    loadRecords,
   } = useDynamicModule({ moduleKey: "inventory" });
 
   const [mainView, setMainView] = useState<"inventory" | "tracking">("inventory");
@@ -68,8 +79,17 @@ export default function InventoryPage() {
   const [searchField, setSearchField] = useState<string>("all");
   const [fieldSearch, setFieldSearch] = useState("");
   const [stockFilter, setStockFilter] = useState<StockStatus>("all");
-  const [restockOpen, setRestockOpen] = useState(false);
-  const [restockRecord, setRestockRecord] = useState<DynamicRecord | null>(null);
+  const [stockOpen, setStockOpen] = useState(false);
+  const [stockRecord, setStockRecord] = useState<DynamicRecord | null>(null);
+  const [stockMovType, setStockMovType] = useState<"IN" | "OUT" | "ADJUST" | "RETURN">("IN");
+  const [stockQty, setStockQty] = useState("");
+  const [stockDate, setStockDate] = useState(new Date().toISOString().split("T")[0]);
+  const [stockRate, setStockRate] = useState("");
+  const [stockVendorName, setStockVendorName] = useState("");
+  const [stockInvoiceNo, setStockInvoiceNo] = useState("");
+  const [stockOrderCode, setStockOrderCode] = useState("");
+  const [stockReason, setStockReason] = useState("");
+  const [stockLoading, setStockLoading] = useState(false);
   const [importing, setImporting] = useState(false);
 
   // States for Record Saving/Deletion
@@ -77,6 +97,22 @@ export default function InventoryPage() {
   const [recordToDelete, setRecordToDelete] = useState<DynamicRecord | null>(null);
   const [isDeletingRecord, setIsDeletingRecord] = useState(false);
   const [isSavingRecord, setIsSavingRecord] = useState(false);
+
+  const [selectedVendorItem, setSelectedVendorItem] =
+  useState<DynamicRecord | null>(null);
+
+const [itemVendors, setItemVendors] = useState<any[]>([]);
+
+const [itemVendorsLoading, setItemVendorsLoading] =
+  useState(false);
+
+const [vendorDialogOpen, setVendorDialogOpen] =
+  useState(false);
+  const [supplierMailRecipient, setSupplierMailRecipient] =
+    useState<SupplierMailRecipient | null>(null);
+  const [supplierMailSubject, setSupplierMailSubject] = useState("");
+  const [supplierMailText, setSupplierMailText] = useState("");
+  const [supplierMailSending, setSupplierMailSending] = useState(false);
 
   const buildFormValues = (recordValues?: Record<string, any> | string | null) => {
     const base: Record<string, any> = {};
@@ -124,6 +160,103 @@ export default function InventoryPage() {
   const confirmDeleteRecord = (record: DynamicRecord) => {
     setRecordToDelete(record);
     setDeleteRecordOpen(true);
+  };
+  const getMaterialId = (record: DynamicRecord): string => {
+  return record.inventory?.materialId ?? "";
+};
+ const handleViewItemVendors = async (
+  record: DynamicRecord,
+) => {
+  const materialId = getMaterialId(record);
+
+
+  if (!materialId) {
+    toast.error(
+      "This inventory item is not linked to a material.",
+    );
+    return;
+  }
+
+  setSelectedVendorItem(record);
+  setVendorDialogOpen(true);
+  setItemVendorsLoading(true);
+  setItemVendors([]);
+
+  try {
+    const vendors =
+      await tenderApi.vendorProducts.listByMaterial(
+        materialId,
+      );
+
+console.log(
+  "VENDORS FOR ITEM:",
+  JSON.stringify(vendors, null, 2),
+);
+
+    setItemVendors(vendors);
+  } catch (error: any) {
+    console.error(
+      "Failed to load item vendors:",
+      error,
+    );
+
+    toast.error(
+      error?.response?.data?.message ??
+        "Failed to load vendors for this item.",
+    );
+  } finally {
+    setItemVendorsLoading(false);
+  }
+};
+
+  const openSupplierMail = (vendor: SupplierMailRecipient, materialName: string) => {
+    const vendorName = vendor.name || "Supplier";
+    setSupplierMailRecipient(vendor);
+    setSupplierMailSubject(`Inventory enquiry: ${materialName}`);
+    setSupplierMailText([
+      `Dear ${vendorName},`,
+      "",
+      `We would like to discuss the availability and pricing of ${materialName}.`,
+      "Please share the current availability, lead time, and any relevant terms.",
+      "",
+      "Regards,",
+      "DVEPL Procurement Team",
+    ].join("\n"));
+  };
+
+  const closeSupplierMail = () => {
+    setSupplierMailRecipient(null);
+    setSupplierMailSubject("");
+    setSupplierMailText("");
+  };
+
+  const sendSupplierMail = async () => {
+    if (!supplierMailRecipient) return;
+    if (!supplierMailSubject.trim() || !supplierMailText.trim()) {
+      toast.error("Enter a subject and message before sending");
+      return;
+    }
+
+    try {
+      setSupplierMailSending(true);
+      const response = await apiClient.post(
+        "/settings/send-vendor-follow-up-email",
+        {
+          vendorId: supplierMailRecipient.id,
+          subject: supplierMailSubject.trim(),
+          text: supplierMailText.trim(),
+        },
+      );
+      toast.success(response.data?.message || "Supplier email sent successfully");
+      closeSupplierMail();
+    } catch (error: any) {
+      console.error("Failed to send supplier email:", error);
+      toast.error(
+        error?.response?.data?.message || "Failed to send supplier email",
+      );
+    } finally {
+      setSupplierMailSending(false);
+    }
   };
 
   const handleConfirmDeleteRecord = async () => {
@@ -314,38 +447,140 @@ export default function InventoryPage() {
     }
   };
 
-  const handleRestockAction = (record: DynamicRecord) => {
-    setRestockRecord(record);
-    setRestockOpen(true);
-  };
-
-  const handleSendVendorMail = () => {
-    if (!restockRecord) return;
-
-    const emailField = fields.find((field) => {
+  const getStockQuantityFieldName = (record: DynamicRecord) => {
+    const quantityField = fields.find((field) => {
       const label = field.label.toLowerCase();
-      return label.includes("email") || label.includes("mail");
+      return (
+        label.includes("qty") ||
+        label.includes("quantity") ||
+        label.includes("stock") ||
+        label.includes("balance")
+      );
     });
 
-    const vendorEmail = restockRecord.values?.[emailField?.fieldName ?? ""];
-    if (!vendorEmail) {
-      toast.error("No vendor email found for this item");
+    if (quantityField) return quantityField.fieldName;
+    if (record.values?.quantity !== undefined) return "quantity";
+    if (record.values?.qty !== undefined) return "qty";
+    if (record.values?.currentStock !== undefined) return "currentStock";
+    return "quantity";
+  };
+
+  const getCurrentStock = (record: DynamicRecord) => {
+    const fieldName = getStockQuantityFieldName(record);
+    return Number(record.values?.[fieldName] ?? 0);
+  };
+
+  const getNameValue = (record: DynamicRecord) => {
+    const nameField = fields.find((field) => {
+      const label = field.label.toLowerCase();
+      const key = field.fieldName.toLowerCase();
+      return label.includes("name") || key === "name" || key === "materialcode";
+    });
+
+    return String(
+      nameField?.fieldName
+        ? record.values?.[nameField.fieldName]
+        : record.values?.name ?? record.values?.materialCode ?? "Item",
+    );
+  };
+
+  const getUnitValue = (record: DynamicRecord) => {
+    const unitField = fields.find((field) => {
+      const label = field.label.toLowerCase();
+      const key = field.fieldName.toLowerCase();
+      return label.includes("unit") || key === "unit";
+    });
+
+    return String(unitField?.fieldName ? record.values?.[unitField.fieldName] : record.values?.unit ?? "");
+  };
+
+  const resetStockForm = () => {
+    setStockQty("");
+    setStockDate(new Date().toISOString().split("T")[0]);
+    setStockRate("");
+    setStockVendorName("");
+    setStockInvoiceNo("");
+    setStockOrderCode("");
+    setStockReason("");
+  };
+
+  const handleOpenStockModal = (
+    record: DynamicRecord,
+    type: "IN" | "OUT" | "ADJUST" | "RETURN",
+  ) => {
+    setStockRecord(record);
+    setStockMovType(type);
+    resetStockForm();
+    setStockOpen(true);
+  };
+
+  const handleSaveStock = async () => {
+    if (!stockRecord) return;
+
+    const qty = parseFloat(stockQty);
+    if (Number.isNaN(qty) || qty < 0) {
+      toast.error("Enter a valid quantity");
       return;
     }
 
-    const itemName = getItemName(restockRecord);
-    const subject = encodeURIComponent(`Restock request for ${itemName}`);
-    const body = encodeURIComponent(`Hello,\n\nWe need to restock the item ${itemName}. Please share availability and lead time.\n\nThanks`);
-    window.open(`mailto:${vendorEmail}?subject=${subject}&body=${body}`, "_blank");
-    setRestockOpen(false);
+    if ((stockMovType === "IN" || stockMovType === "OUT" || stockMovType === "RETURN") && qty <= 0) {
+      toast.error("Quantity must be greater than zero");
+      return;
+    }
+
+    setStockLoading(true);
+
+    try {
+      if (stockMovType === "ADJUST") {
+        await apiClient.patch(`/inventory/update/${stockRecord.id}`, {
+          currentStock: qty,
+        });
+      } else {
+        const body: Record<string, any> = {
+          // Older records created before the DynamicRecord ↔ Inventory
+          // relationship was introduced share the same id, so retain that
+          // fallback until the migration has linked them.
+          inventoryId: stockRecord.inventory?.id ?? stockRecord.id,
+          quantity: qty,
+          referenceType: "MANUAL",
+          referenceId: stockRecord.id,
+          remarks: stockReason || `${stockMovType} stock movement`,
+        };
+
+        if (stockMovType === "IN") {
+          body.referenceType = stockInvoiceNo ? "INVOICE" : "MANUAL";
+          if (stockRate) body.unitPrice = parseFloat(stockRate);
+          if (stockVendorName) body.vendorName = stockVendorName;
+          if (stockInvoiceNo) body.invoiceNo = stockInvoiceNo;
+        }
+
+        if (stockMovType === "OUT" || stockMovType === "RETURN") {
+          body.referenceType = stockOrderCode ? "SALES_ORDER" : "MANUAL";
+          body.referenceId = stockOrderCode || stockRecord.id;
+        }
+
+        if (stockMovType === "RETURN") {
+          await apiClient.post("/inventory/stock-in", body);
+        } else if (stockMovType === "IN") {
+          await apiClient.post("/inventory/stock-in", body);
+        } else {
+          await apiClient.post("/inventory/stock-out", body);
+        }
+      }
+
+      toast.success("Stock transaction completed successfully");
+      setStockOpen(false);
+      await loadRecords();
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error?.response?.data?.message ?? "Failed to submit stock transaction");
+    } finally {
+      setStockLoading(false);
+    }
   };
 
-  const handleCreatePo = () => {
-    if (!restockRecord) return;
-    navigate("/purchase/vendors", {
-      state: { fromInventory: true, inventoryItem: restockRecord },
-    });
-    setRestockOpen(false);
+  const handleRestockAction = (record: DynamicRecord) => {
+    handleOpenStockModal(record, "IN");
   };
 
   const stockOptions: Array<{ value: StockStatus; label: string }> = [
@@ -354,6 +589,29 @@ export default function InventoryPage() {
     { value: "low-stock", label: "Low Stock" },
     { value: "out-of-stock", label: "Out of Stock" },
   ];
+
+  const stockPreview = (() => {
+    const qtyVal = parseFloat(stockQty) || 0;
+    const current = stockRecord ? getCurrentStock(stockRecord) : 0;
+    const unit = stockRecord ? getUnitValue(stockRecord) : "";
+    let calculatedAfter = current;
+
+    if (stockMovType === "IN" || stockMovType === "RETURN") {
+      calculatedAfter += qtyVal;
+    } else if (stockMovType === "OUT") {
+      calculatedAfter -= qtyVal;
+    } else if (stockMovType === "ADJUST") {
+      calculatedAfter = qtyVal;
+    }
+
+    return {
+      qtyVal,
+      current,
+      unit,
+      calculatedAfter,
+      isNegative: calculatedAfter < 0,
+    };
+  })();
 
   return (
     <div className="space-y-6 p-6">
@@ -566,6 +824,7 @@ export default function InventoryPage() {
             onStock={handleRestockAction}
             onEdit={openEdit}
             onDelete={confirmDeleteRecord}
+            onVendors={handleViewItemVendors}
           />
         </>
       ) : (
@@ -604,48 +863,161 @@ export default function InventoryPage() {
       </Dialog>
 
       <Dialog open={fieldManagerOpen} onOpenChange={setFieldManagerOpen}>
-        <DialogContent className="max-w-6xl max-h-[85vh] overflow-hidden">
+        <DialogContent className="max-w-4xl h-[85vh] flex flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle>Manage Fields</DialogTitle>
           </DialogHeader>
 
-          {module && (
-            <div className="h-[calc(85vh-8rem)]">
-              <DynamicFieldManager moduleId={module.id} fields={fields} onRefresh={loadFields} />
-            </div>
-          )}
+          <div className="flex-1 min-h-0 overflow-y-auto p-4">
+            <DynamicFieldManager
+              moduleId={module?.id ?? ""}
+              fields={fields}
+              onRefresh={async () => {
+                await loadFields();
+                await loadRecords();
+              }}
+            />
+          </div>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={restockOpen} onOpenChange={setRestockOpen}>
-        <DialogContent className="max-w-md">
+      <Dialog open={stockOpen} onOpenChange={setStockOpen}>
+        <DialogContent className="max-w-md h-[85vh] flex flex-col overflow-hidden">
           <DialogHeader>
-            <DialogTitle>Restock Options</DialogTitle>
+            <DialogTitle>Stock Movement</DialogTitle>
           </DialogHeader>
 
-          {restockRecord && (
-            <div className="space-y-4">
+          {stockRecord ? (
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
               <div className="rounded-lg border bg-muted/40 p-4">
                 <div className="flex items-center gap-2">
                   <Package className="h-4 w-4" />
-                  <p className="font-medium">{getItemName(restockRecord)}</p>
+                  <p className="font-medium">{getNameValue(stockRecord)}</p>
                 </div>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  This item is currently {getStockStatus(restockRecord).replace(/-/g, " ")}.
+                  Current stock: {getCurrentStock(stockRecord)} {getUnitValue(stockRecord)}
                 </p>
               </div>
 
-              <div className="flex flex-col gap-2">
-                <Button onClick={handleSendVendorMail}>
-                  <Mail className="mr-2 h-4 w-4" />
-                  Send Mail to Vendor
-                </Button>
-
-                <Button variant="outline" onClick={handleCreatePo}>
-                  <Package className="mr-2 h-4 w-4" />
-                  Create Purchase Order
-                </Button>
+              <div className="grid grid-cols-4 gap-2">
+                {(["IN", "OUT", "ADJUST", "RETURN"] as const).map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setStockMovType(type)}
+                    className={`flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                      stockMovType === type
+                        ? "bg-card text-foreground border-border"
+                        : "bg-muted/20 text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
               </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      {stockMovType === "ADJUST" ? "New Level" : "Quantity"} *
+                    </label>
+                    <Input
+                      type="number"
+                      required
+                      min={0}
+                      step="any"
+                      placeholder="0"
+                      value={stockQty}
+                      onChange={(e) => setStockQty(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      Transaction Date
+                    </label>
+                    <Input
+                      type="date"
+                      value={stockDate}
+                      onChange={(e) => setStockDate(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {stockMovType === "IN" && (
+                  <div className="grid grid-cols-1 gap-4">
+                    
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-bold tracking-wider text-muted-foreground">
+                        Supplier Name
+                      </label>
+                      <Input
+                        placeholder="Supplier name"
+                        value={stockVendorName}
+                        onChange={(e) => setStockVendorName(e.target.value)}
+                      />
+                    </div>
+                    
+                  </div>
+                )}
+
+                {(stockMovType === "OUT" || stockMovType === "RETURN") && (
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold tracking-wider text-muted-foreground">
+                      Sales Order / Project Code Reference
+                    </label>
+                    <Input
+                      placeholder="Order or project code"
+                      value={stockOrderCode}
+                      onChange={(e) => setStockOrderCode(e.target.value)}
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Reason / Note
+                  </label>
+                  <Textarea
+                    placeholder="Enter reason or comments"
+                    value={stockReason}
+                    onChange={(e) => setStockReason(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+
+                {stockQty && (
+                  <div className="p-3 border rounded-lg bg-primary/5 text-sm text-muted-foreground">
+                    <div className="font-semibold text-foreground">
+                      Stock Level Preview: {stockPreview.current} {stockPreview.unit} ?{' '}
+                      <strong className="text-primary">{stockPreview.calculatedAfter}</strong> {stockPreview.unit}
+                    </div>
+                    {stockPreview.isNegative && (
+                      <div className="text-rose-500 font-bold mt-1">
+                        Warning: Insufficient stock after this action
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="border-t pt-4 flex items-center justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setStockOpen(false)}
+                    disabled={stockLoading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button onClick={handleSaveStock} disabled={stockLoading}>
+                    {stockLoading ? "Submitting..." : "Submit"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="p-4 text-sm text-muted-foreground">
+              Select an item to manage stock.
             </div>
           )}
         </DialogContent>
@@ -661,6 +1033,261 @@ export default function InventoryPage() {
         onConfirm={handleConfirmDeleteRecord}
         loading={isDeletingRecord}
       />
+    
+<Dialog
+  open={vendorDialogOpen}
+  onOpenChange={setVendorDialogOpen}
+>
+  <DialogContent className="w-[95vw] max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
+    <DialogHeader className="px-6 py-4 border-b shrink-0">
+      <DialogTitle className="text-lg">
+        Vendors Supplying This Item
+      </DialogTitle>
+
+      {selectedVendorItem && (
+        <p className="text-sm text-muted-foreground">
+          Select a supplier below to contact them about this item.
+        </p>
+      )}
+    </DialogHeader>
+
+    {/* Content */}
+    <div className="flex-1 min-h-0 overflow-hidden">
+      {itemVendorsLoading ? (
+        <div className="h-48 flex items-center justify-center text-sm text-muted-foreground">
+          Loading vendors...
+        </div>
+      ) : itemVendors.length === 0 ? (
+        <div className="h-48 flex flex-col items-center justify-center text-center px-6">
+          <Users className="h-10 w-10 text-muted-foreground/50 mb-3" />
+
+          <p className="text-sm font-medium">
+            No vendors found
+          </p>
+
+          <p className="text-xs text-muted-foreground mt-1">
+            No suppliers are currently associated with this item.
+          </p>
+        </div>
+      ) : (
+        <div className="h-full overflow-y-auto px-6 py-4">
+          <div className="space-y-3">
+            {itemVendors.map((association) => {
+              const vendor = association.vendor;
+              const material = association.material;
+
+              return (
+                <div
+                  key={association.id}
+                  className="rounded-lg border bg-background p-4 hover:bg-muted/30 transition-colors"
+                >
+                  {/* Vendor Header */}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold truncate">
+                          {vendor?.name ?? "Unnamed Vendor"}
+                        </h3>
+
+                        {association.isPreferred && (
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary shrink-0">
+                            Preferred
+                          </span>
+                        )}
+                      </div>
+
+                      {vendor?.contactPerson && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Contact: {vendor.contactPerson}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Email Button */}
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="shrink-0"
+                      onClick={() =>
+                        openSupplierMail(
+                          vendor,
+                          material?.name ?? "this item",
+                        )
+                      }
+                      disabled={!vendor?.email}
+                    >
+                      <Mail className="h-4 w-4 mr-1.5" />
+                      Email Vendor
+                    </Button>
+                  </div>
+
+                  {/* Vendor Contact */}
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="rounded-md bg-muted/40 px-3 py-2">
+                      <p className="text-[11px] text-muted-foreground">
+                        Email
+                      </p>
+
+                      <p className="text-sm truncate">
+                        {vendor?.email ?? "No email available"}
+                      </p>
+                    </div>
+
+                    <div className="rounded-md bg-muted/40 px-3 py-2">
+                      <p className="text-[11px] text-muted-foreground">
+                        Phone
+                      </p>
+
+                      <p className="text-sm">
+                        {vendor?.phone ?? "No phone available"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Material Details */}
+                  <div className="mt-3 pt-3 border-t">
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
+                      <div>
+                        <span className="text-muted-foreground">
+                          Item:
+                        </span>{" "}
+                        <span className="font-medium">
+                          {material?.name ?? "Unknown"}
+                        </span>
+                      </div>
+
+                      <div>
+                        <span className="text-muted-foreground">
+                          Code:
+                        </span>{" "}
+                        <span className="font-medium">
+                          {material?.materialCode ?? "—"}
+                        </span>
+                      </div>
+
+                      <div>
+                        <span className="text-muted-foreground">
+                          Unit:
+                        </span>{" "}
+                        <span className="font-medium">
+                          {material?.unit ?? "—"}
+                        </span>
+                      </div>
+
+                      <div>
+                        <span className="text-muted-foreground">
+                          Vendor Rate:
+                        </span>{" "}
+                        <span className="font-medium">
+                          {association.vendorRate ?? "—"}
+                        </span>
+                      </div>
+
+                      {association.vendorMaterialCode && (
+                        <div>
+                          <span className="text-muted-foreground">
+                            Vendor Code:
+                          </span>{" "}
+                          <span className="font-medium">
+                            {association.vendorMaterialCode}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  {association.notes && (
+                    <div className="mt-3 text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">
+                        Notes:
+                      </span>{" "}
+                      {association.notes}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+
+    {/* Footer */}
+    {!itemVendorsLoading && itemVendors.length > 0 && (
+      <div className="px-6 py-3 border-t bg-muted/20 shrink-0">
+        <p className="text-xs text-muted-foreground">
+          {itemVendors.length}{" "}
+          {itemVendors.length === 1 ? "vendor" : "vendors"} found
+        </p>
+      </div>
+    )}
+  </DialogContent>
+</Dialog>
+
+
+      <Dialog
+        open={!!supplierMailRecipient}
+        onOpenChange={(open) => {
+          if (!open) closeSupplierMail();
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              Email {supplierMailRecipient?.name || "Supplier"}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+              To: {supplierMailRecipient?.email}
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor="supplier-mail-subject">
+                Subject
+              </label>
+              <Input
+                id="supplier-mail-subject"
+                value={supplierMailSubject}
+                onChange={(event) => setSupplierMailSubject(event.target.value)}
+                disabled={supplierMailSending}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor="supplier-mail-message">
+                Message
+              </label>
+              <Textarea
+                id="supplier-mail-message"
+                rows={8}
+                value={supplierMailText}
+                onChange={(event) => setSupplierMailText(event.target.value)}
+                disabled={supplierMailSending}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={closeSupplierMail}
+                disabled={supplierMailSending}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={sendSupplierMail}
+                disabled={supplierMailSending}
+                className="gap-2"
+              >
+                <Mail className="h-4 w-4" />
+                {supplierMailSending ? "Sending..." : "Send Email"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

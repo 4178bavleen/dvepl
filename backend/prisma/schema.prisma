@@ -1945,6 +1945,8 @@ model Inventory {
   material           Material               @relation(fields: [materialId], references: [id])
   // warehouse          Warehouse              @relation(fields: [warehouseId], references: [id])
   transactions       InventoryTransaction[]
+  dynamicRecord      DynamicRecord?
+  
 
   // @@unique([materialId, warehouseId, batchNo, serialNo])
   @@index([companyId])
@@ -3125,6 +3127,7 @@ enum TransactionType {
   ADJUST
   RETURN
 }
+
 enum DynamicFieldType {
   TEXT
   NUMBER
@@ -3134,57 +3137,58 @@ enum DynamicFieldType {
 }
 
 model DynamicModule {
-  id          String   @id @default(uuid())
-  moduleKey   String   @unique
-  moduleName  String
+  id         String @id @default(uuid())
+  moduleKey  String @unique
+  moduleName String
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  fields       DynamicField[]
-  records      DynamicRecord[]
+  fields  DynamicField[]
+  records DynamicRecord[]
 }
 
 model DynamicField {
-  id           String @id @default(uuid())
+  id String @id @default(uuid())
 
-  moduleId     String
+  moduleId String
 
-  fieldName    String
-  label        String
+  fieldName String
+  label     String
 
-  type         DynamicFieldType
+  type DynamicFieldType
 
-  required     Boolean @default(false)
+  required Boolean @default(false)
 
-  visible      Boolean @default(true)
-  searchable   Boolean @default(true)
-  filterable   Boolean @default(false)
-  table        Boolean @default(true)
+  visible    Boolean @default(true)
+  searchable Boolean @default(true)
+  filterable Boolean @default(false)
+  table      Boolean @default(true)
 
   placeholder  String?
   defaultValue Json?
 
-  options      Json?
+  options Json?
 
-  orderNo      Int @default(0)
+  orderNo Int @default(0)
 
-  module       DynamicModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  module DynamicModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 
   @@unique([moduleId, fieldName])
 }
 
 model DynamicRecord {
-
-  id String @id @default(uuid())
-
+  id       String @id @default(uuid())
   moduleId String
+  values   Json
 
-  values Json 
+  inventoryId String?    @unique
+  inventory   Inventory? @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
-  createdAt DateTime @default(now())
+  module DynamicModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 
-  updatedAt DateTime @updatedAt
-
-  module DynamicModule @relation(fields:[moduleId],references:[id],onDelete:Cascade)
+  @@index([moduleId])
+  @@index([inventoryId])
 }

@@ -114,6 +114,59 @@ async function adminInventoryStockOutRoutes(
             },
           });
 
+          // The inventory table renders DynamicRecord.values, so mirror the
+          // updated balance there as well.
+          const dynamicRecord = await tx.dynamicRecord.findFirst({
+            where: {
+              OR: [
+                { inventoryId: inventory.id },
+                // Supports legacy rows whose record and inventory ids match.
+                { id: inventory.id },
+              ],
+            },
+          });
+
+          if (dynamicRecord) {
+            const dynamicFields = await tx.dynamicField.findMany({
+              where: { moduleId: dynamicRecord.moduleId },
+            });
+            const quantityFieldNames = dynamicFields
+              .filter((field) => {
+                const fieldName = field.fieldName.toLowerCase();
+                const label = field.label.toLowerCase();
+                return (
+                  fieldName === "quantity" ||
+                  fieldName === "currentstock" ||
+                  fieldName.includes("qty") ||
+                  fieldName.includes("quantity") ||
+                  fieldName.includes("stock") ||
+                  fieldName.includes("balance") ||
+                  label.includes("qty") ||
+                  label.includes("quantity") ||
+                  label.includes("stock") ||
+                  label.includes("balance")
+                );
+              })
+              .map((field) => field.fieldName);
+
+            if (quantityFieldNames.length > 0) {
+              const currentValues =
+                (dynamicRecord.values as Record<string, unknown>) || {};
+              await tx.dynamicRecord.update({
+                where: { id: dynamicRecord.id },
+                data: {
+                  values: quantityFieldNames.reduce<Record<string, unknown>>(
+                    (values, fieldName) => ({
+                      ...values,
+                      [fieldName]: Number(stockAfter.toString()),
+                    }),
+                    currentValues,
+                  ),
+                },
+              });
+            }
+          }
+
           // Create Inventory Transaction
 
           const transaction =

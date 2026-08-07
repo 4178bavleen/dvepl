@@ -11,7 +11,7 @@ interface Params {
 
 export default async function getRecordRoute(
   fastify: FastifyInstance,
-  options: FastifyPluginOptions
+  options: FastifyPluginOptions,
 ) {
   fastify.get(
     "/record/id/:id",
@@ -22,27 +22,41 @@ export default async function getRecordRoute(
     },
     async (
       request: FastifyRequest<{ Params: Params }>,
-      reply: FastifyReply
+      reply: FastifyReply,
     ) => {
-      const { id } = request.params;
+      try {
+        const { id } = request.params;
 
-      const record = await fastify.prisma.dynamicRecord.findUnique({
-        where: {
-          id,
-        },
-      });
+        const record = await fastify.prisma.dynamicRecord.findUnique({
+          where: {
+            id,
+          },
+          include: {
+            inventory: true,
+          },
+        });
 
-      if (!record) {
-        return reply.code(404).send({
+        console.log("DYNAMIC RECORD:", record);
+        console.log("INVENTORY RELATION:", record?.inventory);
+        if (!record) {
+          return reply.code(404).send({
+            success: false,
+            message: "Record not found",
+          });
+        }
+
+        return reply.send({
+          success: true,
+          data: record,
+        });
+      } catch (error) {
+        console.error("Failed to get dynamic record:", error);
+
+        return reply.code(500).send({
           success: false,
-          message: "Record not found",
+          message: "Failed to fetch record",
         });
       }
-
-      return reply.send({
-        success: true,
-        data: record,
-      });
-    }
+    },
   );
 }

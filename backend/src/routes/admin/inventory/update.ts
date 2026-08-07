@@ -181,6 +181,57 @@ async function adminInventoryUpdateRoutes(
               location: data.location !== undefined ? data.location : undefined,
             },
           });
+
+          // Keep the dynamic value shown in the inventory page consistent
+          // when a stock adjustment changes the static inventory quantity.
+          if (data.currentStock !== undefined || data.quantity !== undefined) {
+            const dynamicRecord = await tx.dynamicRecord.findFirst({
+              where: {
+                OR: [{ inventoryId: id }, { id }],
+              },
+            });
+
+            if (dynamicRecord) {
+              const dynamicFields = await tx.dynamicField.findMany({
+                where: { moduleId: dynamicRecord.moduleId },
+              });
+              const quantityFieldNames = dynamicFields
+                .filter((field) => {
+                  const fieldName = field.fieldName.toLowerCase();
+                  const label = field.label.toLowerCase();
+                  return (
+                    fieldName === "quantity" ||
+                    fieldName === "currentstock" ||
+                    fieldName.includes("qty") ||
+                    fieldName.includes("quantity") ||
+                    fieldName.includes("stock") ||
+                    fieldName.includes("balance") ||
+                    label.includes("qty") ||
+                    label.includes("quantity") ||
+                    label.includes("stock") ||
+                    label.includes("balance")
+                  );
+                })
+                .map((field) => field.fieldName);
+
+              if (quantityFieldNames.length > 0) {
+                const currentValues =
+                  (dynamicRecord.values as Record<string, unknown>) || {};
+                await tx.dynamicRecord.update({
+                  where: { id: dynamicRecord.id },
+                  data: {
+                    values: quantityFieldNames.reduce<Record<string, unknown>>(
+                      (values, fieldName) => ({
+                        ...values,
+                        [fieldName]: Number(inv.quantity.toString()),
+                      }),
+                      currentValues,
+                    ),
+                  },
+                });
+              }
+            }
+          }
           
 
           if ((request.body as any)?.customFields) {
