@@ -1,100 +1,109 @@
-import { Search } from "lucide-react";
-
+import { Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card";
-
 import { Input } from "@/components/ui/input";
-
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
+import type { Filters } from "../ExportOrdersPage";
 
-export default function FilterPanel() {
-    return (
-        <Card>
+interface Props {
+  filters: Filters;
+  setFilters: (f: Filters) => void;
+  onSearch: () => void;
+}
 
-            <CardHeader>
-                <CardTitle>
-                    Filter Orders
-                </CardTitle>
-            </CardHeader>
+export default function FilterPanel({ filters, setFilters, onSearch }: Props) {
+  const set = (key: keyof Filters) => (value: string) =>
+    setFilters({ ...filters, [key]: value });
 
-            <CardContent>
+  const handleClear = () =>
+    setFilters({
+      soNo: "",
+      customer: "",
+      status: "all",
+      assignedEngineer: "",
+      startDate: "",
+      endDate: "",
+    });
 
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
+  const hasActive =
+    filters.soNo ||
+    filters.customer ||
+    (filters.status && filters.status !== "all") ||
+    filters.assignedEngineer ||
+    filters.startDate ||
+    filters.endDate;
 
-                    <Input
-                        placeholder="Sales Order No"
-                    />
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Filter Orders</CardTitle>
+      </CardHeader>
 
-                    <Input
-                        placeholder="Customer"
-                    />
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
+          <Input
+            placeholder="Sales Order No"
+            value={filters.soNo}
+            onChange={(e) => set("soNo")(e.target.value)}
+          />
 
-                    <Select>
+          <Input
+            placeholder="Customer"
+            value={filters.customer}
+            onChange={(e) => set("customer")(e.target.value)}
+          />
 
-                        <SelectTrigger>
-                            <SelectValue placeholder="Status" />
-                        </SelectTrigger>
+          <Select value={filters.status} onValueChange={(val) => set("status")(val ?? "all")}>
+            <SelectTrigger>
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="DRAFT">Draft</SelectItem>
+              <SelectItem value="PENDING">Pending</SelectItem>
+              <SelectItem value="APPROVED">Approved</SelectItem>
+              <SelectItem value="COMPLETED">Completed</SelectItem>
+            </SelectContent>
+          </Select>
 
-                        <SelectContent>
+          <Input
+            placeholder="Assigned Engineer"
+            value={filters.assignedEngineer}
+            onChange={(e) => set("assignedEngineer")(e.target.value)}
+          />
 
-                            <SelectItem value="all">
-                                All
-                            </SelectItem>
+          <Input
+            type="date"
+            value={filters.startDate}
+            onChange={(e) => set("startDate")(e.target.value)}
+          />
 
-                            <SelectItem value="draft">
-                                Draft
-                            </SelectItem>
+          <Input
+            type="date"
+            value={filters.endDate}
+            onChange={(e) => set("endDate")(e.target.value)}
+          />
+        </div>
 
-                            <SelectItem value="pending">
-                                Pending
-                            </SelectItem>
-
-                            <SelectItem value="approved">
-                                Approved
-                            </SelectItem>
-
-                            <SelectItem value="completed">
-                                Completed
-                            </SelectItem>
-
-                        </SelectContent>
-
-                    </Select>
-
-                    <Input
-                        placeholder="Assigned Engineer"
-                    />
-
-                    <Input
-                        type="date"
-                    />
-
-                    <Input
-                        type="date"
-                    />
-
-                </div>
-
-                <div className="flex justify-end mt-6">
-
-                    <Button className="gap-2">
-
-                        <Search className="w-4 h-4" />
-
-                        Preview Orders
-
-                    </Button>
-
-                </div>
-
-            </CardContent>
-
-        </Card>
-    );
+        <div className="flex justify-end mt-6 gap-3">
+          {hasActive && (
+            <Button variant="outline" className="gap-2" onClick={handleClear}>
+              <X className="w-4 h-4" />
+              Clear
+            </Button>
+          )}
+          <Button className="gap-2" onClick={onSearch}>
+            <Search className="w-4 h-4" />
+            Preview Orders
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }

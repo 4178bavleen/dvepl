@@ -5,6 +5,7 @@ import fastifyJwt from "@fastify/jwt";
 import formbody from "@fastify/formbody";
 import path from "path";
 import multipart from "@fastify/multipart";
+import fastifyStatic from "@fastify/static";
 
 
 //Logger
@@ -37,6 +38,10 @@ async function buildApp() {
   fastify.register(prismaPlugin);
   fastify.register(utilsPlugin);
   fastify.register(multipart);
+  fastify.register(fastifyStatic, {
+    root: path.join(__dirname, "../uploads"),
+    prefix: "/uploads/",
+  });
 
   fastify.register(fastifyJwt, {
     secret: process.env.JWT_SECRET || "SecretKey",

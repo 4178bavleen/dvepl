@@ -7,7 +7,6 @@ export * from "../../configs/quotation.config";
 export * from "../../configs/salesOrder.config";
 export * from "../../configs/approvalRule.config";
 export * from "../../configs/boq.config";
-export * from "../../configs/engineering.config";
 export * from "../../configs/approvalRequest.config";
 export * from "../../configs/material.config";
 export * from "../../configs/purchase.config";

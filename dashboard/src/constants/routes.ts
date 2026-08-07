@@ -46,9 +46,7 @@ export const ROUTES = {
   SECURITY_APPROVAL_REQUESTS: '/security/approval-requests',
   
   // Engineering & Manufacturing
-  ENGINEERING_PROJECTS: '/engineering/projects',
   ENGINEERING_DRAWINGS: '/engineering/drawings',
-  ENGINEERING_BOMS: '/engineering/boms',
 
   // Materials & Master Catalog
   MATERIAL_MATERIALS: '/material/materials',
@@ -83,5 +81,5 @@ export const ROUTES = {
   RECYCLE_BIN: '/settings/recycle-bin',
   SETTINGS_APPROVAL_RULES: '/settings/approval-rules',
 
-  EXPORT_ORDERS: "/export-orders",
+  EXPORT_ORDERS: '/export-orders',
 };

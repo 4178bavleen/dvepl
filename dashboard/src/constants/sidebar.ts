@@ -29,6 +29,7 @@ import {
   Truck,
   Package,
   Trash2,
+  PenTool,
 } from "lucide-react";
 import { ROUTES } from "./routes";
 
@@ -173,6 +174,12 @@ export const sidebarItems: SidebarItem[] = [
     path: ROUTES.INVENTORY_STOCKS,
     section: "CRM",
   },
+  {
+    name: "Export Orders",
+    icon: FileText,
+    path: ROUTES.EXPORT_ORDERS,
+    section: "CRM",
+  },
 
   // Finance
   {
@@ -267,10 +274,11 @@ export const sidebarItems: SidebarItem[] = [
     section: "Settings",
   },
 
+  // Engineering & Manufacturing
   {
-    name: "Export Orders",
-    icon: FileText,
-    path: ROUTES.EXPORT_ORDERS,
-    section: "CRM",
+    name: "Engineering Drawings",
+    icon: PenTool,
+    path: ROUTES.ENGINEERING_DRAWINGS,
+    section: "Engineering",
   },
 ];

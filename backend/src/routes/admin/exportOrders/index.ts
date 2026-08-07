@@ -1,0 +1,288 @@
+import { FastifyInstance, FastifyPluginOptions, FastifyRequest, FastifyReply } from "fastify";
+import { adminLogs } from "../../../services/logger/contextLogger";
+import { DrawingStatus, DrawingType } from "@prisma/client";
+import { z } from "zod";
+
+interface Query {
+  search?: string;
+  status?: string;
+  assignedEngineer?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+async function adminExportOrdersRouteGroup(
+  fastify: FastifyInstance,
+  options: FastifyPluginOptions
+) {
+  // Pre-handler hook for verification
+  const preHandlers = [fastify.verifyToken];
+
+  // 1. Get Matching Sales Orders with filters
+  fastify.get(
+    "/read",
+    {
+      schema: {
+        tags: ["Export Orders"],
+        summary: "Get Sales Orders for Exporting",
+        description: "Fetch matching sales orders with criteria for export reports",
+      },
+      preHandler: preHandlers,
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { search, status, assignedEngineer, startDate, endDate } =
+          (request.query as Query);
+        const companyId = request.admin?.companyId;
+
+        if (!companyId) {
+          return reply.status(401).send({
+            success: false,
+            message: "Unauthorized. Company info missing.",
+          });
+        }
+
+        const where: any = {
+          companyId,
+          deletedAt: null,
+        };
+
+        if (search) {
+          where.OR = [
+            { dveplCode: { contains: search, mode: "insensitive" } },
+            { partyName: { contains: search, mode: "insensitive" } },
+          ];
+        }
+
+        if (status && status !== "all") {
+          // Normalize status
+          where.status = status.toUpperCase();
+        }
+
+        if (assignedEngineer) {
+          where.assignments = {
+            some: {
+              user: {
+                name: { contains: assignedEngineer, mode: "insensitive" },
+              },
+            },
+          };
+        }
+
+        if (startDate || endDate) {
+          where.createdAt = {};
+          if (startDate) {
+            where.createdAt.gte = new Date(startDate);
+          }
+          if (endDate) {
+            where.createdAt.lte = new Date(endDate);
+          }
+        }
+
+        const orders = await fastify.prisma.salesOrder.findMany({
+          where,
+          include: {
+            assignments: {
+              include: {
+                user: {
+                  select: { id: true, name: true, email: true },
+                },
+              },
+            },
+            items: true,
+            engineeringProjects: {
+              where: { deletedAt: null },
+              include: {
+                drawings: {
+                  where: { deletedAt: null },
+                },
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        });
+
+        return reply.send({
+          success: true,
+          data: orders,
+        });
+      } catch (error: any) {
+        adminLogs.error("Failed to read export orders", { error });
+        return reply.status(500).send({
+          success: false,
+          message: "Server error reading export orders.",
+          error: error.message,
+        });
+      }
+    }
+  );
+
+  // 2. Read drawings for specific sales order IDs
+  interface DrawingsQuery { orderIds?: string; }
+  fastify.get(
+    "/drawings",
+    {
+      schema: {
+        tags: ["Export Orders"],
+        summary: "Get Drawings for selected Sales Orders",
+      },
+      preHandler: preHandlers,
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { orderIds } = (request.query as { orderIds?: string });
+        if (!orderIds) {
+          return reply.send({ success: true, data: [] });
+        }
+
+        const ids = orderIds.split(",").filter(Boolean);
+        if (ids.length === 0) {
+          return reply.send({ success: true, data: [] });
+        }
+
+        const drawings = await fastify.prisma.engineeringDrawing.findMany({
+          where: {
+            project: {
+              salesOrderId: { in: ids },
+              deletedAt: null,
+            },
+            deletedAt: null,
+          },
+          include: {
+            project: {
+              select: { id: true, name: true, salesOrderId: true },
+            },
+          },
+        });
+
+        return reply.send({ success: true, data: drawings });
+      } catch (error: any) {
+        adminLogs.error("Failed to fetch drawings for orders", { error });
+        return reply.status(500).send({
+          success: false,
+          message: "Server error fetching drawings.",
+          error: error.message,
+        });
+      }
+    }
+  );
+
+  // 3. Create engineering drawing associated with sales order
+  fastify.post(
+    "/create-drawing",
+    {
+      schema: {
+        tags: ["Export Orders"],
+        summary: "Create engineering drawing for a sales order",
+      },
+      preHandler: preHandlers,
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const bodySchema = z.object({
+          salesOrderId: z.string().uuid(),
+          drawingNo: z.string().trim().min(1),
+          title: z.string().trim().min(1),
+          drawingType: z.nativeEnum(DrawingType),
+          fileUrl: z.string().url(),
+          fileName: z.string().trim().min(1),
+          fileSize: z.number().int().optional().nullable(),
+          mimeType: z.string().trim().optional().nullable(),
+        });
+
+        const validation = bodySchema.safeParse(request.body);
+        if (!validation.success) {
+          return reply.status(400).send({
+            success: false,
+            message: "Invalid request data.",
+            error: validation.error.issues,
+          });
+        }
+
+        const data = validation.data;
+        const companyId = request.admin?.companyId;
+        const userId = request.admin?.id;
+
+        if (!companyId || !userId) {
+          return reply.status(401).send({
+            success: false,
+            message: "Unauthorized. Missing token info.",
+          });
+        }
+
+        // Get Sales Order
+        const salesOrder = await fastify.prisma.salesOrder.findFirst({
+          where: { id: data.salesOrderId, companyId, deletedAt: null },
+        });
+
+        if (!salesOrder) {
+          return reply.status(404).send({
+            success: false,
+            message: "Sales Order not found.",
+          });
+        }
+
+        // Find or create EngineeringProject linked to this Sales Order
+        let project = await fastify.prisma.engineeringProject.findFirst({
+          where: { salesOrderId: data.salesOrderId, companyId, deletedAt: null },
+        });
+
+        if (!project) {
+          project = await fastify.prisma.engineeringProject.create({
+            data: {
+              name: `Project for ${salesOrder.dveplCode}`,
+              salesOrderId: data.salesOrderId,
+              companyId,
+              createdById: userId,
+            },
+          });
+        }
+
+        // Check if drawing number exists
+        const existingDrawing = await fastify.prisma.engineeringDrawing.findUnique({
+          where: { drawingNo: data.drawingNo },
+        });
+
+        if (existingDrawing) {
+          return reply.status(409).send({
+            success: false,
+            message: "Drawing number already exists. Please choose a unique reference.",
+          });
+        }
+
+        // Create the drawing
+        const drawing = await fastify.prisma.engineeringDrawing.create({
+          data: {
+            projectId: project.id,
+            drawingNo: data.drawingNo,
+            title: data.title,
+            drawingType: data.drawingType,
+            fileUrl: data.fileUrl,
+            fileName: data.fileName,
+            fileSize: data.fileSize,
+            mimeType: data.mimeType,
+            createdById: userId,
+            status: DrawingStatus.PENDING,
+          },
+        });
+
+        adminLogs.info("Created drawing for sales order export context", { drawingId: drawing.id });
+
+        return reply.status(201).send({
+          success: true,
+          message: "Drawing created successfully.",
+          data: drawing,
+        });
+      } catch (error: any) {
+        adminLogs.error("Failed to create drawing under export orders context", { error });
+        return reply.status(500).send({
+          success: false,
+          message: "Server Error.",
+          error: error.message,
+        });
+      }
+    }
+  );
+}
+
+export default adminExportOrdersRouteGroup;

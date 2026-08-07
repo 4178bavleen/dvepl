@@ -49,6 +49,8 @@ import adminPaymentRouteGroup from "./payment/index";
 import adminVendorProductRouteGroup from "./vendorProduct/index";
 import goodsReceiptRoutes from "./goodsRecipt";
 
+import adminUploadRouteGroup from "./upload/index";
+import adminExportOrdersRouteGroup from "./exportOrders/index";
 import dynamicRoutes from "./dynamic";
 
 // import notificationRoutes from "./notification";
@@ -243,8 +245,12 @@ async function adminRoutes(
   prefix: "/purchase-order",
 });
 
-fastify.register(dynamicRoutes, {
-  prefix: "/dynamic",
+fastify.register(dynamicRoutes, { prefix: "/dynamic" });
+  fastify.register(adminUploadRouteGroup, {
+  prefix: "/upload",
+});
+  fastify.register(adminExportOrdersRouteGroup, {
+  prefix: "/export-orders",
 });
   });
 }

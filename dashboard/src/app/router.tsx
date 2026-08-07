@@ -74,14 +74,6 @@ const OrdersPage = lazy(() => import("@/pages/tenders/ordersPage"));
 const VendorsPage = lazy(() => import("@/pages/vendors/vendorsPage"));
 const BoqsPage = lazy(() => import("@/pages/tenders/boqsPage"));
 
-// Engineering & Manufacturing
-const EngineeringProjectsPage = lazy(
-  () => import("@/pages/engineering/engineeringProjectsPage"),
-);
-const EngineeringDrawingsPage = lazy(
-  () => import("@/pages/engineering/engineeringDrawingsPage"),
-);
-const BomsPage = lazy(() => import("@/pages/engineering/bomsPage"));
 
 // Security & Audit
 const RolesPage = lazy(() => import("@/pages/roles/rolesPage"));
@@ -142,6 +134,7 @@ const NotificationsPage = lazy(
 );
 const DeliveryPage = lazy(() => import("@/pages/delivery/deliveryPage"));
 const ExportOrdersPage = lazy(() => import("@/pages/exportOrders/ExportOrdersPage"));
+
 
 export function AppRouter() {
   return (
@@ -219,17 +212,6 @@ export function AppRouter() {
                 path="/security/approval-requests"
                 element={<ApprovalRequestsPage />}
               />
-
-              {/* Engineering & Manufacturing */}
-              <Route
-                path="/engineering/projects"
-                element={<EngineeringProjectsPage />}
-              />
-              <Route
-                path="/engineering/drawings"
-                element={<EngineeringDrawingsPage />}
-              />
-              <Route path="/engineering/boms" element={<BomsPage />} />
 
               {/* Materials & Master Catalog */}
               <Route path="/material/materials" element={<MaterialsPage />} />

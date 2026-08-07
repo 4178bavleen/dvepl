@@ -10,7 +10,7 @@ const unwrap = async <T>(request: Promise<{ data: ApiResponse<T> }>) => (await r
 type CrudEndpoints = { list: string; create: string; update?: (id: string) => string; remove?: (id: string) => string };
 
 const crud = (paths: CrudEndpoints, options: { updateMethod?: 'put' | 'patch'; update?: boolean; remove?: boolean } = {}): ResourceApi<any> => ({
-  list: () => unwrap(apiClient.get<ApiResponse<ApiRecord[]>>(paths.list)),
+  list: (params) => unwrap(apiClient.get<ApiResponse<ApiRecord[]>>(paths.list, { params })),
   create: (data) => unwrap(apiClient.post<ApiResponse<ApiRecord>>(paths.create, data)),
   ...(options.update === false ? {} : {
     update: (id: string, data: Record<string, unknown>) => options.updateMethod === 'patch'
@@ -120,12 +120,6 @@ export const securityApi = {
   }
 };
 
-export const engineeringApi = {
-  projects: crud((API_ENDPOINTS as any).engineering.projects),
-  drawings: crud((API_ENDPOINTS as any).engineering.drawings),
-  boms: crud((API_ENDPOINTS as any).engineering.boms),
-};
-
 export const workflowApi = {
   approvalRequests: crud((API_ENDPOINTS as any).workflow.approvalRequests),
 };
@@ -204,4 +198,34 @@ export const financePaymentApi = {
   // Delete (soft-revert) a payment
   deletePayment: (id: string) =>
     apiClient.delete(`/payment/delete/${id}`).then(res => res.data),
+};
+
+// Export Orders API
+export const exportOrdersApi = {
+  // List sales orders with optional filters
+  listOrders: (params?: {
+    search?: string;
+    status?: string;
+    assignedEngineer?: string;
+    startDate?: string;
+    endDate?: string;
+  }) => apiClient.get('/export-orders/read', { params }).then(res => res.data),
+
+  // Fetch all drawings associated with given sales order IDs
+  listDrawings: (orderIds: string[]) =>
+    apiClient
+      .get('/export-orders/drawings', { params: { orderIds: orderIds.join(',') } })
+      .then(res => res.data),
+
+  // Create a drawing record, automatically linking/creating the project for the given sales order
+  createDrawing: (data: {
+    salesOrderId: string;
+    drawingNo: string;
+    title: string;
+    drawingType: string;
+    fileUrl: string;
+    fileName: string;
+    fileSize?: number | null;
+    mimeType?: string | null;
+  }) => apiClient.post('/export-orders/create-drawing', data).then(res => res.data),
 };

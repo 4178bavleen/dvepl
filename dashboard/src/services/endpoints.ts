@@ -269,26 +269,6 @@ export const API_ENDPOINTS = {
       importBackup: '/settings/backup/import',
     },
   },
-  engineering: {
-    projects: {
-      list: '/engineering-project/read/',
-      create: '/engineering-project/create/',
-      update: (id: string) => `/engineering-project/update/${id}`,
-      remove: (id: string) => `/engineering-project/delete/${id}`,
-    },
-    drawings: {
-      list: '/engineering-drawing/read/',
-      create: '/engineering-drawing/create/',
-      update: (id: string) => `/engineering-drawing/update/${id}`,
-      remove: (id: string) => `/engineering-drawing/delete/${id}`,
-    },
-    boms: {
-      list: '/bom/read/',
-      create: '/bom/create/',
-      update: (id: string) => `/bom/update/${id}`,
-      remove: (id: string) => `/bom/delete/${id}`,
-    },
-  },
   workflow: {
     approvalRequests: {
       list: '/approval-request/read/',
@@ -445,5 +425,10 @@ export const API_ENDPOINTS = {
       update: (id: string) => `/expense/update/${id}`,
       remove: (id: string) => `/expense/delete/${id}`,
     },
+  },
+  exportOrders: {
+    list: '/export-orders/read',
+    drawings: '/export-orders/drawings',
+    createDrawing: '/export-orders/create-drawing',
   },
 } as const;
