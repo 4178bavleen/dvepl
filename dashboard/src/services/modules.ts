@@ -169,7 +169,7 @@ export const logisticsApi = {
 
 export const reportsApi = {
   getReport: (type: string, fromDate?: string, toDate?: string) =>
-    apiClient.get(`/reports/read/`, { params: { type, fromDate, toDate } }).then(res => res.data)
+    apiClient.get(`/reports/read`, { params: { type, fromDate, toDate } }).then(res => res.data)
 };
 
 // Finance Payment API (used by Finance Manager pages)

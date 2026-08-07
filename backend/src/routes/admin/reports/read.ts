@@ -77,13 +77,26 @@ async function adminReportReadRouteGroup(fastify: FastifyInstance, options: Fast
           return (rate + (rate * gst) / 100) * qty;
         };
 
+        const getFormattedDate = (date: any): string => {
+          if (!date) return "";
+          try {
+            const d = new Date(date);
+            if (isNaN(d.getTime())) return "";
+            return d.toISOString().split("T")[0];
+          } catch {
+            return "";
+          }
+        };
+
+        adminLogs.info(`Report request received: type=${type}, fromDate=${fromDate}, toDate=${toDate}, totalOrdersInDB=${orders.length}`);
+
         // 1. Filter by Date range
         const filtered = orders.filter((o) => {
-          const oDate = o.orderConfirmDate 
-            ? o.orderConfirmDate.toISOString().split("T")[0]
-            : o.poDate 
-              ? o.poDate.toISOString().split("T")[0]
-              : o.createdAt.toISOString().split("T")[0];
+          const oDate = getFormattedDate(o.orderConfirmDate) ||
+                        getFormattedDate(o.poDate) ||
+                        getFormattedDate(o.createdAt);
+
+          if (!oDate) return false;
 
           if (fromDate && oDate < fromDate) return false;
           if (toDate && oDate > toDate) return false;
@@ -117,11 +130,10 @@ async function adminReportReadRouteGroup(fastify: FastifyInstance, options: Fast
         else if (type === "datewise") {
           const map: Record<string, any> = {};
           filtered.forEach((o) => {
-            const date = o.orderConfirmDate 
-              ? o.orderConfirmDate.toISOString().split("T")[0]
-              : o.poDate 
-                ? o.poDate.toISOString().split("T")[0]
-                : o.createdAt.toISOString().split("T")[0];
+            const date = getFormattedDate(o.orderConfirmDate) ||
+                         getFormattedDate(o.poDate) ||
+                         getFormattedDate(o.createdAt) ||
+                         "Unknown Date";
 
             if (!map[date]) {
               map[date] = { date, count: 0, revenue: 0 };
@@ -174,7 +186,7 @@ async function adminReportReadRouteGroup(fastify: FastifyInstance, options: Fast
             orderPlaceTo: (o as any).orderPlaceTo || "—",
             poNumber: (o as any).poNumber || "—",
             materialStatus: (o as any).materialStatus || "—",
-            poDate: o.poDate ? o.poDate.toISOString().split("T")[0] : "—"
+            poDate: getFormattedDate(o.poDate) || "—"
           }));
         } 
         
@@ -187,15 +199,15 @@ async function adminReportReadRouteGroup(fastify: FastifyInstance, options: Fast
               dveplCode: o.dveplCode || "—",
               customerName: o.partyName || o.customer?.name || "—",
               item,
-              orderDate: o.orderConfirmDate 
-                ? o.orderConfirmDate.toISOString().split("T")[0] 
-                : o.createdAt.toISOString().split("T")[0],
+              orderDate: getFormattedDate(o.orderConfirmDate) || getFormattedDate(o.createdAt) || "—",
               deliveryTarget: o.deliveryMonthTarget || "—",
-              completeDate: (o as any).orderCompleteDate ? (o as any).orderCompleteDate.toISOString().split("T")[0] : "—",
+              completeDate: getFormattedDate((o as any).orderCompleteDate) || "—",
               status: o.status || "—"
             };
           });
         }
+
+        adminLogs.info(`Report generated successfully: type=${type}, filteredOrders=${filtered.length}, dataRows=${dataRows.length}`);
 
         return reply.send({
           success: true,

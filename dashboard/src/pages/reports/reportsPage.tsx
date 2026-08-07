@@ -98,22 +98,25 @@ export default function ReportsPage() {
   }, [visibleTabs]);
 
   // Format Currency
-  const formatCurrency = (amount: number) => {
-    return amount.toLocaleString("en-IN", {
+  const formatCurrency = (amount: any) => {
+    const num = Number(amount || 0);
+    return (isNaN(num) ? 0 : num).toLocaleString("en-IN", {
       maximumFractionDigits: 2,
       style: "currency",
       currency: "INR"
     });
   };
 
-  const formatShortCurrency = (amount: number) => {
-    if (amount >= 10000000) {
-      return `₹${(amount / 10000000).toFixed(1)} Cr`;
+  const formatShortCurrency = (amount: any) => {
+    const num = Number(amount || 0);
+    const val = isNaN(num) ? 0 : num;
+    if (val >= 10000000) {
+      return `₹${(val / 10000000).toFixed(1)} Cr`;
     }
-    if (amount >= 100000) {
-      return `₹${(amount / 100000).toFixed(1)} L`;
+    if (val >= 100000) {
+      return `₹${(val / 100000).toFixed(1)} L`;
     }
-    return formatCurrency(amount);
+    return formatCurrency(val);
   };
 
   // Run Report Logic (Delegated to Backend API)
@@ -127,7 +130,12 @@ export default function ReportsPage() {
       );
 
       if (res && res.success) {
-        setSummaryStats(res.summary);
+        setSummaryStats({
+          total: res.summary?.total || 0,
+          revenue: res.summary?.revenue || 0,
+          completed: res.summary?.completed || 0,
+          pending: res.summary?.pending || 0
+        });
         setReportData(res.data || []);
         setReportRan(true);
         toast.success(res.message || "Report updated successfully from server.");
@@ -200,26 +208,43 @@ export default function ReportsPage() {
     return reportData.map((r, i) => {
       switch (currentReport) {
         case "customer":
-          return [i + 1, r.name, r.count, r.pending, r.completed, formatCurrency(r.revenue)];
+          return [i + 1, r?.name || "—", r?.count || 0, r?.pending || 0, r?.completed || 0, formatCurrency(r?.revenue)];
         case "datewise":
-          return [i + 1, r.date, r.count, formatCurrency(r.revenue)];
+          return [i + 1, r?.date || "—", r?.count || 0, formatCurrency(r?.revenue)];
         case "salesperson":
-          return [i + 1, r.name, r.count, r.completed, formatCurrency(r.revenue)];
+          return [i + 1, r?.name || "—", r?.count || 0, r?.completed || 0, formatCurrency(r?.revenue)];
         case "finance":
           return [
             i + 1,
-            r.dveplCode,
-            r.customerName,
-            r.items,
-            formatCurrency(r.total),
-            formatCurrency(r.paid),
-            formatCurrency(r.balance),
-            r.status
+            r?.dveplCode || "—",
+            r?.customerName || "—",
+            r?.items || "—",
+            formatCurrency(r?.total),
+            formatCurrency(r?.paid),
+            formatCurrency(r?.balance),
+            r?.status || "—"
           ];
         case "procurement":
-          return [i + 1, r.dveplCode, r.customerName, r.orderPlaceTo, r.poNumber, r.materialStatus, r.poDate];
+          return [
+            i + 1,
+            r?.dveplCode || "—",
+            r?.customerName || "—",
+            r?.orderPlaceTo || "—",
+            r?.poNumber || "—",
+            r?.materialStatus || "—",
+            r?.poDate || "—"
+          ];
         case "delivery":
-          return [i + 1, r.dveplCode, r.customerName, r.item, r.orderDate, r.deliveryTarget, r.completeDate, r.status];
+          return [
+            i + 1,
+            r?.dveplCode || "—",
+            r?.customerName || "—",
+            r?.item || "—",
+            r?.orderDate || "—",
+            r?.deliveryTarget || "—",
+            r?.completeDate || "—",
+            r?.status || "—"
+          ];
         default:
           return [];
       }
