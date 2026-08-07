@@ -347,7 +347,10 @@ export const apiService = {
 };
 
 export function VendorsPage() {
-  const { currentCompanyId, companies } = useERPStore();
+  const { currentCompanyId, companies, users, currentUserId } = useERPStore();
+  const currentUser = users?.find((u: any) => u.id === currentUserId) as any;
+  const canCreate = currentUser?.actionPermissions?.create !== false;
+
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [revisions, setRevisions] = useState<PORevision[]>([]);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
@@ -2869,12 +2872,14 @@ export function VendorsPage() {
             </p>
           </div>
         </div>
-        <Button
-          onClick={() => setIsFormOpen(true)}
-          className="gap-2 bg-primary text-white font-semibold"
-        >
-          + Add Vendor
-        </Button>
+        {canCreate && (
+          <Button
+            onClick={() => setIsFormOpen(true)}
+            className="gap-2 bg-primary text-white font-semibold"
+          >
+            + Add Vendor
+          </Button>
+        )}
       </div>
 
       {/* ── Add/Edit Vendor Form Section ── */}
@@ -2951,8 +2956,7 @@ export function VendorsPage() {
                     </p>
                   )}
                 </div>
-                {vendorCustomFields.some((f) => f.afterField === "name") && (
-                  <div className="sm:col-span-2">
+                 {vendorCustomFields.some((f) => f.afterField === "name") && (
                     <DynamicFormRenderer
                       fields={vendorCustomFields}
                       values={vCustomFields}
@@ -2964,21 +2968,19 @@ export function VendorsPage() {
                       errors={vErrors}
                       afterFieldPosition="name"
                     />
-                  </div>
-                )}
-
-                <div className="flex flex-col gap-1.5">
-                  <Label className="text-xs font-semibold">Category</Label>
-                  <Input
-                    value={vCategory}
-                    onChange={(e) => setVCategory(e.target.value)}
-                    placeholder="e.g. Electrical, Mechanical"
-                  />
-                </div>
-                {vendorCustomFields.some(
-                  (f) => f.afterField === "category",
-                ) && (
-                    <div className="sm:col-span-2">
+                 )}
+ 
+                 <div className="flex flex-col gap-1.5">
+                   <Label className="text-xs font-semibold">Category</Label>
+                   <Input
+                     value={vCategory}
+                     onChange={(e) => setVCategory(e.target.value)}
+                     placeholder="e.g. Electrical, Mechanical"
+                   />
+                 </div>
+                 {vendorCustomFields.some(
+                   (f) => f.afterField === "category",
+                 ) && (
                       <DynamicFormRenderer
                         fields={vendorCustomFields}
                         values={vCustomFields}
@@ -2990,23 +2992,21 @@ export function VendorsPage() {
                         errors={vErrors}
                         afterFieldPosition="category"
                       />
-                    </div>
-                  )}
-
-                <div className="flex flex-col gap-1.5">
-                  <Label className="text-xs font-semibold">
-                    Contact Person
-                  </Label>
-                  <Input
-                    value={vContact}
-                    onChange={(e) => setVContact(e.target.value)}
-                    placeholder="e.g. Rajesh Kumar"
-                  />
-                </div>
-                {vendorCustomFields.some(
-                  (f) => f.afterField === "contactPerson",
-                ) && (
-                    <div className="sm:col-span-2">
+                   )}
+ 
+                 <div className="flex flex-col gap-1.5">
+                   <Label className="text-xs font-semibold">
+                     Contact Person
+                   </Label>
+                   <Input
+                     value={vContact}
+                     onChange={(e) => setVContact(e.target.value)}
+                     placeholder="e.g. Rajesh Kumar"
+                   />
+                 </div>
+                 {vendorCustomFields.some(
+                   (f) => f.afterField === "contactPerson",
+                 ) && (
                       <DynamicFormRenderer
                         fields={vendorCustomFields}
                         values={vCustomFields}
@@ -3018,8 +3018,7 @@ export function VendorsPage() {
                         errors={vErrors}
                         afterFieldPosition="contactPerson"
                       />
-                    </div>
-                  )}
+                   )}
 
                 <div className="flex flex-col gap-1.5">
                   <Label className="text-xs font-semibold">Phone</Label>
@@ -3049,8 +3048,7 @@ export function VendorsPage() {
                     </p>
                   )}
                 </div>
-                {vendorCustomFields.some((f) => f.afterField === "phone") && (
-                  <div className="sm:col-span-2">
+                 {vendorCustomFields.some((f) => f.afterField === "phone") && (
                     <DynamicFormRenderer
                       fields={vendorCustomFields}
                       values={vCustomFields}
@@ -3062,35 +3060,33 @@ export function VendorsPage() {
                       errors={vErrors}
                       afterFieldPosition="phone"
                     />
-                  </div>
-                )}
-
-                <div className="flex flex-col gap-1.5">
-                  <Label className="text-xs font-semibold">Email</Label>
-                  <Input
-                    type="text"
-                    value={vEmail}
-                    onChange={(e) => {
-                      setVEmail(e.target.value);
-                      if (vErrors.email)
-                        setVErrors((p) => ({ ...p, email: "" }));
-                    }}
-                    placeholder="vendor@company.com"
-                    className={
-                      vErrors.email
-                        ? "border-destructive focus-visible:ring-destructive"
-                        : ""
-                    }
-                  />
-                  {vErrors.email && (
-                    <p className="text-xs text-destructive flex items-center gap-1">
-                      <AlertCircle className="size-3" />
-                      {vErrors.email}
-                    </p>
-                  )}
-                </div>
-                {vendorCustomFields.some((f) => f.afterField === "email") && (
-                  <div className="sm:col-span-2">
+                 )}
+ 
+                 <div className="flex flex-col gap-1.5">
+                   <Label className="text-xs font-semibold">Email</Label>
+                   <Input
+                     type="text"
+                     value={vEmail}
+                     onChange={(e) => {
+                       setVEmail(e.target.value);
+                       if (vErrors.email)
+                         setVErrors((p) => ({ ...p, email: "" }));
+                     }}
+                     placeholder="vendor@company.com"
+                     className={
+                       vErrors.email
+                         ? "border-destructive focus-visible:ring-destructive"
+                         : ""
+                     }
+                   />
+                   {vErrors.email && (
+                     <p className="text-xs text-destructive flex items-center gap-1">
+                       <AlertCircle className="size-3" />
+                       {vErrors.email}
+                     </p>
+                   )}
+                 </div>
+                 {vendorCustomFields.some((f) => f.afterField === "email") && (
                     <DynamicFormRenderer
                       fields={vendorCustomFields}
                       values={vCustomFields}
@@ -3102,8 +3098,7 @@ export function VendorsPage() {
                       errors={vErrors}
                       afterFieldPosition="email"
                     />
-                  </div>
-                )}
+                 )}
 
                 <div className="flex flex-col gap-1.5 sm:col-span-2">
                   <Label className="text-xs font-semibold">GST Number</Label>
@@ -3128,10 +3123,9 @@ export function VendorsPage() {
                     </p>
                   )}
                 </div>
-                {vendorCustomFields.some(
-                  (f) => f.afterField === "gstNumber",
-                ) && (
-                    <div className="sm:col-span-2">
+                 {vendorCustomFields.some(
+                   (f) => f.afterField === "gstNumber",
+                 ) && (
                       <DynamicFormRenderer
                         fields={vendorCustomFields}
                         values={vCustomFields}
@@ -3143,19 +3137,17 @@ export function VendorsPage() {
                         errors={vErrors}
                         afterFieldPosition="gstNumber"
                       />
-                    </div>
-                  )}
-
-                <div className="flex flex-col gap-1.5 sm:col-span-2">
-                  <Label className="text-xs font-semibold">Address</Label>
-                  <Input
-                    value={vAddress}
-                    onChange={(e) => setVAddress(e.target.value)}
-                    placeholder="Full address"
-                  />
-                </div>
-                {vendorCustomFields.some((f) => f.afterField === "address") && (
-                  <div className="sm:col-span-2">
+                   )}
+ 
+                 <div className="flex flex-col gap-1.5 sm:col-span-2">
+                   <Label className="text-xs font-semibold">Address</Label>
+                   <Input
+                     value={vAddress}
+                     onChange={(e) => setVAddress(e.target.value)}
+                     placeholder="Full address"
+                   />
+                 </div>
+                 {vendorCustomFields.some((f) => f.afterField === "address") && (
                     <DynamicFormRenderer
                       fields={vendorCustomFields}
                       values={vCustomFields}
@@ -3167,20 +3159,18 @@ export function VendorsPage() {
                       errors={vErrors}
                       afterFieldPosition="address"
                     />
-                  </div>
-                )}
-
-                <div className="flex flex-col gap-1.5 sm:col-span-2">
-                  <Label className="text-xs font-semibold">Notes</Label>
-                  <Textarea
-                    value={vNotes}
-                    onChange={(e) => setVNotes(e.target.value)}
-                    placeholder="Any additional notes..."
-                    rows={2}
-                  />
-                </div>
-                {vendorCustomFields.some((f) => f.afterField === "notes") && (
-                  <div className="sm:col-span-2">
+                 )}
+ 
+                 <div className="flex flex-col gap-1.5 sm:col-span-2">
+                   <Label className="text-xs font-semibold">Notes</Label>
+                   <Textarea
+                     value={vNotes}
+                     onChange={(e) => setVNotes(e.target.value)}
+                     placeholder="Any additional notes..."
+                     rows={2}
+                   />
+                 </div>
+                 {vendorCustomFields.some((f) => f.afterField === "notes") && (
                     <DynamicFormRenderer
                       fields={vendorCustomFields}
                       values={vCustomFields}
@@ -3192,17 +3182,15 @@ export function VendorsPage() {
                       errors={vErrors}
                       afterFieldPosition="notes"
                     />
-                  </div>
-                )}
-
-                {/* Dynamic EAV Custom Fields without specific afterField position or assigned to end */}
-                {vendorCustomFields.some(
-                  (f) => !f.afterField || f.afterField === "end",
-                ) && (
-                    <div className="sm:col-span-2">
+                 )}
+ 
+                 {/* Dynamic EAV Custom Fields without specific afterField position or assigned to end */}
+                 {vendorCustomFields.some(
+                   (f) => !f.afterField || f.afterField === "end" || !["name", "category", "contactPerson", "phone", "email", "gstNumber", "address", "notes"].includes(f.afterField),
+                 ) && (
                       <DynamicFormRenderer
                         fields={vendorCustomFields.filter(
-                          (f) => !f.afterField || f.afterField === "end",
+                          (f) => !f.afterField || f.afterField === "end" || !["name", "category", "contactPerson", "phone", "email", "gstNumber", "address", "notes"].includes(f.afterField),
                         )}
                         values={vCustomFields}
                         onChange={(key, val) => {
@@ -3212,8 +3200,7 @@ export function VendorsPage() {
                         }}
                         errors={vErrors}
                       />
-                    </div>
-                  )}
+                   )}
               </div>
             )}
 

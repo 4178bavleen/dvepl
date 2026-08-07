@@ -46,6 +46,11 @@ async function readUsersRoute(
                 role: true,
               },
             },
+            employee: {
+              include: {
+                team: true,
+              },
+            },
           },
           orderBy: {
             createdAt: "desc",
@@ -55,7 +60,7 @@ async function readUsersRoute(
         return reply.status(200).send({
           success: true,
           message: "Users fetched successfully.",
-          data: users.map((user) => {
+          data: users.map((user: any) => {
             const up = user.accessProfile;
             return {
               id: user.id,
@@ -72,7 +77,9 @@ async function readUsersRoute(
               pageAccess: up?.pageAccess || [],
               fieldPermissions: up?.fieldPermissions || {},
               actionPermissions: up?.actionPermissions || { create: true, edit: true, delete: false, export: true },
-              roles: user.userRoles.map((ur) => ({
+              teamId: user.employee?.teamId || null,
+              teamName: user.employee?.team?.name || null,
+              roles: user.userRoles.map((ur: any) => ({
                 id: ur.role.id,
                 name: ur.role.name,
               })),

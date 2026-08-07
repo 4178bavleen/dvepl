@@ -27,6 +27,7 @@ import { apiClient } from "@/services/axios";
 import { DynamicFormRenderer } from "@/components/customFields/dynamicFormRenderer";
 import { useDynamicCustomFields, validateCustomFields } from "@/hooks/useDynamicCustomFields";
 import { ConfirmDialog } from "@/components/shared/confirmDialog";
+import { useERPStore } from "@/store/erpStore";
 
 // Definitions
 interface Task {
@@ -81,6 +82,10 @@ export const apiService = {
 };
 
 export default function TasksPage() {
+  const store = useERPStore();
+  const currentUser = store.users.find((u: any) => u.id === store.currentUserId) as any;
+  const canCreate = currentUser?.actionPermissions?.create !== false;
+
   // Empty Database States (Mock data removed)
   const [tasks, setTasks] = useState<Task[]>([]);
   const [users, setUsers] = useState<Array<{ id: string; name: string }>>([]);
@@ -556,16 +561,18 @@ export default function TasksPage() {
               Send Overdue Reminders
             </Button>
 
-            <Button
-              onClick={() => {
-                resetForm();
-                setIsFormOpen(true);
-              }}
-              size="sm"
-              className="h-9 text-xs font-semibold gap-1.5"
-            >
-              <Plus className="size-4" /> Add Task
-            </Button>
+            {canCreate && (
+              <Button
+                onClick={() => {
+                  resetForm();
+                  setIsFormOpen(true);
+                }}
+                size="sm"
+                className="h-9 text-xs font-semibold gap-1.5"
+              >
+                <Plus className="size-4" /> Add Task
+              </Button>
+            )}
           </div>
         </div>
 
@@ -749,16 +756,18 @@ export default function TasksPage() {
               />
             </div>
             {taskCustomFields.some(f => f.afterField === 'title') && (
-              <DynamicFormRenderer
-                fields={taskCustomFields}
-                values={taskCustomValues}
-                onChange={(key, val) => {
-                  setTaskCustomValues((prev) => ({ ...prev, [key]: val }));
-                  if (taskErrors[key]) setTaskErrors((prev) => ({ ...prev, [key]: "" }));
-                }}
-                errors={taskErrors}
-                afterFieldPosition="title"
-              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <DynamicFormRenderer
+                  fields={taskCustomFields}
+                  values={taskCustomValues}
+                  onChange={(key, val) => {
+                    setTaskCustomValues((prev) => ({ ...prev, [key]: val }));
+                    if (taskErrors[key]) setTaskErrors((prev) => ({ ...prev, [key]: "" }));
+                  }}
+                  errors={taskErrors}
+                  afterFieldPosition="title"
+                />
+              </div>
             )}
 
             <div className="space-y-1">
@@ -772,16 +781,18 @@ export default function TasksPage() {
               />
             </div>
             {taskCustomFields.some(f => f.afterField === 'description') && (
-              <DynamicFormRenderer
-                fields={taskCustomFields}
-                values={taskCustomValues}
-                onChange={(key, val) => {
-                  setTaskCustomValues((prev) => ({ ...prev, [key]: val }));
-                  if (taskErrors[key]) setTaskErrors((prev) => ({ ...prev, [key]: "" }));
-                }}
-                errors={taskErrors}
-                afterFieldPosition="description"
-              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <DynamicFormRenderer
+                  fields={taskCustomFields}
+                  values={taskCustomValues}
+                  onChange={(key, val) => {
+                    setTaskCustomValues((prev) => ({ ...prev, [key]: val }));
+                    if (taskErrors[key]) setTaskErrors((prev) => ({ ...prev, [key]: "" }));
+                  }}
+                  errors={taskErrors}
+                  afterFieldPosition="description"
+                />
+              </div>
             )}
 
             <div className="grid grid-cols-2 gap-4">
@@ -810,17 +821,33 @@ export default function TasksPage() {
                 />
               </div>
             </div>
-            {taskCustomFields.some(f => f.afterField === 'priority' || f.afterField === 'dueDate') && (
-              <DynamicFormRenderer
-                fields={taskCustomFields}
-                values={taskCustomValues}
-                onChange={(key, val) => {
-                  setTaskCustomValues((prev) => ({ ...prev, [key]: val }));
-                  if (taskErrors[key]) setTaskErrors((prev) => ({ ...prev, [key]: "" }));
-                }}
-                errors={taskErrors}
-                afterFieldPosition={taskCustomFields.find(f => f.afterField === 'priority' || f.afterField === 'dueDate')?.afterField}
-              />
+            {taskCustomFields.some(f => f.afterField === 'priority') && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <DynamicFormRenderer
+                  fields={taskCustomFields}
+                  values={taskCustomValues}
+                  onChange={(key, val) => {
+                    setTaskCustomValues((prev) => ({ ...prev, [key]: val }));
+                    if (taskErrors[key]) setTaskErrors((prev) => ({ ...prev, [key]: "" }));
+                  }}
+                  errors={taskErrors}
+                  afterFieldPosition="priority"
+                />
+              </div>
+            )}
+            {taskCustomFields.some(f => f.afterField === 'dueDate') && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <DynamicFormRenderer
+                  fields={taskCustomFields}
+                  values={taskCustomValues}
+                  onChange={(key, val) => {
+                    setTaskCustomValues((prev) => ({ ...prev, [key]: val }));
+                    if (taskErrors[key]) setTaskErrors((prev) => ({ ...prev, [key]: "" }));
+                  }}
+                  errors={taskErrors}
+                  afterFieldPosition="dueDate"
+                />
+              </div>
             )}
 
             <div className="grid grid-cols-2 gap-4">
@@ -838,22 +865,25 @@ export default function TasksPage() {
               </div>
             </div>
             {taskCustomFields.some(f => f.afterField === 'status') && (
-              <DynamicFormRenderer
-                fields={taskCustomFields}
-                values={taskCustomValues}
-                onChange={(key, val) => {
-                  setTaskCustomValues((prev) => ({ ...prev, [key]: val }));
-                  if (taskErrors[key]) setTaskErrors((prev) => ({ ...prev, [key]: "" }));
-                }}
-                errors={taskErrors}
-                afterFieldPosition="status"
-              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <DynamicFormRenderer
+                  fields={taskCustomFields}
+                  values={taskCustomValues}
+                  onChange={(key, val) => {
+                    setTaskCustomValues((prev) => ({ ...prev, [key]: val }));
+                    if (taskErrors[key]) setTaskErrors((prev) => ({ ...prev, [key]: "" }));
+                  }}
+                  errors={taskErrors}
+                  afterFieldPosition="status"
+                />
+              </div>
             )}
 
             {/* Dynamic Custom Fields at end */}
-            {taskCustomFields.some(f => !f.afterField || f.afterField === 'end' || f.afterField === 'assignedUsers') && (
+            {taskCustomFields.some(f => !f.afterField || f.afterField === 'end' || !['title', 'description', 'priority', 'dueDate', 'status', 'assignedUsers'].includes(f.afterField)) && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <DynamicFormRenderer
-                  fields={taskCustomFields.filter(f => !f.afterField || f.afterField === 'end' || f.afterField === 'assignedUsers')}
+                  fields={taskCustomFields.filter(f => !f.afterField || f.afterField === 'end' || !['title', 'description', 'priority', 'dueDate', 'status', 'assignedUsers'].includes(f.afterField))}
                   values={taskCustomValues}
                   onChange={(key, val) => {
                     setTaskCustomValues((prev) => ({ ...prev, [key]: val }));
@@ -861,6 +891,7 @@ export default function TasksPage() {
                   }}
                   errors={taskErrors}
                 />
+              </div>
             )}
 
             <div className="space-y-2 border-t pt-4">
@@ -908,6 +939,20 @@ export default function TasksPage() {
                   ))}
               </select>
             </div>
+            {taskCustomFields.some(f => f.afterField === 'assignedUsers') && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <DynamicFormRenderer
+                  fields={taskCustomFields}
+                  values={taskCustomValues}
+                  onChange={(key, val) => {
+                    setTaskCustomValues((prev) => ({ ...prev, [key]: val }));
+                    if (taskErrors[key]) setTaskErrors((prev) => ({ ...prev, [key]: "" }));
+                  }}
+                  errors={taskErrors}
+                  afterFieldPosition="assignedUsers"
+                />
+              </div>
+            )}
 
             <div className="flex items-center justify-end gap-2 border-t pt-4">
               <Button

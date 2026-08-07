@@ -20,8 +20,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   
   const currentUser = users.find(u => u.id === currentUserId) || null;
 
-  const logout = () => {
-    void authService.logout();
+  const logout = async () => {
+    await authService.logout();
     clearAuth();
   };
 

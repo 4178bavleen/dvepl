@@ -443,7 +443,7 @@ export async function recycleBinRoutes(
 
         await getDelegate(fastify, config).update({
           where: { id },
-          data: { deletedAt: null, ...(module === "company" ? { isActive: true } : {}) },
+          data: { deletedAt: null, ...(module === "company" || module === "user" || module === "branch" ? { isActive: true } : {}) },
         });
 
         return reply.status(200).send({

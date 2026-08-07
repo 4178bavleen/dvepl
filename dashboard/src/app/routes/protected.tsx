@@ -7,7 +7,8 @@ import { toast } from 'react-hot-toast';
 
 const getRequiredPermission = (pathname: string): string | null => {
   // exact matches
-  if (pathname === '/' || pathname === '/profile') return null;
+  if (pathname === '/profile') return null;
+  if (pathname === '/') return 'dashboard';
   
   if (pathname.startsWith('/finance')) return 'finance';
   if (pathname.startsWith('/settings/custom-fields')) return 'custom_fields';

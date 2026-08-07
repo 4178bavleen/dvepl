@@ -47,7 +47,7 @@ async function createUserRoute(
           });
         }
 
-        const { email, phone, password, roleIds, name, designation } =
+        const { email, phone, password, roleIds, name, designation, teamId } =
           validationResult.data;
 
         // ======================================================
@@ -186,13 +186,14 @@ async function createUserRoute(
               },
             });
 
-            if (employeeContact) {
+             if (employeeContact) {
               await tx.employee.update({
                 where: {
                   id: employeeContact.employeeId,
                 },
                 data: {
                   userId: user.id,
+                  teamId: teamId || undefined,
                 },
               });
             } else {
@@ -227,6 +228,7 @@ async function createUserRoute(
                   firstName,
                   lastName,
                   designationId,
+                  teamId: teamId || null,
                   status: "ACTIVE"
                 }
               });

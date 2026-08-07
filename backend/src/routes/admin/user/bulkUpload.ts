@@ -64,6 +64,7 @@ async function adminUserBulkUploadRoutes(
           "password": "password",
           "role": "role",
           "designation": "designation",
+          "team": "team",
         };
 
         const usersList: any[] = [];
@@ -82,6 +83,7 @@ async function adminUserBulkUploadRoutes(
               password: row.password ? String(row.password) : null,
               role: row.role ? String(row.role).trim() : "",
               designation: row.designation ? String(row.designation).trim() : "Team Member",
+              teamName: row.team ? String(row.team).trim() : "",
             });
           }
         }
@@ -140,6 +142,20 @@ async function adminUserBulkUploadRoutes(
               throw new Error("No valid role found and no system fallback roles available.");
             }
 
+            // Resolve team
+            let resolvedTeamId: string | null = null;
+            if (userData.teamName) {
+              const foundTeam = await fastify.prisma.team.findFirst({
+                where: {
+                  name: { equals: userData.teamName, mode: "insensitive" },
+                  isActive: true,
+                },
+              });
+              if (foundTeam) {
+                resolvedTeamId = foundTeam.id;
+              }
+            }
+
             const passwordToHash = userData.password || "Dvepl@2026";
             const passwordHash = await hashPassword(passwordToHash);
 
@@ -195,6 +211,7 @@ async function adminUserBulkUploadRoutes(
                   firstName,
                   lastName,
                   designationId,
+                  teamId: resolvedTeamId,
                   status: "ACTIVE"
                 }
               });

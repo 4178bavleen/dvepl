@@ -62,6 +62,9 @@ interface UserItem {
     delete: boolean;
     export: boolean;
   };
+  password?: string;
+  teamId?: string | null;
+  teamName?: string | null;
 }
 
 const defaultWaSettings = {
@@ -135,6 +138,9 @@ export function SettingsPage() {
 
   const [isPermModalOpen, setIsPermModalOpen] = useState(false);
   const [permUser, setPermUser] = useState<UserItem | null>(null);
+  const [activePermModalTab, setActivePermModalTab] = useState<"ui-profile" | "db-permissions">("ui-profile");
+  const [permissionGroups, setPermissionGroups] = useState<any[]>([]);
+  const [loadingPermGroups, setLoadingPermGroups] = useState(false);
 
   // Quick Preset state
   const [pageAccessState, setPageAccessState] = useState<
@@ -155,9 +161,11 @@ export function SettingsPage() {
   const [newUserEmail, setNewUserEmail] = useState("");
   const [newUserPassword, setNewUserPassword] = useState("");
   const [showNewUserPassword, setShowNewUserPassword] = useState(false);
+  const [showEditUserPassword, setShowEditUserPassword] = useState(false);
   const [newUserDesignation, setNewUserDesignation] = useState("");
   const [newUserPhone, setNewUserPhone] = useState("");
   const [newUserRole, setNewUserRole] = useState("");
+  const [newUserTeamId, setNewUserTeamId] = useState("");
   const [formErrors, setFormErrors] = useState<Record<string, boolean>>({});
 
   // Create bulk users state
@@ -261,6 +269,7 @@ export function SettingsPage() {
     "merge",
   );
   const [designationsList, setDesignationsList] = useState<any[]>([]);
+  const [teamsList, setTeamsList] = useState<any[]>([]);
 
   // 1. Initial Load of Users & Configuration from API or LocalStorage
   const loadUsersList = async () => {
@@ -272,6 +281,10 @@ export function SettingsPage() {
       // Fetch designations list from organization API
       const desList = await organizationApi.designations.list().catch(() => []);
       setDesignationsList(desList);
+
+      // Fetch teams list from organization API
+      const tList = await organizationApi.teams.list().catch(() => []);
+      setTeamsList(tList);
 
       // Fetch users from API endpoint
       const list = await securityApi.users.list();
@@ -298,6 +311,8 @@ export function SettingsPage() {
             delete: false,
             export: true,
           },
+          teamId: u.teamId || null,
+          teamName: u.teamName || null,
         }));
         setUsers(mapped);
       } else {
@@ -554,7 +569,8 @@ export function SettingsPage() {
 
   // Handle Edit User
   const handleOpenEditModal = (user: UserItem) => {
-    setEditingUser(user);
+    setEditingUser({ ...user, password: "" });
+    setShowEditUserPassword(false);
     setIsEditModalOpen(true);
   };
 
@@ -567,6 +583,8 @@ export function SettingsPage() {
           email: editingUser.email,
           role: editingUser.role,
           designation: editingUser.designation,
+          password: editingUser.password || undefined,
+          teamId: editingUser.teamId || null,
         });
       }
       toast.success("User details updated successfully");
@@ -622,6 +640,7 @@ export function SettingsPage() {
     { key: "delivery", label: "🚚 Delivery" },
     { key: "vendors", label: "🚚 Vendors" },
     { key: "inventory", label: "📦 Inventory" },
+    { key: "export_orders", label: "📤 Export Orders" },
 
     // Finance
     { key: "finance", label: "💵 Finance / Accounts" },
@@ -639,8 +658,6 @@ export function SettingsPage() {
     // Security (PRBAC)
     { key: "users", label: "👤 Users" },
     { key: "roles", label: "🛡️ Roles" },
-    { key: "permissions", label: "⚡ Permissions" },
-    { key: "permission_groups", label: "📂 Permission Groups" },
     { key: "approval_requests", label: "✅ Approval Requests" },
 
     // Other / Reports / Settings
@@ -654,84 +671,113 @@ export function SettingsPage() {
   // Fields Access List
   const fieldsAccessList = [
     // Organization
-    {
-      key: "company_tax_id",
-      label: "Company Tax ID (GST/PAN)",
-      tag: "organization",
-    },
-    {
-      key: "registration_number",
-      label: "Company Registration No",
-      tag: "organization",
-    },
-    {
-      key: "budget_limit",
-      label: "Cost Center Budget Limit",
-      tag: "organization",
-    },
-    {
-      key: "allocated_amount",
-      label: "Cost Center Allocated Amt",
-      tag: "organization",
-    },
+    { key: "company_name", label: "Company Name", tag: "companies" },
+    { key: "company_code", label: "Company Code", tag: "companies" },
+    { key: "company_tax_id", label: "Company Tax ID (GST/PAN)", tag: "companies" },
+    { key: "registration_number", label: "Company Registration No", tag: "companies" },
+    { key: "branch_name", label: "Branch Name", tag: "branches" },
+    { key: "branch_code", label: "Branch Code", tag: "branches" },
+    { key: "department_name", label: "Department Name", tag: "departments" },
+    { key: "department_code", label: "Department Code", tag: "departments" },
+    { key: "team_name", label: "Team Name", tag: "teams" },
+    { key: "designation_title", label: "Designation Title", tag: "designations" },
+    { key: "budget_limit", label: "Cost Center Budget Limit", tag: "cost_centers" },
+    { key: "allocated_amount", label: "Cost Center Allocated Amt", tag: "cost_centers" },
 
     // Finance / Banking
-    { key: "advance_amount", label: "Advance Paid", tag: "finance" },
-    { key: "balance_due", label: "Balance Due", tag: "finance" },
+    { key: "payment_date", label: "Payment Date", tag: "finance" },
     { key: "bank_name", label: "Bank Name", tag: "finance" },
     { key: "bank_account_no", label: "Bank Account Number", tag: "finance" },
     { key: "ifsc_code", label: "IFSC Code", tag: "finance" },
-    {
-      key: "discount_margin",
-      label: "Allowed Discount Margin %",
-      tag: "finance",
-    },
+    { key: "advance_amount", label: "Advance Paid", tag: "finance" },
+    { key: "balance_due", label: "Balance Due", tag: "finance" },
+    { key: "discount_margin", label: "Allowed Discount Margin %", tag: "finance" },
     { key: "markup_percent", label: "Markup Percentage", tag: "finance" },
 
-    // HRMS / Personal Details
-    { key: "employee_code", label: "Employee Code", tag: "hrms" },
-    { key: "basic_salary", label: "Basic Salary & Payroll", tag: "hrms" },
-    { key: "hra_allowance", label: "HRA Allowance", tag: "hrms" },
-    { key: "allowances", label: "HRMS Allowances", tag: "hrms" },
-    { key: "deductions", label: "HRMS Deductions", tag: "hrms" },
-    { key: "total_ctc", label: "Total CTC Value", tag: "hrms" },
-    { key: "pan_no", label: "PAN Card Number", tag: "hrms" },
-    { key: "aadhaar_no", label: "Aadhaar Card Number", tag: "hrms" },
-    { key: "pf_uan", label: "PF UAN Number", tag: "hrms" },
-    { key: "date_of_birth", label: "Date of Birth", tag: "hrms" },
+    // HRMS
+    { key: "employee_code", label: "Employee Code", tag: "employees" },
+    { key: "employee_first_name", label: "First Name", tag: "employees" },
+    { key: "employee_last_name", label: "Last Name", tag: "employees" },
+    { key: "date_of_birth", label: "Date of Birth", tag: "employees" },
+    { key: "pan_no", label: "PAN Card Number", tag: "employees" },
+    { key: "aadhaar_no", label: "Aadhaar Card Number", tag: "employees" },
+    { key: "pf_uan", label: "PF UAN Number", tag: "employees" },
+    { key: "attendance_date", label: "Attendance Date", tag: "attendance" },
+    { key: "check_in", label: "Check-in Time", tag: "attendance" },
+    { key: "check_out", label: "Check-out Time", tag: "attendance" },
+    { key: "leave_type", label: "Leave Type", tag: "leaves" },
+    { key: "leave_reason", label: "Leave Reason", tag: "leaves" },
+    { key: "holiday_name", label: "Holiday Name", tag: "holidays" },
+    { key: "shift_name", label: "Shift Name", tag: "shift_management" },
+    { key: "basic_salary", label: "Basic Salary & Payroll", tag: "payroll" },
+    { key: "hra_allowance", label: "HRA Allowance", tag: "payroll" },
+    { key: "allowances", label: "HRMS Allowances", tag: "payroll" },
+    { key: "deductions", label: "HRMS Deductions", tag: "payroll" },
+    { key: "total_ctc", label: "Total CTC Value", tag: "payroll" },
+    { key: "document_name", label: "Document Name", tag: "documents" },
+    { key: "task_title", label: "Task Title", tag: "tasks" },
+    { key: "task_priority", label: "Task Priority", tag: "tasks" },
+    { key: "task_due_date", label: "Task Due Date", tag: "tasks" },
 
-    // CRM / Credit
-    { key: "customer_pan", label: "Customer/Vendor PAN", tag: "crm" },
-    { key: "customer_gstin", label: "Customer/Vendor GSTIN", tag: "crm" },
-    { key: "credit_limit", label: "Customer Credit Limit", tag: "crm" },
-    { key: "payment_terms", label: "Payment Term (Days)", tag: "crm" },
+    // CRM / Customers & Vendors
+    { key: "customer_name", label: "Customer Name", tag: "customers" },
+    { key: "customer_company", label: "Customer Company", tag: "customers" },
+    { key: "customer_pan", label: "Customer PAN", tag: "customers" },
+    { key: "customer_gstin", label: "Customer GSTIN", tag: "customers" },
+    { key: "credit_limit", label: "Customer Credit Limit", tag: "customers" },
+    { key: "payment_terms", label: "Payment Term (Days)", tag: "customers" },
+    { key: "contact_name", label: "Contact Person Name", tag: "contacts" },
+    { key: "communication_date", label: "Communication Date", tag: "communication" },
+    { key: "vendor_name", label: "Vendor Name", tag: "vendors" },
+    { key: "vendor_category", label: "Vendor Category", tag: "vendors" },
+    { key: "vendor_contact_person", label: "Vendor Contact Person", tag: "vendors" },
+    { key: "vendor_phone", label: "Vendor Phone", tag: "vendors" },
+    { key: "vendor_email", label: "Vendor Email", tag: "vendors" },
+    { key: "vendor_gstin", label: "Vendor GSTIN", tag: "vendors" },
+    { key: "vendor_address", label: "Vendor Address", tag: "vendors" },
+    { key: "vendor_payment_terms", label: "Vendor Payment Terms", tag: "vendors" },
+    { key: "inventory_qty", label: "Stock Qty", tag: "inventory" },
+    { key: "min_stock_level", label: "Min Stock Level", tag: "inventory" },
 
     // Security
-    { key: "password_hash", label: "User Password Hash", tag: "security" },
-    {
-      key: "is_system_role",
-      label: "Is System Role Indicator",
-      tag: "security",
-    },
+    { key: "password_hash", label: "User Password Hash", tag: "users" },
+    { key: "is_system_role", label: "Is System Role Indicator", tag: "roles" },
 
-    // Orders & Logistics
-    { key: "po_number", label: "PO Number", tag: "order" },
-    { key: "po_value", label: "PO Total Value", tag: "order" },
-    {
-      key: "delivery_month_target",
-      label: "Delivery Month Target",
-      tag: "order",
-    },
-    { key: "concerned_person", label: "Concerned Person", tag: "order" },
-    { key: "drawing_status", label: "Drawing Status", tag: "order" },
-    { key: "material_status", label: "Material Status", tag: "order" },
-    { key: "plant_status", label: "Plant Status", tag: "order" },
+    // Orders
+    { key: "po_number", label: "PO Number", tag: "orders" },
+    { key: "po_value", label: "PO Total Value", tag: "orders" },
+    { key: "delivery_month_target", label: "Delivery Month Target", tag: "orders" },
+    { key: "concerned_person", label: "Concerned Person", tag: "orders" },
+    { key: "drawing_status", label: "Drawing Status", tag: "orders" },
+    { key: "material_status", label: "Material Status", tag: "orders" },
+    { key: "plant_status", label: "Plant Status", tag: "orders" },
+    { key: "order_client_name", label: "Order Client Name", tag: "orders" },
+    { key: "po_date", label: "PO Date", tag: "orders" },
+
+    // Delivery
     { key: "dispatch_date", label: "Dispatch Date", tag: "delivery" },
+    { key: "delivery_status", label: "Delivery Status", tag: "delivery" },
+    { key: "vehicle_no", label: "Vehicle Number", tag: "delivery" },
+    { key: "tracking_no", label: "Tracking Number", tag: "delivery" },
+
+    // Tenders
+    { key: "tender_request_no", label: "Tender Request No", tag: "tender_requests" },
+    { key: "tender_request_client", label: "Tender Request Client", tag: "tender_requests" },
+    { key: "tender_no", label: "Tender Number", tag: "tenders" },
+    { key: "tender_name", label: "Tender Name", tag: "tenders" },
+    { key: "tender_value", label: "Tender Value", tag: "tenders" },
+    { key: "clarification_query", label: "Clarification Query", tag: "technical_clarifications" },
+    { key: "gov_dept_name", label: "Government Dept Name", tag: "government_departments" },
+    { key: "section_name", label: "Section Name", tag: "sections" },
+    { key: "division_name", label: "Division Name", tag: "divisions" },
+    { key: "sub_division_name", label: "Sub Division Name", tag: "sub_divisions" },
+    { key: "reference_code", label: "Reference Code", tag: "reference_codes" }
   ];
 
   // Handle Permissions Modal
-  const handleOpenPermModal = (user: UserItem) => {
+  const handleOpenPermModal = async (user: UserItem) => {
     setPermUser(user);
+    setActivePermModalTab("ui-profile");
 
     // Initial page checkboxes
     const pageObj: Record<string, boolean> = {};
@@ -761,6 +807,18 @@ export function SettingsPage() {
     );
 
     setIsPermModalOpen(true);
+    setLoadingPermGroups(true);
+    try {
+      const res = await securityApi.access.read(user.id);
+      if (res.success && res.data) {
+        setPermissionGroups(res.data.permissionGroups || []);
+      }
+    } catch (err) {
+      console.error("Failed to load granular permissions:", err);
+      toast.error("Failed to load granular database permissions.");
+    } finally {
+      setLoadingPermGroups(false);
+    }
   };
 
   const applyPreset = (preset: "full" | "viewer" | "none") => {
@@ -794,20 +852,42 @@ export function SettingsPage() {
       const pageAccess = Object.keys(pageAccessState).filter(
         (k) => pageAccessState[k],
       );
+
+      // If edit is globally disabled, force edit permission of all fields to false
+      const finalFieldPerms = { ...fieldPermsState };
+      if (!actionPermsState.edit) {
+        Object.keys(finalFieldPerms).forEach((key) => {
+          finalFieldPerms[key] = {
+            ...finalFieldPerms[key],
+            edit: false,
+          };
+        });
+      }
+
       const updatedUser = {
         ...permUser,
         pageAccess,
-        fieldPermissions: fieldPermsState,
+        fieldPermissions: finalFieldPerms,
         actionPermissions: actionPermsState,
       };
 
       if (securityApi.users.update) {
         await securityApi.users.update(permUser.id, {
           pageAccess,
-          fieldPermissions: fieldPermsState,
+          fieldPermissions: finalFieldPerms,
           actionPermissions: actionPermsState,
         });
       }
+
+      const enabledPermissionIds = permissionGroups.flatMap((group) =>
+        (group.permissions || [])
+          .filter((p: any) => p.enabled)
+          .map((p: any) => p.id)
+      );
+
+      await securityApi.access.update(permUser.id, {
+        permissionIds: enabledPermissionIds,
+      });
 
       setUsers((prev) =>
         prev.map((u) => (u.id === permUser.id ? updatedUser : u)),
@@ -819,7 +899,7 @@ export function SettingsPage() {
           ? {
               ...u,
               pageAccess,
-              fieldPermissions: fieldPermsState,
+              fieldPermissions: finalFieldPerms,
               actionPermissions: actionPermsState,
             }
           : u,
@@ -873,6 +953,7 @@ export function SettingsPage() {
         role: newUserRole,
         designation: newUserDesignation.trim() || undefined,
         phone: newUserPhone.trim() || undefined,
+        teamId: newUserTeamId || undefined,
       });
       toast.success("User created successfully");
       // Reset form
@@ -882,6 +963,7 @@ export function SettingsPage() {
       setNewUserDesignation("");
       setNewUserPhone("");
       setNewUserRole("");
+      setNewUserTeamId("");
       setFormErrors({});
       loadUsersList();
       setActiveSection("manage-users");
@@ -975,7 +1057,7 @@ export function SettingsPage() {
   const downloadExcelTemplate = () => {
     // Generate true XLSX file template using SheetJS
     const headers = [
-      ["Name", "Email", "Password", "Role", "Designation", "Phone"],
+      ["Name", "Email", "Password", "Role", "Designation", "Phone", "Team"],
     ];
     const data = [
       [
@@ -985,6 +1067,7 @@ export function SettingsPage() {
         "admin",
         "Executive",
         "9876543210",
+        "Engineering",
       ],
       [
         "Jane Smith",
@@ -993,6 +1076,7 @@ export function SettingsPage() {
         "sales",
         "Manager",
         "9876543211",
+        "Sales Team",
       ],
     ];
 
@@ -1676,7 +1760,12 @@ export function SettingsPage() {
                           {user.email}
                         </td>
                         <td className="p-3 text-muted-foreground">
-                          {user.designation || "Staff"}
+                          <div>{user.designation || "Staff"}</div>
+                          {user.teamName && (
+                            <div className="text-[10px] text-muted-foreground/75 font-semibold mt-0.5">
+                              Team: {user.teamName}
+                            </div>
+                          )}
                         </td>
                         <td className="p-3">
                           <span
@@ -1884,6 +1973,25 @@ export function SettingsPage() {
                       {rolesList.map((r) => (
                         <option key={r.id} value={r.name.toLowerCase()}>
                           {r.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                      Team (Optional)
+                    </label>
+                    <select
+                      value={newUserTeamId}
+                      onChange={(e) => setNewUserTeamId(e.target.value)}
+                      className="w-full px-3.5 py-2 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
+                    >
+                      <option value="">— Select Team —</option>
+                      {teamsList.map((t: any) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
                         </option>
                       ))}
                     </select>
@@ -3641,6 +3749,52 @@ export function SettingsPage() {
                   ))}
                 </select>
               </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                  Team (Optional)
+                </label>
+                <select
+                  value={editingUser.teamId || ""}
+                  onChange={(e) =>
+                    setEditingUser({ ...editingUser, teamId: e.target.value })
+                  }
+                  className="w-full px-3 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
+                >
+                  <option value="">— Select Team —</option>
+                  {teamsList.map((t: any) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                  New Password (Optional)
+                </label>
+                <div className="relative">
+                  <input
+                    type={showEditUserPassword ? "text" : "password"}
+                    placeholder="Leave blank to keep current password"
+                    value={editingUser.password || ""}
+                    onChange={(e) =>
+                      setEditingUser({ ...editingUser, password: e.target.value })
+                    }
+                    className="w-full pl-3 pr-10 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowEditUserPassword(!showEditUserPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground hover:text-foreground focus:outline-none"
+                  >
+                    {showEditUserPassword ? (
+                      <EyeOff className="h-3.5 w-3.5" />
+                    ) : (
+                      <Eye className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
             <div className="modal-footer">
               <button
@@ -3689,177 +3843,281 @@ export function SettingsPage() {
               </button>
             </div>
             <div className="modal-body space-y-6">
-              {/* Presets */}
-              <div className="space-y-2">
-                <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                  Quick Preset Profile
-                </div>
-                <div className="perm-presets">
-                  <button
-                    onClick={() => applyPreset("full")}
-                    className="perm-preset-btn"
-                  >
-                    ⚡ Full Access
-                  </button>
-                  <button
-                    onClick={() => applyPreset("viewer")}
-                    className="perm-preset-btn"
-                  >
-                    👁 View Only
-                  </button>
-                  <button
-                    onClick={() => applyPreset("none")}
-                    className="perm-preset-btn preset-danger"
-                  >
-                    🚫 No Access
-                  </button>
-                </div>
+              {/* Tab Navigation */}
+              <div className="flex border-b border-border gap-4 pb-2">
+                <button
+                  onClick={() => setActivePermModalTab("ui-profile")}
+                  className={`pb-1 text-xs font-bold transition border-b-2 ${activePermModalTab === "ui-profile" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}
+                >
+                  🌐 UI Navigation & Fields
+                </button>
+                <button
+                  onClick={() => setActivePermModalTab("db-permissions")}
+                  className={`pb-1 text-xs font-bold transition border-b-2 ${activePermModalTab === "db-permissions" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}
+                >
+                  🔐 Granular DB Permissions
+                </button>
               </div>
 
-              {/* Page Access */}
-              <div className="space-y-2">
-                <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                  Page / Module Navigation Access
-                </div>
-                <div className="perm-page-access-grid">
-                  {modulesList.map((m) => (
-                    <label key={m.key} className="perm-page-toggle">
-                      <input
-                        type="checkbox"
-                        checked={pageAccessState[m.key] ?? false}
-                        onChange={(e) =>
-                          setPageAccessState({
-                            ...pageAccessState,
-                            [m.key]: e.target.checked,
-                          })
-                        }
-                      />
-                      <div className="perm-page-card">{m.label}</div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Action Permissions */}
-              <div className="space-y-2">
-                <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                  Entity Action Rules
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {[
-                    {
-                      key: "create",
-                      label: "➕ Create Records",
-                      desc: "Can insert new entries",
-                    },
-                    {
-                      key: "edit",
-                      label: "✏️ Edit Records",
-                      desc: "Can update existing fields",
-                    },
-                    {
-                      key: "delete",
-                      label: "🗑 Delete Records",
-                      desc: "Can delete data rows",
-                    },
-                    {
-                      key: "export",
-                      label: "📤 Export Data",
-                      desc: "Can download csv/reports",
-                    },
-                  ].map((act) => (
-                    <div key={act.key} className="perm-action-card">
-                      <div>
-                        <div className="text-xs font-bold text-foreground">
-                          {act.label}
-                        </div>
-                        <div className="text-[10px] text-muted-foreground">
-                          {act.desc}
-                        </div>
-                      </div>
-                      <label className="toggle-wrap">
-                        <input
-                          type="checkbox"
-                          checked={(actionPermsState as any)[act.key]}
-                          onChange={(e) =>
-                            setActionPermsState({
-                              ...actionPermsState,
-                              [act.key]: e.target.checked,
-                            })
-                          }
-                        />
-                        <span className="toggle-slider"></span>
-                      </label>
+              {activePermModalTab === "ui-profile" ? (
+                <>
+                  {/* Presets */}
+                  <div className="space-y-2">
+                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                      Quick Preset Profile
                     </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Field Permissions */}
-              <div className="space-y-2">
-                <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                  Field-Level Visibility Restrictions
-                </div>
-                <div className="perm-fields-table">
-                  <div className="perm-fields-header">
-                    <div>Fieldname</div>
-                    <div className="text-center">👁 View</div>
-                    <div className="text-center">✏️ Edit</div>
+                    <div className="perm-presets">
+                      <button
+                        onClick={() => applyPreset("full")}
+                        className="perm-preset-btn"
+                      >
+                        ⚡ Full Access
+                      </button>
+                      <button
+                        onClick={() => applyPreset("viewer")}
+                        className="perm-preset-btn"
+                      >
+                        👁 View Only
+                      </button>
+                      <button
+                        onClick={() => applyPreset("none")}
+                        className="perm-preset-btn preset-danger"
+                      >
+                        🚫 No Access
+                      </button>
+                    </div>
                   </div>
-                  <div className="divide-y divide-border max-h-[380px] overflow-y-auto">
-                    {fieldsAccessList.map((f) => (
-                      <div key={f.key} className="perm-fields-row">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-foreground text-xs">
-                            {f.label}
-                          </span>
-                          <span className={`field-tag tag-${f.tag}`}>
-                            {f.tag}
-                          </span>
-                        </div>
-                        <div className="flex justify-center">
+
+                  {/* Page Access */}
+                  <div className="space-y-2">
+                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                      Page / Module Navigation Access
+                    </div>
+                    <div className="perm-page-access-grid">
+                      {modulesList.map((m) => (
+                        <label key={m.key} className="perm-page-toggle">
                           <input
                             type="checkbox"
-                            checked={fieldPermsState[f.key]?.view ?? true}
+                            checked={pageAccessState[m.key] ?? false}
                             onChange={(e) =>
-                              setFieldPermsState({
-                                ...fieldPermsState,
-                                [f.key]: {
-                                  ...(fieldPermsState[f.key] ?? {
-                                    view: true,
-                                    edit: true,
-                                  }),
-                                  view: e.target.checked,
-                                },
+                              setPageAccessState({
+                                ...pageAccessState,
+                                [m.key]: e.target.checked,
                               })
                             }
-                            className="perm-checkbox"
                           />
+                          <div className="perm-page-card">{m.label}</div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Action Permissions */}
+                  <div className="space-y-2">
+                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                      Entity Action Rules
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {[
+                        {
+                          key: "create",
+                          label: "➕ Create Records",
+                          desc: "Can insert new entries",
+                        },
+                        {
+                          key: "edit",
+                          label: "✏️ Edit Records",
+                          desc: "Can update existing fields",
+                        },
+                        {
+                          key: "delete",
+                          label: "🗑 Delete Records",
+                          desc: "Can delete data rows",
+                        },
+                        {
+                          key: "export",
+                          label: "📤 Export Data",
+                          desc: "Can download csv/reports",
+                        },
+                      ].map((act) => (
+                        <div key={act.key} className="perm-action-card">
+                          <div>
+                            <div className="text-xs font-bold text-foreground">
+                              {act.label}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground">
+                              {act.desc}
+                            </div>
+                          </div>
+                          <label className="toggle-wrap">
+                            <input
+                              type="checkbox"
+                              checked={(actionPermsState as any)[act.key]}
+                              onChange={(e) =>
+                                setActionPermsState({
+                                  ...actionPermsState,
+                                  [act.key]: e.target.checked,
+                                })
+                              }
+                            />
+                            <span className="toggle-slider"></span>
+                          </label>
                         </div>
-                        <div className="flex justify-center">
-                          <input
-                            type="checkbox"
-                            checked={fieldPermsState[f.key]?.edit ?? true}
-                            onChange={(e) =>
-                              setFieldPermsState({
-                                ...fieldPermsState,
-                                [f.key]: {
-                                  ...(fieldPermsState[f.key] ?? {
-                                    view: true,
-                                    edit: true,
-                                  }),
-                                  edit: e.target.checked,
-                                },
-                              })
-                            }
-                            className="perm-checkbox"
-                          />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Field Permissions */}
+                  <div className="space-y-2">
+                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                      Field-Level Visibility Restrictions
+                    </div>
+                    <div className="perm-fields-table">
+                      <div className="perm-fields-header">
+                        <div>Fieldname</div>
+                        <div className="text-center">👁 View</div>
+                        <div className="text-center">✏️ Edit</div>
+                      </div>
+                      <div className="divide-y divide-border max-h-[380px] overflow-y-auto">
+                        {fieldsAccessList
+                          .filter((f) => {
+                            return pageAccessState[f.tag] !== false;
+                          })
+                          .map((f) => (
+                            <div key={f.key} className="perm-fields-row">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-foreground text-xs">
+                                {f.label}
+                              </span>
+                              <span className={`field-tag tag-${f.tag}`}>
+                                {f.tag}
+                              </span>
+                            </div>
+                            <div className="flex justify-center">
+                              <input
+                                type="checkbox"
+                                checked={fieldPermsState[f.key]?.view ?? true}
+                                onChange={(e) =>
+                                  setFieldPermsState({
+                                    ...fieldPermsState,
+                                    [f.key]: {
+                                      ...(fieldPermsState[f.key] ?? {
+                                        view: true,
+                                        edit: true,
+                                      }),
+                                      view: e.target.checked,
+                                    },
+                                  })
+                                }
+                                className="perm-checkbox"
+                              />
+                            </div>
+                            <div className="flex justify-center">
+                              <input
+                                type="checkbox"
+                                checked={actionPermsState.edit ? (fieldPermsState[f.key]?.edit ?? true) : false}
+                                disabled={!actionPermsState.edit}
+                                onChange={(e) =>
+                                  setFieldPermsState({
+                                    ...fieldPermsState,
+                                    [f.key]: {
+                                      ...(fieldPermsState[f.key] ?? {
+                                        view: true,
+                                        edit: true,
+                                      }),
+                                      edit: e.target.checked,
+                                    },
+                                  })
+                                }
+                                className={`perm-checkbox ${!actionPermsState.edit ? "opacity-40 cursor-not-allowed" : ""}`}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1">
+                  {loadingPermGroups ? (
+                    <div className="p-8 text-center text-xs text-muted-foreground animate-pulse">
+                      ⏳ Loading database access matrix...
+                    </div>
+                  ) : permissionGroups.length === 0 ? (
+                    <div className="p-8 text-center text-xs text-muted-foreground">
+                      No system permissions registered in backend.
+                    </div>
+                  ) : (
+                    permissionGroups.map((group) => (
+                      <div key={group.groupId} className="border border-border rounded-lg bg-card overflow-hidden">
+                        <div className="bg-muted/15 px-4 py-2 border-b border-border text-xs font-bold text-foreground">
+                          📂 {group.groupName}
+                        </div>
+                        <div className="divide-y divide-border">
+                          {group.permissions.map((p: any) => (
+                            <div key={p.id} className="p-3 flex items-center justify-between hover:bg-muted/5 transition">
+                              <div className="space-y-0.5 max-w-[80%] text-left">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-bold font-mono text-foreground bg-muted px-1.5 py-0.5 rounded">
+                                    {p.code}
+                                  </span>
+                                  {p.source === "role" && p.enabled && (
+                                    <span className="text-[9px] font-bold bg-green-50 text-green-600 border border-green-200/50 px-1 rounded">
+                                      Role Default
+                                    </span>
+                                  )}
+                                  {p.source === "override" && (
+                                    <span className={`text-[9px] font-bold px-1 rounded border ${p.enabled ? "bg-blue-50 text-blue-600 border-blue-200/50" : "bg-red-50 text-red-600 border-red-200/50"}`}>
+                                      {p.enabled ? "Allowed Override" : "Denied Override"}
+                                    </span>
+                                  )}
+                                </div>
+                                {p.description && (
+                                  <div className="text-[10px] text-muted-foreground">
+                                    {p.description}
+                                  </div>
+                                )}
+                              </div>
+                              <label className="toggle-wrap">
+                                <input
+                                  type="checkbox"
+                                  checked={p.enabled}
+                                  onChange={(e) => {
+                                    const updatedGroups = permissionGroups.map((g) => {
+                                      if (g.groupId !== group.groupId) return g;
+                                      return {
+                                        ...g,
+                                        permissions: g.permissions.map((perm: any) => {
+                                          if (perm.id !== p.id) return perm;
+                                          
+                                          const newEnabled = e.target.checked;
+                                          let newSource = p.source;
+                                          if (p.source === "role" || p.source === "override") {
+                                            newSource = "override";
+                                          }
+                                          
+                                          return {
+                                            ...perm,
+                                            enabled: newEnabled,
+                                            source: newSource,
+                                          };
+                                        }),
+                                      };
+                                    });
+                                    setPermissionGroups(updatedGroups);
+                                  }}
+                                />
+                                <span className="toggle-slider"></span>
+                              </label>
+                            </div>
+                          ))}
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    ))
+                  )}
                 </div>
-              </div>
+              )}
             </div>
             <div className="modal-footer">
               <button

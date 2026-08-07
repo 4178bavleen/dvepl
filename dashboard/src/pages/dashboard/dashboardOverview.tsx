@@ -29,6 +29,7 @@ import {
 import { toast } from 'react-hot-toast';
 
 import { Button } from '@/components/ui/button';
+import { useERPStore } from '@/store/erpStore';
 
 // ── API and Service Imports ──
 import { hrmsApi, crmApi, tenderApi } from '@/services/modules';
@@ -44,12 +45,26 @@ export function DashboardOverview() {
 
   useEffect(() => {
     let isMounted = true;
+
+    const currentUserObj = useERPStore.getState().users.find(u => u.id === useERPStore.getState().currentUserId) as any;
+    const pageAccess = currentUserObj?.pageAccess || [];
+    const isAdmin = currentUserObj?.role?.toLowerCase().includes('admin') || 
+                    currentUserObj?.name?.toLowerCase().includes('admin');
+
+    const hasAccess = (page: string) => isAdmin || pageAccess.includes(page);
+
+    const fetchEmployees = hasAccess("employees") ? hrmsApi.employees.list().catch(() => []) : Promise.resolve([]);
+    const fetchAttendance = hasAccess("attendance") ? hrmsApi.attendance.list().catch(() => []) : Promise.resolve([]);
+    const fetchCustomers = hasAccess("customers") ? crmApi.customers.list().catch(() => []) : Promise.resolve([]);
+    const fetchTenders = hasAccess("tenders") ? tenderApi.tenders.list().catch(() => []) : Promise.resolve([]);
+    const fetchCostCenters = hasAccess("cost_centers") ? organizationApi.costCenters.list().catch(() => []) : Promise.resolve([]);
+
     void Promise.all([
-      hrmsApi.employees.list(),
-      hrmsApi.attendance.list(),
-      crmApi.customers.list(),
-      tenderApi.tenders.list(),
-      organizationApi.costCenters.list(),
+      fetchEmployees,
+      fetchAttendance,
+      fetchCustomers,
+      fetchTenders,
+      fetchCostCenters
     ]).then(([employeeData, attendanceData, customerData, tenderData, costCenterData]) => {
       if (!isMounted) return;
       setEmployees(employeeData || []);

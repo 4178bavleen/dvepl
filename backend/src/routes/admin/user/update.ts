@@ -5,6 +5,7 @@ import {
   FastifyRequest,
 } from "fastify";
 import { adminLogs } from "../../../services/logger/contextLogger";
+import { hashPassword } from "../../../utils/hashPassword";
 
 async function updateUserRoute(
   fastify: FastifyInstance,
@@ -38,7 +39,7 @@ async function updateUserRoute(
         }
 
         const { id } = request.params as { id: string };
-        const { name, email, phone, isActive, role, designation, pageAccess, fieldPermissions, actionPermissions } = request.body as any;
+        const { name, email, phone, isActive, role, designation, pageAccess, fieldPermissions, actionPermissions, password, teamId } = request.body as any;
 
         // Check User Exists
         const existingUser = await fastify.prisma.user.findFirst({
@@ -94,6 +95,12 @@ async function updateUserRoute(
           }
         }
 
+        // Hash password if provided
+        let passwordHash: string | undefined = undefined;
+        if (password) {
+          passwordHash = await hashPassword(password);
+        }
+
         // Transaction for User Table
         await fastify.prisma.$transaction(async (tx) => {
           await tx.user.update({
@@ -105,6 +112,7 @@ async function updateUserRoute(
               email: email || undefined,
               phone: phone || undefined,
               isActive: isActive !== undefined ? !!isActive : undefined,
+              passwordHash,
             },
           });
 
@@ -149,6 +157,9 @@ async function updateUserRoute(
                 }
               }
               updateData.designationId = designationId;
+            }
+            if (teamId !== undefined) {
+              updateData.teamId = teamId || null;
             }
 
             await tx.employee.update({

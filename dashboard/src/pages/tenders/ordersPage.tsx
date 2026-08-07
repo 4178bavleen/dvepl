@@ -132,6 +132,11 @@ const emptyLineItem = (id: string): LineItemRow => ({
 });
 
 export function OrdersPage() {
+  const storeUsers = useERPStore((state) => (state as any).users);
+  const currentUserId = useERPStore((state) => (state as any).currentUserId);
+  const currentUser = storeUsers?.find((u: any) => u.id === currentUserId) as any;
+  const canCreate = currentUser?.actionPermissions?.create !== false;
+
   const localOrders = useERPStore(
     (state) => ((state as any).salesOrders as SalesOrder[]) ?? EMPTY_ARRAY,
   );
@@ -981,16 +986,20 @@ export function OrdersPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setIsBulkModalOpen(true)}
-            className="gap-2"
-          >
-            <Upload className="size-4" /> Bulk Upload
-          </Button>
-          <Button onClick={openCreate} className="gap-2">
-            <Plus className="size-4" /> Add Order
-          </Button>
+          {canCreate && (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => setIsBulkModalOpen(true)}
+                className="gap-2"
+              >
+                <Upload className="size-4" /> Bulk Upload
+              </Button>
+              <Button onClick={openCreate} className="gap-2">
+                <Plus className="size-4" /> Add Order
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -1263,119 +1272,167 @@ export function OrdersPage() {
                     )}
                   </div>
 
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
-                      DVEPL Code *
-                    </Label>
-                    <Input
-                      value={formValues.companyCode}
-                      onChange={(e) =>
-                        setFormValues({
-                          ...formValues,
-                          companyCode: e.target.value,
-                        })
-                      }
-                      placeholder="DVEPL-2026-001"
-                      className="h-10 bg-muted/40"
-                    />
-                    {errors.companyCode && (
-                      <p className="text-xs text-destructive mt-0.5">
-                        {errors.companyCode}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
-                      Status
-                    </Label>
-                    <Select
-                      value={formValues.status}
-                      onValueChange={(val) =>
-                        setFormValues({ ...formValues, status: val })
-                      }
-                    >
-                      <SelectTrigger className="h-10 bg-muted/40">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="in-progress">In Progress</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
-                        <SelectItem value="on-hold">On Hold</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
-                      Order Taken By
-                    </Label>
-                    <Select
-                      value={formValues.orderTakenById}
-                      onValueChange={(val) =>
-                        setFormValues({ ...formValues, orderTakenById: val })
-                      }
-                    >
-                      <SelectTrigger className="h-10 bg-muted/40">
-                        <SelectValue placeholder="— Select user —" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {users
-                          .filter((u) => u.userId)
-                          .map((u) => (
-                            <SelectItem key={u.id} value={u.userId!}>
-                              {u.name}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
-                      Assigned To (Multi-Select)
-                    </Label>
-                    <Popover>
-                      <PopoverTrigger
-                        render={
-                          <button
-                            type="button"
-                            className="h-10 w-full bg-muted/40 border border-input rounded-md px-3 flex items-center justify-between text-sm text-left"
-                          />
-                        }
-                      >
-                        <span className="truncate">{assignedUserLabel}</span>
-                        <ChevronDown className="size-4 text-muted-foreground shrink-0" />
-                      </PopoverTrigger>
-                      <PopoverContent
-                        align="start"
-                        className="w-64 p-2 space-y-1 max-h-64 overflow-y-auto"
-                      >
-                        {users
-                          .filter((u) => u.userId)
-                          .map((u) => (
-                            <label
-                              key={u.id}
-                              className="flex items-center gap-2 text-xs font-medium cursor-pointer hover:bg-muted/50 p-1.5 rounded"
-                            >
-                              <Checkbox
-                                checked={assignedUserIds.includes(u.userId!)}
-                                onCheckedChange={() =>
-                                  toggleAssignedUser(u.userId!)
-                                }
-                              />
-                              <span>{u.name}</span>
-                            </label>
-                          ))}
-                        {users.filter((u) => u.userId).length === 0 && (
-                          <p className="text-xs text-muted-foreground p-1.5">
-                            No users found.
-                          </p>
-                        )}
-                      </PopoverContent>
-                    </Popover>
-                  </div>
+                   <div className="flex flex-col gap-1.5">
+                     <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
+                       DVEPL Code *
+                     </Label>
+                     <Input
+                       value={formValues.companyCode}
+                       onChange={(e) =>
+                         setFormValues({
+                           ...formValues,
+                           companyCode: e.target.value,
+                         })
+                       }
+                       placeholder="DVEPL-2026-001"
+                       className="h-10 bg-muted/40"
+                     />
+                     {errors.companyCode && (
+                       <p className="text-xs text-destructive mt-0.5">
+                         {errors.companyCode}
+                       </p>
+                     )}
+                   </div>
+                   {orderCustomFields.some(f => f.afterField === 'companyCode') && (
+                     <DynamicFormRenderer
+                       fields={orderCustomFields}
+                       values={orderCustomValues}
+                       onChange={(key, val) => {
+                         setOrderCustomValues((prev) => ({ ...prev, [key]: val }));
+                         if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
+                       }}
+                       errors={errors}
+                       afterFieldPosition="companyCode"
+                     />
+                   )}
+ 
+                   <div className="flex flex-col gap-1.5">
+                     <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
+                       Status
+                     </Label>
+                     <Select
+                       value={formValues.status}
+                       onValueChange={(val) =>
+                         setFormValues({ ...formValues, status: val })
+                       }
+                     >
+                       <SelectTrigger className="h-10 bg-muted/40">
+                         <SelectValue />
+                       </SelectTrigger>
+                       <SelectContent>
+                         <SelectItem value="pending">Pending</SelectItem>
+                         <SelectItem value="in-progress">In Progress</SelectItem>
+                         <SelectItem value="completed">Completed</SelectItem>
+                         <SelectItem value="on-hold">On Hold</SelectItem>
+                       </SelectContent>
+                     </Select>
+                   </div>
+                   {orderCustomFields.some(f => f.afterField === 'orderStatus') && (
+                     <DynamicFormRenderer
+                       fields={orderCustomFields}
+                       values={orderCustomValues}
+                       onChange={(key, val) => {
+                         setOrderCustomValues((prev) => ({ ...prev, [key]: val }));
+                         if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
+                       }}
+                       errors={errors}
+                       afterFieldPosition="orderStatus"
+                     />
+                   )}
+ 
+                   <div className="flex flex-col gap-1.5">
+                     <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
+                       Order Taken By
+                     </Label>
+                     <Select
+                       value={formValues.orderTakenById}
+                       onValueChange={(val) =>
+                         setFormValues({ ...formValues, orderTakenById: val })
+                       }
+                     >
+                       <SelectTrigger className="h-10 bg-muted/40">
+                         <SelectValue placeholder="— Select user —" />
+                       </SelectTrigger>
+                       <SelectContent>
+                         {users
+                           .filter((u) => u.userId)
+                           .map((u) => (
+                             <SelectItem key={u.id} value={u.userId!}>
+                               {u.name}
+                             </SelectItem>
+                           ))}
+                       </SelectContent>
+                     </Select>
+                   </div>
+                   {orderCustomFields.some(f => f.afterField === 'orderTakenBy') && (
+                     <DynamicFormRenderer
+                       fields={orderCustomFields}
+                       values={orderCustomValues}
+                       onChange={(key, val) => {
+                         setOrderCustomValues((prev) => ({ ...prev, [key]: val }));
+                         if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
+                       }}
+                       errors={errors}
+                       afterFieldPosition="orderTakenBy"
+                     />
+                   )}
+ 
+                   <div className="flex flex-col gap-1.5">
+                     <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
+                       Assigned To (Multi-Select)
+                     </Label>
+                     <Popover>
+                       <PopoverTrigger
+                         render={
+                           <button
+                             type="button"
+                             className="h-10 w-full bg-muted/40 border border-input rounded-md px-3 flex items-center justify-between text-sm text-left"
+                           />
+                         }
+                       >
+                         <span className="truncate">{assignedUserLabel}</span>
+                         <ChevronDown className="size-4 text-muted-foreground shrink-0" />
+                       </PopoverTrigger>
+                       <PopoverContent
+                         align="start"
+                         className="w-64 p-2 space-y-1 max-h-64 overflow-y-auto"
+                       >
+                         {users
+                           .filter((u) => u.userId)
+                           .map((u) => (
+                             <label
+                               key={u.id}
+                               className="flex items-center gap-2 text-xs font-medium cursor-pointer hover:bg-muted/50 p-1.5 rounded"
+                             >
+                               <Checkbox
+                                 checked={assignedUserIds.includes(u.userId!)}
+                                 onCheckedChange={() =>
+                                   toggleAssignedUser(u.userId!)
+                                 }
+                               />
+                               <span>{u.name}</span>
+                             </label>
+                           ))}
+                         {users.filter((u) => u.userId).length === 0 && (
+                           <p className="text-xs text-muted-foreground p-1.5">
+                             No users found.
+                           </p>
+                         )}
+                       </PopoverContent>
+                     </Popover>
+                   </div>
+                   {orderCustomFields.some(f => f.afterField === 'assignedTo') && (
+                     <DynamicFormRenderer
+                       fields={orderCustomFields}
+                       values={orderCustomValues}
+                       onChange={(key, val) => {
+                         setOrderCustomValues((prev) => ({ ...prev, [key]: val }));
+                         if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
+                       }}
+                       errors={errors}
+                       afterFieldPosition="assignedTo"
+                     />
+                   )}
                 </div>
               </section>
 
@@ -1409,48 +1466,44 @@ export function OrdersPage() {
                       </p>
                     )}
                   </div>
-                  {orderCustomFields.some(f => f.afterField === 'customerName') && (
-                    <div className="sm:col-span-2">
-                      <DynamicFormRenderer
-                        fields={orderCustomFields}
-                        values={orderCustomValues}
-                        onChange={(key, val) => {
-                          setOrderCustomValues((prev) => ({ ...prev, [key]: val }));
-                          if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
-                        }}
-                        errors={errors}
-                        afterFieldPosition="customerName"
-                      />
-                    </div>
-                  )}
-
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
-                      CA No
-                    </Label>
-                    <Input
-                      value={formValues.caNo}
-                      onChange={(e) =>
-                        setFormValues({ ...formValues, caNo: e.target.value })
-                      }
-                      placeholder="CA-88902"
-                      className="h-10 bg-muted/40"
-                    />
-                  </div>
-                  {orderCustomFields.some(f => f.afterField === 'caNo') && (
-                    <div className="sm:col-span-2">
-                      <DynamicFormRenderer
-                        fields={orderCustomFields}
-                        values={orderCustomValues}
-                        onChange={(key, val) => {
-                          setOrderCustomValues((prev) => ({ ...prev, [key]: val }));
-                          if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
-                        }}
-                        errors={errors}
-                        afterFieldPosition="caNo"
-                      />
-                    </div>
-                  )}
+                   {orderCustomFields.some(f => f.afterField === 'customerName') && (
+                     <DynamicFormRenderer
+                       fields={orderCustomFields}
+                       values={orderCustomValues}
+                       onChange={(key, val) => {
+                         setOrderCustomValues((prev) => ({ ...prev, [key]: val }));
+                         if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
+                       }}
+                       errors={errors}
+                       afterFieldPosition="customerName"
+                     />
+                   )}
+ 
+                   <div className="flex flex-col gap-1.5">
+                     <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
+                       CA No
+                     </Label>
+                     <Input
+                       value={formValues.caNo}
+                       onChange={(e) =>
+                         setFormValues({ ...formValues, caNo: e.target.value })
+                       }
+                       placeholder="CA-88902"
+                       className="h-10 bg-muted/40"
+                     />
+                   </div>
+                   {orderCustomFields.some(f => f.afterField === 'caNo') && (
+                     <DynamicFormRenderer
+                       fields={orderCustomFields}
+                       values={orderCustomValues}
+                       onChange={(key, val) => {
+                         setOrderCustomValues((prev) => ({ ...prev, [key]: val }));
+                         if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
+                       }}
+                       errors={errors}
+                       afterFieldPosition="caNo"
+                     />
+                   )}
 
                   <div className="flex flex-col gap-1.5">
                     <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
@@ -1476,209 +1529,315 @@ export function OrdersPage() {
                       </p>
                     )}
                   </div>
-                  {orderCustomFields.some(f => f.afterField === 'contact') && (
-                    <div className="sm:col-span-2">
+                   {orderCustomFields.some(f => f.afterField === 'contact') && (
+                     <DynamicFormRenderer
+                       fields={orderCustomFields}
+                       values={orderCustomValues}
+                       onChange={(key, val) => {
+                         setOrderCustomValues((prev) => ({ ...prev, [key]: val }));
+                         if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
+                       }}
+                       errors={errors}
+                       afterFieldPosition="contact"
+                     />
+                   )}
+ 
+                   <div className="flex flex-col gap-1.5">
+                     <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
+                       Order Confirm Date
+                     </Label>
+                     <Input
+                       type="date"
+                       value={formValues.orderTakenDate}
+                       onChange={(e) =>
+                         setFormValues({
+                           ...formValues,
+                           orderTakenDate: e.target.value,
+                         })
+                       }
+                       className="h-10 bg-muted/40 text-sm"
+                     />
+                   </div>
+                   {orderCustomFields.some(f => f.afterField === 'orderTakenDate') && (
+                     <DynamicFormRenderer
+                       fields={orderCustomFields}
+                       values={orderCustomValues}
+                       onChange={(key, val) => {
+                         setOrderCustomValues((prev) => ({ ...prev, [key]: val }));
+                         if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
+                       }}
+                       errors={errors}
+                       afterFieldPosition="orderTakenDate"
+                     />
+                   )}
+
+                   <div className="flex flex-col gap-1.5">
+                     <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
+                       Delivery Month Target
+                     </Label>
+                     <Input
+                       placeholder="e.g. June 2026"
+                       value={formValues.deliveryTarget}
+                       onChange={(e) =>
+                         setFormValues({
+                           ...formValues,
+                           deliveryTarget: e.target.value,
+                         })
+                       }
+                       className="h-10 bg-muted/40"
+                     />
+                   </div>
+                   {orderCustomFields.some(f => f.afterField === 'deliveryTarget') && (
+                     <DynamicFormRenderer
+                       fields={orderCustomFields}
+                       values={orderCustomValues}
+                       onChange={(key, val) => {
+                         setOrderCustomValues((prev) => ({ ...prev, [key]: val }));
+                         if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
+                       }}
+                       errors={errors}
+                       afterFieldPosition="deliveryTarget"
+                     />
+                   )}
+ 
+                   <div className="flex flex-col gap-1.5">
+                     <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
+                       PO Date
+                     </Label>
+                     <Input
+                       type="date"
+                       value={formValues.poDate}
+                       onChange={(e) =>
+                         setFormValues({ ...formValues, poDate: e.target.value })
+                       }
+                       className="h-10 bg-muted/40 text-sm"
+                     />
+                   </div>
+                   {orderCustomFields.some(f => f.afterField === 'poDate') && (
+                     <DynamicFormRenderer
+                       fields={orderCustomFields}
+                       values={orderCustomValues}
+                       onChange={(key, val) => {
+                         setOrderCustomValues((prev) => ({ ...prev, [key]: val }));
+                         if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
+                       }}
+                       errors={errors}
+                       afterFieldPosition="poDate"
+                     />
+                   )}
+                 </div>
+ 
+                 {/* Concerned Persons tag input */}
+                 <div className="flex flex-col gap-1.5">
+                   <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
+                     Concerned Persons (type + Enter to add multiple)
+                   </Label>
+                   <div className="flex gap-2">
+                     <Input
+                       placeholder="Type name and press Add..."
+                       value={cpInput}
+                       onChange={(e) => setCpInput(e.target.value)}
+                       onKeyDown={(e) => {
+                         if (e.key === "Enter") {
+                           e.preventDefault();
+                           handleAddCP();
+                         }
+                       }}
+                       className="h-10 bg-muted/40 text-sm"
+                     />
+                     <Button
+                       type="button"
+                       onClick={handleAddCP}
+                       variant="secondary"
+                       size="sm"
+                       className="h-10 px-3"
+                     >
+                       + Add
+                     </Button>
+                   </div>
+                   <div className="flex flex-wrap gap-1.5 mt-1">
+                     {concernedPeople.map((cp, idx) => (
+                       <span
+                         key={idx}
+                         className="inline-flex items-center gap-1 bg-primary/5 hover:bg-primary/10 border border-primary/20 text-primary px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition-colors duration-150"
+                       >
+                         {cp}
+                         <X
+                           className="size-3 cursor-pointer text-primary hover:text-destructive"
+                           onClick={() => handleRemoveCP(idx)}
+                         />
+                       </span>
+                     ))}
+                   </div>
+                 </div>
+                 {orderCustomFields.some(f => f.afterField === 'concernedPeople') && (
+                   <DynamicFormRenderer
+                     fields={orderCustomFields}
+                     values={orderCustomValues}
+                     onChange={(key, val) => {
+                       setOrderCustomValues((prev) => ({ ...prev, [key]: val }));
+                       if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
+                     }}
+                     errors={errors}
+                     afterFieldPosition="concernedPeople"
+                   />
+                 )}
+               </section>
+ 
+               {/* Drawing */}
+               <section className="space-y-3">
+                 <div className="flex items-center gap-2 border-b border-emerald-600/30 pb-1.5">
+                   <FileText className="size-3.5 text-emerald-600" />
+                   <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-600">
+                     Drawing
+                   </h3>
+                 </div>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                   <div className="flex flex-col gap-1.5">
+                     <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
+                       Drawing Concerned Person
+                     </Label>
+                     <Input
+                       value={formValues.drawingConcernedPerson}
+                       onChange={(e) =>
+                         setFormValues({
+                           ...formValues,
+                           drawingConcernedPerson: e.target.value,
+                         })
+                       }
+                       placeholder="Lead Engineer"
+                       className="h-10 bg-muted/40"
+                     />
+                   </div>
+                   {orderCustomFields.some(f => f.afterField === 'drawingConcernedPerson') && (
+                     <DynamicFormRenderer
+                       fields={orderCustomFields}
+                       values={orderCustomValues}
+                       onChange={(key, val) => {
+                         setOrderCustomValues((prev) => ({ ...prev, [key]: val }));
+                         if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
+                       }}
+                       errors={errors}
+                       afterFieldPosition="drawingConcernedPerson"
+                     />
+                   )}
+ 
+                   <div className="flex flex-col gap-1.5">
+                     <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
+                       Drawing Approved Date
+                     </Label>
+                     <Input
+                       type="date"
+                       value={formValues.drawingApprovedDate}
+                       onChange={(e) =>
+                         setFormValues({
+                           ...formValues,
+                           drawingApprovedDate: e.target.value,
+                         })
+                       }
+                       className="h-10 bg-muted/40 text-sm"
+                     />
+                   </div>
+                   {orderCustomFields.some(f => f.afterField === 'drawingApprovedDate') && (
+                     <DynamicFormRenderer
+                       fields={orderCustomFields}
+                       values={orderCustomValues}
+                       onChange={(key, val) => {
+                         setOrderCustomValues((prev) => ({ ...prev, [key]: val }));
+                         if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
+                       }}
+                       errors={errors}
+                       afterFieldPosition="drawingApprovedDate"
+                     />
+                   )}
+ 
+                   <div className="flex flex-col gap-1.5">
+                     <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
+                       Drawing Status
+                     </Label>
+                     <Select
+                       value={formValues.drawingStatus}
+                       onValueChange={(val) =>
+                         setFormValues({ ...formValues, drawingStatus: val })
+                       }
+                     >
+                       <SelectTrigger className="h-10 bg-muted/40">
+                         <SelectValue placeholder="— Select —" />
+                       </SelectTrigger>
+                       <SelectContent>
+                         <SelectItem value="Pending">Pending</SelectItem>
+                         <SelectItem value="In Process">In Process</SelectItem>
+                         <SelectItem value="Approved">Approved</SelectItem>
+                         <SelectItem value="Rejected">Rejected</SelectItem>
+                       </SelectContent>
+                     </Select>
+                   </div>
+                   {orderCustomFields.some(f => f.afterField === 'drawingStatus') && (
+                     <DynamicFormRenderer
+                       fields={orderCustomFields}
+                       values={orderCustomValues}
+                       onChange={(key, val) => {
+                         setOrderCustomValues((prev) => ({ ...prev, [key]: val }));
+                         if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
+                       }}
+                       errors={errors}
+                       afterFieldPosition="drawingStatus"
+                     />
+                   )}
+ 
+                   <div className="flex flex-col gap-1.5">
+                     <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
+                       Drawing Remarks
+                     </Label>
+                     <Input
+                       value={formValues.drawingRemarks}
+                       onChange={(e) =>
+                         setFormValues({
+                           ...formValues,
+                           drawingRemarks: e.target.value,
+                         })
+                       }
+                       placeholder="Revisions or sign-off notes"
+                       className="h-10 bg-muted/40"
+                     />
+                   </div>
+                   {orderCustomFields.some(f => f.afterField === 'drawingRemarks') && (
+                     <DynamicFormRenderer
+                       fields={orderCustomFields}
+                       values={orderCustomValues}
+                       onChange={(key, val) => {
+                         setOrderCustomValues((prev) => ({ ...prev, [key]: val }));
+                         if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
+                       }}
+                       errors={errors}
+                       afterFieldPosition="drawingRemarks"
+                     />
+                   )}
+                 </div>
+               </section>
+ 
+               {/* Dynamic Custom Fields at end */}
+               {orderCustomFields.some(f => !f.afterField || f.afterField === 'end' || !['companyCode', 'orderStatus', 'orderTakenBy', 'assignedTo', 'customerName', 'caNo', 'contact', 'orderTakenDate', 'deliveryTarget', 'poDate', 'concernedPeople', 'drawingConcernedPerson', 'drawingApprovedDate', 'drawingStatus', 'drawingRemarks'].includes(f.afterField)) && (
+                 <section className="space-y-3">
+                   <div className="flex items-center gap-2 border-b border-emerald-600/30 pb-1.5">
+                     <SlidersHorizontal className="size-3.5 text-emerald-600" />
+                     <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-600">
+                       Additional Information
+                     </h3>
+                   </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <DynamicFormRenderer
-                        fields={orderCustomFields}
+                        fields={orderCustomFields.filter(f => !f.afterField || f.afterField === 'end' || !['companyCode', 'orderStatus', 'orderTakenBy', 'assignedTo', 'customerName', 'caNo', 'contact', 'orderTakenDate', 'deliveryTarget', 'poDate', 'concernedPeople', 'drawingConcernedPerson', 'drawingApprovedDate', 'drawingStatus', 'drawingRemarks'].includes(f.afterField))}
                         values={orderCustomValues}
                         onChange={(key, val) => {
                           setOrderCustomValues((prev) => ({ ...prev, [key]: val }));
                           if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
                         }}
                         errors={errors}
-                        afterFieldPosition="contact"
                       />
                     </div>
-                  )}
-
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
-                      Order Confirm Date
-                    </Label>
-                    <Input
-                      type="date"
-                      value={formValues.orderTakenDate}
-                      onChange={(e) =>
-                        setFormValues({
-                          ...formValues,
-                          orderTakenDate: e.target.value,
-                        })
-                      }
-                      className="h-10 bg-muted/40 text-sm"
-                    />
-                  </div>
-                  {orderCustomFields.some(f => f.afterField === 'orderTakenDate') && (
-                    <div className="sm:col-span-2">
-                      <DynamicFormRenderer
-                        fields={orderCustomFields}
-                        values={orderCustomValues}
-                        onChange={(key, val) => {
-                          setOrderCustomValues((prev) => ({ ...prev, [key]: val }));
-                          if (errors[key]) setErrors((prev) => ({ ...prev, [key]: "" }));
-                        }}
-                        errors={errors}
-                        afterFieldPosition="orderTakenDate"
-                      />
-                    </div>
-                  )}
-
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
-                      Delivery Month Target
-                    </Label>
-                    <Input
-                      placeholder="e.g. June 2026"
-                      value={formValues.deliveryTarget}
-                      onChange={(e) =>
-                        setFormValues({
-                          ...formValues,
-                          deliveryTarget: e.target.value,
-                        })
-                      }
-                      className="h-10 bg-muted/40"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
-                      PO Date
-                    </Label>
-                    <Input
-                      type="date"
-                      value={formValues.poDate}
-                      onChange={(e) =>
-                        setFormValues({ ...formValues, poDate: e.target.value })
-                      }
-                      className="h-10 bg-muted/40 text-sm"
-                    />
-                  </div>
-                </div>
-
-                {/* Concerned Persons tag input */}
-                <div className="flex flex-col gap-1.5">
-                  <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
-                    Concerned Persons (type + Enter to add multiple)
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Type name and press Add..."
-                      value={cpInput}
-                      onChange={(e) => setCpInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          handleAddCP();
-                        }
-                      }}
-                      className="h-10 bg-muted/40 text-sm"
-                    />
-                    <Button
-                      type="button"
-                      onClick={handleAddCP}
-                      variant="secondary"
-                      size="sm"
-                      className="h-10 px-3"
-                    >
-                      + Add
-                    </Button>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5 mt-1">
-                    {concernedPeople.map((cp, idx) => (
-                      <span
-                        key={idx}
-                        className="inline-flex items-center gap-1 bg-primary/5 hover:bg-primary/10 border border-primary/20 text-primary px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition-colors duration-150"
-                      >
-                        {cp}
-                        <X
-                          className="size-3 cursor-pointer text-primary hover:text-destructive"
-                          onClick={() => handleRemoveCP(idx)}
-                        />
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </section>
-
-              {/* Drawing */}
-              <section className="space-y-3">
-                <div className="flex items-center gap-2 border-b border-emerald-600/30 pb-1.5">
-                  <FileText className="size-3.5 text-emerald-600" />
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-emerald-600">
-                    Drawing
-                  </h3>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
-                      Drawing Concerned Person
-                    </Label>
-                    <Input
-                      value={formValues.drawingConcernedPerson}
-                      onChange={(e) =>
-                        setFormValues({
-                          ...formValues,
-                          drawingConcernedPerson: e.target.value,
-                        })
-                      }
-                      placeholder="Lead Engineer"
-                      className="h-10 bg-muted/40"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
-                      Drawing Approved Date
-                    </Label>
-                    <Input
-                      type="date"
-                      value={formValues.drawingApprovedDate}
-                      onChange={(e) =>
-                        setFormValues({
-                          ...formValues,
-                          drawingApprovedDate: e.target.value,
-                        })
-                      }
-                      className="h-10 bg-muted/40 text-sm"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
-                      Drawing Status
-                    </Label>
-                    <Select
-                      value={formValues.drawingStatus}
-                      onValueChange={(val) =>
-                        setFormValues({ ...formValues, drawingStatus: val })
-                      }
-                    >
-                      <SelectTrigger className="h-10 bg-muted/40">
-                        <SelectValue placeholder="— Select —" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Pending">Pending</SelectItem>
-                        <SelectItem value="In Process">In Process</SelectItem>
-                        <SelectItem value="Approved">Approved</SelectItem>
-                        <SelectItem value="Rejected">Rejected</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Label className="text-[11px] font-semibold text-muted-foreground uppercase">
-                      Drawing Remarks
-                    </Label>
-                    <Input
-                      value={formValues.drawingRemarks}
-                      onChange={(e) =>
-                        setFormValues({
-                          ...formValues,
-                          drawingRemarks: e.target.value,
-                        })
-                      }
-                      placeholder="Revisions or sign-off notes"
-                      className="h-10 bg-muted/40"
-                    />
-                  </div>
-                </div>
-              </section>
+                 </section>
+               )}
 
               {/* Item & Pricing */}
               <section className="space-y-3">

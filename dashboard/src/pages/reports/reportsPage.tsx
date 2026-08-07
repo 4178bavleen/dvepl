@@ -66,8 +66,14 @@ export default function ReportsPage() {
       try {
         const profileRes = await apiClient.get("/auth/profile").catch(() => null);
         if (profileRes?.data?.success) {
-          const role = profileRes.data.data?.role?.name?.toLowerCase() || "admin";
-          setUserRole(role);
+          const roles: string[] = profileRes.data.data?.roles || [];
+          const lowerRoles = roles.map(r => r.toLowerCase());
+          
+          const matchedKeyword = ["admin", "sales", "accounts", "finance", "procurement", "project", "production"].find(
+            keyword => lowerRoles.some(role => role.includes(keyword))
+          );
+
+          setUserRole(matchedKeyword === "finance" ? "accounts" : (matchedKeyword || "admin"));
         }
       } catch (err: any) {
         toast.error("Failed to load initial reports configuration.");
