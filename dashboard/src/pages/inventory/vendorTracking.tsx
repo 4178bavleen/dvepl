@@ -1292,7 +1292,12 @@ if (!followUpPhone.trim()) {
             onValueChange={(val: string | null) => setVendorFilter(val || "")}
           >
             <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="All Vendors" />
+              <SelectValue placeholder="All Vendors">
+                {(value) => {
+                  const vendor = vendorOptions.find((v) => v.id === value);
+                  return vendor ? vendor.name : value;
+                }}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {vendorOptions.map((v) => (

@@ -13,6 +13,7 @@ import {
   SubDivision,
   ReferenceCode
 } from '@/types/erp';
+import { useERPStore } from '@/store/erpStore';
 
 // ==========================================
 // 16. TENDER REQUESTS ROUTE CONFIG
@@ -389,8 +390,13 @@ export const referenceCodesConfig = {
     { 
       accessorKey: 'tenderId', 
       header: 'Assigned Tender',
-      cell: ({ getValue }) => {
+      cell: ({ getValue, row }) => {
         const id = getValue() as string;
+        const tenderObj = (row.original as any).tender;
+        if (tenderObj) return `${tenderObj.title} (${tenderObj.tenderNo})`;
+        const tenders = useERPStore.getState().tenders;
+        const tender = tenders?.find((t: any) => t.id === id);
+        if (tender) return `${tender.title} (${tender.tenderNo})`;
         if (id === 't-1') return 'Supply and Testing of Cast Steel Gate Valves (TND-2026-CR-089)';
         if (id === 't-2') return 'L&T Butterfly Valves supply (LT-HE-PL-2026)';
         return id || 'System Generated';

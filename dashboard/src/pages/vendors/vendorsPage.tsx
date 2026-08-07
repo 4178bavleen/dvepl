@@ -228,6 +228,8 @@ interface PurchaseOrderRecord {
     material?: { name: string; materialCode?: string; unit?: string; hsnCode?: string };
   }[];
   createdAt?: string;
+  createdById?: string;
+  createdBy?: any;
 }
 // ==========================================
 // API ADAPTERS (EASILY REPLACE WITH AXIOS/FETCH LATER)
@@ -1124,7 +1126,7 @@ export function VendorsPage() {
   const filteredVendors = useMemo(() => {
     let result = vendors;
 
-    // 1. Apply Global Search (searches name, category, gstNumber, contactPerson)
+    // 1. Apply Global Search (searches name, category, gstNumber, contactPerson, and custom fields)
     const globalQuery = globalSearch.trim().toLowerCase();
     if (globalQuery) {
       result = result.filter(
@@ -1132,7 +1134,10 @@ export function VendorsPage() {
           (v.name ?? "").toLowerCase().includes(globalQuery) ||
           (v.category ?? "").toLowerCase().includes(globalQuery) ||
           (v.gstNumber ?? "").toLowerCase().includes(globalQuery) ||
-          (v.contactPerson ?? "").toLowerCase().includes(globalQuery),
+          (v.contactPerson ?? "").toLowerCase().includes(globalQuery) ||
+          Object.values((v as any).customFields || {}).some((val) =>
+            String(val ?? "").toLowerCase().includes(globalQuery)
+          ),
       );
     }
 
@@ -1153,7 +1158,13 @@ export function VendorsPage() {
         );
         result = result.filter((v) => matchingVendorIds.has(v.id));
       } else {
-        const fieldValue = (v: Vendor) => (v as any)[searchField] ?? "";
+        const fieldValue = (v: Vendor) => {
+          if (searchField.startsWith("cf_")) {
+            const key = searchField.substring(3);
+            return (v as any).customFields?.[key] ?? "";
+          }
+          return (v as any)[searchField] ?? "";
+        };
         result = result.filter((v) =>
           fieldValue(v).toString().toLowerCase().includes(columnQuery),
         );
@@ -3369,7 +3380,24 @@ export function VendorsPage() {
               }}
             >
               <SelectTrigger className="border-none shadow-none focus:ring-0 focus:ring-offset-0 w-[125px] h-full pl-4 pr-1 text-xs font-semibold text-muted-foreground bg-transparent hover:text-foreground cursor-pointer transition-colors shrink-0">
-                <SelectValue placeholder="Search in" />
+                <SelectValue placeholder="Search in">
+                  {(value) => {
+                    if (value === "all") return "Select Column";
+                    if (value === "name") return "Vendor Name";
+                    if (value === "category") return "Category";
+                    if (value === "contactPerson") return "Contact Person";
+                    if (value === "phone") return "Phone";
+                    if (value === "email") return "Email";
+                    if (value === "gstNumber") return "GSTIN";
+                    if (value === "products") return "Products Supplied";
+                    if (value && value.startsWith("cf_")) {
+                      const key = value.substring(3);
+                      const field = vendorCustomFields.find((f: any) => f.key === key);
+                      return field ? (field.name || field.key) : key;
+                    }
+                    return value || "";
+                  }}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Select Column</SelectItem>
@@ -3380,6 +3408,11 @@ export function VendorsPage() {
                 <SelectItem value="email">Email</SelectItem>
                 <SelectItem value="gstNumber">GSTIN</SelectItem>
                 <SelectItem value="products">Products Supplied</SelectItem>
+                {vendorCustomFields.map((field: any) => (
+                  <SelectItem key={field.id} value={`cf_${field.key}`}>
+                    {field.name || field.key}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
@@ -3392,12 +3425,18 @@ export function VendorsPage() {
               placeholder={
                 searchField === "all"
                   ? "Select a column to filter..."
-                  : `Search by ${searchField === "gstNumber"
-                    ? "GSTIN"
-                    : searchField === "contactPerson"
-                      ? "contact person"
-                      : searchField
-                  }...`
+                  : searchField.startsWith("cf_")
+                    ? `Search by ${(() => {
+                        const key = searchField.substring(3);
+                        const field = vendorCustomFields.find((f: any) => f.key === key);
+                        return field ? (field.name || field.key) : key;
+                      })()}...`
+                    : `Search by ${searchField === "gstNumber"
+                      ? "GSTIN"
+                      : searchField === "contactPerson"
+                        ? "contact person"
+                        : searchField
+                    }...`
               }
               value={fieldSearch}
               onChange={(e) => setFieldSearch(e.target.value)}
@@ -3891,6 +3930,8 @@ export function VendorsPage() {
                               : "—"}{" "}
                             • Items: {po.items?.length ?? 0} • Payment:{" "}
                             {po.paymentTerms || "—"}
+                            • Created By: {po.createdBy?.name || (po.createdById ? users?.find((u: any) => u.id === po.createdById)?.name : null) || po.createdBy || "System"}
+                            {po.createdAt && ` • Created At: ${new Date(po.createdAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}`}
                           </div>
                         </div>
                         <div className="text-right shrink-0 flex flex-col items-end gap-1">

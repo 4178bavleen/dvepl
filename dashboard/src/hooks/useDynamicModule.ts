@@ -119,9 +119,11 @@ export default function useDynamicModule({
     if (!search.trim()) return records;
 
     return records.filter((record) => {
-      return Object.values(
-        record.values || {}
-      )
+      const parsedValues = typeof record.values === "string" ? (() => {
+        try { return JSON.parse(record.values); } catch { return {}; }
+      })() : (record.values || {});
+
+      return Object.values(parsedValues)
         .join(" ")
         .toLowerCase()
         .includes(search.toLowerCase());

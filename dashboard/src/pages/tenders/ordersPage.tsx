@@ -509,6 +509,9 @@ export function OrdersPage() {
             item.concernedPeople.some((cp: string) =>
               cp.toLowerCase().includes(q),
             )) ||
+          Object.values(item.customFields || {}).some((val) =>
+            String(val ?? "").toLowerCase().includes(q)
+          ) ||
           (Array.isArray(item.lineItems) &&
             item.lineItems.some((li: any) =>
               (li.itemNo || "").toLowerCase().includes(q),
@@ -1255,7 +1258,12 @@ export function OrdersPage() {
                       }
                     >
                       <SelectTrigger className="h-10 bg-muted/40">
-                        <SelectValue placeholder="Select Company..." />
+                        <SelectValue placeholder="Select Company...">
+                          {(value) => {
+                            const company = companies.find((c) => c.id === value);
+                            return company ? company.name : value;
+                          }}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {companies.map((c) => (
@@ -1351,7 +1359,12 @@ export function OrdersPage() {
                        }
                      >
                        <SelectTrigger className="h-10 bg-muted/40">
-                         <SelectValue placeholder="— Select user —" />
+                         <SelectValue placeholder="— Select user —">
+                           {(value) => {
+                             const user = users.find((u) => u.userId === value);
+                             return user ? user.name : value;
+                           }}
+                         </SelectValue>
                        </SelectTrigger>
                        <SelectContent>
                          {users

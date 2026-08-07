@@ -471,7 +471,14 @@ export function QuotationsPage() {
               <div className="flex flex-col gap-1.5">
                 <Label className="text-xs font-bold text-muted-foreground uppercase">Client Partner *</Label>
                 <Select value={formValues.customerId} onValueChange={(val) => setFormValues(prev => ({ ...prev, customerId: val || '' }))}>
-                  <SelectTrigger><SelectValue placeholder="Select Client" /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Client">
+                      {(value) => {
+                        const customer = customers.find(c => c.id === value);
+                        return customer ? customer.name : value;
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
                   <SelectContent>
                     {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                   </SelectContent>
@@ -481,7 +488,15 @@ export function QuotationsPage() {
               <div className="flex flex-col gap-1.5">
                 <Label className="text-xs font-bold text-muted-foreground uppercase">Linked Tender Project</Label>
                 <Select value={formValues.tenderId} onValueChange={(val) => setFormValues(prev => ({ ...prev, tenderId: val || '' }))}>
-                  <SelectTrigger><SelectValue placeholder="Select Tender (Optional)" /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Tender (Optional)">
+                      {(value) => {
+                        if (value === "none") return "None";
+                        const tender = tenders.find(t => t.id === value);
+                        return tender ? tender.title : value;
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None</SelectItem>
                     {tenders.map(t => <SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>)}

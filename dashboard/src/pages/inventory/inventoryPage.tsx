@@ -16,7 +16,7 @@ import {
   Upload,
 } from "lucide-react";
 
-import { cn } from "@/utils/helpers";
+import { cn, getFieldLabel } from "@/utils/helpers";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -41,6 +41,7 @@ import DynamicFieldManager from "@/components/dynamic/DynamicFieldManager";
 import useDynamicModule from "@/hooks/useDynamicModule";
 import VendorTracking from "./vendorTracking";
 import { DynamicRecord } from "@/types/dynamic";
+import { ConfirmDialog } from "@/components/shared/confirmDialog";
 
 type StockStatus = "all" | "in-stock" | "low-stock" | "out-of-stock";
 
@@ -82,6 +83,12 @@ export default function InventoryPage() {
   const [stockReason, setStockReason] = useState("");
   const [stockLoading, setStockLoading] = useState(false);
   const [importing, setImporting] = useState(false);
+
+  // States for Record Saving/Deletion
+  const [deleteRecordOpen, setDeleteRecordOpen] = useState(false);
+  const [recordToDelete, setRecordToDelete] = useState<DynamicRecord | null>(null);
+  const [isDeletingRecord, setIsDeletingRecord] = useState(false);
+  const [isSavingRecord, setIsSavingRecord] = useState(false);
 
   const buildFormValues = (recordValues?: Record<string, any> | string | null) => {
     const base: Record<string, any> = {};
@@ -126,20 +133,45 @@ export default function InventoryPage() {
     setFormOpen(true);
   };
 
-  const removeRecord = async (record: DynamicRecord) => {
-    if (!confirm("Delete record?")) return;
-    await deleteRecord(record.id);
+  const confirmDeleteRecord = (record: DynamicRecord) => {
+    setRecordToDelete(record);
+    setDeleteRecordOpen(true);
+  };
+
+  const handleConfirmDeleteRecord = async () => {
+    if (!recordToDelete) return;
+    try {
+      setIsDeletingRecord(true);
+      await deleteRecord(recordToDelete.id);
+      toast.success("Record deleted successfully");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.response?.data?.message || "Failed to delete record");
+    } finally {
+      setIsDeletingRecord(false);
+      setDeleteRecordOpen(false);
+      setRecordToDelete(null);
+    }
   };
 
   const saveRecord = async () => {
-    if (editing) {
-      await updateRecord(editing.id, values);
-    } else {
-      await createRecord(values);
+    try {
+      setIsSavingRecord(true);
+      if (editing) {
+        await updateRecord(editing.id, values);
+        toast.success("Record updated successfully");
+      } else {
+        await createRecord(values);
+        toast.success("Record created successfully");
+      }
+      setFormOpen(false);
+      setValues({});
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.response?.data?.message || "Failed to save record");
+    } finally {
+      setIsSavingRecord(false);
     }
-
-    setFormOpen(false);
-    setValues({});
   };
 
   const getStockStatus = (record: DynamicRecord) => {
@@ -158,6 +190,14 @@ export default function InventoryPage() {
     return "in-stock" as const;
   };
 
+  const getItemName = (record: DynamicRecord) => {
+    const nameField = fields.find((field) => {
+      const label = field.label.toLowerCase();
+      return label.includes("name") || label.includes("item");
+    }) || fields[0];
+    return record.values?.[nameField?.fieldName ?? ""] ?? "Selected item";
+  };
+
   const filteredRecords = useMemo(() => {
     const searchQuery = `${search} ${fieldSearch}`.trim().toLowerCase();
     const selectedField = fields.find((field) => field.fieldName === searchField);
@@ -168,12 +208,16 @@ export default function InventoryPage() {
 
       if (!searchQuery) return true;
 
+      const parsedValues = typeof record.values === "string" ? (() => {
+        try { return JSON.parse(record.values); } catch { return {}; }
+      })() : (record.values || {});
+
       if (searchField !== "all" && selectedField) {
-        return String(record.values?.[selectedField.fieldName] ?? "").toLowerCase().includes(searchQuery);
+        return String(parsedValues[selectedField.fieldName] ?? "").toLowerCase().includes(searchQuery);
       }
 
       const searchableText = fields
-        .map((field) => String(record.values?.[field.fieldName] ?? ""))
+        .map((field) => String(parsedValues[field.fieldName] ?? ""))
         .join(" ")
         .toLowerCase();
 
@@ -500,7 +544,12 @@ export default function InventoryPage() {
               onValueChange={(value) => setSearchField(value ?? "all")}
             >
               <SelectTrigger className="w-full md:w-[240px]">
-                <SelectValue placeholder="Search field" />
+                <SelectValue placeholder="Search field">
+                  {(value) => {
+                    if (value === "all") return "All fields";
+                    return getFieldLabel(fields, value);
+                  }}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All fields</SelectItem>
@@ -653,7 +702,7 @@ export default function InventoryPage() {
             loading={loading}
             onStock={handleRestockAction}
             onEdit={openEdit}
-            onDelete={removeRecord}
+            onDelete={confirmDeleteRecord}
           />
         </>
       ) : (
@@ -871,6 +920,17 @@ export default function InventoryPage() {
           )}
         </DialogContent>
       </Dialog>
+      <ConfirmDialog
+        open={deleteRecordOpen}
+        onOpenChange={setDeleteRecordOpen}
+        title="Delete Inventory Record?"
+        description="Are you sure you want to permanently delete this inventory record? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="warning"
+        onConfirm={handleConfirmDeleteRecord}
+        loading={isDeletingRecord}
+      />
     </div>
   );
 }

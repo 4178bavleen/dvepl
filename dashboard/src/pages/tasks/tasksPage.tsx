@@ -342,7 +342,10 @@ export default function TasksPage() {
         (t) =>
           t.title.toLowerCase().includes(q) ||
           t.description.toLowerCase().includes(q) ||
-          t.assignedUsers.some((u) => u.name.toLowerCase().includes(q))
+          t.assignedUsers.some((u) => u.name.toLowerCase().includes(q)) ||
+          Object.values((t as any).customFields || {}).some((val) =>
+            String(val ?? "").toLowerCase().includes(q)
+          )
       );
     }
 
