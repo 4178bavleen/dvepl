@@ -225,7 +225,7 @@ export default function DynamicTable({
                           size="sm"
                           onClick={() => onStock(record)}
                         >
-                          Restock
+                          Stock
                         </Button>
 
                         <Button

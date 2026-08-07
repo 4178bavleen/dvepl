@@ -22,6 +22,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { apiClient } from "@/services/axios";
 import {
   Select,
   SelectContent,
@@ -54,6 +56,7 @@ export default function InventoryPage() {
     updateRecord,
     deleteRecord,
     loadFields,
+    loadRecords,
   } = useDynamicModule({ moduleKey: "inventory" });
 
   const [mainView, setMainView] = useState<"inventory" | "tracking">("inventory");
@@ -64,8 +67,17 @@ export default function InventoryPage() {
   const [searchField, setSearchField] = useState<string>("all");
   const [fieldSearch, setFieldSearch] = useState("");
   const [stockFilter, setStockFilter] = useState<StockStatus>("all");
-  const [restockOpen, setRestockOpen] = useState(false);
-  const [restockRecord, setRestockRecord] = useState<DynamicRecord | null>(null);
+  const [stockOpen, setStockOpen] = useState(false);
+  const [stockRecord, setStockRecord] = useState<DynamicRecord | null>(null);
+  const [stockMovType, setStockMovType] = useState<"IN" | "OUT" | "ADJUST" | "RETURN">("IN");
+  const [stockQty, setStockQty] = useState("");
+  const [stockDate, setStockDate] = useState(new Date().toISOString().split("T")[0]);
+  const [stockRate, setStockRate] = useState("");
+  const [stockVendorName, setStockVendorName] = useState("");
+  const [stockInvoiceNo, setStockInvoiceNo] = useState("");
+  const [stockOrderCode, setStockOrderCode] = useState("");
+  const [stockReason, setStockReason] = useState("");
+  const [stockLoading, setStockLoading] = useState(false);
   const [importing, setImporting] = useState(false);
 
   const buildFormValues = (recordValues?: Record<string, any> | string | null) => {
@@ -226,37 +238,137 @@ export default function InventoryPage() {
     }
   };
 
-  const handleRestockAction = (record: DynamicRecord) => {
-    setRestockRecord(record);
-    setRestockOpen(true);
-  };
-
-  const handleSendVendorMail = () => {
-    if (!restockRecord) return;
-
-    const emailField = fields.find((field) => {
+  const getStockQuantityFieldName = (record: DynamicRecord) => {
+    const quantityField = fields.find((field) => {
       const label = field.label.toLowerCase();
-      return label.includes("email") || label.includes("mail");
+      return (
+        label.includes("qty") ||
+        label.includes("quantity") ||
+        label.includes("stock") ||
+        label.includes("balance")
+      );
     });
 
-    const vendorEmail = restockRecord.values?.[emailField?.fieldName ?? ""];
-    if (!vendorEmail) {
-      toast.error("No vendor email found for this item");
+    if (quantityField) return quantityField.fieldName;
+    if (record.values?.quantity !== undefined) return "quantity";
+    if (record.values?.qty !== undefined) return "qty";
+    if (record.values?.currentStock !== undefined) return "currentStock";
+    return "quantity";
+  };
+
+  const getCurrentStock = (record: DynamicRecord) => {
+    const fieldName = getStockQuantityFieldName(record);
+    return Number(record.values?.[fieldName] ?? 0);
+  };
+
+  const getNameValue = (record: DynamicRecord) => {
+    const nameField = fields.find((field) => {
+      const label = field.label.toLowerCase();
+      const key = field.fieldName.toLowerCase();
+      return label.includes("name") || key === "name" || key === "materialcode";
+    });
+
+    return String(
+      nameField?.fieldName
+        ? record.values?.[nameField.fieldName]
+        : record.values?.name ?? record.values?.materialCode ?? "Item",
+    );
+  };
+
+  const getUnitValue = (record: DynamicRecord) => {
+    const unitField = fields.find((field) => {
+      const label = field.label.toLowerCase();
+      const key = field.fieldName.toLowerCase();
+      return label.includes("unit") || key === "unit";
+    });
+
+    return String(unitField?.fieldName ? record.values?.[unitField.fieldName] : record.values?.unit ?? "");
+  };
+
+  const resetStockForm = () => {
+    setStockQty("");
+    setStockDate(new Date().toISOString().split("T")[0]);
+    setStockRate("");
+    setStockVendorName("");
+    setStockInvoiceNo("");
+    setStockOrderCode("");
+    setStockReason("");
+  };
+
+  const handleOpenStockModal = (
+    record: DynamicRecord,
+    type: "IN" | "OUT" | "ADJUST" | "RETURN",
+  ) => {
+    setStockRecord(record);
+    setStockMovType(type);
+    resetStockForm();
+    setStockOpen(true);
+  };
+
+  const handleSaveStock = async () => {
+    if (!stockRecord) return;
+
+    const qty = parseFloat(stockQty);
+    if (Number.isNaN(qty) || qty < 0) {
+      toast.error("Enter a valid quantity");
       return;
     }
 
-    const subject = encodeURIComponent(`Restock request for ${restockRecord.values?.name ?? "item"}`);
-    const body = encodeURIComponent(`Hello,\n\nWe need to restock the item ${restockRecord.values?.name ?? "this item"}. Please share availability and lead time.\n\nThanks`);
-    window.open(`mailto:${vendorEmail}?subject=${subject}&body=${body}`, "_blank");
-    setRestockOpen(false);
+    if ((stockMovType === "IN" || stockMovType === "OUT" || stockMovType === "RETURN") && qty <= 0) {
+      toast.error("Quantity must be greater than zero");
+      return;
+    }
+
+    setStockLoading(true);
+
+    try {
+      if (stockMovType === "ADJUST") {
+        await apiClient.patch(`/inventory/update/${stockRecord.id}`, {
+          currentStock: qty,
+        });
+      } else {
+        const body: Record<string, any> = {
+          inventoryId: stockRecord.id,
+          quantity: qty,
+          referenceType: "MANUAL",
+          referenceId: stockRecord.id,
+          remarks: stockReason || `${stockMovType} stock movement`,
+        };
+
+        if (stockMovType === "IN") {
+          body.referenceType = stockInvoiceNo ? "INVOICE" : "MANUAL";
+          if (stockRate) body.unitPrice = parseFloat(stockRate);
+          if (stockVendorName) body.vendorName = stockVendorName;
+          if (stockInvoiceNo) body.invoiceNo = stockInvoiceNo;
+        }
+
+        if (stockMovType === "OUT" || stockMovType === "RETURN") {
+          body.referenceType = stockOrderCode ? "SALES_ORDER" : "MANUAL";
+          body.referenceId = stockOrderCode || stockRecord.id;
+        }
+
+        if (stockMovType === "RETURN") {
+          await apiClient.post("/inventory/stock-in", body);
+        } else if (stockMovType === "IN") {
+          await apiClient.post("/inventory/stock-in", body);
+        } else {
+          await apiClient.post("/inventory/stock-out", body);
+        }
+      }
+
+      toast.success("Stock transaction completed successfully");
+      setStockOpen(false);
+      await loadRecords();
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error?.response?.data?.message ?? "Failed to submit stock transaction");
+    } finally {
+      setStockLoading(false);
+    }
   };
 
-  const handleCreatePo = () => {
-    if (!restockRecord) return;
-    navigate("/purchase/vendors", {
-      state: { fromInventory: true, inventoryItem: restockRecord },
-    });
-    setRestockOpen(false);
+  const handleRestockAction = (record: DynamicRecord) => {
+    handleOpenStockModal(record, "IN");
   };
 
   const stockOptions: Array<{ value: StockStatus; label: string }> = [
@@ -265,6 +377,29 @@ export default function InventoryPage() {
     { value: "low-stock", label: "Low Stock" },
     { value: "out-of-stock", label: "Out of Stock" },
   ];
+
+  const stockPreview = (() => {
+    const qtyVal = parseFloat(stockQty) || 0;
+    const current = stockRecord ? getCurrentStock(stockRecord) : 0;
+    const unit = stockRecord ? getUnitValue(stockRecord) : "";
+    let calculatedAfter = current;
+
+    if (stockMovType === "IN" || stockMovType === "RETURN") {
+      calculatedAfter += qtyVal;
+    } else if (stockMovType === "OUT") {
+      calculatedAfter -= qtyVal;
+    } else if (stockMovType === "ADJUST") {
+      calculatedAfter = qtyVal;
+    }
+
+    return {
+      qtyVal,
+      current,
+      unit,
+      calculatedAfter,
+      isNegative: calculatedAfter < 0,
+    };
+  })();
 
   return (
     <div className="space-y-6 p-6">
@@ -395,49 +530,163 @@ export default function InventoryPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={fieldManagerOpen} onOpenChange={setFieldManagerOpen}>
-        <DialogContent className="max-w-6xl max-h-[85vh] overflow-hidden">
+      <Dialog open={stockOpen} onOpenChange={setStockOpen}>
+        <DialogContent className="max-w-md h-[85vh] flex flex-col overflow-hidden">
           <DialogHeader>
-            <DialogTitle>Manage Fields</DialogTitle>
+            <DialogTitle>Stock Movement</DialogTitle>
           </DialogHeader>
 
-          {module && (
-            <div className="h-[calc(85vh-8rem)]">
-              <DynamicFieldManager moduleId={module.id} fields={fields} onRefresh={loadFields} />
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={restockOpen} onOpenChange={setRestockOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Restock Options</DialogTitle>
-          </DialogHeader>
-
-          {restockRecord && (
-            <div className="space-y-4">
+          {stockRecord ? (
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
               <div className="rounded-lg border bg-muted/40 p-4">
                 <div className="flex items-center gap-2">
                   <Package className="h-4 w-4" />
-                  <p className="font-medium">{restockRecord.values?.name ?? "Selected item"}</p>
+                  <p className="font-medium">{getNameValue(stockRecord)}</p>
                 </div>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  This item is currently {getStockStatus(restockRecord).replace(/-/g, " ")}.
+                  Current stock: {getCurrentStock(stockRecord)} {getUnitValue(stockRecord)}
                 </p>
               </div>
 
-              <div className="flex flex-col gap-2">
-                <Button onClick={handleSendVendorMail}>
-                  <Mail className="mr-2 h-4 w-4" />
-                  Send Mail to Vendor
-                </Button>
-
-                <Button variant="outline" onClick={handleCreatePo}>
-                  <Package className="mr-2 h-4 w-4" />
-                  Create Purchase Order
-                </Button>
+              <div className="grid grid-cols-4 gap-2">
+                {(["IN", "OUT", "ADJUST", "RETURN"] as const).map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setStockMovType(type)}
+                    className={`flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                      stockMovType === type
+                        ? "bg-card text-foreground border-border"
+                        : "bg-muted/20 text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
               </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      {stockMovType === "ADJUST" ? "New Level" : "Quantity"} *
+                    </label>
+                    <Input
+                      type="number"
+                      required
+                      min={0}
+                      step="any"
+                      placeholder="0"
+                      value={stockQty}
+                      onChange={(e) => setStockQty(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      Transaction Date
+                    </label>
+                    <Input
+                      type="date"
+                      value={stockDate}
+                      onChange={(e) => setStockDate(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                {stockMovType === "IN" && (
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-bold tracking-wider text-muted-foreground">
+                        Custom Rate (?)
+                      </label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="Enter rate"
+                        value={stockRate}
+                        onChange={(e) => setStockRate(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-bold tracking-wider text-muted-foreground">
+                        Supplier Name
+                      </label>
+                      <Input
+                        placeholder="Supplier name"
+                        value={stockVendorName}
+                        onChange={(e) => setStockVendorName(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-bold tracking-wider text-muted-foreground">
+                        Invoice No.
+                      </label>
+                      <Input
+                        placeholder="Invoice number"
+                        value={stockInvoiceNo}
+                        onChange={(e) => setStockInvoiceNo(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {(stockMovType === "OUT" || stockMovType === "RETURN") && (
+                  <div className="flex flex-col gap-2">
+                    <label className="text-xs font-bold tracking-wider text-muted-foreground">
+                      Sales Order / Project Code Reference
+                    </label>
+                    <Input
+                      placeholder="Order or project code"
+                      value={stockOrderCode}
+                      onChange={(e) => setStockOrderCode(e.target.value)}
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Reason / Note
+                  </label>
+                  <Textarea
+                    placeholder="Enter reason or comments"
+                    value={stockReason}
+                    onChange={(e) => setStockReason(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+
+                {stockQty && (
+                  <div className="p-3 border rounded-lg bg-primary/5 text-sm text-muted-foreground">
+                    <div className="font-semibold text-foreground">
+                      Stock Level Preview: {stockPreview.current} {stockPreview.unit} ?{' '}
+                      <strong className="text-primary">{stockPreview.calculatedAfter}</strong> {stockPreview.unit}
+                    </div>
+                    {stockPreview.isNegative && (
+                      <div className="text-rose-500 font-bold mt-1">
+                        Warning: Insufficient stock after this action
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="border-t pt-4 flex items-center justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setStockOpen(false)}
+                    disabled={stockLoading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button onClick={handleSaveStock} disabled={stockLoading}>
+                    {stockLoading ? "Submitting..." : "Submit"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="p-4 text-sm text-muted-foreground">
+              Select an item to manage stock.
             </div>
           )}
         </DialogContent>
