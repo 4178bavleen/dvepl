@@ -45,9 +45,6 @@ export const ROUTES = {
   SECURITY_PERMISSION_GROUPS: '/security/permission-groups',
   SECURITY_APPROVAL_REQUESTS: '/security/approval-requests',
   
-  // Engineering & Manufacturing
-  ENGINEERING_DRAWINGS: '/engineering/drawings',
-
   // Materials & Master Catalog
   MATERIAL_MATERIALS: '/material/materials',
   MATERIAL_CATEGORIES: '/material/categories',

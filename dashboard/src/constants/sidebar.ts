@@ -273,12 +273,4 @@ export const sidebarItems: SidebarItem[] = [
     path: ROUTES.SETTINGS,
     section: "Settings",
   },
-
-  // Engineering & Manufacturing
-  {
-    name: "Engineering Drawings",
-    icon: PenTool,
-    path: ROUTES.ENGINEERING_DRAWINGS,
-    section: "Engineering",
-  },
 ];
