@@ -100,14 +100,12 @@ function DynamicFieldRow({
       <div className="flex items-center gap-2">
         <Checkbox
           checked={field.visible}
-          onCheckedChange={(v) => {
-                        onUpdate(field.id, {
-    visible: Boolean(v),
-})
-          } 
-
-          }/>
-
+          onCheckedChange={(v) =>
+            onUpdate(field.id, {
+              visible: Boolean(v),
+            })
+          }
+        />
         <span>Visible</span>
       </div>
 

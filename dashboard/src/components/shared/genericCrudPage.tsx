@@ -593,8 +593,8 @@ export function GenericCrudPage<TRecord extends { id: string }>({
         <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={searchPlaceholder} className="pl-9" />
       </div>
 
-      <GenericTable
-        columns={processedColumns}
+      <GenericTable<any>
+        columns={processedColumns as any}
         data={filteredRecords}
         onView={setViewingRecord}
         onEdit={!readOnly && (!api || api.update) ? openEdit : undefined}

@@ -6,6 +6,7 @@ import { organizationApi } from "@/services/organization";
 import { EmployeeStatus } from "@/types/erp";
 import { Employee, Attendance, Leave, Salary } from "@/types/erp";
 import { ExternalLink } from "lucide-react";
+import { useERPStore } from "@/store/erpStore";
 
 // ==========================================
 // 7. EMPLOYEES ROUTE CONFIG
@@ -215,12 +216,17 @@ export const attendanceConfig = {
     {
       accessorKey: "employeeId",
       header: "Employee Code",
-      cell: ({ getValue }) => {
-        const id = getValue();
-        if (id === "emp-1") return "Gabriel Dhillon (EMP-001)";
-        if (id === "emp-2") return "Rajesh Kumar (EMP-002)";
-        if (id === "emp-3") return "Priya Sharma (EMP-003)";
-        return String(id);
+      cell: ({ getValue, row }) => {
+        const id = getValue() as string;
+        const empObj = (row.original as any).employee;
+        if (empObj?.employeeCode) return empObj.employeeCode;
+        const employees = useERPStore.getState().employees;
+        const emp = employees?.find((e: any) => e.id === id);
+        if (emp?.employeeCode) return emp.employeeCode;
+        if (id === "emp-1") return "EMP-001";
+        if (id === "emp-2") return "EMP-002";
+        if (id === "emp-3") return "EMP-003";
+        return id;
       },
     },
     {
@@ -356,12 +362,17 @@ export const leaveConfig = {
     {
       accessorKey: "employeeId",
       header: "Employee",
-      cell: ({ getValue }) => {
-        const id = getValue();
+      cell: ({ getValue, row }) => {
+        const id = getValue() as string;
+        const empObj = (row.original as any).employee;
+        if (empObj) return `${empObj.firstName} ${empObj.lastName}`;
+        const employees = useERPStore.getState().employees;
+        const emp = employees?.find((e: any) => e.id === id);
+        if (emp) return `${emp.firstName} ${emp.lastName}`;
         if (id === "emp-1") return "Gabriel Dhillon";
         if (id === "emp-2") return "Rajesh Kumar";
         if (id === "emp-3") return "Priya Sharma";
-        return String(id);
+        return id;
       },
     },
     { accessorKey: "leaveType", header: "Leave Type" },
@@ -488,12 +499,17 @@ export const payrollConfig = {
     {
       accessorKey: "employeeId",
       header: "Employee",
-      cell: ({ getValue }) => {
-        const id = getValue();
+      cell: ({ getValue, row }) => {
+        const id = getValue() as string;
+        const empObj = (row.original as any).employee;
+        if (empObj) return `${empObj.firstName} ${empObj.lastName}`;
+        const employees = useERPStore.getState().employees;
+        const emp = employees?.find((e: any) => e.id === id);
+        if (emp) return `${emp.firstName} ${emp.lastName}`;
         if (id === "emp-1") return "Gabriel Dhillon";
         if (id === "emp-2") return "Rajesh Kumar";
         if (id === "emp-3") return "Priya Sharma";
-        return String(id);
+        return id;
       },
     },
     { accessorKey: "effectiveFrom", header: "Effective From" },

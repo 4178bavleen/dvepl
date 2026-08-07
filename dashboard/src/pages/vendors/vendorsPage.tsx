@@ -228,6 +228,8 @@ interface PurchaseOrderRecord {
     material?: { name: string; materialCode?: string; unit?: string; hsnCode?: string };
   }[];
   createdAt?: string;
+  createdById?: string;
+  createdBy?: any;
 }
 // ==========================================
 // API ADAPTERS (EASILY REPLACE WITH AXIOS/FETCH LATER)
@@ -3928,6 +3930,8 @@ export function VendorsPage() {
                               : "—"}{" "}
                             • Items: {po.items?.length ?? 0} • Payment:{" "}
                             {po.paymentTerms || "—"}
+                            • Created By: {po.createdBy?.name || (po.createdById ? users?.find((u: any) => u.id === po.createdById)?.name : null) || po.createdBy || "System"}
+                            {po.createdAt && ` • Created At: ${new Date(po.createdAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}`}
                           </div>
                         </div>
                         <div className="text-right shrink-0 flex flex-col items-end gap-1">

@@ -39,6 +39,7 @@ import DynamicFieldManager from "@/components/dynamic/DynamicFieldManager";
 import useDynamicModule from "@/hooks/useDynamicModule";
 import VendorTracking from "./vendorTracking";
 import { DynamicRecord } from "@/types/dynamic";
+import { ConfirmDialog } from "@/components/shared/confirmDialog";
 
 type StockStatus = "all" | "in-stock" | "low-stock" | "out-of-stock";
 
@@ -70,6 +71,12 @@ export default function InventoryPage() {
   const [restockOpen, setRestockOpen] = useState(false);
   const [restockRecord, setRestockRecord] = useState<DynamicRecord | null>(null);
   const [importing, setImporting] = useState(false);
+
+  // States for Record Saving/Deletion
+  const [deleteRecordOpen, setDeleteRecordOpen] = useState(false);
+  const [recordToDelete, setRecordToDelete] = useState<DynamicRecord | null>(null);
+  const [isDeletingRecord, setIsDeletingRecord] = useState(false);
+  const [isSavingRecord, setIsSavingRecord] = useState(false);
 
   const buildFormValues = (recordValues?: Record<string, any> | string | null) => {
     const base: Record<string, any> = {};
@@ -114,20 +121,45 @@ export default function InventoryPage() {
     setFormOpen(true);
   };
 
-  const removeRecord = async (record: DynamicRecord) => {
-    if (!confirm("Delete record?")) return;
-    await deleteRecord(record.id);
+  const confirmDeleteRecord = (record: DynamicRecord) => {
+    setRecordToDelete(record);
+    setDeleteRecordOpen(true);
+  };
+
+  const handleConfirmDeleteRecord = async () => {
+    if (!recordToDelete) return;
+    try {
+      setIsDeletingRecord(true);
+      await deleteRecord(recordToDelete.id);
+      toast.success("Record deleted successfully");
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.response?.data?.message || "Failed to delete record");
+    } finally {
+      setIsDeletingRecord(false);
+      setDeleteRecordOpen(false);
+      setRecordToDelete(null);
+    }
   };
 
   const saveRecord = async () => {
-    if (editing) {
-      await updateRecord(editing.id, values);
-    } else {
-      await createRecord(values);
+    try {
+      setIsSavingRecord(true);
+      if (editing) {
+        await updateRecord(editing.id, values);
+        toast.success("Record updated successfully");
+      } else {
+        await createRecord(values);
+        toast.success("Record created successfully");
+      }
+      setFormOpen(false);
+      setValues({});
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.response?.data?.message || "Failed to save record");
+    } finally {
+      setIsSavingRecord(false);
     }
-
-    setFormOpen(false);
-    setValues({});
   };
 
   const getStockStatus = (record: DynamicRecord) => {
@@ -533,7 +565,7 @@ export default function InventoryPage() {
             loading={loading}
             onStock={handleRestockAction}
             onEdit={openEdit}
-            onDelete={removeRecord}
+            onDelete={confirmDeleteRecord}
           />
         </>
       ) : (
@@ -618,6 +650,17 @@ export default function InventoryPage() {
           )}
         </DialogContent>
       </Dialog>
+      <ConfirmDialog
+        open={deleteRecordOpen}
+        onOpenChange={setDeleteRecordOpen}
+        title="Delete Inventory Record?"
+        description="Are you sure you want to permanently delete this inventory record? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="warning"
+        onConfirm={handleConfirmDeleteRecord}
+        loading={isDeletingRecord}
+      />
     </div>
   );
 }
