@@ -151,11 +151,11 @@ async function adminInventoryStockOutRoutes(
 
             if (quantityFieldNames.length > 0) {
               const currentValues =
-                (dynamicRecord.values as Record<string, unknown>) || {};
+                (dynamicRecord.values as Prisma.InputJsonObject) || {};
               await tx.dynamicRecord.update({
                 where: { id: dynamicRecord.id },
                 data: {
-                  values: quantityFieldNames.reduce<Record<string, unknown>>(
+                  values: quantityFieldNames.reduce<Prisma.InputJsonObject>(
                     (values, fieldName) => ({
                       ...values,
                       [fieldName]: Number(stockAfter.toString()),
@@ -220,7 +220,7 @@ async function adminInventoryStockOutRoutes(
                   preferredVendor: true,
                 },
               },
-              
+
               bin: true,
             },
           });
