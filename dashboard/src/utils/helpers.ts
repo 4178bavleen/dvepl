@@ -93,3 +93,21 @@ export function exportToExcel(data: any[], fileName: string) {
 export function exportToPdf(data: any[], fileName: string) {
   console.log('Simulating PDF export for:', fileName, data.length, 'records');
 }
+
+// ==========================================
+// METADATA UTILITY FOR DYNAMIC FIELDS
+// ==========================================
+export function getFieldLabel(
+  fields: Array<{ fieldName?: string; key?: string; label?: string; name?: string }>,
+  fieldName: string
+): string {
+  if (!fieldName) return '';
+  const field = fields.find(
+    (f) =>
+      f.fieldName === fieldName ||
+      f.key === fieldName ||
+      (f.fieldName && f.fieldName.toLowerCase() === fieldName.toLowerCase()) ||
+      (f.key && f.key.toLowerCase() === fieldName.toLowerCase())
+  );
+  return field?.label || field?.name || fieldName;
+}

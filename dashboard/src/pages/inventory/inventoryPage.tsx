@@ -16,7 +16,7 @@ import {
   Upload,
 } from "lucide-react";
 
-import { cn } from "@/utils/helpers";
+import { cn, getFieldLabel } from "@/utils/helpers";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -146,6 +146,14 @@ export default function InventoryPage() {
     return "in-stock" as const;
   };
 
+  const getItemName = (record: DynamicRecord) => {
+    const nameField = fields.find((field) => {
+      const label = field.label.toLowerCase();
+      return label.includes("name") || label.includes("item");
+    }) || fields[0];
+    return record.values?.[nameField?.fieldName ?? ""] ?? "Selected item";
+  };
+
   const filteredRecords = useMemo(() => {
     const searchQuery = `${search} ${fieldSearch}`.trim().toLowerCase();
     const selectedField = fields.find((field) => field.fieldName === searchField);
@@ -156,12 +164,16 @@ export default function InventoryPage() {
 
       if (!searchQuery) return true;
 
+      const parsedValues = typeof record.values === "string" ? (() => {
+        try { return JSON.parse(record.values); } catch { return {}; }
+      })() : (record.values || {});
+
       if (searchField !== "all" && selectedField) {
-        return String(record.values?.[selectedField.fieldName] ?? "").toLowerCase().includes(searchQuery);
+        return String(parsedValues[selectedField.fieldName] ?? "").toLowerCase().includes(searchQuery);
       }
 
       const searchableText = fields
-        .map((field) => String(record.values?.[field.fieldName] ?? ""))
+        .map((field) => String(parsedValues[field.fieldName] ?? ""))
         .join(" ")
         .toLowerCase();
 
@@ -289,8 +301,9 @@ export default function InventoryPage() {
       return;
     }
 
-    const subject = encodeURIComponent(`Restock request for ${restockRecord.values?.name ?? "item"}`);
-    const body = encodeURIComponent(`Hello,\n\nWe need to restock the item ${restockRecord.values?.name ?? "this item"}. Please share availability and lead time.\n\nThanks`);
+    const itemName = getItemName(restockRecord);
+    const subject = encodeURIComponent(`Restock request for ${itemName}`);
+    const body = encodeURIComponent(`Hello,\n\nWe need to restock the item ${itemName}. Please share availability and lead time.\n\nThanks`);
     window.open(`mailto:${vendorEmail}?subject=${subject}&body=${body}`, "_blank");
     setRestockOpen(false);
   };
@@ -362,7 +375,12 @@ export default function InventoryPage() {
               onValueChange={(value) => setSearchField(value ?? "all")}
             >
               <SelectTrigger className="w-full md:w-[240px]">
-                <SelectValue placeholder="Search field" />
+                <SelectValue placeholder="Search field">
+                  {(value) => {
+                    if (value === "all") return "All fields";
+                    return getFieldLabel(fields, value);
+                  }}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All fields</SelectItem>
@@ -578,7 +596,7 @@ export default function InventoryPage() {
               <div className="rounded-lg border bg-muted/40 p-4">
                 <div className="flex items-center gap-2">
                   <Package className="h-4 w-4" />
-                  <p className="font-medium">{restockRecord.values?.name ?? "Selected item"}</p>
+                  <p className="font-medium">{getItemName(restockRecord)}</p>
                 </div>
                 <p className="mt-2 text-sm text-muted-foreground">
                   This item is currently {getStockStatus(restockRecord).replace(/-/g, " ")}.
