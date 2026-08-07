@@ -15,9 +15,20 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Pencil, Trash2, GripVertical, Package, Plus } from "lucide-react";
+import {
+  Pencil,
+  Trash2,
+  GripVertical,
+  Package,
+  Plus,
+  Users,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DynamicRecord, DynamicTableProps, DynamicField } from "@/types/dynamic";
+import {
+  DynamicRecord,
+  DynamicTableProps,
+  DynamicField,
+} from "@/types/dynamic";
 
 function SortableHeaderCell({
   id,
@@ -65,6 +76,7 @@ export default function DynamicTable({
   loading = false,
   onStock,
   onEdit,
+  onVendors,
   onDelete,
 }: DynamicTableProps) {
   const sensors = useSensors(
@@ -204,9 +216,12 @@ export default function DynamicTable({
                           <Package className="h-8 w-8" />
                         </div>
                         <div className="flex flex-col gap-1">
-                          <p className="font-bold text-foreground text-sm">No inventory records found</p>
+                          <p className="font-bold text-foreground text-sm">
+                            No inventory records found
+                          </p>
                           <p className="text-xs text-muted-foreground max-w-xs">
-                            Add a new item to get started or try importing an Excel sheet.
+                            Add a new item to get started or try importing an
+                            Excel sheet.
                           </p>
                         </div>
                       </div>
@@ -215,20 +230,24 @@ export default function DynamicTable({
                 )}
 
                 {records.map((record: DynamicRecord) => (
-                  <tr key={record.id} className="border-t hover:bg-muted/40 transition-colors duration-150">
+                  <tr
+                    key={record.id}
+                    className="border-t hover:bg-muted/40 transition-colors duration-150"
+                  >
                     {orderedColumnIds.map((colId) => {
                       const field = fieldsMap.get(colId);
                       if (!field) return null;
                       return (
-                        <td key={colId} className="px-6 py-3.5 align-middle whitespace-nowrap">
+                        <td
+                          key={colId}
+                          className="px-6 py-3.5 align-middle whitespace-nowrap"
+                        >
                           {renderValue(record.values?.[field.fieldName], field)}
                         </td>
                       );
                     })}
 
-                    <td
-                      className="w-[200px] min-w-[200px] max-w-[200px] sticky right-0 z-10 bg-background/95 backdrop-blur-xs px-2 py-3.5 border-l border-border/60 shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.06)] align-middle text-center"
-                    >
+                    <td className="w-[200px] min-w-[200px] max-w-[200px] sticky right-0 z-10 bg-background/95 backdrop-blur-xs px-2 py-3.5 border-l border-border/60 shadow-[-6px_0_10px_-4px_rgba(0,0,0,0.06)] align-middle text-center">
                       <div className="flex items-center gap-2 justify-center">
                         <Button
                           variant="ghost"
@@ -238,6 +257,15 @@ export default function DynamicTable({
                         >
                           <Plus className="h-3.5 w-3.5" />
                           <span>Stock</span>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 px-2.5 rounded-lg hover:bg-blue-500/10 hover:text-blue-600 font-semibold text-xs flex items-center gap-1.5 cursor-pointer transition-colors duration-150"
+                          onClick={() => onVendors(record)}
+                        >
+                          <Users className="h-3.5 w-3.5" />
+                          <span>Suppliers</span>
                         </Button>
 
                         <Button
@@ -320,14 +348,28 @@ function renderValue(value: any, field: DynamicField) {
   }
 
   // 2. Email Address
-  if (field.type === "EMAIL" || fieldNameLower.includes("email") || labelLower.includes("email")) {
+  if (
+    field.type === "EMAIL" ||
+    fieldNameLower.includes("email") ||
+    labelLower.includes("email")
+  ) {
     return (
       <a
         href={`mailto:${value}`}
         className="inline-flex items-center gap-1.5 text-primary hover:underline font-medium hover:text-primary/80 transition-colors"
       >
-        <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        <svg
+          className="w-3.5 h-3.5 shrink-0"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+          />
         </svg>
         {String(value)}
       </a>
@@ -335,7 +377,13 @@ function renderValue(value: any, field: DynamicField) {
   }
 
   // 3. Phone Number
-  if (field.type === "PHONE" || fieldNameLower.includes("phone") || labelLower.includes("phone") || fieldNameLower.includes("contact") || labelLower.includes("contact")) {
+  if (
+    field.type === "PHONE" ||
+    fieldNameLower.includes("phone") ||
+    labelLower.includes("phone") ||
+    fieldNameLower.includes("contact") ||
+    labelLower.includes("contact")
+  ) {
     const valStr = String(value);
     if (/^[+]*[0-9\s-]{7,15}$/.test(valStr.trim())) {
       return (
@@ -343,8 +391,18 @@ function renderValue(value: any, field: DynamicField) {
           href={`tel:${valStr}`}
           className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground font-medium hover:underline transition-colors"
         >
-          <svg className="w-3.5 h-3.5 shrink-0 text-muted-foreground/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+          <svg
+            className="w-3.5 h-3.5 shrink-0 text-muted-foreground/60"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+            />
           </svg>
           {valStr}
         </a>
@@ -355,18 +413,28 @@ function renderValue(value: any, field: DynamicField) {
   // 4. Default formats
   if (typeof value === "boolean") {
     return value ? (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 border border-emerald-500/10">Yes</span>
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 border border-emerald-500/10">
+        Yes
+      </span>
     ) : (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-muted text-muted-foreground border border-border">No</span>
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-muted text-muted-foreground border border-border">
+        No
+      </span>
     );
   }
 
   if (Array.isArray(value)) {
-    return <span className="font-medium text-foreground">{value.join(", ")}</span>;
+    return (
+      <span className="font-medium text-foreground">{value.join(", ")}</span>
+    );
   }
 
   if (typeof value === "object") {
-    return <code className="text-xs bg-muted p-1 rounded font-mono">{JSON.stringify(value)}</code>;
+    return (
+      <code className="text-xs bg-muted p-1 rounded font-mono">
+        {JSON.stringify(value)}
+      </code>
+    );
   }
 
   // Standard string

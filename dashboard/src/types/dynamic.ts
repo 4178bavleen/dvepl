@@ -50,7 +50,6 @@ export interface DynamicField {
   orderNo: number;
 }
 
-
 export interface DynamicRecord {
   id: string;
   moduleId: string;
@@ -88,10 +87,7 @@ export interface DynamicFormProps {
 
   loading?: boolean;
 
-  onChange: (
-    fieldName: string,
-    value: any
-  ) => void;
+  onChange: (fieldName: string, value: any) => void;
 
   onSubmit: () => void;
 
@@ -104,15 +100,14 @@ export interface DynamicTableProps {
   records: DynamicRecord[];
 
   loading?: boolean;
+    
 
-  onEdit: (
-    record: DynamicRecord
-  ) => void;
+  onEdit: (record: DynamicRecord) => void;
 
-  onDelete: (
-    record: DynamicRecord
-  ) => void;
+  onDelete: (record: DynamicRecord) => void;
   onStock: (record: DynamicRecord) => void;
+  onVendors: (record: DynamicRecord) => void;
+
 }
 
 export interface DynamicFieldManagerProps {

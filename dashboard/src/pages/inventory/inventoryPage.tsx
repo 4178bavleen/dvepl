@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import * as XLSX from "xlsx";
+import {tenderApi} from "../../services/modules"
 
 import {
   ArrowLeft,
@@ -14,6 +15,7 @@ import {
   Settings,
   Truck,
   Upload,
+  Users
 } from "lucide-react";
 
 import { cn, getFieldLabel } from "@/utils/helpers";
@@ -44,6 +46,12 @@ import { DynamicRecord } from "@/types/dynamic";
 import { ConfirmDialog } from "@/components/shared/confirmDialog";
 
 type StockStatus = "all" | "in-stock" | "low-stock" | "out-of-stock";
+
+type SupplierMailRecipient = {
+  id: string;
+  name?: string | null;
+  email: string;
+};
 
 export default function InventoryPage() {
   const navigate = useNavigate();
@@ -89,6 +97,22 @@ export default function InventoryPage() {
   const [recordToDelete, setRecordToDelete] = useState<DynamicRecord | null>(null);
   const [isDeletingRecord, setIsDeletingRecord] = useState(false);
   const [isSavingRecord, setIsSavingRecord] = useState(false);
+
+  const [selectedVendorItem, setSelectedVendorItem] =
+  useState<DynamicRecord | null>(null);
+
+const [itemVendors, setItemVendors] = useState<any[]>([]);
+
+const [itemVendorsLoading, setItemVendorsLoading] =
+  useState(false);
+
+const [vendorDialogOpen, setVendorDialogOpen] =
+  useState(false);
+  const [supplierMailRecipient, setSupplierMailRecipient] =
+    useState<SupplierMailRecipient | null>(null);
+  const [supplierMailSubject, setSupplierMailSubject] = useState("");
+  const [supplierMailText, setSupplierMailText] = useState("");
+  const [supplierMailSending, setSupplierMailSending] = useState(false);
 
   const buildFormValues = (recordValues?: Record<string, any> | string | null) => {
     const base: Record<string, any> = {};
@@ -136,6 +160,103 @@ export default function InventoryPage() {
   const confirmDeleteRecord = (record: DynamicRecord) => {
     setRecordToDelete(record);
     setDeleteRecordOpen(true);
+  };
+  const getMaterialId = (record: DynamicRecord): string => {
+  return record.inventory?.materialId ?? "";
+};
+ const handleViewItemVendors = async (
+  record: DynamicRecord,
+) => {
+  const materialId = getMaterialId(record);
+
+
+  if (!materialId) {
+    toast.error(
+      "This inventory item is not linked to a material.",
+    );
+    return;
+  }
+
+  setSelectedVendorItem(record);
+  setVendorDialogOpen(true);
+  setItemVendorsLoading(true);
+  setItemVendors([]);
+
+  try {
+    const vendors =
+      await tenderApi.vendorProducts.listByMaterial(
+        materialId,
+      );
+
+console.log(
+  "VENDORS FOR ITEM:",
+  JSON.stringify(vendors, null, 2),
+);
+
+    setItemVendors(vendors);
+  } catch (error: any) {
+    console.error(
+      "Failed to load item vendors:",
+      error,
+    );
+
+    toast.error(
+      error?.response?.data?.message ??
+        "Failed to load vendors for this item.",
+    );
+  } finally {
+    setItemVendorsLoading(false);
+  }
+};
+
+  const openSupplierMail = (vendor: SupplierMailRecipient, materialName: string) => {
+    const vendorName = vendor.name || "Supplier";
+    setSupplierMailRecipient(vendor);
+    setSupplierMailSubject(`Inventory enquiry: ${materialName}`);
+    setSupplierMailText([
+      `Dear ${vendorName},`,
+      "",
+      `We would like to discuss the availability and pricing of ${materialName}.`,
+      "Please share the current availability, lead time, and any relevant terms.",
+      "",
+      "Regards,",
+      "DVEPL Procurement Team",
+    ].join("\n"));
+  };
+
+  const closeSupplierMail = () => {
+    setSupplierMailRecipient(null);
+    setSupplierMailSubject("");
+    setSupplierMailText("");
+  };
+
+  const sendSupplierMail = async () => {
+    if (!supplierMailRecipient) return;
+    if (!supplierMailSubject.trim() || !supplierMailText.trim()) {
+      toast.error("Enter a subject and message before sending");
+      return;
+    }
+
+    try {
+      setSupplierMailSending(true);
+      const response = await apiClient.post(
+        "/settings/send-vendor-follow-up-email",
+        {
+          vendorId: supplierMailRecipient.id,
+          subject: supplierMailSubject.trim(),
+          text: supplierMailText.trim(),
+        },
+      );
+      toast.success(response.data?.message || "Supplier email sent successfully");
+      closeSupplierMail();
+    } catch (error: any) {
+      console.error("Failed to send supplier email:", error);
+      toast.error(
+        error?.response?.data?.message || "Failed to send supplier email",
+      );
+    } finally {
+      setSupplierMailSending(false);
+    }
   };
 
   const handleConfirmDeleteRecord = async () => {
@@ -703,6 +824,7 @@ export default function InventoryPage() {
             onStock={handleRestockAction}
             onEdit={openEdit}
             onDelete={confirmDeleteRecord}
+            onVendors={handleViewItemVendors}
           />
         </>
       ) : (
@@ -824,18 +946,7 @@ export default function InventoryPage() {
 
                 {stockMovType === "IN" && (
                   <div className="grid grid-cols-1 gap-4">
-                    <div className="flex flex-col gap-2">
-                      <label className="text-xs font-bold tracking-wider text-muted-foreground">
-                        Custom Rate (?)
-                      </label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="Enter rate"
-                        value={stockRate}
-                        onChange={(e) => setStockRate(e.target.value)}
-                      />
-                    </div>
+                    
                     <div className="flex flex-col gap-2">
                       <label className="text-xs font-bold tracking-wider text-muted-foreground">
                         Supplier Name
@@ -846,16 +957,7 @@ export default function InventoryPage() {
                         onChange={(e) => setStockVendorName(e.target.value)}
                       />
                     </div>
-                    <div className="flex flex-col gap-2">
-                      <label className="text-xs font-bold tracking-wider text-muted-foreground">
-                        Invoice No.
-                      </label>
-                      <Input
-                        placeholder="Invoice number"
-                        value={stockInvoiceNo}
-                        onChange={(e) => setStockInvoiceNo(e.target.value)}
-                      />
-                    </div>
+                    
                   </div>
                 )}
 
@@ -931,6 +1033,261 @@ export default function InventoryPage() {
         onConfirm={handleConfirmDeleteRecord}
         loading={isDeletingRecord}
       />
+    
+<Dialog
+  open={vendorDialogOpen}
+  onOpenChange={setVendorDialogOpen}
+>
+  <DialogContent className="w-[95vw] max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
+    <DialogHeader className="px-6 py-4 border-b shrink-0">
+      <DialogTitle className="text-lg">
+        Vendors Supplying This Item
+      </DialogTitle>
+
+      {selectedVendorItem && (
+        <p className="text-sm text-muted-foreground">
+          Select a supplier below to contact them about this item.
+        </p>
+      )}
+    </DialogHeader>
+
+    {/* Content */}
+    <div className="flex-1 min-h-0 overflow-hidden">
+      {itemVendorsLoading ? (
+        <div className="h-48 flex items-center justify-center text-sm text-muted-foreground">
+          Loading vendors...
+        </div>
+      ) : itemVendors.length === 0 ? (
+        <div className="h-48 flex flex-col items-center justify-center text-center px-6">
+          <Users className="h-10 w-10 text-muted-foreground/50 mb-3" />
+
+          <p className="text-sm font-medium">
+            No vendors found
+          </p>
+
+          <p className="text-xs text-muted-foreground mt-1">
+            No suppliers are currently associated with this item.
+          </p>
+        </div>
+      ) : (
+        <div className="h-full overflow-y-auto px-6 py-4">
+          <div className="space-y-3">
+            {itemVendors.map((association) => {
+              const vendor = association.vendor;
+              const material = association.material;
+
+              return (
+                <div
+                  key={association.id}
+                  className="rounded-lg border bg-background p-4 hover:bg-muted/30 transition-colors"
+                >
+                  {/* Vendor Header */}
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold truncate">
+                          {vendor?.name ?? "Unnamed Vendor"}
+                        </h3>
+
+                        {association.isPreferred && (
+                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary shrink-0">
+                            Preferred
+                          </span>
+                        )}
+                      </div>
+
+                      {vendor?.contactPerson && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Contact: {vendor.contactPerson}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Email Button */}
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="shrink-0"
+                      onClick={() =>
+                        openSupplierMail(
+                          vendor,
+                          material?.name ?? "this item",
+                        )
+                      }
+                      disabled={!vendor?.email}
+                    >
+                      <Mail className="h-4 w-4 mr-1.5" />
+                      Email Vendor
+                    </Button>
+                  </div>
+
+                  {/* Vendor Contact */}
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="rounded-md bg-muted/40 px-3 py-2">
+                      <p className="text-[11px] text-muted-foreground">
+                        Email
+                      </p>
+
+                      <p className="text-sm truncate">
+                        {vendor?.email ?? "No email available"}
+                      </p>
+                    </div>
+
+                    <div className="rounded-md bg-muted/40 px-3 py-2">
+                      <p className="text-[11px] text-muted-foreground">
+                        Phone
+                      </p>
+
+                      <p className="text-sm">
+                        {vendor?.phone ?? "No phone available"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Material Details */}
+                  <div className="mt-3 pt-3 border-t">
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
+                      <div>
+                        <span className="text-muted-foreground">
+                          Item:
+                        </span>{" "}
+                        <span className="font-medium">
+                          {material?.name ?? "Unknown"}
+                        </span>
+                      </div>
+
+                      <div>
+                        <span className="text-muted-foreground">
+                          Code:
+                        </span>{" "}
+                        <span className="font-medium">
+                          {material?.materialCode ?? "—"}
+                        </span>
+                      </div>
+
+                      <div>
+                        <span className="text-muted-foreground">
+                          Unit:
+                        </span>{" "}
+                        <span className="font-medium">
+                          {material?.unit ?? "—"}
+                        </span>
+                      </div>
+
+                      <div>
+                        <span className="text-muted-foreground">
+                          Vendor Rate:
+                        </span>{" "}
+                        <span className="font-medium">
+                          {association.vendorRate ?? "—"}
+                        </span>
+                      </div>
+
+                      {association.vendorMaterialCode && (
+                        <div>
+                          <span className="text-muted-foreground">
+                            Vendor Code:
+                          </span>{" "}
+                          <span className="font-medium">
+                            {association.vendorMaterialCode}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  {association.notes && (
+                    <div className="mt-3 text-xs text-muted-foreground">
+                      <span className="font-medium text-foreground">
+                        Notes:
+                      </span>{" "}
+                      {association.notes}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+
+    {/* Footer */}
+    {!itemVendorsLoading && itemVendors.length > 0 && (
+      <div className="px-6 py-3 border-t bg-muted/20 shrink-0">
+        <p className="text-xs text-muted-foreground">
+          {itemVendors.length}{" "}
+          {itemVendors.length === 1 ? "vendor" : "vendors"} found
+        </p>
+      </div>
+    )}
+  </DialogContent>
+</Dialog>
+
+
+      <Dialog
+        open={!!supplierMailRecipient}
+        onOpenChange={(open) => {
+          if (!open) closeSupplierMail();
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              Email {supplierMailRecipient?.name || "Supplier"}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+              To: {supplierMailRecipient?.email}
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor="supplier-mail-subject">
+                Subject
+              </label>
+              <Input
+                id="supplier-mail-subject"
+                value={supplierMailSubject}
+                onChange={(event) => setSupplierMailSubject(event.target.value)}
+                disabled={supplierMailSending}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor="supplier-mail-message">
+                Message
+              </label>
+              <Textarea
+                id="supplier-mail-message"
+                rows={8}
+                value={supplierMailText}
+                onChange={(event) => setSupplierMailText(event.target.value)}
+                disabled={supplierMailSending}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={closeSupplierMail}
+                disabled={supplierMailSending}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={sendSupplierMail}
+                disabled={supplierMailSending}
+                className="gap-2"
+              >
+                <Mail className="h-4 w-4" />
+                {supplierMailSending ? "Sending..." : "Send Email"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

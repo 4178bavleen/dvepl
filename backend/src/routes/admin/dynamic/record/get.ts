@@ -36,6 +36,8 @@ export default async function getRecordRoute(
           },
         });
 
+        console.log("DYNAMIC RECORD:", record);
+        console.log("INVENTORY RELATION:", record?.inventory);
         if (!record) {
           return reply.code(404).send({
             success: false,
@@ -58,4 +60,3 @@ export default async function getRecordRoute(
     },
   );
 }
-
