@@ -54,6 +54,7 @@ export const employeesConfig = {
     status: "ACTIVE",
   },
   breadcrumbs: [{ label: "Dashboard", href: "/" }, { label: "Employees" }],
+  hideAdd: true,
   columns: [
     { accessorKey: "employeeCode", header: sortableHeader("Emp Code") },
     {

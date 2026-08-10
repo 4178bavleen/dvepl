@@ -96,6 +96,7 @@ interface GenericCrudPageProps<
     >
   >;
   readOnly?: boolean;
+  hideAdd?: boolean;
   freezeActions?: boolean;
 }
 
@@ -485,6 +486,7 @@ export function GenericCrudPage<TRecord extends { id: string }>({
   api,
   selectOptions,
   readOnly = false,
+  hideAdd = false,
   freezeActions = true,
 }: GenericCrudPageProps<TRecord>) {
   const [searchParams] = useSearchParams();
@@ -521,7 +523,7 @@ export function GenericCrudPage<TRecord extends { id: string }>({
     } catch (error: any) {
       toast.error(
         error.response?.data?.message ??
-          `Unable to load ${pluralName.toLowerCase()}.`,
+        `Unable to load ${pluralName.toLowerCase()}.`,
       );
     } finally {
       setIsLoading(false);
@@ -634,7 +636,7 @@ export function GenericCrudPage<TRecord extends { id: string }>({
     } catch (error: any) {
       toast.error(
         error.response?.data?.message ??
-          `Unable to save ${moduleName.toLowerCase()}.`,
+        `Unable to save ${moduleName.toLowerCase()}.`,
       );
     } finally {
       setIsSubmitting(false);
@@ -723,7 +725,7 @@ export function GenericCrudPage<TRecord extends { id: string }>({
             Manage {pluralName.toLowerCase()}.
           </p>
         </div>
-        {!readOnly && (
+        {!readOnly && !hideAdd && (
           <Button onClick={openCreate} className="gap-2">
             <Plus className="size-4" /> Add {moduleName}
           </Button>
@@ -768,9 +770,9 @@ export function GenericCrudPage<TRecord extends { id: string }>({
           api && !api.remove
             ? undefined
             : (record) => {
-                setRecordToDelete(record);
-                setDeleteConfirmOpen(true);
-              }
+              setRecordToDelete(record);
+              setDeleteConfirmOpen(true);
+            }
         }
         isLoading={isLoading}
         freezeActions={freezeActions}
@@ -827,7 +829,14 @@ export function GenericCrudPage<TRecord extends { id: string }>({
                         id={field.name}
                         className="w-full bg-card hover:bg-card/85 transition-colors border-border/80 focus:ring-1 focus:ring-primary"
                       >
-                        <SelectValue placeholder={`Select ${field.label}`} />
+                        <SelectValue placeholder={`Select ${field.label}`}>
+                          {/* Explicitly render the matched label so that Radix UI
+                              never falls back to displaying the raw UUID value,
+                              even when SelectContent items load asynchronously. */}
+                          {getCombinedOptions(field.name, field.options, optionValues)
+                            .find((o) => o.value === asInputValue(formValues[field.name]))
+                            ?.label ?? undefined}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {getCombinedOptions(
@@ -1012,7 +1021,7 @@ export function GenericCrudPage<TRecord extends { id: string }>({
           } catch (error: any) {
             toast.error(
               error.response?.data?.message ??
-                `Unable to delete ${moduleName.toLowerCase()}.`,
+              `Unable to delete ${moduleName.toLowerCase()}.`,
             );
           } finally {
             setIsLoading(false);

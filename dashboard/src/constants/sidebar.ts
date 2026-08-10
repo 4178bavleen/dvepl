@@ -106,24 +106,24 @@ export const sidebarItems: SidebarItem[] = [
     path: ROUTES.HRMS_HOLIDAYS,
     section: "HRMS",
   },
-  {
-    name: "Shift Management",
-    icon: Clock,
-    path: ROUTES.HRMS_SHIFTS,
-    section: "HRMS",
-  },
-  {
-    name: "Payroll",
-    icon: DollarSign,
-    path: ROUTES.HRMS_PAYROLL,
-    section: "HRMS",
-  },
-  {
-    name: "Documents",
-    icon: FileText,
-    path: ROUTES.HRMS_DOCUMENTS,
-    section: "HRMS",
-  },
+  // {
+  //   name: "Shift Management",
+  //   icon: Clock,
+  //   path: ROUTES.HRMS_SHIFTS,
+  //   section: "HRMS",
+  // },
+  // {
+  //   name: "Payroll",
+  //   icon: DollarSign,
+  //   path: ROUTES.HRMS_PAYROLL,
+  //   section: "HRMS",
+  // },
+  // {
+  //   name: "Documents",
+  //   icon: FileText,
+  //   path: ROUTES.HRMS_DOCUMENTS,
+  //   section: "HRMS",
+  // },
   {
     name: "Tasks",
     icon: CheckSquare,
@@ -145,11 +145,17 @@ export const sidebarItems: SidebarItem[] = [
     section: "CRM",
   },
   {
-    name: "Communication History",
-    icon: MessageSquare,
-    path: ROUTES.CRM_COMMUNICATION,
-    section: "CRM",
+    name: "Roles",
+    icon: ShieldCheck,
+    path: ROUTES.SECURITY_ROLES,
+    section: "HRMS",
   },
+  // {
+  //   name: "Communication History",
+  //   icon: MessageSquare,
+  //   path: ROUTES.CRM_COMMUNICATION,
+  //   section: "CRM",
+  // },
   {
     name: "Orders",
     icon: ShoppingCart,
@@ -175,7 +181,7 @@ export const sidebarItems: SidebarItem[] = [
     section: "CRM",
   },
   {
-    name: "Export Orders",
+    name: "Engineering Drawing",
     icon: FileText,
     path: ROUTES.EXPORT_ORDERS,
     section: "CRM",
@@ -240,18 +246,13 @@ export const sidebarItems: SidebarItem[] = [
   },
 
   // Security (PRBAC)
-  {
-    name: "Roles",
-    icon: ShieldCheck,
-    path: ROUTES.SECURITY_ROLES,
-    section: "Security",
-  },
-  {
-    name: "Approval Requests",
-    icon: CheckSquare,
-    path: ROUTES.SECURITY_APPROVAL_REQUESTS,
-    section: "Security",
-  },
+  
+  // {
+  //   name: "Approval Requests",
+  //   icon: CheckSquare,
+  //   path: ROUTES.SECURITY_APPROVAL_REQUESTS,
+  //   section: "Security",
+  // },
 
   { name: "Reports", icon: FileSpreadsheet, path: ROUTES.REPORTS },
   { name: "Audit Logs", icon: AuditIcon, path: ROUTES.AUDIT_LOGS },
