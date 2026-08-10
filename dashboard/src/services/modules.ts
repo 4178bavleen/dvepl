@@ -2,6 +2,14 @@ import { apiClient } from './axios';
 import type { ApiResponse } from '@/types/api';
 import type { ResourceApi } from './organization';
 import { API_ENDPOINTS } from './endpoints';
+import {
+  drawingResponseSchema,
+  drawingsResponseSchema,
+  exportOrdersResponseSchema,
+  nextDrawingNumberResponseSchema,
+  uploadedFileResponseSchema,
+} from '@/types/exportOrders';
+import type { ExportOrderFilters } from '@/types/exportOrders';
 
 type ApiRecord = { id: string;[key: string]: unknown };
 
@@ -210,23 +218,20 @@ export const financePaymentApi = {
 // Export Orders API
 export const exportOrdersApi = {
   // List sales orders with optional filters
-  listOrders: (params?: {
-    search?: string;
-    status?: string;
-    assignedEngineer?: string;
-    startDate?: string;
-    endDate?: string;
-  }) => apiClient.get('/export-orders/read', { params }).then(res => res.data),
+  listOrders: (params?: ExportOrderFilters) =>
+    apiClient.get(API_ENDPOINTS.exportOrders.list, { params })
+      .then((res) => exportOrdersResponseSchema.parse(res.data)),
 
   // Fetch all drawings associated with given sales order IDs
   listDrawings: (orderIds: string[]) =>
     apiClient
-      .get('/export-orders/drawings', { params: { orderIds: orderIds.join(',') } })
-      .then(res => res.data),
+      .get(API_ENDPOINTS.exportOrders.drawings, { params: { orderIds: orderIds.join(',') } })
+      .then((res) => drawingsResponseSchema.parse(res.data)),
 
   // Get the next auto-incremented drawing number (e.g. DWG-004)
   nextDrawingNo: () =>
-    apiClient.get('/export-orders/next-drawing-no').then(res => res.data),
+    apiClient.get(API_ENDPOINTS.exportOrders.nextDrawingNo)
+      .then((res) => nextDrawingNumberResponseSchema.parse(res.data)),
 
   // Create a drawing record, automatically linking/creating the project for the given sales order
   createDrawing: (data: {
@@ -238,5 +243,19 @@ export const exportOrdersApi = {
     fileName: string;
     fileSize?: number | null;
     mimeType?: string | null;
-  }) => apiClient.post('/export-orders/create-drawing', data).then(res => res.data),
+  }) => apiClient.post(API_ENDPOINTS.exportOrders.createDrawing, data)
+    .then((res) => drawingResponseSchema.parse(res.data)),
+
+  // Upload the drawing binary before creating its engineering-drawing record.
+  uploadDrawingFile: (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return apiClient.post('/upload/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then((res) => uploadedFileResponseSchema.parse(res.data));
+  },
+
+  updateDrawingStatus: (id: string, status: string) =>
+    apiClient.put(API_ENDPOINTS.exportOrders.updateDrawing(id), { status })
+      .then((res) => drawingResponseSchema.parse(res.data)),
 };

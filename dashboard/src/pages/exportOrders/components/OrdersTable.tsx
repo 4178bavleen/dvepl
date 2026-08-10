@@ -1,7 +1,8 @@
 import { Checkbox } from "@/components/ui/checkbox";
+import type { ExportOrder } from "@/types/exportOrders";
 
 interface Props {
-  orders: any[];
+  orders: ExportOrder[];
   isLoading: boolean;
   selectedOrderIds: string[];
   onSelectOrder: (id: string, checked: boolean) => void;

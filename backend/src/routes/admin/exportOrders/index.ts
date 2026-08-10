@@ -2,6 +2,8 @@ import { FastifyInstance, FastifyPluginOptions, FastifyRequest, FastifyReply } f
 import { adminLogs } from "../../../services/logger/contextLogger";
 import { DrawingStatus, DrawingType } from "@prisma/client";
 import { z } from "zod";
+import { existsSync } from "fs";
+import path from "path";
 
 interface Query {
   search?: string;
@@ -10,6 +12,18 @@ interface Query {
   startDate?: string;
   endDate?: string;
 }
+
+const uploadsDirectory = path.join(__dirname, "../../../../uploads");
+
+const hasStoredDrawingFile = (fileUrl: string): boolean => {
+  // A remote URL cannot be verified on the application filesystem, so leave it
+  // available. Locally uploaded drawings must resolve to an existing file.
+  if (/^https?:\/\//i.test(fileUrl)) return true;
+  if (!fileUrl.startsWith("/uploads/")) return false;
+
+  const fileName = path.basename(fileUrl);
+  return fileName !== "." && existsSync(path.join(uploadsDirectory, fileName));
+};
 
 async function adminExportOrdersRouteGroup(
   fastify: FastifyInstance,
@@ -155,7 +169,18 @@ async function adminExportOrdersRouteGroup(
           },
         });
 
-        return reply.send({ success: true, data: drawings });
+        const availableDrawings = drawings.filter((drawing) =>
+          hasStoredDrawingFile(drawing.fileUrl),
+        );
+
+        const missingFileCount = drawings.length - availableDrawings.length;
+        if (missingFileCount > 0) {
+          adminLogs.warn("Excluded drawings whose uploaded files are missing", {
+            missingFileCount,
+          });
+        }
+
+        return reply.send({ success: true, data: availableDrawings });
       } catch (error: any) {
         adminLogs.error("Failed to fetch drawings for orders", { error });
         return reply.status(500).send({

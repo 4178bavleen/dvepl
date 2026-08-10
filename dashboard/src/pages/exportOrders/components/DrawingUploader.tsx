@@ -1,5 +1,4 @@
 import { useState, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { UploadCloud, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,13 +9,14 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { apiClient } from "@/services/axios";
 import { exportOrdersApi } from "@/services/modules";
 import toast from "react-hot-toast";
+import type { ExportOrder } from "@/types/exportOrders";
 
 interface Props {
   selectedOrderIds: string[];
-  selectedOrders: any[];          // full order objects so we can show dveplCode
+  selectedOrders: ExportOrder[];
+  availableOrders: ExportOrder[];
   onSuccess: () => void;
 }
 
@@ -24,7 +24,7 @@ const DRAWING_TYPES = [
   "SLD", "GA_DRAWING", "WIRING_DIAGRAM", "LAYOUT", "CAD", "PDF", "OTHER",
 ];
 
-export default function DrawingUploader({ selectedOrderIds, selectedOrders, onSuccess }: Props) {
+export default function DrawingUploader({ selectedOrderIds, selectedOrders, availableOrders, onSuccess }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -34,13 +34,6 @@ export default function DrawingUploader({ selectedOrderIds, selectedOrders, onSu
   const [drawingNo, setDrawingNo] = useState("");
   const [title, setTitle] = useState("");
   const [drawingType, setDrawingType] = useState("SLD");
-
-  // Fetch all orders for the dropdown (independent of table selection)
-  const { data: allOrdersRes } = useQuery({
-    queryKey: ["all-orders-for-uploader"],
-    queryFn: () => exportOrdersApi.listOrders(),
-  });
-  const allOrders: any[] = allOrdersRes?.data ?? [];
 
   const openDialog = async (file: File) => {
     setPendingFile(file);
@@ -77,12 +70,8 @@ export default function DrawingUploader({ selectedOrderIds, selectedOrders, onSu
 
     setUploading(true);
     try {
-      const form = new FormData();
-      form.append("file", pendingFile);
-      const uploadRes = await apiClient.post("/upload/", form, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      const fileUrl: string = uploadRes.data?.data?.fileUrl;
+      const uploadRes = await exportOrdersApi.uploadDrawingFile(pendingFile);
+      const fileUrl = uploadRes.data.fileUrl;
       if (!fileUrl) throw new Error("Upload did not return a file URL.");
 
       await exportOrdersApi.createDrawing({
@@ -162,7 +151,7 @@ export default function DrawingUploader({ selectedOrderIds, selectedOrders, onSu
                   <SelectValue placeholder="Select order" />
                 </SelectTrigger>
                 <SelectContent>
-                  {allOrders.map((o) => (
+                    {availableOrders.map((o) => (
                     <SelectItem key={o.id} value={o.id}>
                       {o.dveplCode} — {o.partyName}
                     </SelectItem>

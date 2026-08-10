@@ -1,8 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card";
+import type { EngineeringDrawing, ExportOrder } from "@/types/exportOrders";
 
 interface Props {
-  selectedOrders: any[];
-  drawings: any[];
+  selectedOrders: ExportOrder[];
+  drawings: EngineeringDrawing[];
   selectedDrawingIds: string[];
 }
 

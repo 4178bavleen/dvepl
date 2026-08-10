@@ -5,13 +5,14 @@ import toast from "react-hot-toast";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { PdfOpts } from "../ExportOrdersPage";
+import type { EngineeringDrawing, ExportOrder } from "@/types/exportOrders";
 
 interface Props {
   selectedOrderIds: string[];
   selectedDrawingIds: string[];
-  orders: any[];
-  selectedOrders: any[];
-  drawings: any[];
+  orders: ExportOrder[];
+  selectedOrders: ExportOrder[];
+  drawings: EngineeringDrawing[];
   pdfOptions: PdfOpts;
   onReset: () => void;
 }

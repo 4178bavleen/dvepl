@@ -14,24 +14,33 @@ import {
   List,
   ChevronDown,
 } from "lucide-react";
-import { apiClient } from "@/services/axios";
+import { exportOrdersApi } from "@/services/modules";
 import toast from "react-hot-toast";
 import { useState } from "react";
+import type { EngineeringDrawing } from "@/types/exportOrders";
 
 interface Props {
-  drawings: any[];
+  drawings: EngineeringDrawing[];
   selectedDrawingIds: string[];
   setSelectedDrawingIds: (ids: string[]) => void;
   onStatusChanged?: () => void;
 }
 
 const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"];
-const BASE_URL = (import.meta as any).env?.VITE_API_URL ?? "";
+const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL ?? "";
 
 function buildFileUrl(rawUrl: string): string {
   if (!rawUrl) return "";
-  if (rawUrl.startsWith("http")) return rawUrl;
-  return `${BASE_URL}${rawUrl.startsWith("/") ? "" : "/"}${rawUrl}`;
+  if (/^https?:\/\//i.test(rawUrl)) return rawUrl;
+
+  // API requests are sent to /admin, while uploaded files are served from
+  // the backend root at /uploads. Use the API origin rather than the dashboard
+  // origin so opening a relative stored path reaches port 8000.
+  try {
+    return new URL(rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`, API_BASE_URL).toString();
+  } catch {
+    return rawUrl;
+  }
 }
 
 const STATUS_CONFIG = {
@@ -119,15 +128,20 @@ export default function DrawingLibrary({
 
   const openFile = (e: React.MouseEvent, url: string) => {
     e.stopPropagation();
-    window.open(buildFileUrl(url), "_blank");
+    const fileUrl = buildFileUrl(url);
+    if (!fileUrl) {
+      toast.error("This drawing does not have an attached file.");
+      return;
+    }
+    window.open(fileUrl, "_blank", "noopener,noreferrer");
   };
 
-  const changeStatus = async (e: React.MouseEvent, drawing: any, newStatus: string) => {
+  const changeStatus = async (e: React.MouseEvent, drawing: EngineeringDrawing, newStatus: string) => {
     e.stopPropagation();
     setOpenDropdown(null);
     setUpdatingId(drawing.id);
     try {
-      await apiClient.put(`/export-orders/drawing/update/${drawing.id}`, { status: newStatus });
+      await exportOrdersApi.updateDrawingStatus(drawing.id, newStatus);
       toast.success(`Marked as ${STATUS_CONFIG[newStatus as DrawingStatus]?.label ?? newStatus}.`);
       onStatusChanged?.();
     } catch (err: any) {
@@ -248,7 +262,7 @@ export default function DrawingLibrary({
                     {statusCfg.label}
                   </span>
 
-                  <DrawingThumbnail mimeType={d.mimeType} fileName={d.fileName} fileUrl={fileUrl} />
+                  <DrawingThumbnail mimeType={d.mimeType ?? undefined} fileName={d.fileName} fileUrl={fileUrl} />
 
                   {/* Hover action overlay — only Open File */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-200 flex flex-col justify-end p-3 z-10">

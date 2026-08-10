@@ -429,6 +429,8 @@ export const API_ENDPOINTS = {
   exportOrders: {
     list: '/export-orders/read',
     drawings: '/export-orders/drawings',
+    nextDrawingNo: '/export-orders/next-drawing-no',
     createDrawing: '/export-orders/create-drawing',
+    updateDrawing: (id: string) => `/export-orders/drawing/update/${id}`,
   },
 } as const;

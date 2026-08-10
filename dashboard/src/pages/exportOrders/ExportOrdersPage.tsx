@@ -1,6 +1,5 @@
-import { useState, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { exportOrdersApi } from "@/services/modules";
+import { useState, useCallback, useEffect } from "react";
+import { useExportOrdersStore } from "@/store/exportOrders.store";
 
 import { Card, CardContent } from "@/components/ui/card";
 import FilterPanel from "./components/FilterPanel";
@@ -49,6 +48,13 @@ const DEFAULT_PDF_OPTS: PdfOpts = {
 };
 
 export default function ExportOrdersPage() {
+  const orders = useExportOrdersStore((state) => state.orders);
+  const availableOrders = useExportOrdersStore((state) => state.availableOrders);
+  const allDrawings = useExportOrdersStore((state) => state.drawings);
+  const ordersLoading = useExportOrdersStore((state) => state.isOrdersLoading);
+  const fetchOrders = useExportOrdersStore((state) => state.fetchOrders);
+  const fetchAvailableOrders = useExportOrdersStore((state) => state.fetchAvailableOrders);
+  const fetchDrawings = useExportOrdersStore((state) => state.fetchDrawings);
 
   // ── Filter state ──────────────────────────────────────────────────
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
@@ -64,48 +70,31 @@ export default function ExportOrdersPage() {
   // ── Upload dialog state ───────────────────────────────────────────
   const [uploadOpen, setUploadOpen] = useState(false);
 
-  // ── Queries ───────────────────────────────────────────────────────
-  const { data: ordersResponse, isLoading: ordersLoading, refetch: refetchOrders } = useQuery({
-    queryKey: ["export-orders", activeFilters],
-    queryFn: () =>
-      exportOrdersApi.listOrders({
+  // ── Backend data → typed service → Export Orders store ────────────
+  useEffect(() => {
+    void fetchOrders({
         search: (activeFilters.soNo || activeFilters.customer) || undefined,
         status: activeFilters.status && activeFilters.status !== "all" ? activeFilters.status : undefined,
         assignedEngineer: activeFilters.assignedEngineer || undefined,
         startDate: activeFilters.startDate || undefined,
         endDate: activeFilters.endDate || undefined,
-      }),
-  });
+    });
+  }, [activeFilters, fetchOrders]);
 
-  const orders: any[] = ordersResponse?.data ?? [];
+  useEffect(() => {
+    void fetchAvailableOrders();
+  }, [fetchAvailableOrders]);
 
-  // Drawings for selected orders (used in SelectedOrdersCard & ExportToolbar)
-  const { data: drawingsResponse, refetch: refetchDrawings } = useQuery({
-    queryKey: ["export-order-drawings", selectedOrderIds],
-    queryFn: () =>
-      selectedOrderIds.length > 0
-        ? exportOrdersApi.listDrawings(selectedOrderIds)
-        : Promise.resolve({ data: [] }),
-    enabled: selectedOrderIds.length > 0,
-  });
-
-  const drawings: any[] = drawingsResponse?.data ?? [];
-
-  // All drawings for all loaded orders (used in DrawingLibrary — always visible)
-  const allOrderIds = orders.map((o) => o.id);
-  const { data: allDrawingsResponse, refetch: refetchAllDrawings } = useQuery({
-    queryKey: ["all-export-order-drawings", allOrderIds],
-    queryFn: () =>
-      allOrderIds.length > 0
-        ? exportOrdersApi.listDrawings(allOrderIds)
-        : Promise.resolve({ data: [] }),
-    enabled: allOrderIds.length > 0,
-  });
-
-  const allDrawings: any[] = allDrawingsResponse?.data ?? [];
+  const allOrderIds = orders.map((order) => order.id);
+  useEffect(() => {
+    void fetchDrawings(allOrderIds);
+  }, [allOrderIds.join(","), fetchDrawings]);
 
   // ── Computed ──────────────────────────────────────────────────────
   const selectedOrders = orders.filter((o) => selectedOrderIds.includes(o.id));
+  const drawings = allDrawings.filter((drawing) =>
+    drawing.project?.salesOrderId && selectedOrderIds.includes(drawing.project.salesOrderId),
+  );
 
   // ── Handlers ──────────────────────────────────────────────────────
   const handleSearch = useCallback(() => {
@@ -141,9 +130,8 @@ export default function ExportOrdersPage() {
   );
 
   const handleDrawingCreated = useCallback(() => {
-    refetchDrawings();
-    refetchAllDrawings();
-  }, [refetchDrawings, refetchAllDrawings]);
+    void fetchDrawings(allOrderIds);
+  }, [allOrderIds.join(","), fetchDrawings]);
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -203,6 +191,7 @@ export default function ExportOrdersPage() {
           <DrawingUploader
             selectedOrderIds={selectedOrderIds}
             selectedOrders={selectedOrders}
+            availableOrders={availableOrders}
             onSuccess={handleDrawingCreated}
           />
         </CardContent>
@@ -215,7 +204,7 @@ export default function ExportOrdersPage() {
             drawings={allDrawings}
             selectedDrawingIds={selectedDrawingIds}
             setSelectedDrawingIds={setSelectedDrawingIds}
-            onStatusChanged={() => { refetchDrawings(); refetchAllDrawings(); }}
+            onStatusChanged={handleDrawingCreated}
           />
         </CardContent>
       </Card>

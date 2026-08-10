@@ -1,8 +1,9 @@
 import { FileText } from "lucide-react";
 import type { PdfOpts } from "../ExportOrdersPage";
+import type { ExportOrder } from "@/types/exportOrders";
 
 interface Props {
-  selectedOrders: any[];
+  selectedOrders: ExportOrder[];
   pdfOptions: PdfOpts;
 }
 
