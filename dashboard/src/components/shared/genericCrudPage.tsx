@@ -67,6 +67,16 @@ interface BreadcrumbItem {
   label: string;
   href?: string;
 }
+interface RelationManagerConfig<TRecord = any> {
+  relationKey: string;
+  title: string;
+
+  getAvailableRecords: (record: TRecord) => Promise<any[]>;
+
+  add: (record: TRecord, relatedRecordId: string) => Promise<void>;
+
+  remove: (record: TRecord, relatedRecordId: string) => Promise<void>;
+}
 
 interface GenericCrudPageProps<
   TRecord extends { id: string } = { id: string },
@@ -78,23 +88,33 @@ interface GenericCrudPageProps<
   fields: CrudField[];
   defaultFormValues: Record<string, unknown>;
   zodSchema: ZodType;
+
   breadcrumbs?: BreadcrumbItem[];
   searchPlaceholder?: string;
-  statsCards?: (
-    data: TRecord[],
-  ) => Array<{
+
+  statsCards?: (data: TRecord[]) => Array<{
     label: string;
     value: React.ReactNode;
     change?: string;
     trend?: "up" | "down";
   }>;
+
   api?: ResourceApi<any>;
+
   selectOptions?: Record<
     string,
     () => Promise<
-      Array<{ id: string; name?: string; title?: string; code?: string }>
+      Array<{
+        id: string;
+        name?: string;
+        title?: string;
+        code?: string;
+      }>
     >
   >;
+
+  relationManager?: RelationManagerConfig<TRecord>;
+
   readOnly?: boolean;
   freezeActions?: boolean;
 }
@@ -357,34 +377,128 @@ const renderDisplayValue = (
   }
 
   // Handle Arrays (e.g. attachments, revisions, etc.)
+
+  // Handle Arrays / Relations
+
+  // Handle Arrays / Relations
   if (Array.isArray(value)) {
-    if (value.length === 0) return "—";
+    if (value.length === 0) {
+      return (
+        <div className="rounded-lg border border-dashed border-border p-4 text-center">
+          <p className="text-xs text-muted-foreground">
+            No related records found.
+          </p>
+        </div>
+      );
+    }
+
+    // Team → Employees relation
+    if (key === "employees") {
+      return (
+        <div className="mt-2 space-y-2">
+          {value.map((employee: any) => {
+            const firstName = employee.firstName ?? "";
+            const lastName = employee.lastName ?? "";
+
+            const fullName =
+              `${firstName} ${lastName}`.trim() || "Unknown Employee";
+
+            const initials =
+              `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() ||
+              "?";
+
+            const designation =
+              employee.designation?.title ??
+              employee.designation?.name ??
+              "Employee";
+
+            const isActive =
+              employee.status === "ACTIVE" || employee.status === "active";
+
+            return (
+              <div
+                key={employee.id}
+                className="flex items-center gap-3 rounded-xl border border-border/70 bg-card p-3 transition-colors hover:bg-muted/40"
+              >
+                {/* Avatar */}
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                  {initials}
+                </div>
+
+                {/* Employee information */}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-foreground">
+                    {fullName}
+                  </p>
+
+                  <div className="flex flex-wrap items-center gap-x-2">
+                    {employee.employeeCode && (
+                      <span className="text-[10px] font-medium text-muted-foreground">
+                        {employee.employeeCode}
+                      </span>
+                    )}
+
+                    {employee.employeeCode && designation && (
+                      <span className="text-[10px] text-muted-foreground">
+                        •
+                      </span>
+                    )}
+
+                    <span className="text-[10px] text-muted-foreground">
+                      {designation}
+                    </span>
+                  </div>
+
+                  {employee.user?.email && (
+                    <p className="mt-0.5 truncate text-[10px] text-muted-foreground">
+                      {employee.user.email}
+                    </p>
+                  )}
+                </div>
+
+                {/* Employee status */}
+                {employee.status && (
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${
+                      isActive
+                        ? "bg-success/15 text-success"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {employee.status}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    // Generic object-array relation fallback
     if (typeof value[0] === "object" && value[0] !== null) {
       return (
-        <div className="flex flex-wrap gap-1.5 mt-1.5">
-          {value.map((item: any, i) => {
-            const label =
-              item.name ??
-              item.title ??
-              item.fileName ??
-              item.code ??
-              item.quotationNo ??
-              item.orderNo ??
-              item.soNumber ??
-              `Item #${i + 1}`;
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {value.map((item: any, index: number) => {
+            let label = item.name ?? item.title ?? item.code ?? item.id;
+
+            if (!label && item.firstName) {
+              label = `${item.firstName ?? ""} ${item.lastName ?? ""}`.trim();
+            }
+
             return (
               <span
-                key={i}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-muted border hover:bg-muted/80 transition-all px-2.5 py-1 text-xs font-semibold text-foreground"
+                key={item.id ?? index}
+                className="rounded-md bg-muted px-2 py-1 text-xs"
               >
-                <Paperclip className="size-3 text-muted-foreground" />
-                {label}
+                {label ?? `Item ${index + 1}`}
               </span>
             );
           })}
         </div>
       );
     }
+
     return value.join(", ");
   }
 
@@ -480,6 +594,7 @@ export function GenericCrudPage<TRecord extends { id: string }>({
   defaultFormValues,
   zodSchema,
   breadcrumbs = [],
+  relationManager,
   searchPlaceholder = `Search ${pluralName.toLowerCase()}...`,
   statsCards,
   api,
@@ -501,6 +616,11 @@ export function GenericCrudPage<TRecord extends { id: string }>({
     useState<Record<string, unknown>>(defaultFormValues);
   const [editingRecord, setEditingRecord] = useState<TRecord | null>(null);
   const [viewingRecord, setViewingRecord] = useState<TRecord | null>(null);
+  const [relationRecords, setRelationRecords] = useState<any[]>([]);
+  const [isRelationLoading, setIsRelationLoading] = useState(false);
+  const [isRelationDialogOpen, setIsRelationDialogOpen] = useState(false);
+  const [selectedRelationIds, setSelectedRelationIds] = useState<string[]>([]);
+  const [relationActionLoading, setRelationActionLoading] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [remoteRecords, setRemoteRecords] = useState<TRecord[]>([]);
@@ -511,6 +631,10 @@ export function GenericCrudPage<TRecord extends { id: string }>({
   >({});
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<TRecord | null>(null);
+
+  const [relationSearch, setRelationSearch] = useState("");
+
+  const [isRelationSubmitting, setIsRelationSubmitting] = useState(false);
   const records = api ? remoteRecords : localRecords;
 
   const loadRecords = useCallback(async () => {
@@ -527,11 +651,70 @@ export function GenericCrudPage<TRecord extends { id: string }>({
       setIsLoading(false);
     }
   }, [api, pluralName]);
+  const loadAvailableRelations = useCallback(async () => {
+    if (!relationManager || !viewingRecord) return;
+
+    setIsRelationLoading(true);
+
+    try {
+      const available =
+        await relationManager.getAvailableRecords(viewingRecord);
+
+      setRelationRecords(Array.isArray(available) ? available : []);
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.message ??
+          `Unable to load ${relationManager.title.toLowerCase()}.`,
+      );
+    } finally {
+      setIsRelationLoading(false);
+    }
+  }, [relationManager, viewingRecord]);
 
   useEffect(() => {
     void loadRecords();
   }, [loadRecords]);
 
+  useEffect(() => {
+    if (!isRelationDialogOpen) return;
+
+    void loadAvailableRelations();
+  }, [isRelationDialogOpen, loadAvailableRelations]);
+
+  const handleAddRelations = async () => {
+    if (
+      !relationManager ||
+      !viewingRecord ||
+      selectedRelationIds.length === 0
+    ) {
+      return;
+    }
+
+    setRelationActionLoading(true);
+
+    try {
+      for (const relatedRecordId of selectedRelationIds) {
+        await relationManager.add(viewingRecord, relatedRecordId);
+      }
+
+      toast.success(
+        `${selectedRelationIds.length} member${
+          selectedRelationIds.length === 1 ? "" : "s"
+        } added successfully.`,
+      );
+
+      setSelectedRelationIds([]);
+      setIsRelationDialogOpen(false);
+
+      await loadRecords();
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.message ?? "Unable to add team members.",
+      );
+    } finally {
+      setRelationActionLoading(false);
+    }
+  };
   // Stabilise the selectOptions reference — the prop is an object literal that
   // gets a new identity on every render, which would cause an infinite loop.
   const selectOptionsRef = React.useRef(selectOptions);
@@ -645,7 +828,114 @@ export function GenericCrudPage<TRecord extends { id: string }>({
     setFormValues((current) => ({ ...current, [name]: value }));
     setErrors((current) => ({ ...current, [name]: "" }));
   };
+  const openRelationManager = async () => {
+    if (!relationManager || !viewingRecord) return;
 
+    setRelationSearch("");
+    setSelectedRelationIds([]);
+    setIsRelationDialogOpen(true);
+    setIsRelationLoading(true);
+
+    try {
+      const available =
+        await relationManager.getAvailableRecords(viewingRecord);
+      setRelationRecords(Array.isArray(available) ? available : []);
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.message ??
+          `Unable to load ${relationManager.title.toLowerCase()}.`,
+      );
+      setIsRelationDialogOpen(false);
+    } finally {
+      setIsRelationLoading(false);
+    }
+  };
+
+  const toggleRelationSelection = (id: string) => {
+    setSelectedRelationIds((current) =>
+      current.includes(id)
+        ? current.filter((item) => item !== id)
+        : [...current, id],
+    );
+  };
+
+  const addSelectedRelations = async () => {
+    if (
+      !relationManager ||
+      !viewingRecord ||
+      selectedRelationIds.length === 0
+    ) {
+      return;
+    }
+
+    setIsRelationSubmitting(true);
+
+    try {
+      await Promise.all(
+        selectedRelationIds.map((relatedId) =>
+          relationManager.add(viewingRecord, relatedId),
+        ),
+      );
+
+      toast.success(
+        `${selectedRelationIds.length} member${
+          selectedRelationIds.length > 1 ? "s" : ""
+        } added successfully.`,
+      );
+
+      setIsRelationDialogOpen(false);
+      setSelectedRelationIds([]);
+
+      await loadRecords();
+
+      // Refresh currently viewed record from the newly loaded records
+      if (api) {
+        const refreshed = await api.list();
+
+        setRemoteRecords(refreshed);
+
+        const updated = refreshed.find(
+          (record: TRecord) => record.id === viewingRecord.id,
+        );
+
+        if (updated) {
+          setViewingRecord(updated);
+        }
+      }
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.message ?? "Unable to add team members.",
+      );
+    } finally {
+      setIsRelationSubmitting(false);
+    }
+  };
+
+  const removeRelation = async (relatedId: string) => {
+    if (!relationManager || !viewingRecord) return;
+
+    try {
+      await relationManager.remove(viewingRecord, relatedId);
+
+      toast.success("Member removed successfully.");
+
+      if (api) {
+        const refreshed = await api.list();
+
+        setRemoteRecords(refreshed);
+
+        const updated = refreshed.find(
+          (record: TRecord) => record.id === viewingRecord.id,
+        );
+
+        if (updated) {
+          setViewingRecord(updated);
+        }
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message ?? "Unable to remove member.");
+    }
+  };
   const cards = statsCards?.(records) ?? [];
 
   const processedColumns = useMemo(() => {
@@ -763,7 +1053,7 @@ export function GenericCrudPage<TRecord extends { id: string }>({
         columns={processedColumns as any}
         data={filteredRecords}
         onView={setViewingRecord}
-        onEdit={!readOnly && (!api || api.update) ? openEdit : undefined}
+        onEdit={!readOnly ? openEdit : undefined}
         onDelete={
           api && !api.remove
             ? undefined
@@ -907,7 +1197,11 @@ export function GenericCrudPage<TRecord extends { id: string }>({
           {viewingRecord && viewingGroups && (
             <div className="space-y-6 py-4">
               {"status" in (viewingRecord as any) && (
-                <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Status
+                  </span>
+
                   {getStatusBadge(String((viewingRecord as any).status))}
                 </div>
               )}
@@ -915,15 +1209,18 @@ export function GenericCrudPage<TRecord extends { id: string }>({
               {viewingGroups.core.length > 0 && (
                 <section className="space-y-2">
                   <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground/80">
-                    <Info className="size-3.5" /> Details
+                    <Info className="size-3.5" />
+                    Details
                   </h3>
+
                   <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                     {viewingGroups.core.map(({ key, value }) => (
                       <React.Fragment key={key}>
-                        <dt className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mt-1">
+                        <dt className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                           {formatFieldLabel(key)}
                         </dt>
-                        <dd className="break-words text-foreground font-medium">
+
+                        <dd className="break-words font-medium text-foreground">
                           {renderDisplayValue(
                             key,
                             value,
@@ -941,15 +1238,18 @@ export function GenericCrudPage<TRecord extends { id: string }>({
               {viewingGroups.dates.length > 0 && (
                 <section className="space-y-2">
                   <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground/80">
-                    <Calendar className="size-3.5" /> Dates
+                    <Calendar className="size-3.5" />
+                    Dates
                   </h3>
+
                   <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                     {viewingGroups.dates.map(({ key, value }) => (
                       <React.Fragment key={key}>
-                        <dt className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mt-1">
+                        <dt className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                           {formatFieldLabel(key)}
                         </dt>
-                        <dd className="break-words text-foreground font-medium">
+
+                        <dd className="break-words font-medium text-foreground">
                           {renderDisplayValue(
                             key,
                             value,
@@ -967,15 +1267,18 @@ export function GenericCrudPage<TRecord extends { id: string }>({
               {viewingGroups.relations.length > 0 && (
                 <section className="space-y-2">
                   <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground/80">
-                    <Layers className="size-3.5" /> Related records
+                    <Layers className="size-3.5" />
+                    Related records
                   </h3>
+
                   <dl className="grid grid-cols-1 gap-y-3 text-sm">
                     {viewingGroups.relations.map(({ key, value }) => (
                       <React.Fragment key={key}>
-                        <dt className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mt-1">
+                        <dt className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                           {formatFieldLabel(key)}
                         </dt>
-                        <dd className="break-words text-foreground font-medium">
+
+                        <dd className="break-words font-medium text-foreground">
                           {renderDisplayValue(
                             key,
                             value,
@@ -989,11 +1292,362 @@ export function GenericCrudPage<TRecord extends { id: string }>({
                   </dl>
                 </section>
               )}
+
+              {/* ============================================================
+        TEAM MEMBERS / RELATION MANAGER
+        ============================================================ */}
+              {relationManager &&
+                Array.isArray(
+                  (viewingRecord as Record<string, any>)[
+                    relationManager.relationKey
+                  ],
+                ) && (
+                  <section className="space-y-4 border-t border-border/60 pt-5">
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground/80">
+                          <User className="size-3.5" />
+                          {relationManager.title}
+                        </h3>
+
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {
+                            (
+                              (viewingRecord as Record<string, any>)[
+                                relationManager.relationKey
+                              ] as any[]
+                            ).length
+                          }{" "}
+                          {(
+                            (viewingRecord as Record<string, any>)[
+                              relationManager.relationKey
+                            ] as any[]
+                          ).length === 1
+                            ? "member"
+                            : "members"}
+                        </p>
+                      </div>
+
+                      {!readOnly && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="h-8 shrink-0 gap-1.5"
+                          onClick={openRelationManager}
+                        >
+                          <Plus className="size-3.5" />
+                          Add Members
+                        </Button>
+                      )}
+                    </div>
+
+                    {/* Members */}
+                    {(
+                      (viewingRecord as Record<string, any>)[
+                        relationManager.relationKey
+                      ] as Array<Record<string, any>>
+                    ).length > 0 ? (
+                      <div className="space-y-2">
+                        {(
+                          (viewingRecord as Record<string, any>)[
+                            relationManager.relationKey
+                          ] as Array<Record<string, any>>
+                        ).map((employee) => {
+                          const firstName = employee.firstName ?? "";
+                          const lastName = employee.lastName ?? "";
+
+                          const fullName =
+                            `${firstName} ${lastName}`.trim() ||
+                            "Unknown Employee";
+
+                          const initials =
+                            `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() ||
+                            "?";
+
+                          const designation =
+                            employee.designation?.title ?? "Employee";
+
+                          return (
+                            <div
+                              key={employee.id}
+                              className="group flex items-center gap-3 rounded-xl border border-border/70 bg-card p-3 transition-colors hover:bg-muted/30"
+                            >
+                              {/* Avatar */}
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                                {initials}
+                              </div>
+
+                              {/* Employee information */}
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-semibold text-foreground">
+                                  {fullName}
+                                </p>
+
+                                <p className="truncate text-[10px] text-muted-foreground">
+                                  {employee.employeeCode ?? "No employee code"}
+                                  {designation && ` • ${designation}`}
+                                </p>
+
+                                {employee.user?.email && (
+                                  <p className="truncate text-[10px] text-muted-foreground">
+                                    {employee.user.email}
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* Employee status */}
+                              {employee.status && (
+                                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">
+                                  {employee.status}
+                                </span>
+                              )}
+
+                              {/* Remove */}
+                              {!readOnly && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 shrink-0 px-2 text-xs text-destructive opacity-70 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+                                  onClick={() => removeRelation(employee.id)}
+                                >
+                                  Remove
+                                </Button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      /* Empty state */
+                      <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-8 text-center">
+                        <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                          <User className="size-5 text-muted-foreground" />
+                        </div>
+
+                        <p className="text-sm font-semibold text-foreground">
+                          No team members
+                        </p>
+
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          No employees are currently assigned to this team.
+                        </p>
+
+                        {!readOnly && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="mt-4 gap-1.5"
+                            onClick={openRelationManager}
+                          >
+                            <Plus className="size-3.5" />
+                            Add First Member
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </section>
+                )}
             </div>
           )}
         </SheetContent>
       </Sheet>
+      <Dialog
+        open={isRelationDialogOpen}
+        onOpenChange={setIsRelationDialogOpen}
+      >
+        <DialogContent className="w-full max-w-lg max-h-[85vh] overflow-hidden p-0">
+          <DialogHeader className="border-b p-6">
+            <DialogTitle className="text-lg font-bold">
+              Add {relationManager?.title ?? "Members"}
+            </DialogTitle>
 
+            <DialogDescription className="text-xs text-muted-foreground">
+              Select employees to assign to this team.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col min-h-0">
+            {/* Search */}
+            <div className="border-b p-4">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+
+                <Input
+                  value={relationSearch}
+                  onChange={(event) => setRelationSearch(event.target.value)}
+                  placeholder="Search employees..."
+                  className="pl-9"
+                />
+              </div>
+            </div>
+
+            {/* Employee list */}
+            <div className="max-h-[400px] overflow-y-auto p-4">
+              {isRelationLoading ? (
+                <div className="flex min-h-[180px] items-center justify-center">
+                  <div className="flex flex-col items-center gap-2">
+                    <Loader2 className="size-6 animate-spin text-primary" />
+
+                    <span className="text-xs text-muted-foreground">
+                      Loading employees...
+                    </span>
+                  </div>
+                </div>
+              ) : relationRecords.length === 0 ? (
+                <div className="flex min-h-[180px] flex-col items-center justify-center text-center">
+                  <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                    <User className="size-5 text-muted-foreground" />
+                  </div>
+
+                  <p className="text-sm font-semibold">
+                    No available employees
+                  </p>
+
+                  <p className="mt-1 max-w-xs text-xs text-muted-foreground">
+                    There are no employees available to assign to this team.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {relationRecords
+                    .filter((employee: any) => {
+                      const query = relationSearch.trim().toLowerCase();
+
+                      if (!query) return true;
+
+                      const fullName = `${employee.firstName ?? ""} ${
+                        employee.lastName ?? ""
+                      }`.toLowerCase();
+
+                      const employeeCode = String(
+                        employee.employeeCode ?? "",
+                      ).toLowerCase();
+
+                      const email = String(
+                        employee.user?.email ?? employee.email ?? "",
+                      ).toLowerCase();
+
+                      return (
+                        fullName.includes(query) ||
+                        employeeCode.includes(query) ||
+                        email.includes(query)
+                      );
+                    })
+                    .map((employee: any) => {
+                      const firstName = employee.firstName ?? "";
+                      const lastName = employee.lastName ?? "";
+
+                      const fullName =
+                        `${firstName} ${lastName}`.trim() || "Unknown Employee";
+
+                      const initials =
+                        `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() ||
+                        "?";
+
+                      const isSelected = selectedRelationIds.includes(
+                        employee.id,
+                      );
+
+                      const designation =
+                        employee.designation?.title ?? "Employee";
+
+                      return (
+                        <button
+                          key={employee.id}
+                          type="button"
+                          onClick={() => toggleRelationSelection(employee.id)}
+                          className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors ${
+                            isSelected
+                              ? "border-primary bg-primary/5"
+                              : "border-border/70 bg-card hover:bg-muted/40"
+                          }`}
+                        >
+                          {/* Avatar */}
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                            {initials}
+                          </div>
+
+                          {/* Employee info */}
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold">
+                              {fullName}
+                            </p>
+
+                            <p className="truncate text-[10px] text-muted-foreground">
+                              {employee.employeeCode ?? "No employee code"}
+                              {" • "}
+                              {designation}
+                            </p>
+
+                            {(employee.user?.email || employee.email) && (
+                              <p className="truncate text-[10px] text-muted-foreground">
+                                {employee.user?.email ?? employee.email}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Checkbox */}
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() =>
+                              toggleRelationSelection(employee.id)
+                            }
+                            onClick={(event) => event.stopPropagation()}
+                          />
+                        </button>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-between border-t bg-muted/20 p-4">
+            <span className="text-xs text-muted-foreground">
+              {selectedRelationIds.length} selected
+            </span>
+
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setSelectedRelationIds([]);
+                  setIsRelationDialogOpen(false);
+                }}
+                disabled={isRelationSubmitting}
+              >
+                Cancel
+              </Button>
+
+              <Button
+                type="button"
+                onClick={addSelectedRelations}
+                disabled={
+                  selectedRelationIds.length === 0 || isRelationSubmitting
+                }
+                className="gap-2"
+              >
+                {isRelationSubmitting && (
+                  <Loader2 className="size-4 animate-spin" />
+                )}
+
+                {isRelationSubmitting
+                  ? "Adding..."
+                  : `Add ${
+                      selectedRelationIds.length > 0
+                        ? `${selectedRelationIds.length} `
+                        : ""
+                    }Member${selectedRelationIds.length === 1 ? "" : "s"}`}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
       <ConfirmDialog
         open={deleteConfirmOpen}
         onOpenChange={setDeleteConfirmOpen}

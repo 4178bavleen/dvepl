@@ -12,7 +12,7 @@ interface Params {
 
 async function getTeamByIdRoutes(
   fastify: FastifyInstance,
-  options: FastifyPluginOptions
+  options: FastifyPluginOptions,
 ) {
   fastify.get(
     "/:id",
@@ -28,10 +28,7 @@ async function getTeamByIdRoutes(
       ],
     },
 
-    async (
-      request: FastifyRequest,
-      reply: FastifyReply
-    ) => {
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         const { id } = request.params as Params;
         const companyId = request.admin?.companyId;
@@ -53,12 +50,14 @@ async function getTeamByIdRoutes(
               },
             },
           },
+
           include: {
             department: {
               select: {
                 id: true,
                 name: true,
                 code: true,
+
                 branch: {
                   select: {
                     id: true,
@@ -68,22 +67,34 @@ async function getTeamByIdRoutes(
                 },
               },
             },
+
             employees: {
               where: {
                 deletedAt: null,
               },
+
               select: {
                 id: true,
                 employeeCode: true,
                 firstName: true,
                 lastName: true,
+                status: true,
+
                 user: {
                   select: {
                     email: true,
                   },
                 },
+
+                designation: {
+                  select: {
+                    id: true,
+                    title: true,
+                  },
+                },
               },
             },
+
             _count: {
               select: {
                 employees: true,
@@ -117,12 +128,10 @@ async function getTeamByIdRoutes(
           success: false,
           message: "Server error while fetching team.",
           details:
-            process.env.NODE_ENV === "development"
-              ? error.message
-              : undefined,
+            process.env.NODE_ENV === "development" ? error.message : undefined,
         });
       }
-    }
+    },
   );
 }
 

@@ -9,7 +9,7 @@ import { updateEmployeeSchema } from "../../../schemas/admin/employee/employee.s
 
 async function updateEmployeeRoutes(
   fastify: FastifyInstance,
-  options: FastifyPluginOptions
+  options: FastifyPluginOptions,
 ) {
   fastify.put(
     "/:id",
@@ -112,11 +112,30 @@ async function updateEmployeeRoutes(
               },
               deletedAt: null,
             },
+            select: {
+              id: true,
+              departmentId: true,
+            },
           });
+
           if (!team) {
             return reply.status(400).send({
               success: false,
               message: "Invalid team.",
+            });
+          }
+
+          // Employee must belong to the same department as the team
+          const employeeDepartmentId =
+            data.departmentId ?? existingEmployee.departmentId;
+
+          if (
+            employeeDepartmentId &&
+            team.departmentId !== employeeDepartmentId
+          ) {
+            return reply.status(400).send({
+              success: false,
+              message: "Employee and team must belong to the same department.",
             });
           }
         }
@@ -155,7 +174,10 @@ async function updateEmployeeRoutes(
         }
 
         // Check employeeCode uniqueness if it is changing
-        if (data.employeeCode && data.employeeCode !== existingEmployee.employeeCode) {
+        if (
+          data.employeeCode &&
+          data.employeeCode !== existingEmployee.employeeCode
+        ) {
           const duplicateCode = await fastify.prisma.employee.findUnique({
             where: {
               employeeCode: data.employeeCode,
@@ -172,77 +194,79 @@ async function updateEmployeeRoutes(
 
         const { email, ...employeeData } = data as any;
 
-        const updatedEmployee = await fastify.prisma.$transaction(async (tx) => {
-          const emp = await tx.employee.update({
-            where: {
-              id,
-            },
-            data: employeeData,
-          });
-
-          if (email !== undefined) {
-            const existingEmail = await tx.employeeContact.findFirst({
+        const updatedEmployee = await fastify.prisma.$transaction(
+          async (tx) => {
+            const emp = await tx.employee.update({
               where: {
-                employeeId: id,
-                type: "EMAIL",
+                id,
               },
+              data: employeeData,
             });
 
-            if (existingEmail) {
-              if (email === null || email === "") {
-                await tx.employeeContact.delete({
-                  where: {
-                    id: existingEmail.id,
-                  },
-                });
-              } else {
-                await tx.employeeContact.update({
-                  where: {
-                    id: existingEmail.id,
-                  },
-                  data: {
-                    value: email,
-                  },
-                });
-              }
-            } else if (email !== null && email !== "") {
-              await tx.employeeContact.create({
-                data: {
+            if (email !== undefined) {
+              const existingEmail = await tx.employeeContact.findFirst({
+                where: {
                   employeeId: id,
                   type: "EMAIL",
-                  value: email,
-                  isPrimary: true,
-                },
-              });
-            }
-
-            // Auto-link to existing User
-            if (email !== null && email !== "") {
-              const existingUser = await tx.user.findFirst({
-                where: {
-                  email: {
-                    equals: email,
-                    mode: "insensitive",
-                  },
-                  deletedAt: null,
                 },
               });
 
-              if (existingUser) {
-                await tx.employee.update({
-                  where: {
-                    id,
-                  },
+              if (existingEmail) {
+                if (email === null || email === "") {
+                  await tx.employeeContact.delete({
+                    where: {
+                      id: existingEmail.id,
+                    },
+                  });
+                } else {
+                  await tx.employeeContact.update({
+                    where: {
+                      id: existingEmail.id,
+                    },
+                    data: {
+                      value: email,
+                    },
+                  });
+                }
+              } else if (email !== null && email !== "") {
+                await tx.employeeContact.create({
                   data: {
-                    userId: existingUser.id,
+                    employeeId: id,
+                    type: "EMAIL",
+                    value: email,
+                    isPrimary: true,
                   },
                 });
               }
-            }
-          }
 
-          return emp;
-        });
+              // Auto-link to existing User
+              if (email !== null && email !== "") {
+                const existingUser = await tx.user.findFirst({
+                  where: {
+                    email: {
+                      equals: email,
+                      mode: "insensitive",
+                    },
+                    deletedAt: null,
+                  },
+                });
+
+                if (existingUser) {
+                  await tx.employee.update({
+                    where: {
+                      id,
+                    },
+                    data: {
+                      userId: existingUser.id,
+                    },
+                  });
+                }
+              }
+            }
+
+            return emp;
+          },
+        );
 
         adminLogs.info("Employee updated successfully", {
           updatedBy: (request.admin as any)?.id,
@@ -260,12 +284,10 @@ async function updateEmployeeRoutes(
           success: false,
           message: "Server error.",
           details:
-            process.env.NODE_ENV === "development"
-              ? error.message
-              : undefined,
+            process.env.NODE_ENV === "development" ? error.message : undefined,
         });
       }
-    }
+    },
   );
 }
 

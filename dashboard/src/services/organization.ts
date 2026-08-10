@@ -6,7 +6,7 @@ type RecordData = { id: string; [key: string]: unknown };
 type ResourceApi<T extends RecordData> = {
   list: (params?: Record<string, unknown>) => Promise<T[]>;
   create: (data: Record<string, unknown>) => Promise<T>;
-  update?: (id: string, data: Record<string, unknown>) => Promise<T>;
+    update?: (id: string, data: Record<string, unknown>) => Promise<T>;
   remove?: (id: string) => Promise<void>;
 };
 
@@ -32,7 +32,15 @@ export const organizationApi = {
     ...resource<RecordData>(API_ENDPOINTS.organization.departments),
     update: (id: string, data: Record<string, unknown>) => unwrap(apiClient.patch<ApiResponse<RecordData>>(API_ENDPOINTS.organization.departments.update(id), data)),
   },
-  teams: resource<RecordData>(API_ENDPOINTS.organization.teams),
+  teams: {
+    ...resource<RecordData>(API_ENDPOINTS.organization.teams),
+    availableMembers: (teamId: string) =>
+      unwrap(apiClient.get<ApiResponse<RecordData[]>>(`/team/members/available/${teamId}`)),
+    addMembers: (teamId: string, employeeIds: string[]) =>
+      unwrap(apiClient.put<ApiResponse<RecordData>>(`/team/members/${teamId}`, { employeeIds })),
+    removeMember: (teamId: string, employeeId: string) =>
+      unwrap(apiClient.delete<ApiResponse<RecordData>>(`/team/members/${teamId}/${employeeId}`)),
+  },
   designations: resource<RecordData>(API_ENDPOINTS.organization.designations),
   costCenters: resource<RecordData>(API_ENDPOINTS.organization.costCenters),
 };

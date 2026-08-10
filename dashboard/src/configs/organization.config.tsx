@@ -258,9 +258,13 @@ export const departmentsConfig = {
 // ==========================================
 // 4. TEAMS ROUTE CONFIG
 // ==========================================
+
+
 export const teamsConfig = {
   tableName: "teams",
+
   api: organizationApi.teams,
+
   moduleName: "Team",
   pluralName: "Teams",
 
@@ -269,26 +273,113 @@ export const teamsConfig = {
     departmentId: z.string().min(1, "Select a department"),
     isActive: z.boolean().default(true),
   }),
-  defaultFormValues: { name: "", departmentId: "", isActive: true },
-  selectOptions: { departmentId: organizationApi.departments.list },
-  breadcrumbs: [{ label: "Dashboard", href: "/" }, { label: "Teams" }],
+
+  defaultFormValues: {
+    name: "",
+    departmentId: "",
+    isActive: true,
+  },
+
+  selectOptions: {
+    departmentId: organizationApi.departments.list,
+  },
+
+  breadcrumbs: [
+    {
+      label: "Dashboard",
+      href: "/",
+    },
+    {
+      label: "Teams",
+    },
+  ],
+
   columns: [
-    { accessorKey: "name", header: sortableHeader("Team Name") },
-    { accessorKey: "departmentId", header: "Department ID" },
+    {
+      accessorKey: "name",
+      header: sortableHeader("Team Name"),
+    },
+
+    {
+      accessorKey: "department.name",
+      header: "Department",
+    },
+
+    {
+      accessorKey: "_count.employees",
+      header: "Members",
+
+      cell: ({ row }: { row: any }) => {
+        const count = row.original?._count?.employees ?? 0;
+        const employees = row.original?.employees ?? [];
+
+        return (
+          <div className="flex items-center gap-2">
+            {/* Employee avatar stack */}
+            <div className="flex -space-x-2">
+              {employees.slice(0, 3).map((employee: any) => {
+                const firstName = employee.firstName ?? "";
+                const lastName = employee.lastName ?? "";
+
+                const initials =
+                  `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+
+                return (
+                  <div
+                    key={employee.id}
+                    className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-semibold text-foreground"
+                    title={`${firstName} ${lastName}`}
+                  >
+                    {initials || "?"}
+                  </div>
+                );
+              })}
+
+              {count > 3 && (
+                <div
+                  className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-muted text-[10px] font-semibold text-muted-foreground"
+                  title={`${count - 3} more members`}
+                >
+                  +{count - 3}
+                </div>
+              )}
+            </div>
+
+            <span className="text-sm font-medium text-foreground">
+              {count} {count === 1 ? "member" : "members"}
+            </span>
+          </div>
+        );
+      },
+    },
+
     {
       accessorKey: "isActive",
       header: "Status",
-      cell: ({ getValue }) => (
-        <span
-          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-            getValue()
-              ? "bg-success/15 text-success"
-              : "bg-muted-foreground/15 text-muted-foreground"
-          }`}
-        >
-          {getValue() ? "Active" : "Inactive"}
-        </span>
-      ),
+
+      cell: ({ getValue }: { getValue: () => unknown }) => {
+        const isActive = Boolean(getValue());
+
+        return (
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold ${
+              isActive
+                ? "bg-success/15 text-success"
+                : "bg-muted-foreground/15 text-muted-foreground"
+            }`}
+          >
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${
+                isActive
+                  ? "bg-success"
+                  : "bg-muted-foreground"
+              }`}
+            />
+
+            {isActive ? "Active" : "Inactive"}
+          </span>
+        );
+      },
     },
   ] as ColumnDef<Team>[],
 
@@ -297,14 +388,9 @@ export const teamsConfig = {
       name: "departmentId",
       label: "Department",
       type: "select",
-      options: [
-        { label: "Sales & Marketing", value: "dept-1" },
-        { label: "Human Resources", value: "dept-2" },
-        { label: "Finance & Accounts", value: "dept-3" },
-        { label: "Production Control", value: "dept-4" },
-      ],
       required: true,
     },
+
     {
       name: "name",
       label: "Team Name",
@@ -312,12 +398,54 @@ export const teamsConfig = {
       placeholder: "Bidding Specialists",
       required: true,
     },
+
     {
       name: "isActive",
       label: "Active",
       type: "checkbox",
     },
   ] as any[],
+
+  /*
+   * ============================================================
+   * TEAM → EMPLOYEE RELATION
+   * ============================================================
+   *
+   * Team has:
+   *
+   *   Team
+   *     └── employees[]
+   *
+   * Employee has:
+   *
+   *   Employee
+   *     └── teamId
+   *
+   * Therefore:
+   *
+   * ADD:
+   *   employee.teamId = team.id
+   *
+   * REMOVE:
+   *   employee.teamId = null
+   */
+relationManager: {
+  relationKey: "employees",
+  title: "Team Members",
+
+  getAvailableRecords: async (team: any) => {
+    return organizationApi.teams.availableMembers(team.id);
+  },
+
+  add: async (team: any, employeeId: string) => {
+    await organizationApi.teams.addMembers(team.id, [employeeId]);
+  },
+
+  remove: async (team: any, employeeId: string) => {
+    await organizationApi.teams.removeMember(team.id, employeeId);
+  },
+},
+
 
   statsCards: (data: Team[]) => [
     {
@@ -346,7 +474,9 @@ export const designationsConfig = {
       accessorKey: "title",
       header: sortableHeader("Title"),
       cell: ({ row }) => (
-        <span className="font-semibold text-foreground">{row.original.title}</span>
+        <span className="font-semibold text-foreground">
+          {row.original.title}
+        </span>
       ),
     },
     {

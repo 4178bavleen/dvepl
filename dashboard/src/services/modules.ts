@@ -12,11 +12,24 @@ type CrudEndpoints = { list: string; create: string; update?: (id: string) => st
 const crud = (paths: CrudEndpoints, options: { updateMethod?: 'put' | 'patch'; update?: boolean; remove?: boolean } = {}): ResourceApi<any> => ({
   list: (params) => unwrap(apiClient.get<ApiResponse<ApiRecord[]>>(paths.list, { params })),
   create: (data) => unwrap(apiClient.post<ApiResponse<ApiRecord>>(paths.create, data)),
-  ...(options.update === false ? {} : {
-    update: (id: string, data: Record<string, unknown>) => options.updateMethod === 'patch'
-      ? unwrap(apiClient.patch<ApiResponse<ApiRecord>>(paths.update!(id), data))
-      : unwrap(apiClient.put<ApiResponse<ApiRecord>>(paths.update!(id), data))
-  }),
+ ...(options.update === false || !paths.update
+  ? {}
+  : {
+      update: (id: string, data: Record<string, unknown>) =>
+        options.updateMethod === 'patch'
+          ? unwrap(
+              apiClient.patch<ApiResponse<ApiRecord>>(
+                paths.update!(id),
+                data
+              )
+            )
+          : unwrap(
+              apiClient.put<ApiResponse<ApiRecord>>(
+                paths.update!(id),
+                data
+              )
+            ),
+    }),
   ...(options.remove === false || !paths.remove ? {} : { remove: async (id: string) => { await apiClient.delete(paths.remove!(id)); } }),
 });
 
