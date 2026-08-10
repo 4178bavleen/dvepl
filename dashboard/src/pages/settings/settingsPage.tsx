@@ -5,6 +5,14 @@ import { organizationApi } from "@/services/organization";
 import { toast } from "react-hot-toast";
 import * as XLSX from "xlsx";
 import { Eye, EyeOff } from "lucide-react";
+import {
+  ACTION_PERMISSION_KEYS,
+  LEGACY_ACTION_DEFAULTS,
+  NO_ACTIONS,
+  normalizePageActionPermissions,
+  type PageActionPermissions,
+  type StoredActionPermissions,
+} from "@/utils/pagePermissions";
 import "../../styles/settings.css";
 
 // Hex to HSL space-separated string converter for Tailwind HSL variables compatibility
@@ -56,12 +64,7 @@ interface UserItem {
   role: string;
   pageAccess?: string[];
   fieldPermissions?: Record<string, { view: boolean; edit: boolean }>;
-  actionPermissions?: {
-    create: boolean;
-    edit: boolean;
-    delete: boolean;
-    export: boolean;
-  };
+  actionPermissions?: StoredActionPermissions;
   password?: string;
   teamId?: string | null;
   teamName?: string | null;
@@ -149,12 +152,8 @@ export function SettingsPage() {
   const [fieldPermsState, setFieldPermsState] = useState<
     Record<string, { view: boolean; edit: boolean }>
   >({});
-  const [actionPermsState, setActionPermsState] = useState({
-    create: true,
-    edit: true,
-    delete: false,
-    export: true,
-  });
+  const [actionPermsState, setActionPermsState] = useState<PageActionPermissions>({});
+  const [selectedActionModule, setSelectedActionModule] = useState("dashboard");
 
   // Create single user form state
   const [newUserName, setNewUserName] = useState("");
@@ -798,13 +797,12 @@ export function SettingsPage() {
 
     // Actions settings
     setActionPermsState(
-      user.actionPermissions ?? {
-        create: true,
-        edit: true,
-        delete: false,
-        export: true,
-      },
+      normalizePageActionPermissions(
+        user.actionPermissions ?? LEGACY_ACTION_DEFAULTS,
+        modulesList.map((module) => module.key),
+      ),
     );
+    setSelectedActionModule("dashboard");
 
     setIsPermModalOpen(true);
     setLoadingPermGroups(true);
@@ -838,12 +836,16 @@ export function SettingsPage() {
 
     setPageAccessState(pageObj);
     setFieldPermsState(fieldObj);
-    setActionPermsState({
-      create: preset === "full",
-      edit: preset === "full",
-      delete: preset === "full",
-      export: preset === "full" || preset === "viewer",
-    });
+    setActionPermsState(
+      Object.fromEntries(
+        modulesList.map((module) => [
+          module.key,
+          preset === "full"
+            ? { create: true, edit: true, delete: true, export: true }
+            : NO_ACTIONS,
+        ]),
+      ),
+    );
   };
 
   const savePermissions = async () => {
@@ -853,16 +855,17 @@ export function SettingsPage() {
         (k) => pageAccessState[k],
       );
 
-      // If edit is globally disabled, force edit permission of all fields to false
+      // A field cannot be editable when its own module's edit action is disabled.
       const finalFieldPerms = { ...fieldPermsState };
-      if (!actionPermsState.edit) {
-        Object.keys(finalFieldPerms).forEach((key) => {
+      fieldsAccessList.forEach((field) => {
+        if (!actionPermsState[field.tag]?.edit) {
+          const key = field.key;
           finalFieldPerms[key] = {
             ...finalFieldPerms[key],
             edit: false,
           };
-        });
-      }
+        }
+      });
 
       const updatedUser = {
         ...permUser,
@@ -3899,12 +3902,19 @@ export function SettingsPage() {
                           <input
                             type="checkbox"
                             checked={pageAccessState[m.key] ?? false}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                              const hasPageAccess = e.target.checked;
                               setPageAccessState({
                                 ...pageAccessState,
-                                [m.key]: e.target.checked,
-                              })
-                            }
+                                [m.key]: hasPageAccess,
+                              });
+                              if (!hasPageAccess) {
+                                setActionPermsState({
+                                  ...actionPermsState,
+                                  [m.key]: NO_ACTIONS,
+                                });
+                              }
+                            }}
                           />
                           <div className="perm-page-card">{m.label}</div>
                         </label>
@@ -3915,8 +3925,19 @@ export function SettingsPage() {
                   {/* Action Permissions */}
                   <div className="space-y-2">
                     <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                      Entity Action Rules
+                      Action Rules for Selected Module
                     </div>
+                    <select
+                      value={selectedActionModule}
+                      onChange={(event) => setSelectedActionModule(event.target.value)}
+                      className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs text-foreground"
+                    >
+                      {modulesList.map((module) => (
+                        <option key={module.key} value={module.key}>
+                          {module.label} {pageAccessState[module.key] ? "" : "(No View Access)"}
+                        </option>
+                      ))}
+                    </select>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {[
                         {
@@ -3952,11 +3973,15 @@ export function SettingsPage() {
                           <label className="toggle-wrap">
                             <input
                               type="checkbox"
-                              checked={(actionPermsState as any)[act.key]}
+                              checked={actionPermsState[selectedActionModule]?.[act.key as keyof typeof actionPermsState[string]] ?? false}
+                              disabled={!pageAccessState[selectedActionModule]}
                               onChange={(e) =>
                                 setActionPermsState({
                                   ...actionPermsState,
-                                  [act.key]: e.target.checked,
+                                  [selectedActionModule]: {
+                                    ...(actionPermsState[selectedActionModule] ?? NO_ACTIONS),
+                                    [act.key]: e.target.checked,
+                                  },
                                 })
                               }
                             />
@@ -4015,8 +4040,8 @@ export function SettingsPage() {
                             <div className="flex justify-center">
                               <input
                                 type="checkbox"
-                                checked={actionPermsState.edit ? (fieldPermsState[f.key]?.edit ?? true) : false}
-                                disabled={!actionPermsState.edit}
+                                checked={actionPermsState[f.tag]?.edit ? (fieldPermsState[f.key]?.edit ?? true) : false}
+                                disabled={!actionPermsState[f.tag]?.edit}
                                 onChange={(e) =>
                                   setFieldPermsState({
                                     ...fieldPermsState,
@@ -4029,7 +4054,7 @@ export function SettingsPage() {
                                     },
                                   })
                                 }
-                                className={`perm-checkbox ${!actionPermsState.edit ? "opacity-40 cursor-not-allowed" : ""}`}
+                                className={`perm-checkbox ${!actionPermsState[f.tag]?.edit ? "opacity-40 cursor-not-allowed" : ""}`}
                               />
                             </div>
                           </div>

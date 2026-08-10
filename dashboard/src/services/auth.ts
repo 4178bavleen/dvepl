@@ -1,5 +1,6 @@
 import { apiClient } from './axios';
 import { API_ENDPOINTS } from './endpoints';
+import type { StoredActionPermissions } from '@/utils/pagePermissions';
 
 interface LoginResponse {
   success: boolean;
@@ -15,7 +16,7 @@ interface LoginResponse {
     designation?: string;
     pageAccess?: string[];
     fieldPermissions?: Record<string, string[]>;
-    actionPermissions?: { create: boolean; edit: boolean; delete: boolean; export: boolean };
+    actionPermissions?: StoredActionPermissions;
   };
 }
 
@@ -29,7 +30,7 @@ export interface ProfileResponse {
   designation?: string;
   pageAccess?: string[];
   fieldPermissions?: Record<string, string[]>;
-  actionPermissions?: { create: boolean; edit: boolean; delete: boolean; export: boolean };
+  actionPermissions?: StoredActionPermissions;
 }
 
 export const authService = {

@@ -41,6 +41,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GenericTable, sortableHeader } from "@/components/tables/genericTable";
+import { canPerformPageAction } from "@/utils/pagePermissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -377,7 +378,10 @@ export const apiService = {
 export function VendorsPage() {
   const { currentCompanyId, companies, users, currentUserId } = useERPStore();
   const currentUser = users?.find((u: any) => u.id === currentUserId) as any;
-  const canCreate = currentUser?.actionPermissions?.create !== false;
+  const canCreate = canPerformPageAction(currentUser?.actionPermissions, "vendors", "create");
+  const canEdit = canPerformPageAction(currentUser?.actionPermissions, "vendors", "edit");
+  const canDelete = canPerformPageAction(currentUser?.actionPermissions, "vendors", "delete");
+  const canExport = canPerformPageAction(currentUser?.actionPermissions, "vendors", "export");
 
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [revisions, setRevisions] = useState<PORevision[]>([]);
@@ -1663,6 +1667,7 @@ export function VendorsPage() {
   };
 
   const openEditVendor = async (vendor: Vendor) => {
+    if (!canEdit) return;
     setEditingVendor(vendor);
     setVName(vendor.name);
     setVCategory(vendor.category);
@@ -1794,6 +1799,7 @@ export function VendorsPage() {
   };
 
   const handleDeleteVendor = (id: string) => {
+    if (!canDelete) return;
     setVendorToDelete(id);
     setDeleteConfirmOpen(true);
   };
@@ -2946,6 +2952,7 @@ export function VendorsPage() {
   };
 
   const triggerExport = (format: string) => {
+    if (!canExport) return;
     if (!activePoVendor) return;
 
     if (format === "pdf") {
@@ -3892,8 +3899,8 @@ export function VendorsPage() {
         columns={activeColumns}
         data={filteredVendors}
         onView={(row) => setOverviewVendor(row)}
-        onEdit={openEditVendor}
-        onDelete={(row) => handleDeleteVendor(row.id)}
+        onEdit={canEdit ? openEditVendor : undefined}
+        onDelete={canDelete ? (row) => handleDeleteVendor(row.id) : undefined}
         showColumnVisibility={false}
         storageKey="vendors"
       />

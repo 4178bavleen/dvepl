@@ -28,6 +28,7 @@ import { DynamicFormRenderer } from "@/components/customFields/dynamicFormRender
 import { useDynamicCustomFields, validateCustomFields } from "@/hooks/useDynamicCustomFields";
 import { ConfirmDialog } from "@/components/shared/confirmDialog";
 import { useERPStore } from "@/store/erpStore";
+import { canPerformPageAction } from "@/utils/pagePermissions";
 
 // Definitions
 interface Task {
@@ -84,7 +85,9 @@ export const apiService = {
 export default function TasksPage() {
   const store = useERPStore();
   const currentUser = store.users.find((u: any) => u.id === store.currentUserId) as any;
-  const canCreate = currentUser?.actionPermissions?.create !== false;
+  const canCreate = canPerformPageAction(currentUser?.actionPermissions, "tasks", "create");
+  const canEdit = canPerformPageAction(currentUser?.actionPermissions, "tasks", "edit");
+  const canDelete = canPerformPageAction(currentUser?.actionPermissions, "tasks", "delete");
 
   // Empty Database States (Mock data removed)
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -220,6 +223,7 @@ export default function TasksPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const handleDeleteTask = (id: string) => {
+    if (!canDelete) return;
     setTaskToDelete(id);
     setDeleteConfirmOpen(true);
   };
@@ -702,7 +706,7 @@ export default function TasksPage() {
                       </td>
                       <td className="py-3.5 px-4">
                         <div className="flex items-center justify-center gap-2">
-                          <Button
+                          {canEdit && <Button
                             variant="ghost"
                             size="icon"
                             className="h-8.5 w-8.5 text-muted-foreground hover:text-foreground border border-transparent hover:border-border hover:bg-muted/50 transition-all"
@@ -710,8 +714,8 @@ export default function TasksPage() {
                             title="Edit Task"
                           >
                             <Edit className="size-4" />
-                          </Button>
-                          <Button
+                          </Button>}
+                          {canEdit && <Button
                             variant="ghost"
                             size="icon"
                             className="h-8.5 w-8.5 text-muted-foreground hover:text-primary border border-transparent hover:border-border hover:bg-muted/50 transition-all"
@@ -719,8 +723,8 @@ export default function TasksPage() {
                             title="Notification Settings"
                           >
                             <Settings className="size-4" />
-                          </Button>
-                          <Button
+                          </Button>}
+                          {canDelete && <Button
                             variant="ghost"
                             size="icon"
                             className="h-8.5 w-8.5 text-muted-foreground hover:text-rose-500 border border-transparent hover:border-rose-500/10 hover:bg-rose-500/5 transition-all"
@@ -728,7 +732,7 @@ export default function TasksPage() {
                             title="Delete Task"
                           >
                             <Trash2 className="size-4" />
-                          </Button>
+                          </Button>}
                         </div>
                       </td>
                     </tr>
