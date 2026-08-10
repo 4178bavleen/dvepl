@@ -7,6 +7,21 @@ import {
 import { adminLogs } from "../../../services/logger/contextLogger";
 import { hashPassword } from "../../../utils/hashPassword";
 
+const actionKeys = ["create", "edit", "delete", "export"] as const;
+
+function isValidActionPermissions(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  const isLegacy = actionKeys.some((action) => typeof record[action] === "boolean");
+  if (isLegacy) return actionKeys.every((action) => typeof record[action] === "boolean");
+
+  return Object.keys(record).length > 0 && Object.values(record).every((moduleActions) => {
+    if (!moduleActions || typeof moduleActions !== "object" || Array.isArray(moduleActions)) return false;
+    const actions = moduleActions as Record<string, unknown>;
+    return actionKeys.every((action) => typeof actions[action] === "boolean");
+  });
+}
+
 async function updateUserRoute(
   fastify: FastifyInstance,
   options: FastifyPluginOptions
@@ -40,6 +55,13 @@ async function updateUserRoute(
 
         const { id } = request.params as { id: string };
         const { name, email, phone, isActive, role, designation, pageAccess, fieldPermissions, actionPermissions, password, teamId } = request.body as any;
+
+        if (actionPermissions !== undefined && !isValidActionPermissions(actionPermissions)) {
+          return reply.status(400).send({
+            success: false,
+            message: "actionPermissions must be a legacy action object or a page-keyed action object.",
+          });
+        }
 
         // Check User Exists
         const existingUser = await fastify.prisma.user.findFirst({

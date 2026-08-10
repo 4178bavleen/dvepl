@@ -24,10 +24,24 @@ import {
   Package,
   GripVertical,
 } from "lucide-react";
-import { DndContext, closestCenter, MouseSensor, TouchSensor, useSensor, useSensors, DragEndEvent } from "@dnd-kit/core";
-import { SortableContext, horizontalListSortingStrategy, arrayMove, useSortable } from "@dnd-kit/sortable";
+import {
+  DndContext,
+  closestCenter,
+  MouseSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  horizontalListSortingStrategy,
+  arrayMove,
+  useSortable,
+} from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GenericTable, sortableHeader } from "@/components/tables/genericTable";
+import { canPerformPageAction } from "@/utils/pagePermissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -78,8 +92,14 @@ function SortableHeaderCell({
   className?: string;
   width?: number;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
 
   const style: React.CSSProperties = {
     transform: transform ? CSS.Translate.toString(transform) : undefined,
@@ -225,7 +245,12 @@ interface PurchaseOrderRecord {
     quantity: number;
     unitPrice: number;
     totalPrice?: number;
-    material?: { name: string; materialCode?: string; unit?: string; hsnCode?: string };
+    material?: {
+      name: string;
+      materialCode?: string;
+      unit?: string;
+      hsnCode?: string;
+    };
   }[];
   createdAt?: string;
   createdById?: string;
@@ -305,6 +330,13 @@ export const apiService = {
         vendorId,
       ) as unknown as VendorProductAssoc[];
     },
+    listByMaterial: async (
+      materialId: string,
+    ): Promise<VendorProductAssoc[]> => {
+      return tenderApi.vendorProducts.listByMaterial(
+        materialId,
+      ) as unknown as VendorProductAssoc[];
+    },
     attach: async (
       vendorId: string,
       materialIds: string[],
@@ -320,18 +352,13 @@ export const apiService = {
   },
   purchaseOrders: {
     create: async (body: any) => {
-      const response = await apiClient.post(
-        "/purchase-order/create",
-        body,
-      );
+      const response = await apiClient.post("/purchase-order/create", body);
 
       return response.data?.data ?? response.data;
     },
 
     list: async () => {
-      const response = await apiClient.get(
-        "/purchase-order/read",
-      );
+      const response = await apiClient.get("/purchase-order/read");
 
       return response.data?.data ?? [];
     },
@@ -351,7 +378,10 @@ export const apiService = {
 export function VendorsPage() {
   const { currentCompanyId, companies, users, currentUserId } = useERPStore();
   const currentUser = users?.find((u: any) => u.id === currentUserId) as any;
-  const canCreate = currentUser?.actionPermissions?.create !== false;
+  const canCreate = canPerformPageAction(currentUser?.actionPermissions, "vendors", "create");
+  const canEdit = canPerformPageAction(currentUser?.actionPermissions, "vendors", "edit");
+  const canDelete = canPerformPageAction(currentUser?.actionPermissions, "vendors", "delete");
+  const canExport = canPerformPageAction(currentUser?.actionPermissions, "vendors", "export");
 
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [revisions, setRevisions] = useState<PORevision[]>([]);
@@ -369,13 +399,14 @@ export function VendorsPage() {
     setLoading(true);
     setInventoryLoading(true);
     try {
-      const [vList, rList, invList, dynFieldsRes, dynRecordsRes] = await Promise.all([
-        apiService.vendors.list(),
-        apiService.revisions.list(),
-        apiService.inventory.list(),
-        dynamicApi.getFields("inventory"),
-        dynamicApi.getRecords("inventory"),
-      ]);
+      const [vList, rList, invList, dynFieldsRes, dynRecordsRes] =
+        await Promise.all([
+          apiService.vendors.list(),
+          apiService.revisions.list(),
+          apiService.inventory.list(),
+          dynamicApi.getFields("inventory"),
+          dynamicApi.getRecords("inventory"),
+        ]);
       if (invList[0]) {
         console.log(invList[0].material);
         console.log(invList[0].material?.name);
@@ -383,7 +414,11 @@ export function VendorsPage() {
       setVendors(vList);
       setRevisions(rList);
       setInventoryItems(invList);
-      setInventoryFields((dynFieldsRes.data?.data || []).sort((a: any, b: any) => a.orderNo - b.orderNo));
+      setInventoryFields(
+        (dynFieldsRes.data?.data || []).sort(
+          (a: any, b: any) => a.orderNo - b.orderNo,
+        ),
+      );
       setInventoryRecords(dynRecordsRes.data?.data || []);
       console.log("Inventory Loaded");
       console.log(invList);
@@ -485,15 +520,11 @@ export function VendorsPage() {
   const poDefaultColumnIds = useMemo(() => {
     const dynFields = inventoryFields
       .map((f) => f.fieldName)
-      .filter((name) => name !== "qty" && name !== "discountPercent" && name !== "total");
-    return [
-      "sno",
-      ...dynFields,
-      "qty",
-      "discountPercent",
-      "total",
-      "delete",
-    ];
+      .filter(
+        (name) =>
+          name !== "qty" && name !== "discountPercent" && name !== "total",
+      );
+    return ["sno", ...dynFields, "qty", "discountPercent", "total", "delete"];
   }, [inventoryFields]);
 
   const orderedPoColumnIds = useMemo(() => {
@@ -537,7 +568,7 @@ export function VendorsPage() {
         id !== "qty" &&
         id !== "discountPercent" &&
         id !== "total" &&
-        id !== "delete"
+        id !== "delete",
     );
 
     // Always pin "sno" first, middle draggable columns, then static qty, discountPercent, total, delete.
@@ -555,7 +586,7 @@ export function VendorsPage() {
         id === "qty" ||
         id === "discountPercent" ||
         id === "total" ||
-        id === "delete"
+        id === "delete",
     );
   }, [poColumnOrder, poDefaultColumnIds]);
 
@@ -691,7 +722,12 @@ export function VendorsPage() {
 
     if (id.startsWith("custom_")) {
       return (
-        <SortableHeaderCell key={id} id={id} className={className} width={width}>
+        <SortableHeaderCell
+          key={id}
+          id={id}
+          className={className}
+          width={width}
+        >
           <div
             style={{
               display: "flex",
@@ -755,9 +791,13 @@ export function VendorsPage() {
 
               if (typedVal.trim()) {
                 const matches = getInventoryMatches(typedVal);
-                const exactMatch = matches.find(inv => {
+                const exactMatch = matches.find((inv) => {
                   const fieldVal = inv.values?.[id];
-                  return String(fieldVal || "").trim().toLowerCase() === typedVal.trim().toLowerCase();
+                  return (
+                    String(fieldVal || "")
+                      .trim()
+                      .toLowerCase() === typedVal.trim().toLowerCase()
+                  );
                 });
                 if (exactMatch) {
                   applyInventoryItemToRow(item.id, exactMatch);
@@ -769,9 +809,13 @@ export function VendorsPage() {
               const currentVal = item[id] || "";
               if (String(currentVal).trim()) {
                 const matches = getInventoryMatches(String(currentVal));
-                const exactMatch = matches.find(inv => {
+                const exactMatch = matches.find((inv) => {
                   const fieldVal = inv.values?.[id];
-                  return String(fieldVal || "").trim().toLowerCase() === String(currentVal).trim().toLowerCase();
+                  return (
+                    String(fieldVal || "")
+                      .trim()
+                      .toLowerCase() === String(currentVal).trim().toLowerCase()
+                  );
                 });
                 if (exactMatch) {
                   applyInventoryItemToRow(item.id, exactMatch);
@@ -808,13 +852,17 @@ export function VendorsPage() {
                 {getInventoryMatches(String(val)).map((inv) => {
                   const primaryField = inventoryFields[0];
                   const nameVal = inv.values?.[primaryField?.fieldName];
-                  const displayName = nameVal || Object.values(inv.values || {})[0] || "Unnamed Item";
+                  const displayName =
+                    nameVal ||
+                    Object.values(inv.values || {})[0] ||
+                    "Unnamed Item";
 
                   const subtitleParts = inventoryFields
                     .filter((f) => f.fieldName !== primaryField?.fieldName)
                     .map((f) => {
                       const val = inv.values?.[f.fieldName];
-                      if (val === undefined || val === null || val === "") return null;
+                      if (val === undefined || val === null || val === "")
+                        return null;
                       return `${f.label}: ${val}`;
                     })
                     .filter(Boolean);
@@ -868,9 +916,7 @@ export function VendorsPage() {
             min={0.01}
             step="any"
             value={item.qty === "" ? "" : item.qty}
-            onChange={(e) =>
-              updatePoItemField(item.id, "qty", e.target.value)
-            }
+            onChange={(e) => updatePoItemField(item.id, "qty", e.target.value)}
           />
         </td>
       );
@@ -898,7 +944,11 @@ export function VendorsPage() {
             type="number"
             value={item.discountPercent === 0 ? "" : item.discountPercent}
             onChange={(e) =>
-              updatePoItemField(item.id, "discountPercent", Number(e.target.value) || 0)
+              updatePoItemField(
+                item.id,
+                "discountPercent",
+                Number(e.target.value) || 0,
+              )
             }
             placeholder="0"
           />
@@ -961,11 +1011,7 @@ export function VendorsPage() {
       );
     }
 
-    return (
-      <td key={id}>
-        {item[id] ?? ""}
-      </td>
-    );
+    return <td key={id}>{item[id] ?? ""}</td>;
   };
 
   const sensors = useSensors(
@@ -979,7 +1025,7 @@ export function VendorsPage() {
         delay: 100,
         tolerance: 5,
       },
-    })
+    }),
   );
 
   const isPoColumnDraggable = (id: string) =>
@@ -1047,7 +1093,10 @@ export function VendorsPage() {
 
     const gstin = (vGst ?? "").trim().toUpperCase();
 
-    if (gstin && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(gstin)) {
+    if (
+      gstin &&
+      !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(gstin)
+    ) {
       errs.gst = "Enter a valid 15-character GSTIN (e.g. 22AAAAA0000A1Z5)";
     }
 
@@ -1115,10 +1164,7 @@ export function VendorsPage() {
   // Filter vendors
 
   useEffect(() => {
-    if (
-      searchField === "products" ||
-      productOnlySearch.trim()
-    ) {
+    if (searchField === "products" || productOnlySearch.trim()) {
       loadAllVendorProducts();
     }
   }, [searchField, productOnlySearch, vendors]);
@@ -1136,7 +1182,9 @@ export function VendorsPage() {
           (v.gstNumber ?? "").toLowerCase().includes(globalQuery) ||
           (v.contactPerson ?? "").toLowerCase().includes(globalQuery) ||
           Object.values((v as any).customFields || {}).some((val) =>
-            String(val ?? "").toLowerCase().includes(globalQuery)
+            String(val ?? "")
+              .toLowerCase()
+              .includes(globalQuery),
           ),
       );
     }
@@ -1150,9 +1198,15 @@ export function VendorsPage() {
             .filter(
               (a) =>
                 (a.material?.name ?? "").toLowerCase().includes(columnQuery) ||
-                (a.material?.materialCode ?? "").toLowerCase().includes(columnQuery) ||
-                (a.material?.category ?? "").toLowerCase().includes(columnQuery) ||
-                (a.vendorMaterialCode ?? "").toLowerCase().includes(columnQuery),
+                (a.material?.materialCode ?? "")
+                  .toLowerCase()
+                  .includes(columnQuery) ||
+                (a.material?.category ?? "")
+                  .toLowerCase()
+                  .includes(columnQuery) ||
+                (a.vendorMaterialCode ?? "")
+                  .toLowerCase()
+                  .includes(columnQuery),
             )
             .map((a) => a.vendorId),
         );
@@ -1179,31 +1233,29 @@ export function VendorsPage() {
         allVendorProducts
           .filter(
             (a) =>
-              (a.material?.name ?? "")
-                .toLowerCase()
-                .includes(productQuery) ||
-
+              (a.material?.name ?? "").toLowerCase().includes(productQuery) ||
               (a.material?.materialCode ?? "")
                 .toLowerCase()
                 .includes(productQuery) ||
-
               (a.material?.category ?? "")
                 .toLowerCase()
                 .includes(productQuery) ||
-
-              (a.vendorMaterialCode ?? "")
-                .toLowerCase()
-                .includes(productQuery)
+              (a.vendorMaterialCode ?? "").toLowerCase().includes(productQuery),
           )
-          .map((a) => a.vendorId)
+          .map((a) => a.vendorId),
       );
 
-      result = result.filter((vendor) =>
-        matchingVendorIds.has(vendor.id)
-      );
+      result = result.filter((vendor) => matchingVendorIds.has(vendor.id));
     }
     return result;
-  }, [vendors, globalSearch, fieldSearch, searchField, allVendorProducts, productOnlySearch]);
+  }, [
+    vendors,
+    globalSearch,
+    fieldSearch,
+    searchField,
+    allVendorProducts,
+    productOnlySearch,
+  ]);
 
   const dynamicInventoryWithMaterial = useMemo(() => {
     return inventoryRecords.map((rec) => {
@@ -1228,7 +1280,9 @@ export function VendorsPage() {
     const q = productSearch.toLowerCase();
 
     return pool.filter((rec) => {
-      const nameVal = String(rec.values?.[primaryField?.fieldName] || "").toLowerCase();
+      const nameVal = String(
+        rec.values?.[primaryField?.fieldName] || "",
+      ).toLowerCase();
       const codeVal = String(rec.materialCode || "").toLowerCase();
       const catVal = String(rec.category || "").toLowerCase();
 
@@ -1237,7 +1291,9 @@ export function VendorsPage() {
       }
 
       return Object.values(rec.values || {}).some((val) =>
-        String(val || "").toLowerCase().includes(q)
+        String(val || "")
+          .toLowerCase()
+          .includes(q),
       );
     });
   }, [dynamicInventoryWithMaterial, productSearch, inventoryFields]);
@@ -1251,7 +1307,9 @@ export function VendorsPage() {
       ? inventoryRecords
       : inventoryRecords.filter((rec) => {
           return Object.values(rec.values || {}).some((val) =>
-            String(val || "").toLowerCase().includes(q)
+            String(val || "")
+              .toLowerCase()
+              .includes(q),
           );
         });
 
@@ -1370,15 +1428,16 @@ export function VendorsPage() {
   };
 
   // ── NEW: Purchase Orders (backend) quick-view dialog ──
-  const [vendorPosViewVendor, setVendorPosViewVendor] =
-    useState<Vendor | null>(null);
+  const [vendorPosViewVendor, setVendorPosViewVendor] = useState<Vendor | null>(
+    null,
+  );
   const [vendorPosViewList, setVendorPosViewList] = useState<
     PurchaseOrderRecord[]
   >([]);
   const [vendorPosViewLoading, setVendorPosViewLoading] = useState(false);
-  const [vendorPoCounts, setVendorPoCounts] = useState<
-    Record<string, number>
-  >({});
+  const [vendorPoCounts, setVendorPoCounts] = useState<Record<string, number>>(
+    {},
+  );
 
   const openVendorPurchaseOrders = async (vendor: Vendor) => {
     setVendorPosViewVendor(vendor);
@@ -1401,13 +1460,15 @@ export function VendorsPage() {
       loadRevision(localRev);
     } else {
       setPoNumber(po.poNo);
-      setPoDate(po.orderDate ? new Date(po.orderDate).toISOString().split("T")[0] : "");
+      setPoDate(
+        po.orderDate ? new Date(po.orderDate).toISOString().split("T")[0] : "",
+      );
       setPoStatus(po.status || "SENT");
       setPaymentTerms(po.paymentTerms || "");
       setMaterialStatus(po.shippingTerms || "");
       setAdvance(0);
       setRemarks(po.remarks || "");
-      
+
       const subVal = po.subtotal ? Number(po.subtotal) : 0;
       const taxVal = po.tax ? Number(po.tax) : 0;
       if (subVal > 0 && taxVal > 0) {
@@ -1419,13 +1480,15 @@ export function VendorsPage() {
         setSgstPercent(0);
         setIgstPercent(0);
       }
-      
+
       setTerms("");
-      
+
       const mappedItems = (po.items || []).map((it, idx) => ({
         id: it.id || `item-${idx}`,
         materialId: it.materialId,
-        inventoryId: inventoryItems.find((inv) => inv.materialId === it.materialId)?.id,
+        inventoryId: inventoryItems.find(
+          (inv) => inv.materialId === it.materialId,
+        )?.id,
         description: it.material?.name || "Unknown Material",
         qty: it.quantity,
         unit: it.material?.unit || "Nos",
@@ -1439,7 +1502,7 @@ export function VendorsPage() {
       setPoItems(mappedItems);
       setSelectedRevisionId("");
       setReferenceCode("");
-      
+
       const activeCompany = companies.find((c) => c.id === currentCompanyId);
       setCompanyDetails({
         name: activeCompany?.name || "",
@@ -1604,6 +1667,7 @@ export function VendorsPage() {
   };
 
   const openEditVendor = async (vendor: Vendor) => {
+    if (!canEdit) return;
     setEditingVendor(vendor);
     setVName(vendor.name);
     setVCategory(vendor.category);
@@ -1735,6 +1799,7 @@ export function VendorsPage() {
   };
 
   const handleDeleteVendor = (id: string) => {
+    if (!canDelete) return;
     setVendorToDelete(id);
     setDeleteConfirmOpen(true);
   };
@@ -1817,7 +1882,7 @@ export function VendorsPage() {
       total: 0,
       unit: "",
       hsnCode: "",
-      catNo: ""
+      catNo: "",
     };
     inventoryFields.forEach((f) => {
       newItem[f.fieldName] = "";
@@ -1841,12 +1906,15 @@ export function VendorsPage() {
         };
 
         inventoryFields.forEach((f) => {
-          updatedItem[f.fieldName] = invRecord.values?.[f.fieldName] ?? item[f.fieldName] ?? "";
+          updatedItem[f.fieldName] =
+            invRecord.values?.[f.fieldName] ?? item[f.fieldName] ?? "";
         });
 
         const primaryField = inventoryFields[0];
         if (primaryField) {
-          updatedItem.description = String(updatedItem[primaryField.fieldName] || "");
+          updatedItem.description = String(
+            updatedItem[primaryField.fieldName] || "",
+          );
         }
 
         const qtyField = inventoryFields.find(
@@ -1859,13 +1927,19 @@ export function VendorsPage() {
             f.label.toLowerCase().includes("price") ||
             f.label.toLowerCase().includes("rate"),
         );
-        const discountField = inventoryFields.find(
-          (f) => f.label.toLowerCase().includes("discount"),
+        const discountField = inventoryFields.find((f) =>
+          f.label.toLowerCase().includes("discount"),
         );
 
-        updatedItem.qty = qtyField ? (Number(updatedItem[qtyField.fieldName]) || 1) : (Number(item.qty) || 1);
-        updatedItem.rate = priceField ? (Number(updatedItem[priceField.fieldName]) || 0) : (Number(item.rate) || 0);
-        updatedItem.discountPercent = discountField ? (Number(updatedItem[discountField.fieldName]) || 0) : (Number(item.discountPercent) || 0);
+        updatedItem.qty = qtyField
+          ? Number(updatedItem[qtyField.fieldName]) || 1
+          : Number(item.qty) || 1;
+        updatedItem.rate = priceField
+          ? Number(updatedItem[priceField.fieldName]) || 0
+          : Number(item.rate) || 0;
+        updatedItem.discountPercent = discountField
+          ? Number(updatedItem[discountField.fieldName]) || 0
+          : Number(item.discountPercent) || 0;
 
         const qty = Number(updatedItem.qty) || 1;
         const rate = Number(updatedItem.rate) || 0;
@@ -1880,7 +1954,9 @@ export function VendorsPage() {
     );
 
     const primaryField = inventoryFields[0];
-    const nameVal = primaryField ? invRecord.values?.[primaryField.fieldName] : "";
+    const nameVal = primaryField
+      ? invRecord.values?.[primaryField.fieldName]
+      : "";
     toast.success(`Loaded "${nameVal || "Item"}" details from inventory`);
     setInventoryDropdownRowId(null);
   };
@@ -1936,20 +2012,26 @@ export function VendorsPage() {
             total: 0,
             unit: "",
             hsnCode: "",
-            catNo: ""
+            catNo: "",
           };
 
           // Collect cell values of all columns present in this row
-          const cellValues = Object.values(row).map(v => String(v || "").trim()).filter(Boolean);
+          const cellValues = Object.values(row)
+            .map((v) => String(v || "").trim())
+            .filter(Boolean);
 
           // Find if any cell value matches any field value in inventoryRecords
           let invMatch: DynamicRecord | undefined;
           if (cellValues.length > 0) {
-            invMatch = inventoryRecords.find(rec => {
-              return Object.values(rec.values || {}).some(val => {
-                const valStr = String(val || "").trim().toLowerCase();
+            invMatch = inventoryRecords.find((rec) => {
+              return Object.values(rec.values || {}).some((val) => {
+                const valStr = String(val || "")
+                  .trim()
+                  .toLowerCase();
                 if (!valStr) return false;
-                return cellValues.some(cellVal => cellVal.toLowerCase() === valStr);
+                return cellValues.some(
+                  (cellVal) => cellVal.toLowerCase() === valStr,
+                );
               });
             });
           }
@@ -1968,10 +2050,15 @@ export function VendorsPage() {
             ]);
 
             if (cellVal !== "") {
-              newItem[f.fieldName] = f.type === "NUMBER" ? (Number(cellVal) || 0) : cellVal;
-            } else if (invMatch && invMatch.values?.[f.fieldName] !== undefined) {
+              newItem[f.fieldName] =
+                f.type === "NUMBER" ? Number(cellVal) || 0 : cellVal;
+            } else if (
+              invMatch &&
+              invMatch.values?.[f.fieldName] !== undefined
+            ) {
               const invVal = invMatch.values[f.fieldName];
-              newItem[f.fieldName] = f.type === "NUMBER" ? (Number(invVal) || 0) : String(invVal);
+              newItem[f.fieldName] =
+                f.type === "NUMBER" ? Number(invVal) || 0 : String(invVal);
             } else {
               newItem[f.fieldName] = f.type === "NUMBER" ? 0 : "";
             }
@@ -2004,35 +2091,37 @@ export function VendorsPage() {
               f.label.toLowerCase().includes("cost"),
           );
 
-          newItem.qty = qtyField ? (Number(newItem[qtyField.fieldName]) || 1) : 1;
-          newItem.rate = priceField ? (Number(newItem[priceField.fieldName]) || 0) : 0;
+          newItem.qty = qtyField ? Number(newItem[qtyField.fieldName]) || 1 : 1;
+          newItem.rate = priceField
+            ? Number(newItem[priceField.fieldName]) || 0
+            : 0;
           newItem.net = newItem.rate;
           newItem.total = newItem.qty * newItem.net;
 
-          const hasContent = inventoryFields.some(f => String(newItem[f.fieldName] || "").trim() !== "");
+          const hasContent = inventoryFields.some(
+            (f) => String(newItem[f.fieldName] || "").trim() !== "",
+          );
           if (hasContent) {
             newItems.push(newItem);
           }
         });
 
         if (newItems.length === 0) {
-          toast.error(
-            'No valid rows found in the selected Excel file.'
-          );
+          toast.error("No valid rows found in the selected Excel file.");
           return;
         }
 
         setPoItems((prev) => [...prev, ...newItems]);
         toast.success(
           `Imported ${newItems.length} item(s) from Excel` +
-          (matchedFromInventory > 0
-            ? ` (${matchedFromInventory} matched to Inventory)`
-            : "")
+            (matchedFromInventory > 0
+              ? ` (${matchedFromInventory} matched to Inventory)`
+              : ""),
         );
       } catch (err) {
         console.error(err);
         toast.error(
-          "Failed to read the Excel file. Please check the file format and try again."
+          "Failed to read the Excel file. Please check the file format and try again.",
         );
       } finally {
         setIsImportingExcel(false);
@@ -2050,11 +2139,23 @@ export function VendorsPage() {
     const headers = inventoryFields.map((f) => f.label);
     const sampleRow = inventoryFields.map((f) => {
       if (f.type === "NUMBER") {
-        if (f.label.toLowerCase().includes("qty") || f.label.toLowerCase().includes("quantity")) return 10;
-        if (f.label.toLowerCase().includes("price") || f.label.toLowerCase().includes("rate")) return 100;
+        if (
+          f.label.toLowerCase().includes("qty") ||
+          f.label.toLowerCase().includes("quantity")
+        )
+          return 10;
+        if (
+          f.label.toLowerCase().includes("price") ||
+          f.label.toLowerCase().includes("rate")
+        )
+          return 100;
         return 123;
       }
-      if (f.label.toLowerCase().includes("unit") || f.label.toLowerCase().includes("uom")) return "Nos";
+      if (
+        f.label.toLowerCase().includes("unit") ||
+        f.label.toLowerCase().includes("uom")
+      )
+        return "Nos";
       if (f.label.toLowerCase().includes("hsn")) return "8536";
       return `Sample ${f.label}`;
     });
@@ -2094,12 +2195,29 @@ export function VendorsPage() {
           updated.description = String(val || "");
         }
 
-        const isQtyField = field === "qty" || inventoryFieldsMap.get(field)?.label.toLowerCase().includes("qty") || inventoryFieldsMap.get(field)?.label.toLowerCase().includes("quantity");
-        const isPriceField = field === "rate" || inventoryFieldsMap.get(field)?.label.toLowerCase().includes("price") || inventoryFieldsMap.get(field)?.label.toLowerCase().includes("rate");
-        const isDiscountField = field === "discountPercent" || inventoryFieldsMap.get(field)?.label.toLowerCase().includes("discount");
+        const isQtyField =
+          field === "qty" ||
+          inventoryFieldsMap.get(field)?.label.toLowerCase().includes("qty") ||
+          inventoryFieldsMap
+            .get(field)
+            ?.label.toLowerCase()
+            .includes("quantity");
+        const isPriceField =
+          field === "rate" ||
+          inventoryFieldsMap
+            .get(field)
+            ?.label.toLowerCase()
+            .includes("price") ||
+          inventoryFieldsMap.get(field)?.label.toLowerCase().includes("rate");
+        const isDiscountField =
+          field === "discountPercent" ||
+          inventoryFieldsMap
+            .get(field)
+            ?.label.toLowerCase()
+            .includes("discount");
 
         if (isQtyField) {
-          updated.qty = val === "" ? "" : (Number(val) || 0);
+          updated.qty = val === "" ? "" : Number(val) || 0;
         }
         if (isPriceField) {
           updated.rate = Number(val) || 0;
@@ -2170,11 +2288,17 @@ export function VendorsPage() {
     for (let i = 0; i < poItems.length; i++) {
       const item = poItems[i];
       let resolvedMaterialId = item.materialId || item.inventoryId;
-      if (!resolvedMaterialId && item.description && inventoryFields.length > 0) {
+      if (
+        !resolvedMaterialId &&
+        item.description &&
+        inventoryFields.length > 0
+      ) {
         const primaryFieldName = inventoryFields[0]?.fieldName;
         const descLower = item.description.trim().toLowerCase();
         const matchedRecord = inventoryRecords.find((rec) => {
-          const recName = String(rec.values?.[primaryFieldName] || "").trim().toLowerCase();
+          const recName = String(rec.values?.[primaryFieldName] || "")
+            .trim()
+            .toLowerCase();
           return recName === descLower;
         });
         if (matchedRecord) {
@@ -2184,7 +2308,7 @@ export function VendorsPage() {
       if (!resolvedMaterialId && item.description) {
         const descLower = item.description.trim().toLowerCase();
         const matched = inventoryItems.find(
-          (inv) => inv.material?.name?.trim().toLowerCase() === descLower
+          (inv) => inv.material?.name?.trim().toLowerCase() === descLower,
         );
         if (matched?.materialId) resolvedMaterialId = matched.materialId;
       }
@@ -2192,9 +2316,12 @@ export function VendorsPage() {
         resolvedMaterialId = inventoryItems[0].materialId;
       }
 
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const uuidRegex =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (!resolvedMaterialId || !uuidRegex.test(resolvedMaterialId)) {
-        toast.error(`Item at row ${i + 1} (${item.description || "empty description"}) is not linked to any valid material in the inventory. Please select a valid item from the inventory dropdown.`);
+        toast.error(
+          `Item at row ${i + 1} (${item.description || "empty description"}) is not linked to any valid material in the inventory. Please select a valid item from the inventory dropdown.`,
+        );
         return;
       }
     }
@@ -2249,7 +2376,6 @@ export function VendorsPage() {
     };
 
     try {
-
       // 1. Create Purchase Order in Backend
       await apiService.purchaseOrders.create({
         poNo: poNumber,
@@ -2262,11 +2388,17 @@ export function VendorsPage() {
 
         items: poItems.map((item) => {
           let resolvedMaterialId = item.materialId || item.inventoryId;
-          if (!resolvedMaterialId && item.description && inventoryFields.length > 0) {
+          if (
+            !resolvedMaterialId &&
+            item.description &&
+            inventoryFields.length > 0
+          ) {
             const primaryFieldName = inventoryFields[0]?.fieldName;
             const descLower = item.description.trim().toLowerCase();
             const matchedRecord = inventoryRecords.find((rec) => {
-              const recName = String(rec.values?.[primaryFieldName] || "").trim().toLowerCase();
+              const recName = String(rec.values?.[primaryFieldName] || "")
+                .trim()
+                .toLowerCase();
               return recName === descLower;
             });
             if (matchedRecord) {
@@ -2276,7 +2408,7 @@ export function VendorsPage() {
           if (!resolvedMaterialId && item.description) {
             const descLower = item.description.trim().toLowerCase();
             const matched = inventoryItems.find(
-              (inv) => inv.material?.name?.trim().toLowerCase() === descLower
+              (inv) => inv.material?.name?.trim().toLowerCase() === descLower,
             );
             if (matched?.materialId) resolvedMaterialId = matched.materialId;
           }
@@ -2301,11 +2433,10 @@ export function VendorsPage() {
       setSelectedRevisionId(newRevision.id);
 
       toast.success(`Revision R${newRevision.revisionNo} saved successfully`);
-
     } catch (err: any) {
       toast.error("Failed to save PO revision");
     }
-  }
+  };
 
   // Load selected revision
   const loadRevision = (rev: PORevision) => {
@@ -2334,7 +2465,7 @@ export function VendorsPage() {
     const currentYear = new Date().getFullYear();
     const prefix = `PO-${currentYear}-`;
     const yearRevisions = revisions.filter(
-      (r) => r.poNumber && r.poNumber.startsWith(prefix)
+      (r) => r.poNumber && r.poNumber.startsWith(prefix),
     );
     let nextNum = 1;
     if (yearRevisions.length > 0) {
@@ -2388,7 +2519,9 @@ export function VendorsPage() {
     if (!activePoVendor) return "";
 
     const currentRevision = revisions.find((r) => r.id === selectedRevisionId);
-    const revisionNoStr = currentRevision ? `R${currentRevision.revisionNo}` : "R0";
+    const revisionNoStr = currentRevision
+      ? `R${currentRevision.revisionNo}`
+      : "R0";
 
     const printColumns = orderedPoColumnIds.filter((id) => id !== "delete");
     const headersHtml = printColumns
@@ -2411,8 +2544,9 @@ export function VendorsPage() {
               id === "net" ||
               id === "total" ||
               id === "rate" ||
-              (field?.label.toLowerCase().includes("price") && typeof val === "number");
-            
+              (field?.label.toLowerCase().includes("price") &&
+                typeof val === "number");
+
             const isNumber =
               field?.type === "NUMBER" ||
               id === "qty" ||
@@ -2424,8 +2558,8 @@ export function VendorsPage() {
             const displayVal = isPrice
               ? `₹${Number(val || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
               : val !== undefined && val !== null
-              ? String(val)
-              : "—";
+                ? String(val)
+                : "—";
 
             return `<td style="${isNumber ? "text-align: right;" : ""}">${displayVal}</td>`;
           })
@@ -2550,34 +2684,69 @@ export function VendorsPage() {
     if (!activePoVendor) return null;
 
     const currentRevision = revisions.find((r) => r.id === selectedRevisionId);
-    const revisionNoStr = currentRevision ? `R${currentRevision.revisionNo}` : "R0";
+    const revisionNoStr = currentRevision
+      ? `R${currentRevision.revisionNo}`
+      : "R0";
 
-    const canvas = document.createElement('canvas');
+    const canvas = document.createElement("canvas");
     canvas.width = 1000;
-    const dynamicHeight = 520 + (poItems.length * 32) + 260;
+    const dynamicHeight = 520 + poItems.length * 32 + 260;
     canvas.height = Math.max(800, dynamicHeight);
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return null;
 
-    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#1e3a8a'; ctx.font = 'bold 22px sans-serif'; ctx.fillText(companyDetails.name, 40, 60);
-    ctx.fillStyle = '#4b5563'; ctx.font = '13px sans-serif';
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#1e3a8a";
+    ctx.font = "bold 22px sans-serif";
+    ctx.fillText(companyDetails.name, 40, 60);
+    ctx.fillStyle = "#4b5563";
+    ctx.font = "13px sans-serif";
     ctx.fillText(companyDetails.address, 40, 85);
-    ctx.fillText(`Phone: ${companyDetails.phone} | Email: ${companyDetails.email}`, 40, 105);
-    ctx.fillText(`GSTIN: ${companyDetails.gstin} | ${companyDetails.iso}`, 40, 125);
-    ctx.fillStyle = '#111827'; ctx.font = 'bold 28px sans-serif'; ctx.fillText('PURCHASE ORDER', 620, 60);
-    ctx.font = '14px sans-serif';
+    ctx.fillText(
+      `Phone: ${companyDetails.phone} | Email: ${companyDetails.email}`,
+      40,
+      105,
+    );
+    ctx.fillText(
+      `GSTIN: ${companyDetails.gstin} | ${companyDetails.iso}`,
+      40,
+      125,
+    );
+    ctx.fillStyle = "#111827";
+    ctx.font = "bold 28px sans-serif";
+    ctx.fillText("PURCHASE ORDER", 620, 60);
+    ctx.font = "14px sans-serif";
     ctx.fillText(`PO Number: ${poNumber}`, 620, 85);
     ctx.fillText(`Date: ${poDate}`, 620, 105);
     ctx.fillText(`Revision: ${revisionNoStr}`, 620, 125);
     if (referenceCode) {
       ctx.fillText(`Ref Code: ${referenceCode}`, 620, 142);
     }
-    ctx.strokeStyle = '#111827'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(40, 150); ctx.lineTo(960, 150); ctx.stroke();
-    ctx.fillStyle = '#2563eb'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('ORDER PLACED TO (VENDOR):', 40, 180); ctx.fillText('DELIVERY & SHIPPING TERMS:', 500, 180);
-    ctx.fillStyle = '#111827'; ctx.font = 'bold 14px sans-serif'; ctx.fillText(activePoVendor.name, 40, 205);
-    ctx.font = '13px sans-serif'; ctx.fillText(`Category: ${activePoVendor.category}`, 40, 225); ctx.fillText(`Phone: ${activePoVendor.phone} | Email: ${activePoVendor.email}`, 40, 245); ctx.fillText(`GSTIN: ${activePoVendor.gstNumber}`, 40, 265);
-    ctx.fillText(`Material Status: ${materialStatus}`, 500, 205); ctx.fillText(`Payment Terms: ${paymentTerms}`, 500, 225); ctx.fillText(`Remarks: ${remarks || 'None'}`, 500, 245);
+    ctx.strokeStyle = "#111827";
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(40, 150);
+    ctx.lineTo(960, 150);
+    ctx.stroke();
+    ctx.fillStyle = "#2563eb";
+    ctx.font = "bold 12px sans-serif";
+    ctx.fillText("ORDER PLACED TO (VENDOR):", 40, 180);
+    ctx.fillText("DELIVERY & SHIPPING TERMS:", 500, 180);
+    ctx.fillStyle = "#111827";
+    ctx.font = "bold 14px sans-serif";
+    ctx.fillText(activePoVendor.name, 40, 205);
+    ctx.font = "13px sans-serif";
+    ctx.fillText(`Category: ${activePoVendor.category}`, 40, 225);
+    ctx.fillText(
+      `Phone: ${activePoVendor.phone} | Email: ${activePoVendor.email}`,
+      40,
+      245,
+    );
+    ctx.fillText(`GSTIN: ${activePoVendor.gstNumber}`, 40, 265);
+    ctx.fillText(`Material Status: ${materialStatus}`, 500, 205);
+    ctx.fillText(`Payment Terms: ${paymentTerms}`, 500, 225);
+    ctx.fillText(`Remarks: ${remarks || "None"}`, 500, 245);
 
     const printColumns = orderedPoColumnIds.filter((id) => id !== "delete");
     const colWidths: Record<string, number> = {
@@ -2588,11 +2757,17 @@ export function VendorsPage() {
       net: 90,
       total: 100,
     };
-    
-    const fixedWidthSum = printColumns.reduce((sum, colId) => sum + (colWidths[colId] || 0), 0);
-    const dynamicColsCount = printColumns.filter((colId) => !colWidths[colId]).length;
-    const defaultColWidth = dynamicColsCount > 0 ? (920 - fixedWidthSum) / dynamicColsCount : 100;
-    
+
+    const fixedWidthSum = printColumns.reduce(
+      (sum, colId) => sum + (colWidths[colId] || 0),
+      0,
+    );
+    const dynamicColsCount = printColumns.filter(
+      (colId) => !colWidths[colId],
+    ).length;
+    const defaultColWidth =
+      dynamicColsCount > 0 ? (920 - fixedWidthSum) / dynamicColsCount : 100;
+
     let currentX = 40;
     const colPositions = printColumns.map((colId) => {
       const w = colWidths[colId] || defaultColWidth;
@@ -2601,71 +2776,183 @@ export function VendorsPage() {
       return { id: colId, x, w };
     });
 
-    let y = 300; ctx.fillStyle = '#f3f4f6'; ctx.fillRect(40, y, 920, 32); ctx.strokeStyle = '#cbd5e1'; ctx.lineWidth = 1; ctx.strokeRect(40, y, 920, 32);
-    
-    ctx.fillStyle = '#374151'; ctx.font = 'bold 11px sans-serif';
+    let y = 300;
+    ctx.fillStyle = "#f3f4f6";
+    ctx.fillRect(40, y, 920, 32);
+    ctx.strokeStyle = "#cbd5e1";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(40, y, 920, 32);
+
+    ctx.fillStyle = "#374151";
+    ctx.font = "bold 11px sans-serif";
     colPositions.forEach((col) => {
       const label = getPoColumnLabel(col.id);
-      const isRight = col.id === "rate" || col.id === "total" || col.id === "net" || inventoryFieldsMap.get(col.id)?.label.toLowerCase().includes("price");
+      const isRight =
+        col.id === "rate" ||
+        col.id === "total" ||
+        col.id === "net" ||
+        inventoryFieldsMap.get(col.id)?.label.toLowerCase().includes("price");
       if (isRight) {
-        ctx.textAlign = 'right';
+        ctx.textAlign = "right";
         ctx.fillText(label, col.x + col.w - 10, y + 20);
       } else {
-        ctx.textAlign = 'left';
+        ctx.textAlign = "left";
         ctx.fillText(label, col.x + 10, y + 20);
       }
     });
-    ctx.textAlign = 'left';
+    ctx.textAlign = "left";
 
-    ctx.fillStyle = '#1f2937'; ctx.font = '13px sans-serif';
+    ctx.fillStyle = "#1f2937";
+    ctx.font = "13px sans-serif";
     poItems.forEach((item, idx) => {
       y += 32;
       ctx.strokeRect(40, y, 920, 32);
       colPositions.forEach((col) => {
         const val = item[col.id];
         const field = inventoryFieldsMap.get(col.id);
-        const isPrice = col.id === "net" || col.id === "total" || (field?.label.toLowerCase().includes("price") && typeof val === "number");
-        const displayVal = col.id === "sno"
-          ? String(idx + 1)
-          : isPrice
-            ? `₹${Number(val || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
-            : val !== undefined && val !== null ? String(val) : "—";
-            
-        const isRight = col.id === "rate" || col.id === "total" || col.id === "net" || field?.label.toLowerCase().includes("price");
-        
+        const isPrice =
+          col.id === "net" ||
+          col.id === "total" ||
+          (field?.label.toLowerCase().includes("price") &&
+            typeof val === "number");
+        const displayVal =
+          col.id === "sno"
+            ? String(idx + 1)
+            : isPrice
+              ? `₹${Number(val || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`
+              : val !== undefined && val !== null
+                ? String(val)
+                : "—";
+
+        const isRight =
+          col.id === "rate" ||
+          col.id === "total" ||
+          col.id === "net" ||
+          field?.label.toLowerCase().includes("price");
+
         if (isRight) {
-          ctx.textAlign = 'right';
+          ctx.textAlign = "right";
           if (col.id === "total") {
-            ctx.font = 'bold 13px sans-serif';
-            ctx.fillStyle = '#1e4620';
+            ctx.font = "bold 13px sans-serif";
+            ctx.fillStyle = "#1e4620";
           }
           ctx.fillText(displayVal, col.x + col.w - 10, y + 20);
-          ctx.font = '13px sans-serif';
-          ctx.fillStyle = '#1f2937';
+          ctx.font = "13px sans-serif";
+          ctx.fillStyle = "#1f2937";
         } else {
-          ctx.textAlign = 'left';
+          ctx.textAlign = "left";
           ctx.fillText(displayVal, col.x + 10, y + 20);
         }
       });
-      ctx.textAlign = 'left';
+      ctx.textAlign = "left";
     });
 
-    y += 50; const rightX = 640; ctx.font = '13px sans-serif'; ctx.fillStyle = '#4b5563'; ctx.fillText('Subtotal:', rightX, y); ctx.fillStyle = '#111827'; ctx.fillText(`₹${totals.subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 860, y);
-    y += 24; ctx.fillStyle = '#4b5563'; ctx.fillText(`CGST (${cgstPercent}%):`, rightX, y); ctx.fillStyle = '#111827'; ctx.fillText(`₹${totals.cgstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 860, y);
-    y += 24; ctx.fillStyle = '#4b5563'; ctx.fillText(`SGST (${sgstPercent}%):`, rightX, y); ctx.fillStyle = '#111827'; ctx.fillText(`₹${totals.sgstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 860, y);
-    y += 24; ctx.fillStyle = '#4b5563'; ctx.fillText(`IGST (${igstPercent}%):`, rightX, y); ctx.fillStyle = '#111827'; ctx.fillText(`₹${totals.igstAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 860, y);
-    y += 12; ctx.strokeStyle = '#111827'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(rightX, y); ctx.lineTo(960, y); ctx.stroke();
-    y += 20; ctx.fillStyle = '#111827'; ctx.font = 'bold 14px sans-serif'; ctx.fillText('Grand Total:', rightX, y); ctx.fillStyle = '#1e4620'; ctx.fillText(`₹${totals.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 860, y);
-    y += 24; ctx.font = '13px sans-serif'; ctx.fillStyle = '#4b5563'; ctx.fillText('Advance Paid:', rightX, y); ctx.fillStyle = '#111827'; ctx.fillText(`₹${advance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 860, y);
-    y += 24; ctx.fillStyle = '#111827'; ctx.font = 'bold 13px sans-serif'; ctx.fillText('Balance Due:', rightX, y); ctx.fillStyle = '#1e4620'; ctx.fillText(`₹${totals.balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 860, y);
-    ctx.fillStyle = '#1f2937'; ctx.font = 'bold 12px sans-serif'; ctx.fillText('TERMS & CONDITIONS:', 40, y - 100); ctx.fillStyle = '#4b5563'; ctx.font = '11px sans-serif'; const termLines = terms.split('\n'); let termY = y - 80; termLines.forEach(line => { ctx.fillText(line, 40, termY); termY += 16; });
-    y += 80; ctx.strokeStyle = '#111827'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(680, y); ctx.lineTo(920, y); ctx.stroke();
-    y += 20; ctx.fillStyle = '#111827'; ctx.font = 'bold 13px sans-serif'; ctx.fillText(companyDetails.signatory, 700, y); ctx.font = '11px sans-serif'; ctx.fillStyle = '#4b5563'; ctx.fillText('Authorized Signatory', 700, y + 16);
+    y += 50;
+    const rightX = 640;
+    ctx.font = "13px sans-serif";
+    ctx.fillStyle = "#4b5563";
+    ctx.fillText("Subtotal:", rightX, y);
+    ctx.fillStyle = "#111827";
+    ctx.fillText(
+      `₹${totals.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+      860,
+      y,
+    );
+    y += 24;
+    ctx.fillStyle = "#4b5563";
+    ctx.fillText(`CGST (${cgstPercent}%):`, rightX, y);
+    ctx.fillStyle = "#111827";
+    ctx.fillText(
+      `₹${totals.cgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+      860,
+      y,
+    );
+    y += 24;
+    ctx.fillStyle = "#4b5563";
+    ctx.fillText(`SGST (${sgstPercent}%):`, rightX, y);
+    ctx.fillStyle = "#111827";
+    ctx.fillText(
+      `₹${totals.sgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+      860,
+      y,
+    );
+    y += 24;
+    ctx.fillStyle = "#4b5563";
+    ctx.fillText(`IGST (${igstPercent}%):`, rightX, y);
+    ctx.fillStyle = "#111827";
+    ctx.fillText(
+      `₹${totals.igstAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+      860,
+      y,
+    );
+    y += 12;
+    ctx.strokeStyle = "#111827";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(rightX, y);
+    ctx.lineTo(960, y);
+    ctx.stroke();
+    y += 20;
+    ctx.fillStyle = "#111827";
+    ctx.font = "bold 14px sans-serif";
+    ctx.fillText("Grand Total:", rightX, y);
+    ctx.fillStyle = "#1e4620";
+    ctx.fillText(
+      `₹${totals.grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+      860,
+      y,
+    );
+    y += 24;
+    ctx.font = "13px sans-serif";
+    ctx.fillStyle = "#4b5563";
+    ctx.fillText("Advance Paid:", rightX, y);
+    ctx.fillStyle = "#111827";
+    ctx.fillText(
+      `₹${advance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+      860,
+      y,
+    );
+    y += 24;
+    ctx.fillStyle = "#111827";
+    ctx.font = "bold 13px sans-serif";
+    ctx.fillText("Balance Due:", rightX, y);
+    ctx.fillStyle = "#1e4620";
+    ctx.fillText(
+      `₹${totals.balance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+      860,
+      y,
+    );
+    ctx.fillStyle = "#1f2937";
+    ctx.font = "bold 12px sans-serif";
+    ctx.fillText("TERMS & CONDITIONS:", 40, y - 100);
+    ctx.fillStyle = "#4b5563";
+    ctx.font = "11px sans-serif";
+    const termLines = terms.split("\n");
+    let termY = y - 80;
+    termLines.forEach((line) => {
+      ctx.fillText(line, 40, termY);
+      termY += 16;
+    });
+    y += 80;
+    ctx.strokeStyle = "#111827";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(680, y);
+    ctx.lineTo(920, y);
+    ctx.stroke();
+    y += 20;
+    ctx.fillStyle = "#111827";
+    ctx.font = "bold 13px sans-serif";
+    ctx.fillText(companyDetails.signatory, 700, y);
+    ctx.font = "11px sans-serif";
+    ctx.fillStyle = "#4b5563";
+    ctx.fillText("Authorized Signatory", 700, y + 16);
 
     return canvas;
   };
 
   const triggerExport = (format: string) => {
+    if (!canExport) return;
     if (!activePoVendor) return;
 
     if (format === "pdf") {
@@ -2684,7 +2971,8 @@ export function VendorsPage() {
       iframe.style.left = "-9999px";
       document.body.appendChild(iframe);
 
-      const iframeDoc = iframe.contentWindow?.document || iframe.contentDocument;
+      const iframeDoc =
+        iframe.contentWindow?.document || iframe.contentDocument;
       if (!iframeDoc) {
         toast.error("Unable to create print context.");
         document.body.removeChild(iframe);
@@ -2748,7 +3036,7 @@ export function VendorsPage() {
       "Vendor: " + (activePoVendor?.name || ""),
       "Items: " + itemsLine,
       "Grand Total: Rs. " +
-      totals.grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 }),
+        totals.grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 }),
       "Payment Terms: " + paymentTerms,
       "Material Status: " + materialStatus,
     ];
@@ -2813,14 +3101,16 @@ export function VendorsPage() {
       const emailToast = toast.loading("Sending PO email to vendor...");
       const canvas = generatePoCanvas();
       if (!canvas) {
-        toast.error("Unable to generate PO document for email attachment.", { id: emailToast });
+        toast.error("Unable to generate PO document for email attachment.", {
+          id: emailToast,
+        });
         return;
       }
       const imgData = canvas.toDataURL("image/jpeg", 0.95);
       const pdf = new jsPDF({
         orientation: "portrait",
         unit: "px",
-        format: [canvas.width, canvas.height]
+        format: [canvas.width, canvas.height],
       });
       pdf.addImage(imgData, "JPEG", 0, 0, canvas.width, canvas.height);
       const base64Pdf = pdf.output("datauristring").split(",")[1];
@@ -2842,17 +3132,26 @@ export function VendorsPage() {
           subject,
           html: emailHtml,
           pdfBase64: base64Pdf,
-          poNumber
+          poNumber,
         });
 
         if (res?.success) {
           sentChannels.push("Email");
-          toast.success("PO email sent to vendor successfully!", { id: emailToast });
+          toast.success("PO email sent to vendor successfully!", {
+            id: emailToast,
+          });
         } else {
-          toast.error(res?.message || "Failed to send PO email.", { id: emailToast });
+          toast.error(res?.message || "Failed to send PO email.", {
+            id: emailToast,
+          });
         }
       } catch (err: any) {
-        toast.error(err?.response?.data?.message || err?.message || "Error occurred while sending PO email.", { id: emailToast });
+        toast.error(
+          err?.response?.data?.message ||
+            err?.message ||
+            "Error occurred while sending PO email.",
+          { id: emailToast },
+        );
       }
     }
 
@@ -2863,7 +3162,7 @@ export function VendorsPage() {
     setPoStatus("Placed");
     toast.success(
       "PO marked as Placed - PDF generated and sent via " +
-      sentChannels.join(" & "),
+        sentChannels.join(" & "),
     );
     setIsPoPlacedDialogOpen(false);
   };
@@ -2967,69 +3266,69 @@ export function VendorsPage() {
                     </p>
                   )}
                 </div>
-                 {vendorCustomFields.some((f) => f.afterField === "name") && (
-                    <DynamicFormRenderer
-                      fields={vendorCustomFields}
-                      values={vCustomFields}
-                      onChange={(key, val) => {
-                        setVCustomFields((prev) => ({ ...prev, [key]: val }));
-                        if (vErrors[key])
-                          setVErrors((prev) => ({ ...prev, [key]: "" }));
-                      }}
-                      errors={vErrors}
-                      afterFieldPosition="name"
-                    />
-                 )}
- 
-                 <div className="flex flex-col gap-1.5">
-                   <Label className="text-xs font-semibold">Category</Label>
-                   <Input
-                     value={vCategory}
-                     onChange={(e) => setVCategory(e.target.value)}
-                     placeholder="e.g. Electrical, Mechanical"
-                   />
-                 </div>
-                 {vendorCustomFields.some(
-                   (f) => f.afterField === "category",
-                 ) && (
-                      <DynamicFormRenderer
-                        fields={vendorCustomFields}
-                        values={vCustomFields}
-                        onChange={(key, val) => {
-                          setVCustomFields((prev) => ({ ...prev, [key]: val }));
-                          if (vErrors[key])
-                            setVErrors((prev) => ({ ...prev, [key]: "" }));
-                        }}
-                        errors={vErrors}
-                        afterFieldPosition="category"
-                      />
-                   )}
- 
-                 <div className="flex flex-col gap-1.5">
-                   <Label className="text-xs font-semibold">
-                     Contact Person
-                   </Label>
-                   <Input
-                     value={vContact}
-                     onChange={(e) => setVContact(e.target.value)}
-                     placeholder="e.g. Rajesh Kumar"
-                   />
-                 </div>
-                 {vendorCustomFields.some(
-                   (f) => f.afterField === "contactPerson",
-                 ) && (
-                      <DynamicFormRenderer
-                        fields={vendorCustomFields}
-                        values={vCustomFields}
-                        onChange={(key, val) => {
-                          setVCustomFields((prev) => ({ ...prev, [key]: val }));
-                          if (vErrors[key])
-                            setVErrors((prev) => ({ ...prev, [key]: "" }));
-                        }}
-                        errors={vErrors}
-                        afterFieldPosition="contactPerson"
-                      />
-                   )}
+                {vendorCustomFields.some((f) => f.afterField === "name") && (
+                  <DynamicFormRenderer
+                    fields={vendorCustomFields}
+                    values={vCustomFields}
+                    onChange={(key, val) => {
+                      setVCustomFields((prev) => ({ ...prev, [key]: val }));
+                      if (vErrors[key])
+                        setVErrors((prev) => ({ ...prev, [key]: "" }));
+                    }}
+                    errors={vErrors}
+                    afterFieldPosition="name"
+                  />
+                )}
+
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-xs font-semibold">Category</Label>
+                  <Input
+                    value={vCategory}
+                    onChange={(e) => setVCategory(e.target.value)}
+                    placeholder="e.g. Electrical, Mechanical"
+                  />
+                </div>
+                {vendorCustomFields.some(
+                  (f) => f.afterField === "category",
+                ) && (
+                  <DynamicFormRenderer
+                    fields={vendorCustomFields}
+                    values={vCustomFields}
+                    onChange={(key, val) => {
+                      setVCustomFields((prev) => ({ ...prev, [key]: val }));
+                      if (vErrors[key])
+                        setVErrors((prev) => ({ ...prev, [key]: "" }));
+                    }}
+                    errors={vErrors}
+                    afterFieldPosition="category"
+                  />
+                )}
+
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-xs font-semibold">
+                    Contact Person
+                  </Label>
+                  <Input
+                    value={vContact}
+                    onChange={(e) => setVContact(e.target.value)}
+                    placeholder="e.g. Rajesh Kumar"
+                  />
+                </div>
+                {vendorCustomFields.some(
+                  (f) => f.afterField === "contactPerson",
+                ) && (
+                  <DynamicFormRenderer
+                    fields={vendorCustomFields}
+                    values={vCustomFields}
+                    onChange={(key, val) => {
+                      setVCustomFields((prev) => ({ ...prev, [key]: val }));
+                      if (vErrors[key])
+                        setVErrors((prev) => ({ ...prev, [key]: "" }));
+                    }}
+                    errors={vErrors}
+                    afterFieldPosition="contactPerson"
+                  />
+                )}
 
                 <div className="flex flex-col gap-1.5">
                   <Label className="text-xs font-semibold">Phone</Label>
@@ -3059,57 +3358,57 @@ export function VendorsPage() {
                     </p>
                   )}
                 </div>
-                 {vendorCustomFields.some((f) => f.afterField === "phone") && (
-                    <DynamicFormRenderer
-                      fields={vendorCustomFields}
-                      values={vCustomFields}
-                      onChange={(key, val) => {
-                        setVCustomFields((prev) => ({ ...prev, [key]: val }));
-                        if (vErrors[key])
-                          setVErrors((prev) => ({ ...prev, [key]: "" }));
-                      }}
-                      errors={vErrors}
-                      afterFieldPosition="phone"
-                    />
-                 )}
- 
-                 <div className="flex flex-col gap-1.5">
-                   <Label className="text-xs font-semibold">Email</Label>
-                   <Input
-                     type="text"
-                     value={vEmail}
-                     onChange={(e) => {
-                       setVEmail(e.target.value);
-                       if (vErrors.email)
-                         setVErrors((p) => ({ ...p, email: "" }));
-                     }}
-                     placeholder="vendor@company.com"
-                     className={
-                       vErrors.email
-                         ? "border-destructive focus-visible:ring-destructive"
-                         : ""
-                     }
-                   />
-                   {vErrors.email && (
-                     <p className="text-xs text-destructive flex items-center gap-1">
-                       <AlertCircle className="size-3" />
-                       {vErrors.email}
-                     </p>
-                   )}
-                 </div>
-                 {vendorCustomFields.some((f) => f.afterField === "email") && (
-                    <DynamicFormRenderer
-                      fields={vendorCustomFields}
-                      values={vCustomFields}
-                      onChange={(key, val) => {
-                        setVCustomFields((prev) => ({ ...prev, [key]: val }));
-                        if (vErrors[key])
-                          setVErrors((prev) => ({ ...prev, [key]: "" }));
-                      }}
-                      errors={vErrors}
-                      afterFieldPosition="email"
-                    />
-                 )}
+                {vendorCustomFields.some((f) => f.afterField === "phone") && (
+                  <DynamicFormRenderer
+                    fields={vendorCustomFields}
+                    values={vCustomFields}
+                    onChange={(key, val) => {
+                      setVCustomFields((prev) => ({ ...prev, [key]: val }));
+                      if (vErrors[key])
+                        setVErrors((prev) => ({ ...prev, [key]: "" }));
+                    }}
+                    errors={vErrors}
+                    afterFieldPosition="phone"
+                  />
+                )}
+
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-xs font-semibold">Email</Label>
+                  <Input
+                    type="text"
+                    value={vEmail}
+                    onChange={(e) => {
+                      setVEmail(e.target.value);
+                      if (vErrors.email)
+                        setVErrors((p) => ({ ...p, email: "" }));
+                    }}
+                    placeholder="vendor@company.com"
+                    className={
+                      vErrors.email
+                        ? "border-destructive focus-visible:ring-destructive"
+                        : ""
+                    }
+                  />
+                  {vErrors.email && (
+                    <p className="text-xs text-destructive flex items-center gap-1">
+                      <AlertCircle className="size-3" />
+                      {vErrors.email}
+                    </p>
+                  )}
+                </div>
+                {vendorCustomFields.some((f) => f.afterField === "email") && (
+                  <DynamicFormRenderer
+                    fields={vendorCustomFields}
+                    values={vCustomFields}
+                    onChange={(key, val) => {
+                      setVCustomFields((prev) => ({ ...prev, [key]: val }));
+                      if (vErrors[key])
+                        setVErrors((prev) => ({ ...prev, [key]: "" }));
+                    }}
+                    errors={vErrors}
+                    afterFieldPosition="email"
+                  />
+                )}
 
                 <div className="flex flex-col gap-1.5 sm:col-span-2">
                   <Label className="text-xs font-semibold">GST Number</Label>
@@ -3134,84 +3433,108 @@ export function VendorsPage() {
                     </p>
                   )}
                 </div>
-                 {vendorCustomFields.some(
-                   (f) => f.afterField === "gstNumber",
-                 ) && (
-                      <DynamicFormRenderer
-                        fields={vendorCustomFields}
-                        values={vCustomFields}
-                        onChange={(key, val) => {
-                          setVCustomFields((prev) => ({ ...prev, [key]: val }));
-                          if (vErrors[key])
-                            setVErrors((prev) => ({ ...prev, [key]: "" }));
-                        }}
-                        errors={vErrors}
-                        afterFieldPosition="gstNumber"
-                      />
-                   )}
- 
-                 <div className="flex flex-col gap-1.5 sm:col-span-2">
-                   <Label className="text-xs font-semibold">Address</Label>
-                   <Input
-                     value={vAddress}
-                     onChange={(e) => setVAddress(e.target.value)}
-                     placeholder="Full address"
-                   />
-                 </div>
-                 {vendorCustomFields.some((f) => f.afterField === "address") && (
-                    <DynamicFormRenderer
-                      fields={vendorCustomFields}
-                      values={vCustomFields}
-                      onChange={(key, val) => {
-                        setVCustomFields((prev) => ({ ...prev, [key]: val }));
-                        if (vErrors[key])
-                          setVErrors((prev) => ({ ...prev, [key]: "" }));
-                      }}
-                      errors={vErrors}
-                      afterFieldPosition="address"
-                    />
-                 )}
- 
-                 <div className="flex flex-col gap-1.5 sm:col-span-2">
-                   <Label className="text-xs font-semibold">Notes</Label>
-                   <Textarea
-                     value={vNotes}
-                     onChange={(e) => setVNotes(e.target.value)}
-                     placeholder="Any additional notes..."
-                     rows={2}
-                   />
-                 </div>
-                 {vendorCustomFields.some((f) => f.afterField === "notes") && (
-                    <DynamicFormRenderer
-                      fields={vendorCustomFields}
-                      values={vCustomFields}
-                      onChange={(key, val) => {
-                        setVCustomFields((prev) => ({ ...prev, [key]: val }));
-                        if (vErrors[key])
-                          setVErrors((prev) => ({ ...prev, [key]: "" }));
-                      }}
-                      errors={vErrors}
-                      afterFieldPosition="notes"
-                    />
-                 )}
- 
-                 {/* Dynamic EAV Custom Fields without specific afterField position or assigned to end */}
-                 {vendorCustomFields.some(
-                   (f) => !f.afterField || f.afterField === "end" || !["name", "category", "contactPerson", "phone", "email", "gstNumber", "address", "notes"].includes(f.afterField),
-                 ) && (
-                      <DynamicFormRenderer
-                        fields={vendorCustomFields.filter(
-                          (f) => !f.afterField || f.afterField === "end" || !["name", "category", "contactPerson", "phone", "email", "gstNumber", "address", "notes"].includes(f.afterField),
-                        )}
-                        values={vCustomFields}
-                        onChange={(key, val) => {
-                          setVCustomFields((prev) => ({ ...prev, [key]: val }));
-                          if (vErrors[key])
-                            setVErrors((prev) => ({ ...prev, [key]: "" }));
-                        }}
-                        errors={vErrors}
-                      />
-                   )}
+                {vendorCustomFields.some(
+                  (f) => f.afterField === "gstNumber",
+                ) && (
+                  <DynamicFormRenderer
+                    fields={vendorCustomFields}
+                    values={vCustomFields}
+                    onChange={(key, val) => {
+                      setVCustomFields((prev) => ({ ...prev, [key]: val }));
+                      if (vErrors[key])
+                        setVErrors((prev) => ({ ...prev, [key]: "" }));
+                    }}
+                    errors={vErrors}
+                    afterFieldPosition="gstNumber"
+                  />
+                )}
+
+                <div className="flex flex-col gap-1.5 sm:col-span-2">
+                  <Label className="text-xs font-semibold">Address</Label>
+                  <Input
+                    value={vAddress}
+                    onChange={(e) => setVAddress(e.target.value)}
+                    placeholder="Full address"
+                  />
+                </div>
+                {vendorCustomFields.some((f) => f.afterField === "address") && (
+                  <DynamicFormRenderer
+                    fields={vendorCustomFields}
+                    values={vCustomFields}
+                    onChange={(key, val) => {
+                      setVCustomFields((prev) => ({ ...prev, [key]: val }));
+                      if (vErrors[key])
+                        setVErrors((prev) => ({ ...prev, [key]: "" }));
+                    }}
+                    errors={vErrors}
+                    afterFieldPosition="address"
+                  />
+                )}
+
+                <div className="flex flex-col gap-1.5 sm:col-span-2">
+                  <Label className="text-xs font-semibold">Notes</Label>
+                  <Textarea
+                    value={vNotes}
+                    onChange={(e) => setVNotes(e.target.value)}
+                    placeholder="Any additional notes..."
+                    rows={2}
+                  />
+                </div>
+                {vendorCustomFields.some((f) => f.afterField === "notes") && (
+                  <DynamicFormRenderer
+                    fields={vendorCustomFields}
+                    values={vCustomFields}
+                    onChange={(key, val) => {
+                      setVCustomFields((prev) => ({ ...prev, [key]: val }));
+                      if (vErrors[key])
+                        setVErrors((prev) => ({ ...prev, [key]: "" }));
+                    }}
+                    errors={vErrors}
+                    afterFieldPosition="notes"
+                  />
+                )}
+
+                {/* Dynamic EAV Custom Fields without specific afterField position or assigned to end */}
+                {vendorCustomFields.some(
+                  (f) =>
+                    !f.afterField ||
+                    f.afterField === "end" ||
+                    ![
+                      "name",
+                      "category",
+                      "contactPerson",
+                      "phone",
+                      "email",
+                      "gstNumber",
+                      "address",
+                      "notes",
+                    ].includes(f.afterField),
+                ) && (
+                  <DynamicFormRenderer
+                    fields={vendorCustomFields.filter(
+                      (f) =>
+                        !f.afterField ||
+                        f.afterField === "end" ||
+                        ![
+                          "name",
+                          "category",
+                          "contactPerson",
+                          "phone",
+                          "email",
+                          "gstNumber",
+                          "address",
+                          "notes",
+                        ].includes(f.afterField),
+                    )}
+                    values={vCustomFields}
+                    onChange={(key, val) => {
+                      setVCustomFields((prev) => ({ ...prev, [key]: val }));
+                      if (vErrors[key])
+                        setVErrors((prev) => ({ ...prev, [key]: "" }));
+                    }}
+                    errors={vErrors}
+                  />
+                )}
               </div>
             )}
 
@@ -3231,15 +3554,19 @@ export function VendorsPage() {
                   <div className="flex flex-wrap gap-1.5">
                     {Array.from(selectedMaterialIds).map((matId) => {
                       const dynamicItem = dynamicInventoryWithMaterial.find(
-                        (rec) => rec.materialId === matId
+                        (rec) => rec.materialId === matId,
                       );
                       const staticItem = inventoryItems.find(
-                        (i) => i.materialId === matId
+                        (i) => i.materialId === matId,
                       );
-                      
+
                       const primaryField = inventoryFields[0];
-                      const dynamicName = dynamicItem?.values?.[primaryField?.fieldName];
-                      const name = dynamicName || staticItem?.material?.name || "Unnamed Product";
+                      const dynamicName =
+                        dynamicItem?.values?.[primaryField?.fieldName];
+                      const name =
+                        dynamicName ||
+                        staticItem?.material?.name ||
+                        "Unnamed Product";
 
                       const existing = existingVendorProducts.find(
                         (a) => a.materialId === matId,
@@ -3281,17 +3608,23 @@ export function VendorsPage() {
                     )}
                   {!inventoryLoading &&
                     filteredInventoryForForm.map((item) => {
-                      const isSelected = item.materialId ? selectedMaterialIds.has(item.materialId) : false;
+                      const isSelected = item.materialId
+                        ? selectedMaterialIds.has(item.materialId)
+                        : false;
 
                       const primaryField = inventoryFields[0];
                       const nameVal = item.values?.[primaryField?.fieldName];
-                      const displayName = nameVal || Object.values(item.values || {})[0] || "Unnamed Item";
+                      const displayName =
+                        nameVal ||
+                        Object.values(item.values || {})[0] ||
+                        "Unnamed Item";
 
                       const subtitleParts = inventoryFields
                         .filter((f) => f.fieldName !== primaryField?.fieldName)
                         .map((f) => {
                           const val = item.values?.[f.fieldName];
-                          if (val === undefined || val === null || val === "") return null;
+                          if (val === undefined || val === null || val === "")
+                            return null;
                           return `${f.label}: ${val}`;
                         })
                         .filter(Boolean);
@@ -3331,8 +3664,11 @@ export function VendorsPage() {
                               )}
                             </div>
                             <div className="text-xs text-muted-foreground mt-0.5">
-                              {item.category || "Uncategorized"} • Stock: {item.quantity} • ₹{priceVal.toLocaleString("en-IN")}
-                              {subtitleParts.length > 0 && ` • ${subtitleParts.join(" • ")}`}
+                              {item.category || "Uncategorized"} • Stock:{" "}
+                              {item.quantity} • ₹
+                              {priceVal.toLocaleString("en-IN")}
+                              {subtitleParts.length > 0 &&
+                                ` • ${subtitleParts.join(" • ")}`}
                             </div>
                           </div>
                         </label>
@@ -3392,8 +3728,10 @@ export function VendorsPage() {
                     if (value === "products") return "Products Supplied";
                     if (value && value.startsWith("cf_")) {
                       const key = value.substring(3);
-                      const field = vendorCustomFields.find((f: any) => f.key === key);
-                      return field ? (field.name || field.key) : key;
+                      const field = vendorCustomFields.find(
+                        (f: any) => f.key === key,
+                      );
+                      return field ? field.name || field.key : key;
                     }
                     return value || "";
                   }}
@@ -3428,15 +3766,18 @@ export function VendorsPage() {
                   : searchField.startsWith("cf_")
                     ? `Search by ${(() => {
                         const key = searchField.substring(3);
-                        const field = vendorCustomFields.find((f: any) => f.key === key);
-                        return field ? (field.name || field.key) : key;
+                        const field = vendorCustomFields.find(
+                          (f: any) => f.key === key,
+                        );
+                        return field ? field.name || field.key : key;
                       })()}...`
-                    : `Search by ${searchField === "gstNumber"
-                      ? "GSTIN"
-                      : searchField === "contactPerson"
-                        ? "contact person"
-                        : searchField
-                    }...`
+                    : `Search by ${
+                        searchField === "gstNumber"
+                          ? "GSTIN"
+                          : searchField === "contactPerson"
+                            ? "contact person"
+                            : searchField
+                      }...`
               }
               value={fieldSearch}
               onChange={(e) => setFieldSearch(e.target.value)}
@@ -3463,7 +3804,6 @@ export function VendorsPage() {
               </button>
             )}
           </div>
-
         </div>
 
         {/* Actions Container */}
@@ -3559,8 +3899,8 @@ export function VendorsPage() {
         columns={activeColumns}
         data={filteredVendors}
         onView={(row) => setOverviewVendor(row)}
-        onEdit={openEditVendor}
-        onDelete={(row) => handleDeleteVendor(row.id)}
+        onEdit={canEdit ? openEditVendor : undefined}
+        onDelete={canDelete ? (row) => handleDeleteVendor(row.id) : undefined}
         showColumnVisibility={false}
         storageKey="vendors"
       />
@@ -3702,16 +4042,19 @@ export function VendorsPage() {
               </label>
               {placeSendEmail && (
                 <Input
-                  value={activePoVendor?.email || "No email address saved for this vendor"}
+                  value={
+                    activePoVendor?.email ||
+                    "No email address saved for this vendor"
+                  }
                   readOnly
                   className="ml-6 h-9 text-xs bg-muted"
                 />
               )}
             </div>
             <p className="text-[11px] text-muted-foreground">
-              This will generate the PDF purchase order for you to save or print.
-              When Email is selected, the PDF is sent to the email address saved
-              on the vendor profile.
+              This will generate the PDF purchase order for you to save or
+              print. When Email is selected, the PDF is sent to the email
+              address saved on the vendor profile.
             </p>
             <div className="flex justify-end gap-2 pt-2 border-t">
               <Button
@@ -3925,13 +4268,21 @@ export function VendorsPage() {
                             Date:{" "}
                             {po.orderDate
                               ? new Date(po.orderDate).toLocaleDateString(
-                                "en-IN",
-                              )
+                                  "en-IN",
+                                )
                               : "—"}{" "}
                             • Items: {po.items?.length ?? 0} • Payment:{" "}
-                            {po.paymentTerms || "—"}
-                            • Created By: {po.createdBy?.name || (po.createdById ? users?.find((u: any) => u.id === po.createdById)?.name : null) || po.createdBy || "System"}
-                            {po.createdAt && ` • Created At: ${new Date(po.createdAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}`}
+                            {po.paymentTerms || "—"}• Created By:{" "}
+                            {po.createdBy?.name ||
+                              (po.createdById
+                                ? users?.find(
+                                    (u: any) => u.id === po.createdById,
+                                  )?.name
+                                : null) ||
+                              po.createdBy ||
+                              "System"}
+                            {po.createdAt &&
+                              ` • Created At: ${new Date(po.createdAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}`}
                           </div>
                         </div>
                         <div className="text-right shrink-0 flex flex-col items-end gap-1">
@@ -3939,8 +4290,8 @@ export function VendorsPage() {
                             <div className="text-sm font-bold text-[#137333]">
                               {po.total != null
                                 ? `₹${Number(po.total).toLocaleString("en-IN", {
-                                  minimumFractionDigits: 2,
-                                })}`
+                                    minimumFractionDigits: 2,
+                                  })}`
                                 : "—"}
                             </div>
                             <div className="text-[10px] text-muted-foreground leading-none">
@@ -4057,12 +4408,12 @@ export function VendorsPage() {
                         Created On:{" "}
                         {rev.createdAt
                           ? new Date(rev.createdAt).toLocaleString("en-IN", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
                           : "—"}
                       </span>
                     </div>
@@ -4137,11 +4488,11 @@ export function VendorsPage() {
             style={
               deMaximized
                 ? {
-                  width: "100vw",
-                  height: "100vh",
-                  maxWidth: "100vw",
-                  maxHeight: "100vh",
-                }
+                    width: "100vw",
+                    height: "100vh",
+                    maxWidth: "100vw",
+                    maxHeight: "100vh",
+                  }
                 : undefined
             }
           >
@@ -4655,7 +5006,6 @@ export function VendorsPage() {
                   📋 Duplicate Last
                 </button>
 
-
                 <div className="de-tbtn-sep"></div>
                 <button
                   className="de-tbtn de-tbtn-danger"
@@ -4711,23 +5061,36 @@ export function VendorsPage() {
                                 fontSize: "14px",
                               }}
                             >
-                              No items added yet. Click "Add Item" or search/type in the description to start.
+                              No items added yet. Click "Add Item" or
+                              search/type in the description to start.
                             </td>
                           </tr>
                         )}
                       </tbody>
                       <tfoot>
                         <tr className="de-tfoot-row">
-                          <td colSpan={orderedPoColumnIds.length} className="p-3 text-right">
+                          <td
+                            colSpan={orderedPoColumnIds.length}
+                            className="p-3 text-right"
+                          >
                             <div className="flex items-center justify-end gap-6 text-sm font-bold text-foreground">
                               <span>
                                 Total items:{" "}
-                                <span id="de-total-items" className="text-primary">{poItems.length}</span>
+                                <span
+                                  id="de-total-items"
+                                  className="text-primary"
+                                >
+                                  {poItems.length}
+                                </span>
                               </span>
                               <span>
                                 Grand Total (excl. tax):{" "}
-                                <span id="de-grand-total" className="text-[#137333]">
-                                  ₹{totals.subtotal.toLocaleString("en-IN", {
+                                <span
+                                  id="de-grand-total"
+                                  className="text-[#137333]"
+                                >
+                                  ₹
+                                  {totals.subtotal.toLocaleString("en-IN", {
                                     minimumFractionDigits: 2,
                                   })}
                                 </span>

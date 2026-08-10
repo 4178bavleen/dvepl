@@ -1,3 +1,4 @@
+
 import {
   FastifyInstance,
   FastifyPluginOptions,
@@ -11,7 +12,7 @@ interface Params {
 
 export default async function listRecordRoute(
   fastify: FastifyInstance,
-  options: FastifyPluginOptions
+  options: FastifyPluginOptions,
 ) {
   fastify.get(
     "/record/:moduleKey",
@@ -22,39 +23,49 @@ export default async function listRecordRoute(
     },
     async (
       request: FastifyRequest<{ Params: Params }>,
-      reply: FastifyReply
+      reply: FastifyReply,
     ) => {
-      const { moduleKey } = request.params;
+      try {
+        const { moduleKey } = request.params;
 
-      const module = await fastify.prisma.dynamicModule.upsert({
-        where: {
-          moduleKey,
-        },
-        update: {},
-        create: {
-          moduleKey,
-          moduleName: moduleKey
-            .split("-")
-            .map(
-              word => word.charAt(0).toUpperCase() + word.slice(1)
-            )
-            .join(" "),
-        },
-      });
+        const module = await fastify.prisma.dynamicModule.findUnique({
+          where: {
+            moduleKey,
+          },
+        });
 
-      const records = await fastify.prisma.dynamicRecord.findMany({
-        where: {
-          moduleId: module.id,
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-      });
+        if (!module) {
+          return reply.code(404).send({
+            success: false,
+            message: `Dynamic module '${moduleKey}' not found.`,
+          });
+        }
 
-      return reply.send({
-        success: true,
-        data: records,
-      });
-    }
+        const records = await fastify.prisma.dynamicRecord.findMany({
+          where: {
+            moduleId: module.id,
+          },
+          include: {
+            inventory: true,
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+        });
+
+        return reply.send({
+          success: true,
+          data: records,
+        });
+      } catch (error) {
+        console.error("Failed to list dynamic records:", error);
+
+        return reply.code(500).send({
+          success: false,
+          message: "Failed to fetch records.",
+        });
+      }
+    },
   );
 }
+

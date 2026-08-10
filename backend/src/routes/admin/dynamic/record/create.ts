@@ -136,6 +136,13 @@ export default async function createRecordRoute(
               unitPrice: new Prisma.Decimal(unitPrice),
             },
           });
+
+          // Link the dynamic row to its static inventory counterpart.  The
+          // inventory page uses this relation when submitting stock movements.
+          await fastify.prisma.dynamicRecord.update({
+            where: { id: record.id },
+            data: { inventoryId: record.id },
+          });
         } catch (syncErr) {
           console.error("Failed to sync dynamic record to static tables:", syncErr);
         }

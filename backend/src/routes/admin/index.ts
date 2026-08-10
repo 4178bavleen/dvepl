@@ -99,6 +99,11 @@ async function adminRoutes(
         else if (url.includes("/update")) requiredPermissions = ["employee.update"];
         else if (url.includes("/delete")) requiredPermissions = ["employee.delete"];
         else if (url.includes("/read")) requiredPermissions = ["employee.view"];
+      } else if (url.includes("/task/")) {
+        if (url.includes("/create")) requiredPermissions = ["employee.create"];
+        else if (url.includes("/update")) requiredPermissions = ["employee.update"];
+        else if (url.includes("/delete")) requiredPermissions = ["employee.delete"];
+        else if (url.includes("/read")) requiredPermissions = ["employee.view"];
       } else if (url.includes("/settings/")) {
         // Settings are administrative, allow company.update, company.create, or role.update
         requiredPermissions = ["company.update", "company.create", "role.update"];

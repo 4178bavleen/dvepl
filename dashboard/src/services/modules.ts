@@ -52,10 +52,21 @@ export const tenderApi = {
   vendorProducts: {
     list: (vendorId?: string) =>
       unwrap(apiClient.get<ApiResponse<any[]>>('/vendor-product/read', { params: vendorId ? { vendorId } : {} })),
+      listByMaterial: (materialId: string) =>
+    unwrap(
+      apiClient.get<ApiResponse<any[]>>(
+        "/vendor-product/read",
+        {
+          params: { materialId },
+        },
+      ),
+    ),
     attach: (vendorId: string, materialIds: string[]) =>
       unwrap(apiClient.post<ApiResponse<any[]>>('/vendor-product/create', { vendorId, materialIds })),
     detach: (id: string) =>
       apiClient.delete(`/vendor-product/delete/${id}`).then(res => res.data),
+  
+
   },
   technicalClarifications: {
     ...crud(API_ENDPOINTS.tender.technicalClarifications),

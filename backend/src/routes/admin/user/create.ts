@@ -263,7 +263,11 @@ async function createUserRoute(
           designation: designation || "Team Member",
           pageAccess: ["dashboard", "vendors", "orders"],
           fieldPermissions: {},
-          actionPermissions: { create: true, edit: true, delete: false, export: true }
+          actionPermissions: {
+            dashboard: { create: false, edit: false, delete: false, export: false },
+            vendors: { create: true, edit: true, delete: false, export: true },
+            orders: { create: true, edit: true, delete: false, export: true },
+          }
         }});
 
         // ======================================================

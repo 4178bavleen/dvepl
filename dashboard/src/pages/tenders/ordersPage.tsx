@@ -24,6 +24,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { GenericTable, sortableHeader } from "@/components/tables/genericTable";
+import { canPerformPageAction } from "@/utils/pagePermissions";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -135,7 +136,9 @@ export function OrdersPage() {
   const storeUsers = useERPStore((state) => (state as any).users);
   const currentUserId = useERPStore((state) => (state as any).currentUserId);
   const currentUser = storeUsers?.find((u: any) => u.id === currentUserId) as any;
-  const canCreate = currentUser?.actionPermissions?.create !== false;
+  const canCreate = canPerformPageAction(currentUser?.actionPermissions, "orders", "create");
+  const canEdit = canPerformPageAction(currentUser?.actionPermissions, "orders", "edit");
+  const canDelete = canPerformPageAction(currentUser?.actionPermissions, "orders", "delete");
 
   const localOrders = useERPStore(
     (state) => ((state as any).salesOrders as SalesOrder[]) ?? EMPTY_ARRAY,
@@ -592,6 +595,7 @@ export function OrdersPage() {
 
   // Form submit
   const openCreate = () => {
+    if (!canCreate) return;
     setEditingOrder(null);
     setFormValues({
       companyId: "",
@@ -620,6 +624,7 @@ export function OrdersPage() {
   };
 
   const openEdit = (order: SalesOrder) => {
+    if (!canEdit) return;
     const o = order as any;
     setEditingOrder(order);
     setOrderCustomValues(o.customFields || {});
@@ -770,6 +775,7 @@ export function OrdersPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const handleDelete = (order: SalesOrder) => {
+    if (!canDelete) return;
     setOrderToDelete(order);
     setDeleteConfirmOpen(true);
   };
@@ -1204,8 +1210,8 @@ export function OrdersPage() {
         columns={tableColumns}
         data={processedOrders}
         onView={setViewingOrder}
-        onEdit={openEdit}
-        onDelete={handleDelete}
+        onEdit={canEdit ? openEdit : undefined}
+        onDelete={canDelete ? handleDelete : undefined}
         isLoading={isLoading}
         showColumnVisibility={false}
         storageKey="orders"
