@@ -227,11 +227,11 @@ export const departmentsConfig = {
       name: "branchId",
       label: "Branch Location",
       type: "select",
-      options: [
-        { label: "Mumbai HQ", value: "branch-1" },
-        { label: "Pune Plant", value: "branch-2" },
-        { label: "Delhi Office", value: "branch-3" },
-      ],
+      // options: [
+      //   { label: "Mumbai HQ", value: "branch-1" },
+      //   { label: "Pune Plant", value: "branch-2" },
+      //   { label: "Delhi Office", value: "branch-3" },
+      // ],
       required: true,
     },
     {
@@ -297,12 +297,12 @@ export const teamsConfig = {
       name: "departmentId",
       label: "Department",
       type: "select",
-      options: [
-        { label: "Sales & Marketing", value: "dept-1" },
-        { label: "Human Resources", value: "dept-2" },
-        { label: "Finance & Accounts", value: "dept-3" },
-        { label: "Production Control", value: "dept-4" },
-      ],
+      // options: [
+      //   { label: "Sales & Marketing", value: "dept-1" },
+      //   { label: "Human Resources", value: "dept-2" },
+      //   { label: "Finance & Accounts", value: "dept-3" },
+      //   { label: "Production Control", value: "dept-4" },
+      // ],
       required: true,
     },
     {
@@ -433,11 +433,11 @@ export const costCentersConfig = {
       name: "departmentId",
       label: "Department Link",
       type: "select",
-      options: [
-        { label: "Sales & Marketing", value: "dept-1" },
-        { label: "Human Resources", value: "dept-2" },
-        { label: "Finance & Accounts", value: "dept-3" },
-      ],
+      // options: [
+      //   { label: "Sales & Marketing", value: "dept-1" },
+      //   { label: "Human Resources", value: "dept-2" },
+      //   { label: "Finance & Accounts", value: "dept-3" },
+      // ],
     },
   ] as any[],
   statsCards: (data: CostCenter[]) => [

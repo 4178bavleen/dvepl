@@ -68,12 +68,12 @@ export const sidebarItems: SidebarItem[] = [
     path: ROUTES.ORGANIZATION_TEAMS,
     section: "Organization",
   },
-  {
-    name: "Designations",
-    icon: Award,
-    path: ROUTES.ORGANIZATION_DESIGNATIONS,
-    section: "Organization",
-  },
+  // {
+  //   name: "Designations",
+  //   icon: Award,
+  //   path: ROUTES.ORGANIZATION_DESIGNATIONS,
+  //   section: "Organization",
+  // },
   {
     name: "Cost Centers",
     icon: Wallet,

@@ -123,6 +123,7 @@ const IGNORED_KEYS = new Set([
   "userPermissions",
   "createdAt",
   "updatedAt",
+  "contacts",
 ]);
 
 // Maps a foreign-key field name (as it appears on any Prisma model in
@@ -904,104 +905,109 @@ export function GenericCrudPage<TRecord extends { id: string }>({
         </DialogContent>
       </Dialog>
 
-      <Sheet
+      <Dialog
         open={Boolean(viewingRecord)}
         onOpenChange={(open) => !open && setViewingRecord(null)}
       >
-        <SheetContent side="right" className="max-w-lg p-6 overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>{moduleName} details</SheetTitle>
-          </SheetHeader>
+        <DialogContent className="w-[95vw] max-w-3xl max-h-[85vh] overflow-y-auto p-0">
+          <DialogHeader className="px-6 pt-6">
+            <DialogTitle>{moduleName} Overview</DialogTitle>
+            <DialogDescription>
+              View complete {moduleName.toLowerCase()} details.
+            </DialogDescription>
+          </DialogHeader>
 
-          {viewingRecord && viewingGroups && (
-            <div className="space-y-6 py-4">
-              {"status" in (viewingRecord as any) && (
-                <div>
-                  {getStatusBadge(String((viewingRecord as any).status))}
-                </div>
-              )}
+          <div className="px-6 pb-6">
+            {viewingRecord && viewingGroups && (
+              <div className="space-y-6 py-4">
+                {"status" in (viewingRecord as any) && (
+                  <div>
+                    {getStatusBadge(String((viewingRecord as any).status))}
+                  </div>
+                )}
 
-              {viewingGroups.core.length > 0 && (
-                <section className="space-y-2">
-                  <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground/80">
-                    <Info className="size-3.5" /> Details
-                  </h3>
-                  <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                    {viewingGroups.core.map(({ key, value }) => (
-                      <React.Fragment key={key}>
-                        <dt className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mt-1">
-                          {formatFieldLabel(key)}
-                        </dt>
-                        <dd className="break-words text-foreground font-medium">
-                          {renderDisplayValue(
-                            key,
-                            value,
-                            viewingRecord as Record<string, any>,
-                            optionValues,
-                            fields,
-                          )}
-                        </dd>
-                      </React.Fragment>
-                    ))}
-                  </dl>
-                </section>
-              )}
+                {viewingGroups.core.length > 0 && (
+                  <section className="space-y-2">
+                    <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground/80">
+                      <Info className="size-3.5" /> Details
+                    </h3>
+                    <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                      {viewingGroups.core.map(({ key, value }) => (
+                        <React.Fragment key={key}>
+                          <dt className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mt-1">
+                            {formatFieldLabel(key)}
+                          </dt>
+                          <dd className="break-words text-foreground font-medium">
+                            {renderDisplayValue(
+                              key,
+                              value,
+                              viewingRecord as Record<string, any>,
+                              optionValues,
+                              fields,
+                            )}
+                          </dd>
+                        </React.Fragment>
+                      ))}
+                    </dl>
+                  </section>
+                )}
 
-              {viewingGroups.dates.length > 0 && (
-                <section className="space-y-2">
-                  <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground/80">
-                    <Calendar className="size-3.5" /> Dates
-                  </h3>
-                  <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                    {viewingGroups.dates.map(({ key, value }) => (
-                      <React.Fragment key={key}>
-                        <dt className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mt-1">
-                          {formatFieldLabel(key)}
-                        </dt>
-                        <dd className="break-words text-foreground font-medium">
-                          {renderDisplayValue(
-                            key,
-                            value,
-                            viewingRecord as Record<string, any>,
-                            optionValues,
-                            fields,
-                          )}
-                        </dd>
-                      </React.Fragment>
-                    ))}
-                  </dl>
-                </section>
-              )}
+                {viewingGroups.dates.length > 0 && (
+                  <section className="space-y-2">
+                    <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground/80">
+                      <Calendar className="size-3.5" /> Dates
+                    </h3>
+                    <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                      {viewingGroups.dates.map(({ key, value }) => (
+                        <React.Fragment key={key}>
+                          <dt className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mt-1">
+                            {formatFieldLabel(key)}
+                          </dt>
+                          <dd className="break-words text-foreground font-medium">
+                            {renderDisplayValue(
+                              key,
+                              value,
+                              viewingRecord as Record<string, any>,
+                              optionValues,
+                              fields,
+                            )}
+                          </dd>
+                        </React.Fragment>
+                      ))}
+                    </dl>
+                  </section>
+                )}
 
-              {viewingGroups.relations.length > 0 && (
-                <section className="space-y-2">
-                  <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground/80">
-                    <Layers className="size-3.5" /> Related records
-                  </h3>
-                  <dl className="grid grid-cols-1 gap-y-3 text-sm">
-                    {viewingGroups.relations.map(({ key, value }) => (
-                      <React.Fragment key={key}>
-                        <dt className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mt-1">
-                          {formatFieldLabel(key)}
-                        </dt>
-                        <dd className="break-words text-foreground font-medium">
-                          {renderDisplayValue(
-                            key,
-                            value,
-                            viewingRecord as Record<string, any>,
-                            optionValues,
-                            fields,
-                          )}
-                        </dd>
-                      </React.Fragment>
-                    ))}
-                  </dl>
-                </section>
-              )}
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
+                {viewingGroups.relations.length > 0 && (
+                  <section className="space-y-2">
+                    <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground/80">
+                      <Layers className="size-3.5" /> Related records
+                    </h3>
+                    <dl className="grid grid-cols-1 gap-y-3 text-sm">
+                      {viewingGroups.relations.map(({ key, value }) => (
+                        <React.Fragment key={key}>
+                          <dt className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mt-1">
+                            {formatFieldLabel(key)}
+                          </dt>
+                          <dd className="break-words text-foreground font-medium">
+                            {renderDisplayValue(
+                              key,
+                              value,
+                              viewingRecord as Record<string, any>,
+                              optionValues,
+                              fields,
+                            )}
+                          </dd>
+                        </React.Fragment>
+                      ))}
+                    </dl>
+                  </section>
+                )}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={deleteConfirmOpen}
