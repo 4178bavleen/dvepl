@@ -6,14 +6,12 @@ declare module "@fastify/jwt" {
             userId: string;
             companyId: string;
             roles: string[];
-            permissions: string[];
             tokenVersion?: number;
         };
         user: {
             id: string;
             companyId: string;
             roles: string[];
-            permissions: string[];
         };
     }
 }

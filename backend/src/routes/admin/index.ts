@@ -6,7 +6,6 @@ import adminUserRouteGroup from "./user/index";
 import adminDesignationRouteGroup from "./designation/index";
 import adminSettingsRouteGroup from "./settings/index";
 import adminCostCenterRouteGroup from "./costCenter/index";
-import accessRoutes from "./access";
 
 import adminEmployeeRouteGroup from "./employee";
 import adminEmployeeContactRouteGroup from "./employeeContact";
@@ -215,9 +214,6 @@ async function adminRoutes(
     instance.register(adminSubDivisionRouteGroup, { prefix: "/sub-division" });
     instance.register(adminTechnicalClarificationRouteGroup, {
       prefix: "/technical-clarification",
-    });
-    instance.register(accessRoutes, {
-      prefix: "/user/access",
     });
     instance.register(adminOrderRouteGroup, {
       prefix: "/order",

@@ -57,20 +57,7 @@ async function adminLoginRoutes(
             company: true,
             userRoles: {
               include: {
-                role: {
-                  include: {
-                    rolePermissions: {
-                      include: {
-                        permission: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-            userPermissions: {
-              include: {
-                permission: true,
+                role: true,
               },
             },
             accessProfile: true,
@@ -97,30 +84,11 @@ async function adminLoginRoutes(
         }
         const roles = existingUser.userRoles.map((ur) => ur.role.name);
 
-        const rolePermissionsSet = new Set(
-          existingUser.userRoles.flatMap((ur) =>
-            ur.role.rolePermissions.map((rp) => rp.permission.code)
-          )
-        );
-
-        if (existingUser.userPermissions) {
-          for (const up of existingUser.userPermissions) {
-            if (up.allowed) {
-              rolePermissionsSet.add(up.permission.code);
-            } else {
-              rolePermissionsSet.delete(up.permission.code);
-            }
-          }
-        }
-
-        const permissions = Array.from(rolePermissionsSet);
-
         const token = jwt.sign(
           {
             userId: existingUser.id,
             companyId: existingUser.companyId,
             roles,
-            permissions,
             tokenVersion: (existingUser as any).tokenVersion,
           },
           jwtSecret,
@@ -149,7 +117,6 @@ async function adminLoginRoutes(
             email: existingUser.email,
             company: existingUser.company?.name ?? null,
             roles,
-            permissions,
             designation: up?.designation || "Team Member",
             pageAccess: up?.pageAccess || [],
             fieldPermissions: up?.fieldPermissions || {},

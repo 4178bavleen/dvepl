@@ -6,13 +6,11 @@ interface FastifyRequest {
     id: string;
     companyId: string;
     roles: string[];
-    permissions: string[];
   };
   admin?: {
     id: string;
     companyId: string;
     roles: string[];
-    permissions: string[];
   };
 }
 interface FastifyInstance {

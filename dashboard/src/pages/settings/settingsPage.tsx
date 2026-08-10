@@ -141,9 +141,6 @@ export function SettingsPage() {
 
   const [isPermModalOpen, setIsPermModalOpen] = useState(false);
   const [permUser, setPermUser] = useState<UserItem | null>(null);
-  const [activePermModalTab, setActivePermModalTab] = useState<"ui-profile" | "db-permissions">("ui-profile");
-  const [permissionGroups, setPermissionGroups] = useState<any[]>([]);
-  const [loadingPermGroups, setLoadingPermGroups] = useState(false);
 
   // Quick Preset state
   const [pageAccessState, setPageAccessState] = useState<
@@ -776,7 +773,6 @@ export function SettingsPage() {
   // Handle Permissions Modal
   const handleOpenPermModal = async (user: UserItem) => {
     setPermUser(user);
-    setActivePermModalTab("ui-profile");
 
     // Initial page checkboxes
     const pageObj: Record<string, boolean> = {};
@@ -805,18 +801,6 @@ export function SettingsPage() {
     setSelectedActionModule("dashboard");
 
     setIsPermModalOpen(true);
-    setLoadingPermGroups(true);
-    try {
-      const res = await securityApi.access.read(user.id);
-      if (res.success && res.data) {
-        setPermissionGroups(res.data.permissionGroups || []);
-      }
-    } catch (err) {
-      console.error("Failed to load granular permissions:", err);
-      toast.error("Failed to load granular database permissions.");
-    } finally {
-      setLoadingPermGroups(false);
-    }
   };
 
   const applyPreset = (preset: "full" | "viewer" | "none") => {
@@ -881,16 +865,6 @@ export function SettingsPage() {
           actionPermissions: actionPermsState,
         });
       }
-
-      const enabledPermissionIds = permissionGroups.flatMap((group) =>
-        (group.permissions || [])
-          .filter((p: any) => p.enabled)
-          .map((p: any) => p.id)
-      );
-
-      await securityApi.access.update(permUser.id, {
-        permissionIds: enabledPermissionIds,
-      });
 
       setUsers((prev) =>
         prev.map((u) => (u.id === permUser.id ? updatedUser : u)),
@@ -3846,24 +3820,6 @@ export function SettingsPage() {
               </button>
             </div>
             <div className="modal-body space-y-6">
-              {/* Tab Navigation */}
-              <div className="flex border-b border-border gap-4 pb-2">
-                <button
-                  onClick={() => setActivePermModalTab("ui-profile")}
-                  className={`pb-1 text-xs font-bold transition border-b-2 ${activePermModalTab === "ui-profile" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}
-                >
-                  🌐 UI Navigation & Fields
-                </button>
-                <button
-                  onClick={() => setActivePermModalTab("db-permissions")}
-                  className={`pb-1 text-xs font-bold transition border-b-2 ${activePermModalTab === "db-permissions" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}
-                >
-                  🔐 Granular DB Permissions
-                </button>
-              </div>
-
-              {activePermModalTab === "ui-profile" ? (
-                <>
                   {/* Presets */}
                   <div className="space-y-2">
                     <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
@@ -4062,87 +4018,6 @@ export function SettingsPage() {
                       </div>
                     </div>
                   </div>
-                </>
-              ) : (
-                <div className="space-y-4 max-h-[600px] overflow-y-auto pr-1">
-                  {loadingPermGroups ? (
-                    <div className="p-8 text-center text-xs text-muted-foreground animate-pulse">
-                      ⏳ Loading database access matrix...
-                    </div>
-                  ) : permissionGroups.length === 0 ? (
-                    <div className="p-8 text-center text-xs text-muted-foreground">
-                      No system permissions registered in backend.
-                    </div>
-                  ) : (
-                    permissionGroups.map((group) => (
-                      <div key={group.groupId} className="border border-border rounded-lg bg-card overflow-hidden">
-                        <div className="bg-muted/15 px-4 py-2 border-b border-border text-xs font-bold text-foreground">
-                          📂 {group.groupName}
-                        </div>
-                        <div className="divide-y divide-border">
-                          {group.permissions.map((p: any) => (
-                            <div key={p.id} className="p-3 flex items-center justify-between hover:bg-muted/5 transition">
-                              <div className="space-y-0.5 max-w-[80%] text-left">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs font-bold font-mono text-foreground bg-muted px-1.5 py-0.5 rounded">
-                                    {p.code}
-                                  </span>
-                                  {p.source === "role" && p.enabled && (
-                                    <span className="text-[9px] font-bold bg-green-50 text-green-600 border border-green-200/50 px-1 rounded">
-                                      Role Default
-                                    </span>
-                                  )}
-                                  {p.source === "override" && (
-                                    <span className={`text-[9px] font-bold px-1 rounded border ${p.enabled ? "bg-blue-50 text-blue-600 border-blue-200/50" : "bg-red-50 text-red-600 border-red-200/50"}`}>
-                                      {p.enabled ? "Allowed Override" : "Denied Override"}
-                                    </span>
-                                  )}
-                                </div>
-                                {p.description && (
-                                  <div className="text-[10px] text-muted-foreground">
-                                    {p.description}
-                                  </div>
-                                )}
-                              </div>
-                              <label className="toggle-wrap">
-                                <input
-                                  type="checkbox"
-                                  checked={p.enabled}
-                                  onChange={(e) => {
-                                    const updatedGroups = permissionGroups.map((g) => {
-                                      if (g.groupId !== group.groupId) return g;
-                                      return {
-                                        ...g,
-                                        permissions: g.permissions.map((perm: any) => {
-                                          if (perm.id !== p.id) return perm;
-                                          
-                                          const newEnabled = e.target.checked;
-                                          let newSource = p.source;
-                                          if (p.source === "role" || p.source === "override") {
-                                            newSource = "override";
-                                          }
-                                          
-                                          return {
-                                            ...perm,
-                                            enabled: newEnabled,
-                                            source: newSource,
-                                          };
-                                        }),
-                                      };
-                                    });
-                                    setPermissionGroups(updatedGroups);
-                                  }}
-                                />
-                                <span className="toggle-slider"></span>
-                              </label>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
             </div>
             <div className="modal-footer">
               <button

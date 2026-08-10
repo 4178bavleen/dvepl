@@ -55,8 +55,31 @@ const getModuleForRequest = (url: string): string | null => {
     ["/technical-clarification/", "technical_clarifications"], ["/government-department/", "government_departments"],
     ["/section/", "sections"], ["/division/", "divisions"], ["/sub-division/", "sub_divisions"],
     ["/reference-code/", "reference_codes"], ["/user/", "users"], ["/role/", "roles"],
+    ["/settings/", "settings"],
   ];
   return routeModules.find(([path]) => url.includes(path))?.[1] ?? null;
+};
+
+// API routes that do not have a module-specific URL still declare a legacy
+// permission code.  Use its resource name only to locate the corresponding
+// page-access setting; the permission code itself is never authorized.
+const getModuleForPermission = (permissions: string[]): string | null => {
+  const prefixToModule: Record<string, string> = {
+    company: "companies",
+    branch: "branches",
+    employee: "employees",
+    customer: "customers",
+    tenderRequest: "tender_requests",
+    tender: "tenders",
+    user: "users",
+    role: "roles",
+  };
+
+  for (const permission of permissions) {
+    const prefix = permission.split(".")[0];
+    if (prefixToModule[prefix]) return prefixToModule[prefix];
+  }
+  return null;
 };
 
 const getRequiredAction = (url: string, permissions: string[]): ActionName | null => {
@@ -102,20 +125,7 @@ async function authPlugin(fastify: FastifyInstance) {
           include: {
             userRoles: {
               include: {
-                role: {
-                  include: {
-                    rolePermissions: {
-                      include: {
-                        permission: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-            userPermissions: {
-              include: {
-                permission: true,
+                role: true,
               },
             },
             accessProfile: true,
@@ -133,143 +143,12 @@ async function authPlugin(fastify: FastifyInstance) {
           delete (request.query as any).companyId;
         }
 
-        // Compute dynamic permissions from roles & custom overrides in database
-        const rolePermissionsSet = new Set<string>();
-        for (const userRole of dbUser.userRoles) {
-          for (const rp of userRole.role.rolePermissions) {
-            rolePermissionsSet.add(rp.permission.code);
-          }
-        }
-
-        if (dbUser.userPermissions) {
-          for (const up of dbUser.userPermissions) {
-            if (up.allowed) {
-              rolePermissionsSet.add(up.permission.code);
-            } else {
-              rolePermissionsSet.delete(up.permission.code);
-            }
-          }
-        }
-        const dbPermissions = Array.from(rolePermissionsSet);
-
-        // Compute custom permissions from UserAccessProfile
-        let customPermissions: string[] = [];
-        let forceNoCreate = false;
-        let forceNoEdit = false;
-        let forceNoDelete = false;
-
         const up = dbUser.accessProfile;
-        if (up) {
-          const actionPermissions = up.actionPermissions;
-          const usesLegacyActions = isLegacyActionPermissions(actionPermissions);
-          const legacyActions = getModuleActions(actionPermissions, "");
-          if (usesLegacyActions && legacyActions.create === false) forceNoCreate = true;
-          if (usesLegacyActions && legacyActions.edit === false) forceNoEdit = true;
-          if (usesLegacyActions && legacyActions.delete === false) forceNoDelete = true;
-
-          if (up.pageAccess) {
-            const pageAccess = up.pageAccess as string[];
-            
-            // Map module keys to backend permission prefixes
-            const moduleToPrefixMap: Record<string, string[]> = {
-              dashboard: ["dashboard"],
-              companies: ["company"],
-              branches: ["branch"],
-              departments: ["employee"],
-              teams: ["employee"],
-              designations: ["employee"],
-              cost_centers: ["employee"],
-              employees: ["employee"],
-              attendance: ["employee"],
-              leaves: ["employee"],
-              holidays: ["employee"],
-              shift_management: ["employee"],
-              payroll: ["employee"],
-              documents: ["employee"],
-              tasks: ["employee"],
-              customers: ["customer"],
-              contacts: ["customer"],
-              communication: ["customer"],
-              orders: ["company", "tender"],
-              delivery: ["company", "tender"],
-              vendors: ["company", "tender"],
-              inventory: ["company", "tender"],
-              finance: ["company", "tender"],
-              tender_requests: ["tenderRequest"],
-              tenders: ["tender"],
-              technical_clarifications: ["tender"],
-              government_departments: ["tender"],
-              sections: ["tender"],
-              divisions: ["tender"],
-              sub_divisions: ["tender"],
-              reference_codes: ["tender"],
-              users: ["user"],
-              roles: ["role"],
-              approval_requests: ["role"],
-              reports: ["company", "tender", "employee"],
-              audit_logs: ["role"],
-              custom_fields: ["company"],
-              export_orders: ["tender"]
-            };
-
-            const computedPermissions = new Set<string>();
-            for (const page of pageAccess) {
-              const prefixes = moduleToPrefixMap[page] || [];
-              const pageActions = getModuleActions(actionPermissions, page);
-              for (const prefix of prefixes) {
-                // View permission
-                computedPermissions.add(`${prefix}.view`);
-                
-                // Action permissions
-                if (pageActions.create) {
-                  computedPermissions.add(`${prefix}.create`);
-                }
-                if (pageActions.edit) {
-                  computedPermissions.add(`${prefix}.update`);
-                }
-                if (pageActions.delete) {
-                  computedPermissions.add(`${prefix}.delete`);
-                }
-              }
-            }
-            customPermissions = Array.from(computedPermissions);
-          }
-        }
-
-        let mergedPermissions = Array.from(new Set([
-          ...dbPermissions,
-          ...customPermissions
-        ]));
-
-        if (forceNoCreate) {
-          mergedPermissions = mergedPermissions.filter(
-            (p) => !p.endsWith(".create") && !p.includes(".create.")
-          );
-        }
-        if (forceNoEdit) {
-          mergedPermissions = mergedPermissions.filter(
-            (p) =>
-              !p.endsWith(".update") &&
-              !p.endsWith(".edit") &&
-              !p.includes(".update.") &&
-              !p.includes(".edit.")
-          );
-        }
-        if (forceNoDelete) {
-          mergedPermissions = mergedPermissions.filter(
-            (p) =>
-              !p.endsWith(".delete") &&
-              !p.endsWith(".remove") &&
-              !p.includes(".delete.") &&
-              !p.includes(".remove.")
-          );
-        }
 
         const tokenUser = {
           id: decoded.userId,
           companyId: activeCompanyId,
           roles: dbUser.userRoles.map((ur) => ur.role.name) || [],
-          permissions: mergedPermissions,
           uiAccessProfile: up
             ? {
                 pageAccess: up.pageAccess as string[],
@@ -303,49 +182,39 @@ async function authPlugin(fastify: FastifyInstance) {
           return;
         }
 
-        const userPermissions = (request.admin as any)?.permissions || [];
         const uiAccessProfile = (request.admin as any)?.uiAccessProfile;
+        const moduleKey = getModuleForRequest(request.url) ?? getModuleForPermission(allowedPermissions);
 
-        // New page-scoped action profiles are an additional boundary on top of
-        // role/granular database permissions. Legacy profiles keep their prior
-        // global behavior until an administrator saves the new permission form.
-        if (uiAccessProfile && !isLegacyActionPermissions(uiAccessProfile.actionPermissions)) {
-          const moduleKey = getModuleForRequest(request.url);
-          if (moduleKey) {
-            const pageAccess = Array.isArray(uiAccessProfile.pageAccess)
-              ? uiAccessProfile.pageAccess
-              : [];
-            const requiredAction = getRequiredAction(request.url, allowedPermissions);
-            const hasPageAccess = pageAccess.includes(moduleKey);
-            const hasActionAccess = !requiredAction || getModuleActions(
-              uiAccessProfile.actionPermissions,
-              moduleKey,
-            )[requiredAction];
-
-            if (!hasPageAccess || !hasActionAccess) {
-              return reply.status(403).send({
-                success: false,
-                message: "Access denied: insufficient page permissions.",
-              });
-            }
-          }
-        }
-
-        const hasPermission = userPermissions.some((permission: string) =>
-          allowedPermissions.includes(permission)
-        );
-
-        if (!hasPermission) {
+        // Page/action access profiles are the single source of authorization.
+        // Role permissions and per-user database overrides are deliberately not
+        // consulted here.
+        if (!uiAccessProfile || !moduleKey) {
           AdminLogger.warn("Unauthorized Permission", {
             endpoint: request.url,
             method: request.method,
             userId: request.admin?.id,
-            permissions: userPermissions,
           });
 
           return reply.status(403).send({
             success: false,
-            message: "Access denied: Insufficient permissions.",
+            message: "Access denied: page access profile is missing.",
+          });
+        }
+
+        const pageAccess = Array.isArray(uiAccessProfile.pageAccess)
+          ? uiAccessProfile.pageAccess
+          : [];
+        const requiredAction = getRequiredAction(request.url, allowedPermissions);
+        const hasPageAccess = pageAccess.includes(moduleKey);
+        const hasActionAccess = !requiredAction || getModuleActions(
+          uiAccessProfile.actionPermissions,
+          moduleKey,
+        )[requiredAction];
+
+        if (!hasPageAccess || !hasActionAccess) {
+          return reply.status(403).send({
+            success: false,
+            message: "Access denied: insufficient page permissions.",
           });
         }
       } catch (error: any) {

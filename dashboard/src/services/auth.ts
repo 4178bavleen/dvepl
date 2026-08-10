@@ -12,7 +12,6 @@ interface LoginResponse {
     email: string;
     company: string | null;
     roles: string[];
-    permissions: string[];
     designation?: string;
     pageAccess?: string[];
     fieldPermissions?: Record<string, string[]>;
