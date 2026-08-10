@@ -250,9 +250,8 @@ export default function DrawingLibrary({
 
                   <DrawingThumbnail mimeType={d.mimeType} fileName={d.fileName} fileUrl={fileUrl} />
 
-                  {/* Hover action overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-200 flex flex-col justify-end p-3 gap-2 z-10">
-
+                  {/* Hover action overlay — only Open File */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-200 flex flex-col justify-end p-3 z-10">
                     <button
                       onClick={(e) => openFile(e, d.fileUrl)}
                       className="flex items-center justify-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-white text-gray-900 hover:bg-gray-100 transition-colors w-full"
@@ -260,77 +259,64 @@ export default function DrawingLibrary({
                       <ExternalLink className="w-3.5 h-3.5" />
                       Open File
                     </button>
-
-                    {/* Status buttons row */}
-                    <div className="flex gap-1.5">
-                      {STATUS_ACTIONS.filter((a) => a.status !== d.status).slice(0, 3).map((action) => {
-                        const Icon = STATUS_CONFIG[action.status].icon;
-                        const isRej = action.status === "REJECTED";
-                        return (
-                          <button
-                            key={action.status}
-                            disabled={isUpdating}
-                            onClick={(e) => changeStatus(e, d, action.status)}
-                            className={`flex-1 flex items-center justify-center gap-1 text-[10px] font-semibold py-1.5 rounded-lg transition-colors disabled:opacity-50 ${
-                              isRej
-                                ? "bg-red-600 hover:bg-red-700 text-white"
-                                : "bg-white/20 hover:bg-white/30 text-white backdrop-blur-sm"
-                            }`}
-                          >
-                            {isUpdating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Icon className="w-3 h-3" />}
-                            {action.label.split(" ")[0]}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* More status — dropdown trigger */}
-                    <div className="relative" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        disabled={isUpdating}
-                        onClick={(e) => { e.stopPropagation(); setOpenDropdown(openDropdown === d.id ? null : d.id); }}
-                        className="flex items-center justify-center gap-1 text-[10px] font-medium px-2 py-1 rounded-lg bg-black/40 hover:bg-black/60 text-white w-full transition-colors"
-                      >
-                        <ChevronDown className="w-3 h-3" />
-                        All statuses
-                      </button>
-                      {openDropdown === d.id && (
-                        <div className="absolute bottom-full mb-1 left-0 right-0 z-50 rounded-xl border bg-background shadow-2xl py-1 overflow-hidden">
-                          {STATUS_ACTIONS.map((action) => {
-                            const Icon = STATUS_CONFIG[action.status].icon;
-                            return (
-                              <button
-                                key={action.status}
-                                disabled={d.status === action.status}
-                                onClick={(e) => changeStatus(e, d, action.status)}
-                                className={`w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${action.hoverBg} ${action.textColor}`}
-                              >
-                                <Icon className="w-3.5 h-3.5" />
-                                {action.label}
-                                {d.status === action.status && (
-                                  <span className="ml-auto text-[10px] text-muted-foreground">Current</span>
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
                   </div>
                 </div>
 
                 {/* Card footer */}
-                <div className="p-4 flex flex-col gap-1 bg-background">
+                <div className="p-3 flex flex-col gap-2 bg-background">
+                  {/* Drawing info */}
                   <div className="flex items-start justify-between gap-2">
-                    <p className="font-bold text-sm">{d.drawingNo}</p>
-                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground flex-shrink-0 mt-0.5">
+                    <p className="font-bold text-sm leading-tight">{d.drawingNo}</p>
+                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground flex-shrink-0">
                       {TYPE_LABELS[d.drawingType] ?? d.drawingType}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground truncate leading-snug">{d.title}</p>
                   {d.project?.name && (
-                    <p className="text-[11px] text-muted-foreground/60 truncate">{d.project.name}</p>
+                    <p className="text-[10px] text-muted-foreground/50 truncate">{d.project.name}</p>
                   )}
+
+                  {/* Status dropdown */}
+                  <div className="relative mt-0.5" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      disabled={isUpdating}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenDropdown(openDropdown === d.id ? null : d.id);
+                      }}
+                      className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors disabled:opacity-50 hover:bg-muted ${statusCfg.pill}`}
+                    >
+                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${statusCfg.dot}`} />
+                      <span className="flex-1 text-left">{statusCfg.label}</span>
+                      {isUpdating
+                        ? <Loader2 className="w-3 h-3 animate-spin ml-auto" />
+                        : <ChevronDown className="w-3 h-3 ml-auto opacity-60" />
+                      }
+                    </button>
+
+                    {openDropdown === d.id && (
+                      <div className="absolute bottom-full mb-1 left-0 right-0 z-50 rounded-xl border bg-background shadow-2xl py-1 overflow-hidden">
+                        {STATUS_ACTIONS.map((action) => {
+                          const Icon = STATUS_CONFIG[action.status].icon;
+                          const isCurrent = d.status === action.status;
+                          return (
+                            <button
+                              key={action.status}
+                              disabled={isCurrent}
+                              onClick={(e) => changeStatus(e, d, action.status)}
+                              className={`w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors disabled:cursor-default ${action.hoverBg} ${action.textColor} ${isCurrent ? "opacity-50" : ""}`}
+                            >
+                              <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+                              <span className="flex-1 text-left">{action.label}</span>
+                              {isCurrent && (
+                                <span className="text-[10px] text-muted-foreground">Current</span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             );
