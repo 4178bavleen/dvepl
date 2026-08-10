@@ -69,8 +69,8 @@ export default function ExportOrdersPage() {
     queryKey: ["export-orders", activeFilters],
     queryFn: () =>
       exportOrdersApi.listOrders({
-        search: activeFilters.soNo || activeFilters.customer || undefined,
-        status: activeFilters.status !== "all" ? activeFilters.status : undefined,
+        search: (activeFilters.soNo || activeFilters.customer) || undefined,
+        status: activeFilters.status && activeFilters.status !== "all" ? activeFilters.status : undefined,
         assignedEngineer: activeFilters.assignedEngineer || undefined,
         startDate: activeFilters.startDate || undefined,
         endDate: activeFilters.endDate || undefined,
@@ -79,6 +79,7 @@ export default function ExportOrdersPage() {
 
   const orders: any[] = ordersResponse?.data ?? [];
 
+  // Drawings for selected orders (used in SelectedOrdersCard & ExportToolbar)
   const { data: drawingsResponse, refetch: refetchDrawings } = useQuery({
     queryKey: ["export-order-drawings", selectedOrderIds],
     queryFn: () =>
@@ -89,6 +90,19 @@ export default function ExportOrdersPage() {
   });
 
   const drawings: any[] = drawingsResponse?.data ?? [];
+
+  // All drawings for all loaded orders (used in DrawingLibrary — always visible)
+  const allOrderIds = orders.map((o) => o.id);
+  const { data: allDrawingsResponse, refetch: refetchAllDrawings } = useQuery({
+    queryKey: ["all-export-order-drawings", allOrderIds],
+    queryFn: () =>
+      allOrderIds.length > 0
+        ? exportOrdersApi.listDrawings(allOrderIds)
+        : Promise.resolve({ data: [] }),
+    enabled: allOrderIds.length > 0,
+  });
+
+  const allDrawings: any[] = allDrawingsResponse?.data ?? [];
 
   // ── Computed ──────────────────────────────────────────────────────
   const selectedOrders = orders.filter((o) => selectedOrderIds.includes(o.id));
@@ -128,7 +142,8 @@ export default function ExportOrdersPage() {
 
   const handleDrawingCreated = useCallback(() => {
     refetchDrawings();
-  }, [refetchDrawings]);
+    refetchAllDrawings();
+  }, [refetchDrawings, refetchAllDrawings]);
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -197,10 +212,10 @@ export default function ExportOrdersPage() {
       <Card>
         <CardContent className="p-5">
           <DrawingLibrary
-            drawings={drawings}
+            drawings={allDrawings}
             selectedDrawingIds={selectedDrawingIds}
             setSelectedDrawingIds={setSelectedDrawingIds}
-            onStatusChanged={refetchDrawings}
+            onStatusChanged={() => { refetchDrawings(); refetchAllDrawings(); }}
           />
         </CardContent>
       </Card>

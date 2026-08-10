@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { UploadCloud, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,12 +35,26 @@ export default function DrawingUploader({ selectedOrderIds, selectedOrders, onSu
   const [title, setTitle] = useState("");
   const [drawingType, setDrawingType] = useState("SLD");
 
-  const openDialog = (file: File) => {
+  // Fetch all orders for the dropdown (independent of table selection)
+  const { data: allOrdersRes } = useQuery({
+    queryKey: ["all-orders-for-uploader"],
+    queryFn: () => exportOrdersApi.listOrders(),
+  });
+  const allOrders: any[] = allOrdersRes?.data ?? [];
+
+  const openDialog = async (file: File) => {
     setPendingFile(file);
+    // Pre-select first selected order, or first available order
     setSalesOrderId(selectedOrderIds[0] ?? "");
-    setDrawingNo("");
     setTitle(file.name.replace(/\.[^/.]+$/, ""));
     setDrawingType("SLD");
+    // Auto-fetch next drawing number
+    try {
+      const res = await exportOrdersApi.nextDrawingNo();
+      setDrawingNo(res?.data ?? "");
+    } catch {
+      setDrawingNo("");
+    }
     setDialogOpen(true);
   };
 
@@ -67,7 +82,7 @@ export default function DrawingUploader({ selectedOrderIds, selectedOrders, onSu
       const uploadRes = await apiClient.post("/upload/", form, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      const fileUrl: string = uploadRes.data?.url ?? uploadRes.data?.data?.url;
+      const fileUrl: string = uploadRes.data?.data?.fileUrl;
       if (!fileUrl) throw new Error("Upload did not return a file URL.");
 
       await exportOrdersApi.createDrawing({
@@ -147,7 +162,7 @@ export default function DrawingUploader({ selectedOrderIds, selectedOrders, onSu
                   <SelectValue placeholder="Select order" />
                 </SelectTrigger>
                 <SelectContent>
-                  {selectedOrders.map((o) => (
+                  {allOrders.map((o) => (
                     <SelectItem key={o.id} value={o.id}>
                       {o.dveplCode} — {o.partyName}
                     </SelectItem>

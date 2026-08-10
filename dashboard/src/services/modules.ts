@@ -217,6 +217,10 @@ export const exportOrdersApi = {
       .get('/export-orders/drawings', { params: { orderIds: orderIds.join(',') } })
       .then(res => res.data),
 
+  // Get the next auto-incremented drawing number (e.g. DWG-004)
+  nextDrawingNo: () =>
+    apiClient.get('/export-orders/next-drawing-no').then(res => res.data),
+
   // Create a drawing record, automatically linking/creating the project for the given sales order
   createDrawing: (data: {
     salesOrderId: string;

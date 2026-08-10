@@ -167,7 +167,47 @@ async function adminExportOrdersRouteGroup(
     }
   );
 
-  // 3. Create engineering drawing associated with sales order
+  // 3. Get next available drawing number in serial (DWG-001, DWG-002, ...)
+  fastify.get(
+    "/next-drawing-no",
+    {
+      schema: {
+        tags: ["Export Orders"],
+        summary: "Get next available drawing number",
+      },
+      preHandler: preHandlers,
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        // Find all drawingNo values that match the DWG-NNN pattern
+        const drawings = await fastify.prisma.engineeringDrawing.findMany({
+          where: { deletedAt: null },
+          select: { drawingNo: true },
+        });
+
+        let maxSerial = 0;
+        for (const d of drawings) {
+          const match = d.drawingNo.match(/^DWG-(\d+)$/i);
+          if (match) {
+            const n = parseInt(match[1], 10);
+            if (n > maxSerial) maxSerial = n;
+          }
+        }
+
+        const next = `DWG-${String(maxSerial + 1).padStart(3, "0")}`;
+        return reply.send({ success: true, data: next });
+      } catch (error: any) {
+        adminLogs.error("Failed to get next drawing number", { error });
+        return reply.status(500).send({
+          success: false,
+          message: "Server error getting next drawing number.",
+          error: error.message,
+        });
+      }
+    }
+  );
+
+  // 4. Create engineering drawing associated with sales order
   fastify.post(
     "/create-drawing",
     {
@@ -184,7 +224,7 @@ async function adminExportOrdersRouteGroup(
           drawingNo: z.string().trim().min(1),
           title: z.string().trim().min(1),
           drawingType: z.nativeEnum(DrawingType),
-          fileUrl: z.string().url(),
+          fileUrl: z.string().min(1),
           fileName: z.string().trim().min(1),
           fileSize: z.number().int().optional().nullable(),
           mimeType: z.string().trim().optional().nullable(),
@@ -278,6 +318,50 @@ async function adminExportOrdersRouteGroup(
         return reply.status(500).send({
           success: false,
           message: "Server Error.",
+          error: error.message,
+        });
+      }
+    }
+  );
+
+  // 5. Update drawing status (APPROVED / REJECTED / PENDING)
+  fastify.put(
+    "/drawing/update/:id",
+    {
+      schema: {
+        tags: ["Export Orders"],
+        summary: "Update drawing status",
+      },
+      preHandler: preHandlers,
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { id } = request.params as { id: string };
+        const { status } = request.body as { status: string };
+
+        const validStatuses = ["PENDING", "IN_PROGRESS", "COMPLETED", "ON_HOLD", "REJECTED"];
+        if (!status || !validStatuses.includes(status.toUpperCase())) {
+          return reply.status(400).send({
+            success: false,
+            message: `Invalid status. Must be one of: ${validStatuses.join(", ")}`,
+          });
+        }
+
+        const drawing = await fastify.prisma.engineeringDrawing.update({
+          where: { id },
+          data: { status: status.toUpperCase() as any },
+        });
+
+        return reply.send({
+          success: true,
+          message: "Drawing status updated.",
+          data: drawing,
+        });
+      } catch (error: any) {
+        adminLogs.error("Failed to update drawing status", { error });
+        return reply.status(500).send({
+          success: false,
+          message: "Server error updating drawing status.",
           error: error.message,
         });
       }
