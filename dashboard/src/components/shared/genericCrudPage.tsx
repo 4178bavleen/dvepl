@@ -921,7 +921,11 @@ export function GenericCrudPage<TRecord extends { id: string }>({
             {viewingRecord && viewingGroups && (
               <div className="space-y-6 py-4">
                 {"status" in (viewingRecord as any) && (
-                  <div>
+                  <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Status
+                  </span>
+
                     {getStatusBadge(String((viewingRecord as any).status))}
                   </div>
                 )}
@@ -929,15 +933,18 @@ export function GenericCrudPage<TRecord extends { id: string }>({
                 {viewingGroups.core.length > 0 && (
                   <section className="space-y-2">
                     <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground/80">
-                      <Info className="size-3.5" /> Details
+                      <Info className="size-3.5" />
+                    Details
                     </h3>
+
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                       {viewingGroups.core.map(({ key, value }) => (
                         <React.Fragment key={key}>
-                          <dt className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mt-1">
+                          <dt className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                             {formatFieldLabel(key)}
                           </dt>
-                          <dd className="break-words text-foreground font-medium">
+
+                          <dd className="break-words font-medium text-foreground">
                             {renderDisplayValue(
                               key,
                               value,
@@ -955,15 +962,18 @@ export function GenericCrudPage<TRecord extends { id: string }>({
                 {viewingGroups.dates.length > 0 && (
                   <section className="space-y-2">
                     <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground/80">
-                      <Calendar className="size-3.5" /> Dates
+                      <Calendar className="size-3.5" />
+                    Dates
                     </h3>
+
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                       {viewingGroups.dates.map(({ key, value }) => (
                         <React.Fragment key={key}>
-                          <dt className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mt-1">
+                          <dt className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                             {formatFieldLabel(key)}
                           </dt>
-                          <dd className="break-words text-foreground font-medium">
+
+                          <dd className="break-words font-medium text-foreground">
                             {renderDisplayValue(
                               key,
                               value,
@@ -981,15 +991,18 @@ export function GenericCrudPage<TRecord extends { id: string }>({
                 {viewingGroups.relations.length > 0 && (
                   <section className="space-y-2">
                     <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground/80">
-                      <Layers className="size-3.5" /> Related records
+                      <Layers className="size-3.5" />
+                    Related records
                     </h3>
+
                     <dl className="grid grid-cols-1 gap-y-3 text-sm">
                       {viewingGroups.relations.map(({ key, value }) => (
                         <React.Fragment key={key}>
-                          <dt className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mt-1">
+                          <dt className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                             {formatFieldLabel(key)}
                           </dt>
-                          <dd className="break-words text-foreground font-medium">
+
+                          <dd className="break-words font-medium text-foreground">
                             {renderDisplayValue(
                               key,
                               value,
@@ -1003,12 +1016,363 @@ export function GenericCrudPage<TRecord extends { id: string }>({
                     </dl>
                   </section>
                 )}
+
+              {/* ============================================================
+        TEAM MEMBERS / RELATION MANAGER
+        ============================================================ */}
+              {relationManager &&
+                Array.isArray(
+                  (viewingRecord as Record<string, any>)[
+                    relationManager.relationKey
+                  ],
+                ) && (
+                  <section className="space-y-4 border-t border-border/60 pt-5">
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground/80">
+                          <User className="size-3.5" />
+                          {relationManager.title}
+                        </h3>
+
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {
+                            (
+                              (viewingRecord as Record<string, any>)[
+                                relationManager.relationKey
+                              ] as any[]
+                            ).length
+                          }{" "}
+                          {(
+                            (viewingRecord as Record<string, any>)[
+                              relationManager.relationKey
+                            ] as any[]
+                          ).length === 1
+                            ? "member"
+                            : "members"}
+                        </p>
+                      </div>
+
+                      {!readOnly && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="h-8 shrink-0 gap-1.5"
+                          onClick={openRelationManager}
+                        >
+                          <Plus className="size-3.5" />
+                          Add Members
+                        </Button>
+                      )}
+                    </div>
+
+                    {/* Members */}
+                    {(
+                      (viewingRecord as Record<string, any>)[
+                        relationManager.relationKey
+                      ] as Array<Record<string, any>>
+                    ).length > 0 ? (
+                      <div className="space-y-2">
+                        {(
+                          (viewingRecord as Record<string, any>)[
+                            relationManager.relationKey
+                          ] as Array<Record<string, any>>
+                        ).map((employee) => {
+                          const firstName = employee.firstName ?? "";
+                          const lastName = employee.lastName ?? "";
+
+                          const fullName =
+                            `${firstName} ${lastName}`.trim() ||
+                            "Unknown Employee";
+
+                          const initials =
+                            `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() ||
+                            "?";
+
+                          const designation =
+                            employee.designation?.title ?? "Employee";
+
+                          return (
+                            <div
+                              key={employee.id}
+                              className="group flex items-center gap-3 rounded-xl border border-border/70 bg-card p-3 transition-colors hover:bg-muted/30"
+                            >
+                              {/* Avatar */}
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                                {initials}
+                              </div>
+
+                              {/* Employee information */}
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-semibold text-foreground">
+                                  {fullName}
+                                </p>
+
+                                <p className="truncate text-[10px] text-muted-foreground">
+                                  {employee.employeeCode ?? "No employee code"}
+                                  {designation && ` • ${designation}`}
+                                </p>
+
+                                {employee.user?.email && (
+                                  <p className="truncate text-[10px] text-muted-foreground">
+                                    {employee.user.email}
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* Employee status */}
+                              {employee.status && (
+                                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">
+                                  {employee.status}
+                                </span>
+                              )}
+
+                              {/* Remove */}
+                              {!readOnly && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 shrink-0 px-2 text-xs text-destructive opacity-70 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+                                  onClick={() => removeRelation(employee.id)}
+                                >
+                                  Remove
+                                </Button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      /* Empty state */
+                      <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 px-4 py-8 text-center">
+                        <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                          <User className="size-5 text-muted-foreground" />
+                        </div>
+
+                        <p className="text-sm font-semibold text-foreground">
+                          No team members
+                        </p>
+
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          No employees are currently assigned to this team.
+                        </p>
+
+                        {!readOnly && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="mt-4 gap-1.5"
+                            onClick={openRelationManager}
+                          >
+                            <Plus className="size-3.5" />
+                            Add First Member
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </section>
+                )}
               </div>
             )}
           </div>
         </DialogContent>
       </Dialog>
+      <Dialog
+        open={isRelationDialogOpen}
+        onOpenChange={setIsRelationDialogOpen}
+      >
+        <DialogContent className="w-full max-w-lg max-h-[85vh] overflow-hidden p-0">
+          <DialogHeader className="border-b p-6">
+            <DialogTitle className="text-lg font-bold">
+              Add {relationManager?.title ?? "Members"}
+            </DialogTitle>
 
+            <DialogDescription className="text-xs text-muted-foreground">
+              Select employees to assign to this team.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-col min-h-0">
+            {/* Search */}
+            <div className="border-b p-4">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+
+                <Input
+                  value={relationSearch}
+                  onChange={(event) => setRelationSearch(event.target.value)}
+                  placeholder="Search employees..."
+                  className="pl-9"
+                />
+              </div>
+            </div>
+
+            {/* Employee list */}
+            <div className="max-h-[400px] overflow-y-auto p-4">
+              {isRelationLoading ? (
+                <div className="flex min-h-[180px] items-center justify-center">
+                  <div className="flex flex-col items-center gap-2">
+                    <Loader2 className="size-6 animate-spin text-primary" />
+
+                    <span className="text-xs text-muted-foreground">
+                      Loading employees...
+                    </span>
+                  </div>
+                </div>
+              ) : relationRecords.length === 0 ? (
+                <div className="flex min-h-[180px] flex-col items-center justify-center text-center">
+                  <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                    <User className="size-5 text-muted-foreground" />
+                  </div>
+
+                  <p className="text-sm font-semibold">
+                    No available employees
+                  </p>
+
+                  <p className="mt-1 max-w-xs text-xs text-muted-foreground">
+                    There are no employees available to assign to this team.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {relationRecords
+                    .filter((employee: any) => {
+                      const query = relationSearch.trim().toLowerCase();
+
+                      if (!query) return true;
+
+                      const fullName = `${employee.firstName ?? ""} ${
+                        employee.lastName ?? ""
+                      }`.toLowerCase();
+
+                      const employeeCode = String(
+                        employee.employeeCode ?? "",
+                      ).toLowerCase();
+
+                      const email = String(
+                        employee.user?.email ?? employee.email ?? "",
+                      ).toLowerCase();
+
+                      return (
+                        fullName.includes(query) ||
+                        employeeCode.includes(query) ||
+                        email.includes(query)
+                      );
+                    })
+                    .map((employee: any) => {
+                      const firstName = employee.firstName ?? "";
+                      const lastName = employee.lastName ?? "";
+
+                      const fullName =
+                        `${firstName} ${lastName}`.trim() || "Unknown Employee";
+
+                      const initials =
+                        `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase() ||
+                        "?";
+
+                      const isSelected = selectedRelationIds.includes(
+                        employee.id,
+                      );
+
+                      const designation =
+                        employee.designation?.title ?? "Employee";
+
+                      return (
+                        <button
+                          key={employee.id}
+                          type="button"
+                          onClick={() => toggleRelationSelection(employee.id)}
+                          className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors ${
+                            isSelected
+                              ? "border-primary bg-primary/5"
+                              : "border-border/70 bg-card hover:bg-muted/40"
+                          }`}
+                        >
+                          {/* Avatar */}
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                            {initials}
+                          </div>
+
+                          {/* Employee info */}
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold">
+                              {fullName}
+                            </p>
+
+                            <p className="truncate text-[10px] text-muted-foreground">
+                              {employee.employeeCode ?? "No employee code"}
+                              {" • "}
+                              {designation}
+                            </p>
+
+                            {(employee.user?.email || employee.email) && (
+                              <p className="truncate text-[10px] text-muted-foreground">
+                                {employee.user?.email ?? employee.email}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Checkbox */}
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() =>
+                              toggleRelationSelection(employee.id)
+                            }
+                            onClick={(event) => event.stopPropagation()}
+                          />
+                        </button>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-between border-t bg-muted/20 p-4">
+            <span className="text-xs text-muted-foreground">
+              {selectedRelationIds.length} selected
+            </span>
+
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setSelectedRelationIds([]);
+                  setIsRelationDialogOpen(false);
+                }}
+                disabled={isRelationSubmitting}
+              >
+                Cancel
+              </Button>
+
+              <Button
+                type="button"
+                onClick={addSelectedRelations}
+                disabled={
+                  selectedRelationIds.length === 0 || isRelationSubmitting
+                }
+                className="gap-2"
+              >
+                {isRelationSubmitting && (
+                  <Loader2 className="size-4 animate-spin" />
+                )}
+
+                {isRelationSubmitting
+                  ? "Adding..."
+                  : `Add ${
+                      selectedRelationIds.length > 0
+                        ? `${selectedRelationIds.length} `
+                        : ""
+                    }Member${selectedRelationIds.length === 1 ? "" : "s"}`}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
       <ConfirmDialog
         open={deleteConfirmOpen}
         onOpenChange={setDeleteConfirmOpen}

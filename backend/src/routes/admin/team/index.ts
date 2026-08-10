@@ -5,6 +5,7 @@ import readTeamRoutes from "./read";
 import getTeamByIdRoutes from "./readByID";
 import updateTeamRoutes from "./update";
 import deleteTeamRoutes from "./delete";
+import teamMemberRoutes from "./members";
 
 async function adminTeamRouteGroup(
   fastify: FastifyInstance,
@@ -15,6 +16,7 @@ async function adminTeamRouteGroup(
   fastify.register(getTeamByIdRoutes, { prefix: "/read" });
   fastify.register(updateTeamRoutes, { prefix: "/update" });
   fastify.register(deleteTeamRoutes, { prefix: "/delete" });
+  fastify.register(teamMemberRoutes, { prefix: "/members" });
 }
 
 export default adminTeamRouteGroup;
