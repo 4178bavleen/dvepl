@@ -2748,6 +2748,7 @@ enum DrawingStatus {
   IN_PROGRESS
   COMPLETED
   ON_HOLD
+  REJECTED
 }
 
 enum PurchaseRequestStatus {
