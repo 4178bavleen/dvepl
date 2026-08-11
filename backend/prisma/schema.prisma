@@ -19,12 +19,14 @@ model Company {
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
   deletedAt                 DateTime?
+  notificationConfiguration NotificationConfiguration?
   stockTransfers            StockTransfer[]
   approvalRequests          ApprovalRequest[]
   approvalWorkflows         ApprovalWorkflow[]
   boms                      BOM[]
   boqs                      BOQ[]
   branches                  Branch[]
+  settings                  CompanySettings?
   costCenters               CostCenter[]
   creditNotes               CreditNote[]
   customers                 Customer[]
@@ -66,8 +68,6 @@ model Company {
   vendors                   Vendor[]
   warehouses                Warehouse[]
   workOrders                WorkOrder[]
-  notificationConfiguration NotificationConfiguration?
-  settings                  CompanySettings?
 
   @@map("companies")
 }
@@ -238,42 +238,37 @@ model User {
   tenderRequestsAssigned            TenderRequest[]                    @relation("TenderRequestAssignedTo")
   tendersAssigned                   Tender[]                           @relation("TenderAssignedTo")
   tendersCreated                    Tender[]                           @relation("TenderCreatedBy")
+  accessProfile                     UserAccessProfile?
   userRoles                         UserRole[]
   sessions                          UserSession[]
   company                           Company                            @relation(fields: [companyId], references: [id])
+  vendorProductsCreated             VendorProduct[]
   vendorRevisions                   VendorRevision[]                   @relation("VendorRevisionCreatedBy")
   vendorsCreated                    Vendor[]                           @relation("VendorCreatedBy")
   approvedWorkOrders                WorkOrder[]                        @relation("WorkOrderApprovedBy")
   assignedWorkOrders                WorkOrder[]                        @relation("WorkOrderAssignedTo")
   createdWorkOrders                 WorkOrder[]                        @relation("WorkOrderCreatedBy")
-  vendorProductsCreated             VendorProduct[]
-  accessProfile                     UserAccessProfile?
 
   @@index([companyId])
   @@map("users")
 }
 
 model VendorProduct {
-  id String @id @default(uuid())
-
-  vendorId   String
-  materialId String
-
-  vendorRate         Decimal? @db.Decimal(15, 2)
+  id                 String    @id @default(uuid())
+  vendorId           String
+  materialId         String
+  vendorRate         Decimal?  @db.Decimal(15, 2)
   vendorMaterialCode String?
-  isPreferred        Boolean  @default(false)
+  isPreferred        Boolean   @default(false)
   notes              String?
+  createdById        String
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
+  createdBy          User      @relation(fields: [createdById], references: [id])
+  material           Material  @relation(fields: [materialId], references: [id])
+  vendor             Vendor    @relation(fields: [vendorId], references: [id])
 
-  createdById String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
-
-  vendor    Vendor   @relation(fields: [vendorId], references: [id])
-  material  Material @relation(fields: [materialId], references: [id])
-  createdBy User     @relation(fields: [createdById], references: [id])
-
-  // @@unique([vendorId, materialId])
   @@index([vendorId])
   @@index([materialId])
   @@map("vendor_products")
@@ -362,8 +357,8 @@ model PermissionGroup {
   id          String       @id @default(uuid())
   name        String       @unique
   description String?
-  permissions Permission[]
   deletedAt   DateTime?
+  permissions Permission[]
 
   @@map("permission_groups")
 }
@@ -434,7 +429,7 @@ model UserAccessProfile {
   designation       String   @default("Team Member")
   pageAccess        Json     @default("[]")
   fieldPermissions  Json     @default("{}")
-  actionPermissions Json     @default("{\"create\":true,\"edit\":true,\"delete\":false,\"export\":true}")
+  actionPermissions Json     @default("{\"edit\": true, \"create\": true, \"delete\": false, \"export\": true}")
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -462,8 +457,8 @@ model Employee {
   createdAt              DateTime                   @default(now())
   updatedAt              DateTime                   @updatedAt
   deletedAt              DateTime?
+  notificationRecipients NotificationRecipient[]
   salesOrderAssignments  SalesOrderAssignment[]
-  taskAssignments        TaskAssignment[]
   attendances            Attendance[]
   contacts               EmployeeContact[]
   documents              EmployeeDocument[]
@@ -481,8 +476,8 @@ model Employee {
   user                   User?                      @relation(fields: [userId], references: [id])
   leaves                 Leave[]
   salaries               Salary[]
+  taskAssignments        TaskAssignment[]
   tenderRequestsCreated  TenderRequest[]            @relation("TenderRequestCreatedBy")
-  notificationRecipients NotificationRecipient[]
 
   @@index([companyId])
   @@map("employees")
@@ -574,9 +569,9 @@ model EmployeeShift {
   shiftId       String
   effectiveFrom DateTime
   effectiveTo   DateTime?
+  deletedAt     DateTime?
   employee      Employee  @relation(fields: [employeeId], references: [id])
   shift         Shift     @relation(fields: [shiftId], references: [id])
-  deletedAt     DateTime?
 
   @@map("employee_shifts")
 }
@@ -1294,7 +1289,6 @@ model SalesOrder {
   createdAt              DateTime               @default(now())
   updatedAt              DateTime               @updatedAt
   deletedAt              DateTime?
-  assignedToIds          String[]               @default([])
   caNo                   String?
   contactDetails         String?
   deliveryMonthTarget    String?
@@ -1312,10 +1306,12 @@ model SalesOrder {
   poDate                 DateTime?
   sendNotification       Boolean                @default(true)
   subtotal               Decimal                @default(0) @db.Decimal(15, 2)
+  assignedToIds          String[]               @default([])
   assignments            SalesOrderAssignment[]
   dispatches             Dispatch[]
   engineeringProjects    EngineeringProject[]
   invoices               Invoice[]
+  payments               Payment[]
   salesOrderAttachments  SalesOrderAttachment[]
   items                  SalesOrderItem[]
   company                Company                @relation(fields: [companyId], references: [id])
@@ -1325,7 +1321,6 @@ model SalesOrder {
   quotation              Quotation?             @relation(fields: [quotationId], references: [id])
   tender                 Tender?                @relation(fields: [tenderId], references: [id])
   workOrders             WorkOrder[]
-  payments               Payment[]
 
   @@index([companyId])
   @@index([status])
@@ -1367,8 +1362,8 @@ model TaskAssignment {
   id         String   @id @default(uuid())
   taskId     String
   employeeId String
-  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   employee   Employee @relation(fields: [employeeId], references: [id])
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@unique([taskId, employeeId])
   @@map("task_assignments")
@@ -1567,7 +1562,6 @@ model BOMRevision {
 model Material {
   id                    String                 @id @default(uuid())
   companyId             String
-  category              String?
   brandId               String?
   specificationId       String?
   materialCode          String                 @unique
@@ -1578,9 +1572,6 @@ model Material {
   unit                  String
   weight                Decimal?               @db.Decimal(10, 3)
   color                 String?
-  reorderLevel          Decimal?               @db.Decimal(15, 3)
-  reorderQty            Decimal?               @db.Decimal(15, 3)
-  leadDays              Int?
   alternativeMaterialId String?
   preferredVendorId     String?
   isActive              Boolean                @default(true)
@@ -1588,6 +1579,12 @@ model Material {
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
   deletedAt             DateTime?
+  category              String?
+  leadDays              Int?
+  reorderLevel          Decimal?               @db.Decimal(15, 3)
+  reorderQty            Decimal?               @db.Decimal(15, 3)
+  type                  MaterialType           @default(RAW)
+  vendorId              String?
   stockTransfers        StockTransfer[]
   bomItems              BOMItem[]
   goodsReceiptItems     GoodsReceiptItem[]
@@ -1596,25 +1593,19 @@ model Material {
   alternative           Material?              @relation("MaterialAlternative", fields: [alternativeMaterialId], references: [id])
   alternatives          Material[]             @relation("MaterialAlternative")
   brand                 MaterialBrand?         @relation(fields: [brandId], references: [id])
-  // category              MaterialCategory?      @relation(fields: [categoryId], references: [id])
   company               Company                @relation(fields: [companyId], references: [id])
   createdBy             User                   @relation(fields: [createdById], references: [id])
+  preferredVendor       Vendor?                @relation("MaterialPreferredVendor", fields: [preferredVendorId], references: [id])
   specification         MaterialSpecification? @relation(fields: [specificationId], references: [id])
-  vendorId              String?
-  type                  MaterialType           @default(RAW)
-
-  vendor Vendor? @relation(fields: [vendorId], references: [id])
-
-  preferredVendor      Vendor?               @relation("MaterialPreferredVendor", fields: [preferredVendorId], references: [id])
-  purchaseOrderItems   PurchaseOrderItem[]
-  purchaseRequestItems PurchaseRequestItem[]
-  workOrderItems       WorkOrderItem[]
-  workOrders           WorkOrder[]
-  vendorProducts       VendorProduct[]
+  vendor                Vendor?                @relation(fields: [vendorId], references: [id])
+  purchaseOrderItems    PurchaseOrderItem[]
+  purchaseRequestItems  PurchaseRequestItem[]
+  vendorProducts        VendorProduct[]
+  workOrderItems        WorkOrderItem[]
+  workOrders            WorkOrder[]
 
   @@index([companyId])
   @@index([materialCode])
-  // @@index([categoryId])
   @@map("materials")
 }
 
@@ -1632,7 +1623,6 @@ model MaterialCategory {
   company     Company            @relation(fields: [companyId], references: [id])
   parent      MaterialCategory?  @relation("MaterialCategoryHierarchy", fields: [parentId], references: [id])
   children    MaterialCategory[] @relation("MaterialCategoryHierarchy")
-  // materials   Material[]
 
   @@unique([companyId, code])
   @@index([companyId])
@@ -1739,16 +1729,16 @@ model PurchaseOrder {
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
   deletedAt        DateTime?
+  customerId       String?
   goodsReceipts    GoodsReceipt[]
   invoices         Invoice[]
   items            PurchaseOrderItem[]
   approvedBy       User?               @relation("PurchaseOrderApprovedBy", fields: [approvedById], references: [id])
   company          Company             @relation(fields: [companyId], references: [id])
   createdBy        User                @relation("PurchaseOrderCreatedBy", fields: [createdById], references: [id])
+  customer         Customer?           @relation(fields: [customerId], references: [id])
   request          PurchaseRequest?    @relation(fields: [requestId], references: [id])
   vendor           Vendor              @relation(fields: [vendorId], references: [id])
-  customer         Customer?           @relation(fields: [customerId], references: [id])
-  customerId       String?
 
   @@index([companyId])
   @@index([status])
@@ -1757,23 +1747,20 @@ model PurchaseOrder {
 }
 
 model PurchaseOrderItem {
-  id               String    @id @default(uuid())
-  poId             String
-  materialId       String
-  quantity         Decimal   @db.Decimal(15, 3)
-  unitPrice        Decimal   @db.Decimal(15, 2)
-  totalPrice       Decimal   @db.Decimal(15, 2)
-  receivedQty      Decimal   @default(0) @db.Decimal(15, 3)
-  remarks          String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  deletedAt        DateTime?
-  expectedDelivery DateTime?
-
-  lastReceivedAt DateTime?
-
-  trackingRemarks String?
-
+  id                String             @id @default(uuid())
+  poId              String
+  materialId        String
+  quantity          Decimal            @db.Decimal(15, 3)
+  unitPrice         Decimal            @db.Decimal(15, 2)
+  totalPrice        Decimal            @db.Decimal(15, 2)
+  receivedQty       Decimal            @default(0) @db.Decimal(15, 3)
+  remarks           String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  deletedAt         DateTime?
+  expectedDelivery  DateTime?
+  lastReceivedAt    DateTime?
+  trackingRemarks   String?
   trackingStatus    TrackingStatus     @default(PENDING)
   goodsReceiptItems GoodsReceiptItem[]
   material          Material           @relation(fields: [materialId], references: [id])
@@ -1781,14 +1768,6 @@ model PurchaseOrderItem {
 
   @@index([poId])
   @@map("purchase_order_items")
-}
-
-enum TrackingStatus {
-  PENDING
-  PARTIAL
-  RECEIVED
-  OVERDUE
-  CANCELLED
 }
 
 model GoodsReceipt {
@@ -1857,7 +1836,6 @@ model Warehouse {
   deletedAt          DateTime?
   stockTransfersFrom StockTransfer[] @relation("StockTransferFrom")
   stockTransfersTo   StockTransfer[] @relation("StockTransferTo")
-  // inventories        Inventory[]
   racks              Rack[]
   company            Company         @relation(fields: [companyId], references: [id])
 
@@ -1918,8 +1896,6 @@ model Inventory {
   id                 String                 @id @default(uuid())
   companyId          String
   materialId         String
-  // warehouseId        String?
-  location           String?
   binId              String?
   batchNo            String?
   serialNo           String?
@@ -1938,20 +1914,17 @@ model Inventory {
   createdAt          DateTime               @default(now())
   updatedAt          DateTime               @updatedAt
   deletedAt          DateTime?
+  location           String?
+  dynamicRecord      DynamicRecord?
   stockTransfers     StockTransfer[]
   bin                Bin?                   @relation(fields: [binId], references: [id])
   company            Company                @relation(fields: [companyId], references: [id])
   goodsReceiptItem   GoodsReceiptItem?      @relation(fields: [goodsReceiptItemId], references: [id])
   material           Material               @relation(fields: [materialId], references: [id])
-  // warehouse          Warehouse              @relation(fields: [warehouseId], references: [id])
   transactions       InventoryTransaction[]
-  dynamicRecord      DynamicRecord?
-  
 
-  // @@unique([materialId, warehouseId, batchNo, serialNo])
   @@index([companyId])
   @@index([materialId])
-  // @@index([warehouseId])
   @@map("inventories")
 }
 
@@ -2300,8 +2273,8 @@ model Invoice {
   purchaseOrder   PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id])
   salesOrder      SalesOrder?    @relation(fields: [salesOrderId], references: [id])
   vendor          Customer?      @relation("VendorInvoices", fields: [vendorId], references: [id])
-  ledgerEntries   LedgerEntry[]
-  payments        Payment[]
+
+  payments Payment[]
 
   @@index([companyId])
   @@index([status])
@@ -2333,7 +2306,6 @@ model Payment {
   companyId     String
   paymentNo     String        @unique
   invoiceId     String?
-  salesOrderId  String?
   amount        Decimal       @db.Decimal(15, 2)
   paymentDate   DateTime      @default(now())
   paymentMethod PaymentMethod @default(CASH)
@@ -2343,10 +2315,11 @@ model Payment {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   deletedAt     DateTime?
+  salesOrderId  String?
   company       Company       @relation(fields: [companyId], references: [id])
   invoice       Invoice?      @relation(fields: [invoiceId], references: [id])
-  salesOrder    SalesOrder?   @relation(fields: [salesOrderId], references: [id])
   receivedBy    User          @relation(fields: [receivedById], references: [id])
+  salesOrder    SalesOrder?   @relation(fields: [salesOrderId], references: [id])
 
   @@index([companyId])
   @@index([invoiceId])
@@ -2403,25 +2376,24 @@ model DebitNote {
 }
 
 model Expense {
-  id            String        @id @default(uuid())
-  companyId     String
-  expenseNo     String        @unique
-  category      String
-  amount        Decimal       @db.Decimal(15, 2)
-  expenseDate   DateTime      @default(now())
-  description   String
-  referenceNo   String?
-  approvedById  String?
-  approvedAt    DateTime?
-  createdById   String
-  remarks       String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  deletedAt     DateTime?
-  approvedBy    User?         @relation("ExpenseApprovedBy", fields: [approvedById], references: [id])
-  company       Company       @relation(fields: [companyId], references: [id])
-  createdBy     User          @relation("ExpenseCreatedBy", fields: [createdById], references: [id])
-  ledgerEntries LedgerEntry[]
+  id           String    @id @default(uuid())
+  companyId    String
+  expenseNo    String    @unique
+  category     String
+  amount       Decimal   @db.Decimal(15, 2)
+  expenseDate  DateTime  @default(now())
+  description  String
+  referenceNo  String?
+  approvedById String?
+  approvedAt   DateTime?
+  createdById  String
+  remarks      String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+  approvedBy   User?     @relation("ExpenseApprovedBy", fields: [approvedById], references: [id])
+  company      Company   @relation(fields: [companyId], references: [id])
+  createdBy    User      @relation("ExpenseCreatedBy", fields: [createdById], references: [id])
 
   @@index([companyId])
   @@index([category])
@@ -2446,8 +2418,6 @@ model LedgerEntry {
   deletedAt     DateTime?
   company       Company   @relation(fields: [companyId], references: [id])
   createdBy     User      @relation(fields: [createdById], references: [id])
-  expense       Expense?  @relation(fields: [referenceId], references: [id], map: "ledger_entries_expense_referenceId_fkey")
-  invoice       Invoice?  @relation(fields: [referenceId], references: [id], map: "ledger_entries_invoice_referenceId_fkey")
 
   @@index([companyId])
   @@index([account])
@@ -2529,42 +2499,28 @@ model DashboardWidget {
 }
 
 model Vendor {
-  id            String  @id @default(uuid())
-  companyId     String
-  name          String
-  category      String?
-  contactPerson String?
-
-  phone String?
-
-  email String?
-
-  gstNumber String?
-
-  address String?
-
-  notes String?
-
-  revisionCount Int @default(0)
-
-  createdById String
-
-  createdAt DateTime @default(now())
-
-  updatedAt DateTime @updatedAt
-
-  deletedAt DateTime?
-
-  revisions VendorRevision[]
-
-  materials Material[]
-
-  company        Company         @relation(fields: [companyId], references: [id])
-  vendorProducts VendorProduct[]
-
-  createdBy             User            @relation("VendorCreatedBy", fields: [createdById], references: [id])
-  preferredForMaterials Material[]      @relation("MaterialPreferredVendor")
+  id                    String           @id @default(uuid())
+  companyId             String
+  name                  String
+  category              String?
+  contactPerson         String?
+  phone                 String?
+  email                 String?
+  gstNumber             String?
+  address               String?
+  notes                 String?
+  revisionCount         Int              @default(0)
+  createdById           String
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  deletedAt             DateTime?
+  preferredForMaterials Material[]       @relation("MaterialPreferredVendor")
+  materials             Material[]
   purchaseOrders        PurchaseOrder[]
+  vendorProducts        VendorProduct[]
+  revisions             VendorRevision[]
+  company               Company          @relation(fields: [companyId], references: [id])
+  createdBy             User             @relation("VendorCreatedBy", fields: [createdById], references: [id])
 
   @@index([companyId])
   @@index([name])
@@ -2585,6 +2541,212 @@ model VendorRevision {
 
   @@index([vendorId])
   @@map("vendor_revisions")
+}
+
+model CustomField {
+  id           String              @id @default(uuid())
+  module       String
+  name         String
+  key          String
+  type         String
+  required     Boolean             @default(false)
+  defaultValue String?
+  placeholder  String?
+  helpText     String?
+  displayOrder Int                 @default(0)
+  showInForm   Boolean             @default(true)
+  showInTable  Boolean             @default(true)
+  isActive     Boolean             @default(true)
+  afterField   String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  deletedAt    DateTime?
+  options      CustomFieldOption[]
+  values       CustomFieldValue[]
+
+  @@unique([module, key])
+  @@index([module, isActive, displayOrder])
+  @@map("custom_fields")
+}
+
+model CustomFieldOption {
+  id            String      @id @default(uuid())
+  customFieldId String
+  label         String
+  value         String
+  displayOrder  Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  customField   CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+
+  @@index([customFieldId, displayOrder])
+  @@map("custom_field_options")
+}
+
+model CustomFieldValue {
+  id            String      @id @default(uuid())
+  customFieldId String
+  entityId      String
+  stringValue   String?
+  textValue     String?
+  numberValue   Decimal?    @db.Decimal(18, 4)
+  booleanValue  Boolean?
+  dateValue     DateTime?
+  jsonValue     String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  customField   CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+
+  @@unique([customFieldId, entityId])
+  @@index([entityId])
+  @@index([customFieldId])
+  @@map("custom_field_values")
+}
+
+model NotificationConfiguration {
+  id               String                @id @default(uuid())
+  companyId        String                @unique
+  emailEnabled     Boolean               @default(true)
+  smtpHost         String?
+  smtpPort         Int?
+  smtpUsername     String?
+  smtpPassword     String?
+  smtpFromEmail    String?
+  smtpFromName     String?
+  whatsappEnabled  Boolean               @default(false)
+  whatsappProvider NotificationProvider?
+  whatsappApiKey   String?
+  whatsappEndpoint String?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  company          Company               @relation(fields: [companyId], references: [id])
+}
+
+model NotificationEvent {
+  id                     String                  @id @default(uuid())
+  code                   NotificationEventCode   @unique
+  name                   String
+  emailEnabled           Boolean                 @default(true)
+  whatsappEnabled        Boolean                 @default(false)
+  isActive               Boolean                 @default(true)
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  notificationRecipients NotificationRecipient[]
+  notificationTemplates  NotificationTemplate[]
+}
+
+model NotificationTemplate {
+  id        String              @id @default(uuid())
+  eventId   String
+  channel   NotificationChannel
+  subject   String?
+  body      String
+  isActive  Boolean             @default(true)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+  event     NotificationEvent   @relation(fields: [eventId], references: [id])
+}
+
+model InventoryTransaction {
+  id              String          @id @default(uuid())
+  inventoryId     String
+  transactionType TransactionType
+  quantity        Decimal         @db.Decimal(15, 3)
+  referenceType   String
+  referenceId     String
+  remarks         String?
+  createdById     String
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  stockAfter      Decimal         @db.Decimal(15, 3)
+  stockBefore     Decimal         @db.Decimal(15, 3)
+  createdBy       User            @relation(fields: [createdById], references: [id])
+  inventory       Inventory       @relation(fields: [inventoryId], references: [id])
+
+  @@index([inventoryId])
+  @@index([referenceType, referenceId])
+  @@map("inventory_transactions")
+}
+
+model NotificationRecipient {
+  id         String            @id @default(uuid())
+  eventId    String
+  employeeId String?
+  email      String?
+  phone      String?
+  isActive   Boolean           @default(true)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  employee   Employee?         @relation(fields: [employeeId], references: [id])
+  event      NotificationEvent @relation(fields: [eventId], references: [id])
+}
+
+model NotificationLog {
+  id              String              @id @default(uuid())
+  eventCode       String
+  channel         NotificationChannel
+  recipient       String
+  subject         String?
+  eventId         String?
+  message         String
+  status          NotificationStatus
+  error           String?
+  relatedModule   String?
+  relatedRecordId String?
+  sentAt          DateTime?
+  createdAt       DateTime            @default(now())
+}
+
+model DynamicModule {
+  id         String          @id @default(uuid())
+  moduleKey  String          @unique
+  moduleName String
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  fields     DynamicField[]
+  records    DynamicRecord[]
+}
+
+model DynamicField {
+  id           String           @id @default(uuid())
+  moduleId     String
+  fieldName    String
+  label        String
+  type         DynamicFieldType
+  required     Boolean          @default(false)
+  options      Json?
+  orderNo      Int              @default(0)
+  defaultValue Json?
+  filterable   Boolean          @default(false)
+  placeholder  String?
+  searchable   Boolean          @default(true)
+  table        Boolean          @default(true)
+  visible      Boolean          @default(true)
+  module       DynamicModule    @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([moduleId, fieldName])
+}
+
+model DynamicRecord {
+  id          String        @id @default(uuid())
+  moduleId    String
+  values      Json
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  inventoryId String?       @unique
+  inventory   Inventory?    @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+  module      DynamicModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@index([moduleId])
+  @@index([inventoryId])
+}
+
+enum TrackingStatus {
+  PENDING
+  PARTIAL
+  RECEIVED
+  OVERDUE
+  CANCELLED
 }
 
 enum OtpPurpose {
@@ -2889,212 +3051,11 @@ enum Priority {
   CRITICAL
 }
 
-model CustomField {
-  id           String    @id @default(uuid())
-  module       String // 'vendor', 'order', 'task', etc.
-  name         String // Field Name / Label (e.g. 'Inspection Date')
-  key          String // Unique Field Key (e.g. 'inspectionDate')
-  type         String // text, textarea, number, decimal, email, phone, url, date, datetime, time, checkbox, switch, dropdown, multiselect, radio, file, image
-  required     Boolean   @default(false)
-  defaultValue String?
-  placeholder  String?
-  helpText     String?
-  displayOrder Int       @default(0)
-  showInForm   Boolean   @default(true)
-  showInTable  Boolean   @default(true)
-  isActive     Boolean   @default(true)
-  afterField   String? // For placement ordering relative to built-in fields
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  deletedAt    DateTime?
-
-  options CustomFieldOption[]
-  values  CustomFieldValue[]
-
-  @@unique([module, key])
-  @@index([module, isActive, displayOrder])
-  @@map("custom_fields")
-}
-
-model CustomFieldOption {
-  id            String      @id @default(uuid())
-  customFieldId String
-  label         String
-  value         String
-  displayOrder  Int         @default(0)
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  customField   CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
-
-  @@index([customFieldId, displayOrder])
-  @@map("custom_field_options")
-}
-
-model CustomFieldValue {
-  id            String @id @default(uuid())
-  customFieldId String
-  entityId      String // Foreign record ID (Vendor ID, Order ID, Task ID)
-
-  // Typed storage columns for EAV
-  stringValue  String?
-  textValue    String?   @db.Text
-  numberValue  Decimal?  @db.Decimal(18, 4)
-  booleanValue Boolean?
-  dateValue    DateTime?
-  jsonValue    String? // For multi-select array strings or complex metadata if needed
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  customField CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
-
-  @@unique([customFieldId, entityId])
-  @@index([entityId])
-  @@index([customFieldId])
-  @@map("custom_field_values")
-}
-
-model NotificationConfiguration {
-  id String @id @default(uuid())
-
-  companyId String  @unique
-  company   Company @relation(fields: [companyId], references: [id])
-
-  emailEnabled Boolean @default(true)
-
-  smtpHost      String?
-  smtpPort      Int?
-  smtpUsername  String?
-  smtpPassword  String?
-  smtpFromEmail String?
-  smtpFromName  String?
-
-  whatsappEnabled Boolean @default(false)
-
-  whatsappProvider NotificationProvider?
-  whatsappApiKey   String?
-  whatsappEndpoint String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model NotificationEvent {
-  id String @id @default(uuid())
-
-  code NotificationEventCode @unique
-
-  name String
-
-  emailEnabled Boolean @default(true)
-
-  whatsappEnabled Boolean @default(false)
-
-  isActive Boolean @default(true)
-
-  createdAt DateTime @default(now())
-
-  updatedAt DateTime @updatedAt
-
-  notificationTemplates  NotificationTemplate[]
-  notificationRecipients NotificationRecipient[]
-}
-
 enum NotificationEventCode {
   NEW_ORDER
   PAYMENT_DUE
   PO_CREATED
   DELIVERY_DELAYED
-}
-
-model NotificationTemplate {
-  id String @id @default(uuid())
-
-  eventId String
-
-  channel NotificationChannel
-
-  subject String?
-
-  body String @db.Text
-
-  isActive Boolean @default(true)
-
-  createdAt DateTime @default(now())
-
-  updatedAt DateTime @updatedAt
-
-  event NotificationEvent @relation(fields: [eventId], references: [id])
-}
-
-model InventoryTransaction {
-  id              String          @id @default(uuid())
-  inventoryId     String
-  transactionType TransactionType
-  quantity        Decimal         @db.Decimal(15, 3)
-  stockBefore     Decimal         @db.Decimal(15, 3)
-  stockAfter      Decimal         @db.Decimal(15, 3)
-  referenceType   String
-  referenceId     String
-  remarks         String?
-  createdById     String
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  createdBy       User            @relation(fields: [createdById], references: [id])
-  inventory       Inventory       @relation(fields: [inventoryId], references: [id])
-
-  @@index([inventoryId])
-  @@index([referenceType, referenceId])
-  @@map("inventory_transactions")
-}
-
-model NotificationRecipient {
-  id String @id @default(uuid())
-
-  eventId String
-
-  employeeId String?
-
-  email String?
-
-  phone String?
-
-  isActive Boolean @default(true)
-
-  createdAt DateTime @default(now())
-
-  updatedAt DateTime @updatedAt
-
-  event NotificationEvent @relation(fields: [eventId], references: [id])
-
-  employee Employee? @relation(fields: [employeeId], references: [id])
-}
-
-model NotificationLog {
-  id String @id @default(uuid())
-
-  eventCode String
-
-  channel NotificationChannel
-
-  recipient String
-
-  subject String?
-  eventId String?
-
-  message String @db.Text
-
-  status NotificationStatus
-
-  error String?
-
-  relatedModule String?
-
-  relatedRecordId String?
-
-  sentAt DateTime?
-
-  createdAt DateTime @default(now())
 }
 
 enum MaterialType {
@@ -3135,61 +3096,4 @@ enum DynamicFieldType {
   TEXTAREA
   SELECT
   DATE
-}
-
-model DynamicModule {
-  id         String @id @default(uuid())
-  moduleKey  String @unique
-  moduleName String
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  fields  DynamicField[]
-  records DynamicRecord[]
-}
-
-model DynamicField {
-  id String @id @default(uuid())
-
-  moduleId String
-
-  fieldName String
-  label     String
-
-  type DynamicFieldType
-
-  required Boolean @default(false)
-
-  visible    Boolean @default(true)
-  searchable Boolean @default(true)
-  filterable Boolean @default(false)
-  table      Boolean @default(true)
-
-  placeholder  String?
-  defaultValue Json?
-
-  options Json?
-
-  orderNo Int @default(0)
-
-  module DynamicModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-
-  @@unique([moduleId, fieldName])
-}
-
-model DynamicRecord {
-  id       String @id @default(uuid())
-  moduleId String
-  values   Json
-
-  inventoryId String?    @unique
-  inventory   Inventory? @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-
-  module DynamicModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-
-  @@index([moduleId])
-  @@index([inventoryId])
 }
