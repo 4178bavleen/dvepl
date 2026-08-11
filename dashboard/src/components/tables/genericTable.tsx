@@ -49,7 +49,7 @@ const Table = React.forwardRef<
   HTMLTableElement,
   React.HTMLAttributes<HTMLTableElement>
 >(({ className, ...props }, ref) => (
-  <div className="relative w-full overflow-x-auto" data-slot="table-container">
+  <div className="relative w-full max-h-[60vh] overflow-auto" data-slot="table-container">
     <table
       ref={ref}
       className={cn("w-full caption-bottom text-sm", className)}
@@ -101,7 +101,7 @@ const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      "h-12 px-2 text-left align-middle font-medium whitespace-nowrap text-foreground [&:has([role=checkbox])]:pr-0 sticky top-0 bg-card/95 backdrop-blur-xs z-10 shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)]",
+      "h-12 px-2 text-left align-middle font-medium whitespace-nowrap text-foreground [&:has([role=checkbox])]:pr-0 sticky top-0 bg-card/95 backdrop-blur-xs z-30 shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)]",
       className,
     )}
     {...props}
@@ -845,11 +845,11 @@ export function GenericTable<TData extends { id: string }>({
                               minWidth: header.getSize(),
                             }}
                             className={cn(
-                              "text-xs font-semibold py-3.5 px-6 text-muted-foreground whitespace-nowrap",
+                              "sticky top-0 z-30 bg-muted text-xs font-semibold py-3.5 px-6 text-muted-foreground whitespace-nowrap",
                               header.id === "actions" && "text-center",
                               header.id === "actions" &&
                                 freezeActions &&
-                                "sticky top-0 right-0 bg-muted border-l border-l-border z-20 shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)]",
+                                "right-0 border-l border-l-border z-40 shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)]",
                             )}
                           >
                             {label}
@@ -862,7 +862,7 @@ export function GenericTable<TData extends { id: string }>({
                           key={header.id}
                           id={header.column.id}
                           width={header.getSize()}
-                          className="text-xs font-semibold py-3.5 px-6 text-muted-foreground whitespace-nowrap select-none"
+                          className="sticky top-0 z-30 bg-muted text-xs font-semibold py-3.5 px-6 text-muted-foreground whitespace-nowrap select-none"
                         >
                           {label}
                         </SortableHeaderCell>
