@@ -6,6 +6,7 @@ import {
 } from "fastify";
 import { Prisma } from "@prisma/client";
 
+// import { syncDynamicInventory } from "../../../services/inventory/syncDynamicInventory";
 interface Params {
   moduleKey: string;
 }

@@ -302,7 +302,7 @@ export default function DynamicTable({
 
 function renderValue(value: any, field: DynamicField) {
   if (value === null || value === undefined || value === "") {
-    return <span className="text-muted-foreground/30 font-medium">-</span>;
+    return <span className="text-foreground font-medium">-</span>;
   }
 
   const fieldNameLower = field.fieldName.toLowerCase();
