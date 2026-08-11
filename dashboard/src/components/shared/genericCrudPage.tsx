@@ -13,6 +13,8 @@ import {
   Layers,
   CheckSquare,
   Loader2,
+  UserPlus,
+  UserMinus,
 } from "lucide-react";
 import { GenericTable } from "@/components/tables/genericTable";
 import { Button } from "@/components/ui/button";
@@ -98,6 +100,23 @@ interface GenericCrudPageProps<
   readOnly?: boolean;
   hideAdd?: boolean;
   freezeActions?: boolean;
+  /** Fields to hide from the Overview dialog for this specific CRUD page. */
+  overviewHiddenFields?: string[];
+  /**
+   * Optional relation collection management.
+   *
+   * Used by teamsConfig.relationManager:
+   * - getAvailableRecords(record)
+   * - add(record, relatedRecordId)
+   * - remove(record, relatedRecordId)
+   */
+  relationManager?: {
+    relationKey: string;
+    title?: string;
+    getAvailableRecords: (record: TRecord) => Promise<any[]>;
+    add: (record: TRecord, relatedRecordId: string) => Promise<void>;
+    remove: (record: TRecord, relatedRecordId: string) => Promise<void>;
+  };
 }
 
 const asInputValue = (value: unknown) => (value == null ? "" : String(value));
@@ -250,13 +269,13 @@ const getStatusBadge = (status: string) => {
   );
 };
 
-const groupRecordFields = (record: Record<string, any>) => {
+const groupRecordFields = (record: Record<string, any>, hiddenFields: string[] = []) => {
   const core: Array<{ key: string; value: any }> = [];
   const dates: Array<{ key: string; value: any }> = [];
   const relations: Array<{ key: string; value: any }> = [];
 
   Object.entries(record)
-    .filter(([key]) => !IGNORED_KEYS.has(key))
+    .filter(([key]) => !IGNORED_KEYS.has(key) && !hiddenFields.includes(key))
     .forEach(([key, value]) => {
       if (key === "status" || key === "name" || key === "title") return;
 
@@ -489,6 +508,8 @@ export function GenericCrudPage<TRecord extends { id: string }>({
   readOnly = false,
   hideAdd = false,
   freezeActions = true,
+  overviewHiddenFields = [],
+  relationManager,
 }: GenericCrudPageProps<TRecord>) {
   const [searchParams] = useSearchParams();
   const localRecords = useERPStore(
@@ -514,6 +535,15 @@ export function GenericCrudPage<TRecord extends { id: string }>({
   >({});
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<TRecord | null>(null);
+
+  // Optional Team -> Employee membership management.
+  const [teamEmployees, setTeamEmployees] = useState<any[]>([]);
+  const [teamMemberDialogOpen, setTeamMemberDialogOpen] = useState(false);
+  const [teamMemberSearch, setTeamMemberSearch] = useState("");
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
+  const [isTeamMemberSubmitting, setIsTeamMemberSubmitting] = useState(false);
+  const [removeMemberId, setRemoveMemberId] = useState<string | null>(null);
+
   const records = api ? remoteRecords : localRecords;
 
   const loadRecords = useCallback(async () => {
@@ -579,6 +609,216 @@ export function GenericCrudPage<TRecord extends { id: string }>({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run once on component mount to capture URL query params
+
+  const getEmployeeId = (member: any) =>
+    member?.employeeId ?? member?.employee?.id ?? member?.id;
+
+  const getEmployeeName = (employee: any) => {
+    if (!employee) return "Unknown employee";
+
+    if (employee.firstName) {
+      return `${employee.firstName} ${employee.lastName ?? ""}`.trim();
+    }
+
+    return (
+      employee.name ??
+      employee.title ??
+      employee.email ??
+      employee.employeeCode ??
+      employee.id
+    );
+  };
+
+  const getEmployeeSubtitle = (employee: any) =>
+    employee?.designation?.title ??
+    employee?.designation?.name ??
+    employee?.designation ??
+    employee?.email ??
+    employee?.employeeCode ??
+    "";
+
+  const getCurrentRelationRecords = useCallback(
+    (record: TRecord | null): any[] => {
+      if (!record || !relationManager?.relationKey) return [];
+
+      const value = (record as Record<string, any>)[
+        relationManager.relationKey
+      ];
+
+      return Array.isArray(value) ? value : [];
+    },
+    [relationManager?.relationKey],
+  );
+
+  const loadAvailableRelationRecords = useCallback(
+    async (record: TRecord) => {
+      if (!relationManager) return;
+
+      try {
+        const available = await relationManager.getAvailableRecords(record);
+        setTeamEmployees(Array.isArray(available) ? available : []);
+      } catch (error: any) {
+        toast.error(
+          error.response?.data?.message ??
+            "Unable to load available members.",
+        );
+        setTeamEmployees([]);
+      }
+    },
+    [relationManager],
+  );
+
+  const openTeamMemberDialog = async () => {
+    if (!viewingRecord || !relationManager) return;
+
+    setTeamMemberSearch("");
+    setSelectedEmployeeIds([]);
+    setTeamMemberDialogOpen(true);
+
+    await loadAvailableRelationRecords(viewingRecord);
+  };
+
+  const toggleEmployeeSelection = (employeeId: string) => {
+    setSelectedEmployeeIds((current) =>
+      current.includes(employeeId)
+        ? current.filter((id) => id !== employeeId)
+        : [...current, employeeId],
+    );
+  };
+
+  const submitTeamMembers = async () => {
+    if (
+      !viewingRecord ||
+      !relationManager ||
+      selectedEmployeeIds.length === 0
+    ) {
+      return;
+    }
+
+    setIsTeamMemberSubmitting(true);
+
+    try {
+      // relationManager.add is intentionally single-record because that is
+      // the contract already implemented by teamsConfig.
+      await Promise.all(
+        selectedEmployeeIds.map((employeeId) =>
+          relationManager.add(viewingRecord, employeeId),
+        ),
+      );
+
+      const addedEmployees = teamEmployees.filter((employee) =>
+        selectedEmployeeIds.includes(employee.id),
+      );
+
+      const relationKey = relationManager.relationKey;
+      setViewingRecord((current) => {
+        if (!current) return current;
+
+        const existing = getCurrentRelationRecords(current);
+        const existingIds = new Set(existing.map(getEmployeeId));
+
+        return {
+          ...current,
+          [relationKey]: [
+            ...existing,
+            ...addedEmployees.filter(
+              (employee) => !existingIds.has(getEmployeeId(employee)),
+            ),
+          ],
+        };
+      });
+
+      // Refresh the available list. The backend removes assigned employees
+      // from /members/available/:teamId because their teamId is no longer null.
+      await loadAvailableRelationRecords(viewingRecord);
+
+      setSelectedEmployeeIds([]);
+      setTeamMemberDialogOpen(false);
+
+      toast.success(
+        selectedEmployeeIds.length === 1
+          ? "Employee added to team."
+          : `${selectedEmployeeIds.length} employees added to team.`,
+      );
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.message ??
+          "Unable to add employees to team.",
+      );
+    } finally {
+      setIsTeamMemberSubmitting(false);
+    }
+  };
+
+  const removeTeamMember = async (employeeId: string) => {
+    if (!viewingRecord || !relationManager) return;
+
+    setRemoveMemberId(employeeId);
+
+    try {
+      await relationManager.remove(viewingRecord, employeeId);
+
+      const relationKey = relationManager.relationKey;
+
+      setViewingRecord((current) => {
+        if (!current) return current;
+
+        const currentMembers = getCurrentRelationRecords(current);
+
+        return {
+          ...current,
+          [relationKey]: currentMembers.filter(
+            (member) => getEmployeeId(member) !== employeeId,
+          ),
+        };
+      });
+
+      // The removed employee becomes available again because the backend sets
+      // employee.teamId back to null.
+      await loadAvailableRelationRecords(viewingRecord);
+
+      toast.success("Employee removed from team.");
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.message ??
+          "Unable to remove employee from team.",
+      );
+    } finally {
+      setRemoveMemberId(null);
+    }
+  };
+
+  const currentTeamMembers = useMemo(
+    () => getCurrentRelationRecords(viewingRecord),
+    [getCurrentRelationRecords, viewingRecord],
+  );
+
+  const availableTeamEmployees = useMemo(() => {
+    const memberIds = new Set(currentTeamMembers.map(getEmployeeId));
+    const query = teamMemberSearch.trim().toLowerCase();
+
+    return teamEmployees.filter((employee) => {
+      // The backend already returns only employees with teamId === null.
+      // This extra client-side check protects against stale data.
+      if (!employee?.id || memberIds.has(employee.id)) return false;
+      if (!query) return true;
+
+      return [
+        getEmployeeName(employee),
+        getEmployeeSubtitle(employee),
+        employee?.email,
+        employee?.employeeCode,
+      ]
+        .filter(Boolean)
+        .some((value) =>
+          String(value).toLowerCase().includes(query),
+        );
+    });
+  }, [
+    teamEmployees,
+    currentTeamMembers,
+    teamMemberSearch,
+  ]);
 
   const filteredRecords = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -680,10 +920,23 @@ export function GenericCrudPage<TRecord extends { id: string }>({
   const viewingGroups = useMemo(
     () =>
       viewingRecord
-        ? groupRecordFields(viewingRecord as unknown as Record<string, any>)
+        ? groupRecordFields(viewingRecord as unknown as Record<string, any>, overviewHiddenFields)
         : null,
-    [viewingRecord],
+    [viewingRecord, overviewHiddenFields],
   );
+
+  useEffect(() => {
+    if (!viewingRecord || tableName !== "teams" || !relationManager) {
+      setTeamEmployees([]);
+      setSelectedEmployeeIds([]);
+      return;
+    }
+
+    // Current members are already included by the existing team read endpoint
+    // and therefore come from viewingRecord[relationManager.relationKey].
+    setTeamEmployees([]);
+    setSelectedEmployeeIds([]);
+  }, [viewingRecord, tableName, relationManager]);
 
   if (isLoading && records.length === 0) {
     return (
@@ -1003,8 +1256,202 @@ export function GenericCrudPage<TRecord extends { id: string }>({
                     </dl>
                   </section>
                 )}
+
+                {tableName === "teams" &&
+                  relationManager &&
+                  viewingRecord && (
+                    <section className="space-y-3 rounded-xl border bg-card p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground/80">
+                            <User className="size-3.5" />{" "}
+                            {relationManager.title ?? "Team members"}
+                          </h3>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Add or remove employees assigned to this team.
+                          </p>
+                        </div>
+
+                        {!readOnly && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="gap-1.5"
+                            onClick={() => void openTeamMemberDialog()}
+                          >
+                            <UserPlus className="size-4" />
+                            Add members
+                          </Button>
+                        )}
+                      </div>
+
+                      {currentTeamMembers.length === 0 ? (
+                        <div className="rounded-lg border border-dashed p-5 text-center text-sm text-muted-foreground">
+                          No employees are assigned to this team yet.
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {currentTeamMembers.map((member) => {
+                            const employee =
+                              member?.employee ?? member;
+                            const employeeId =
+                              member?.employeeId ?? employee?.id;
+
+                            return (
+                              <div
+                                key={employeeId}
+                                className="flex items-center justify-between gap-3 rounded-lg border bg-background p-3"
+                              >
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-semibold">
+                                    {getEmployeeName(employee)}
+                                  </p>
+                                  {getEmployeeSubtitle(employee) && (
+                                    <p className="truncate text-xs text-muted-foreground">
+                                      {getEmployeeSubtitle(employee)}
+                                    </p>
+                                  )}
+                                </div>
+
+                                {!readOnly && employeeId && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="shrink-0 gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                    disabled={removeMemberId === employeeId}
+                                    onClick={() =>
+                                      void removeTeamMember(employeeId)
+                                    }
+                                  >
+                                    {removeMemberId === employeeId ? (
+                                      <Loader2 className="size-4 animate-spin" />
+                                    ) : (
+                                      <UserMinus className="size-4" />
+                                    )}
+                                    Remove
+                                  </Button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </section>
+                  )}
               </div>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={teamMemberDialogOpen}
+        onOpenChange={(open) => {
+          setTeamMemberDialogOpen(open);
+          if (!open) {
+            setTeamMemberSearch("");
+            setSelectedEmployeeIds([]);
+          }
+        }}
+      >
+        <DialogContent className="w-[95vw] max-w-lg p-0">
+          <DialogHeader className="border-b p-6">
+            <DialogTitle>Add Team Members</DialogTitle>
+            <DialogDescription>
+              Select one or more employees to add to this team.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 p-6">
+            <Input
+              value={teamMemberSearch}
+              onChange={(event) =>
+                setTeamMemberSearch(event.target.value)
+              }
+              placeholder="Search employees..."
+              autoFocus
+            />
+
+            <div className="max-h-[360px] overflow-y-auto rounded-lg border">
+              {availableTeamEmployees.length === 0 ? (
+                <div className="p-6 text-center text-sm text-muted-foreground">
+                  {teamMemberSearch
+                    ? "No matching available employees."
+                    : "No available employees to add."}
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {availableTeamEmployees.map((employee) => {
+                    const selected = selectedEmployeeIds.includes(
+                      employee.id,
+                    );
+
+                    return (
+                      <button
+                        key={employee.id}
+                        type="button"
+                        onClick={() =>
+                          toggleEmployeeSelection(employee.id)
+                        }
+                        className="flex w-full items-center gap-3 p-3 text-left transition-colors hover:bg-muted/50"
+                      >
+                        <Checkbox
+                          checked={selected}
+                          onCheckedChange={() =>
+                            toggleEmployeeSelection(employee.id)
+                          }
+                          onClick={(event) => event.stopPropagation()}
+                        />
+
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold">
+                            {getEmployeeName(employee)}
+                          </p>
+                          {getEmployeeSubtitle(employee) && (
+                            <p className="truncate text-xs text-muted-foreground">
+                              {getEmployeeSubtitle(employee)}
+                            </p>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {selectedEmployeeIds.length > 0 && (
+              <p className="text-xs font-medium text-muted-foreground">
+                {selectedEmployeeIds.length} employee
+                {selectedEmployeeIds.length === 1 ? "" : "s"} selected
+              </p>
+            )}
+          </div>
+
+          <div className="flex items-center justify-end gap-3 border-t bg-muted/30 p-4">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setTeamMemberDialogOpen(false)}
+              disabled={isTeamMemberSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void submitTeamMembers()}
+              disabled={
+                selectedEmployeeIds.length === 0 ||
+                isTeamMemberSubmitting
+              }
+              className="gap-2"
+            >
+              {isTeamMemberSubmitting && (
+                <Loader2 className="size-4 animate-spin" />
+              )}
+              Add selected
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

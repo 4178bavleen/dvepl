@@ -25,7 +25,7 @@ async function teamMemberRoutes(fastify: FastifyInstance, _options: FastifyPlugi
       const employees = await fastify.prisma.employee.findMany({
         where: {
           companyId,
-          teamId: null,
+         
           deletedAt: null,
         },
         select: {
@@ -62,7 +62,7 @@ async function teamMemberRoutes(fastify: FastifyInstance, _options: FastifyPlugi
         where: {
           id: { in: employeeIds },
           companyId,
-          teamId: null,
+          
           deletedAt: null,
         },
         select: { id: true },
