@@ -283,6 +283,11 @@ export const teamsConfig = {
   selectOptions: {
     departmentId: organizationApi.departments.list,
   },
+  overviewHiddenFields: [
+  "employees",
+  "_count",
+  "isActive",
+],
 
   breadcrumbs: [
     {
@@ -416,25 +421,8 @@ export const teamsConfig = {
    * ============================================================
    * TEAM → EMPLOYEE RELATION
    * ============================================================
-   *
-   * Team has:
-   *
-   *   Team
-   *     └── employees[]
-   *
-   * Employee has:
-   *
-   *   Employee
-   *     └── teamId
-   *
-   * Therefore:
-   *
-   * ADD:
-   *   employee.teamId = team.id
-   *
-   * REMOVE:
-   *   employee.teamId = null
    */
+   
 relationManager: {
   relationKey: "employees",
   title: "Team Members",
