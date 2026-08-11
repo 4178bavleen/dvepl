@@ -301,11 +301,13 @@ export const teamsConfig = {
     },
 
     {
+      id: "department.name",
       accessorKey: "department.name",
       header: "Department",
     },
 
     {
+      id: "_count.employees",
       accessorKey: "_count.employees",
       header: "Members",
 
