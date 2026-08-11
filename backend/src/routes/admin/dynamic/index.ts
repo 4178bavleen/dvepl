@@ -14,12 +14,12 @@ import listFieldRoute from "./field/list";
 import updateModuleRoute from "./module/update";
 import deleteModuleRoute from "./module/delete";
 import getRecordRoute from "./record/get";
+import importRecordRoute from "./record/import";
 
 export default async function dynamicRoutes(
   fastify: FastifyInstance
 ) {
   fastify.register(createModuleRoute);
-
   fastify.register(listModuleRoute);
   fastify.register(createFieldRoute);
   fastify.register(getSchemaRoute);
@@ -33,4 +33,5 @@ export default async function dynamicRoutes(
   fastify.register(updateModuleRoute);
   fastify.register(deleteModuleRoute);
   fastify.register(getRecordRoute);
+  fastify.register(importRecordRoute);
 }

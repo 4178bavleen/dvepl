@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import * as XLSX from "xlsx";
-import {tenderApi} from "../../services/modules"
+import { tenderApi } from "../../services/modules";
 
 import {
   ArrowLeft,
@@ -15,7 +15,7 @@ import {
   Settings,
   Truck,
   Upload,
-  Users
+  Users,
 } from "lucide-react";
 
 import { cn, getFieldLabel } from "@/utils/helpers";
@@ -71,7 +71,9 @@ export default function InventoryPage() {
     loadRecords,
   } = useDynamicModule({ moduleKey: "inventory" });
 
-  const [mainView, setMainView] = useState<"inventory" | "tracking">("inventory");
+  const [mainView, setMainView] = useState<"inventory" | "tracking">(
+    "inventory",
+  );
   const [formOpen, setFormOpen] = useState(false);
   const [fieldManagerOpen, setFieldManagerOpen] = useState(false);
   const [editing, setEditing] = useState<DynamicRecord | null>(null);
@@ -81,9 +83,13 @@ export default function InventoryPage() {
   const [stockFilter, setStockFilter] = useState<StockStatus>("all");
   const [stockOpen, setStockOpen] = useState(false);
   const [stockRecord, setStockRecord] = useState<DynamicRecord | null>(null);
-  const [stockMovType, setStockMovType] = useState<"IN" | "OUT" | "ADJUST" | "RETURN">("IN");
+  const [stockMovType, setStockMovType] = useState<
+    "IN" | "OUT" | "ADJUST" | "RETURN"
+  >("IN");
   const [stockQty, setStockQty] = useState("");
-  const [stockDate, setStockDate] = useState(new Date().toISOString().split("T")[0]);
+  const [stockDate, setStockDate] = useState(
+    new Date().toISOString().split("T")[0],
+  );
   const [stockRate, setStockRate] = useState("");
   const [stockVendorName, setStockVendorName] = useState("");
   const [stockInvoiceNo, setStockInvoiceNo] = useState("");
@@ -94,27 +100,29 @@ export default function InventoryPage() {
 
   // States for Record Saving/Deletion
   const [deleteRecordOpen, setDeleteRecordOpen] = useState(false);
-  const [recordToDelete, setRecordToDelete] = useState<DynamicRecord | null>(null);
+  const [recordToDelete, setRecordToDelete] = useState<DynamicRecord | null>(
+    null,
+  );
   const [isDeletingRecord, setIsDeletingRecord] = useState(false);
   const [isSavingRecord, setIsSavingRecord] = useState(false);
 
   const [selectedVendorItem, setSelectedVendorItem] =
-  useState<DynamicRecord | null>(null);
+    useState<DynamicRecord | null>(null);
 
-const [itemVendors, setItemVendors] = useState<any[]>([]);
+  const [itemVendors, setItemVendors] = useState<any[]>([]);
 
-const [itemVendorsLoading, setItemVendorsLoading] =
-  useState(false);
+  const [itemVendorsLoading, setItemVendorsLoading] = useState(false);
 
-const [vendorDialogOpen, setVendorDialogOpen] =
-  useState(false);
+  const [vendorDialogOpen, setVendorDialogOpen] = useState(false);
   const [supplierMailRecipient, setSupplierMailRecipient] =
     useState<SupplierMailRecipient | null>(null);
   const [supplierMailSubject, setSupplierMailSubject] = useState("");
   const [supplierMailText, setSupplierMailText] = useState("");
   const [supplierMailSending, setSupplierMailSending] = useState(false);
 
-  const buildFormValues = (recordValues?: Record<string, any> | string | null) => {
+  const buildFormValues = (
+    recordValues?: Record<string, any> | string | null,
+  ) => {
     const base: Record<string, any> = {};
     fields.forEach((field) => {
       base[field.fieldName] = field.defaultValue ?? "";
@@ -134,7 +142,7 @@ const [vendorDialogOpen, setVendorDialogOpen] =
     const savedEntries = Object.entries(savedValues);
     fields.forEach((field) => {
       const savedValue = savedEntries.find(
-        ([key]) => key.toLowerCase() === field.fieldName.toLowerCase()
+        ([key]) => key.toLowerCase() === field.fieldName.toLowerCase(),
       )?.[1];
 
       if (savedValue !== undefined) {
@@ -144,6 +152,79 @@ const [vendorDialogOpen, setVendorDialogOpen] =
 
     return base;
   };
+
+  const getDynamicFieldValue = (
+    recordValues: Record<string, any> | string | null | undefined,
+    field: (typeof fields)[number],
+  ) => {
+    let savedValues: Record<string, any> = {};
+
+    if (typeof recordValues === "string") {
+      try {
+        savedValues = JSON.parse(recordValues);
+      } catch {
+        savedValues = {};
+      }
+    } else if (recordValues && typeof recordValues === "object") {
+      savedValues = recordValues;
+    }
+
+    // 1. Exact fieldName
+    if (
+      field.fieldName &&
+      Object.prototype.hasOwnProperty.call(savedValues, field.fieldName)
+    ) {
+      return savedValues[field.fieldName];
+    }
+
+    // 2. Exact label
+    if (
+      field.label &&
+      Object.prototype.hasOwnProperty.call(savedValues, field.label)
+    ) {
+      return savedValues[field.label];
+    }
+
+    // 3. Normalized comparison
+    const normalizeKey = (value: string) =>
+      value
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "");
+
+    const normalizedFieldName = normalizeKey(field.fieldName);
+    const normalizedLabel = normalizeKey(field.label);
+
+    const matchingEntry = Object.entries(savedValues).find(([key]) => {
+      const normalizedKey = normalizeKey(key);
+
+      return (
+        normalizedKey === normalizedFieldName ||
+        normalizedKey === normalizedLabel
+      );
+    });
+
+    return matchingEntry?.[1];
+  };
+
+  const normalizedRecords = useMemo(() => {
+    return (records || []).map((record) => {
+      const normalizedValues: Record<string, any> = {};
+
+      fields.forEach((field) => {
+        const value = getDynamicFieldValue(record.values, field);
+
+        if (value !== undefined) {
+          normalizedValues[field.fieldName] = value;
+        }
+      });
+
+      return {
+        ...record,
+        values: normalizedValues,
+      };
+    });
+  }, [records, fields]);
 
   const openCreate = () => {
     setEditing(null);
@@ -162,66 +243,57 @@ const [vendorDialogOpen, setVendorDialogOpen] =
     setDeleteRecordOpen(true);
   };
   const getMaterialId = (record: DynamicRecord): string => {
-  return record.inventory?.materialId ?? "";
-};
- const handleViewItemVendors = async (
-  record: DynamicRecord,
-) => {
-  const materialId = getMaterialId(record);
+    return record.inventory?.materialId ?? "";
+  };
+  const handleViewItemVendors = async (record: DynamicRecord) => {
+    const materialId = getMaterialId(record);
 
+    if (!materialId) {
+      toast.error("This inventory item is not linked to a material.");
+      return;
+    }
 
-  if (!materialId) {
-    toast.error(
-      "This inventory item is not linked to a material.",
-    );
-    return;
-  }
+    setSelectedVendorItem(record);
+    setVendorDialogOpen(true);
+    setItemVendorsLoading(true);
+    setItemVendors([]);
 
-  setSelectedVendorItem(record);
-  setVendorDialogOpen(true);
-  setItemVendorsLoading(true);
-  setItemVendors([]);
+    try {
+      const vendors = await tenderApi.vendorProducts.listByMaterial(materialId);
 
-  try {
-    const vendors =
-      await tenderApi.vendorProducts.listByMaterial(
-        materialId,
+      console.log("VENDORS FOR ITEM:", JSON.stringify(vendors, null, 2));
+
+      setItemVendors(vendors);
+    } catch (error: any) {
+      console.error("Failed to load item vendors:", error);
+
+      toast.error(
+        error?.response?.data?.message ??
+          "Failed to load vendors for this item.",
       );
+    } finally {
+      setItemVendorsLoading(false);
+    }
+  };
 
-console.log(
-  "VENDORS FOR ITEM:",
-  JSON.stringify(vendors, null, 2),
-);
-
-    setItemVendors(vendors);
-  } catch (error: any) {
-    console.error(
-      "Failed to load item vendors:",
-      error,
-    );
-
-    toast.error(
-      error?.response?.data?.message ??
-        "Failed to load vendors for this item.",
-    );
-  } finally {
-    setItemVendorsLoading(false);
-  }
-};
-
-  const openSupplierMail = (vendor: SupplierMailRecipient, materialName: string) => {
+  const openSupplierMail = (
+    vendor: SupplierMailRecipient,
+    materialName: string,
+  ) => {
     const vendorName = vendor.name || "Supplier";
     setSupplierMailRecipient(vendor);
     setSupplierMailSubject(`Inventory enquiry: ${materialName}`);
-    setSupplierMailText([
-      `Dear ${vendorName},`,
-      "",
-      `We would like to discuss the availability and pricing of ${materialName}.`,
-      "Please share the current availability, lead time, and any relevant terms.",
-      "",
-      "Regards,",
-      "DVEPL Procurement Team",
-    ].join("\n"));
+    setSupplierMailText(
+      [
+        `Dear ${vendorName},`,
+        "",
+        `We would like to discuss the availability and pricing of ${materialName}.`,
+        "Please share the current availability, lead time, and any relevant terms.",
+        "",
+        "Regards,",
+        "DVEPL Procurement Team",
+      ].join("\n"),
+    );
   };
 
   const closeSupplierMail = () => {
@@ -247,7 +319,9 @@ console.log(
           text: supplierMailText.trim(),
         },
       );
-      toast.success(response.data?.message || "Supplier email sent successfully");
+      toast.success(
+        response.data?.message || "Supplier email sent successfully",
+      );
       closeSupplierMail();
     } catch (error: any) {
       console.error("Failed to send supplier email:", error);
@@ -298,7 +372,12 @@ console.log(
   const getStockStatus = (record: DynamicRecord) => {
     const quantityField = fields.find((field) => {
       const label = field.label.toLowerCase();
-      return label.includes("qty") || label.includes("quantity") || label.includes("stock") || label.includes("balance");
+      return (
+        label.includes("qty") ||
+        label.includes("quantity") ||
+        label.includes("stock") ||
+        label.includes("balance")
+      );
     });
 
     const quantityValue = quantityField
@@ -312,29 +391,41 @@ console.log(
   };
 
   const getItemName = (record: DynamicRecord) => {
-    const nameField = fields.find((field) => {
-      const label = field.label.toLowerCase();
-      return label.includes("name") || label.includes("item");
-    }) || fields[0];
+    const nameField =
+      fields.find((field) => {
+        const label = field.label.toLowerCase();
+        return label.includes("name") || label.includes("item");
+      }) || fields[0];
     return record.values?.[nameField?.fieldName ?? ""] ?? "Selected item";
   };
 
   const filteredRecords = useMemo(() => {
     const searchQuery = `${search} ${fieldSearch}`.trim().toLowerCase();
-    const selectedField = fields.find((field) => field.fieldName === searchField);
+    const selectedField = fields.find(
+      (field) => field.fieldName === searchField,
+    );
 
-    return (records || []).filter((record) => {
+    return normalizedRecords.filter((record) => {
       const status = getStockStatus(record);
       if (stockFilter !== "all" && status !== stockFilter) return false;
 
       if (!searchQuery) return true;
 
-      const parsedValues = typeof record.values === "string" ? (() => {
-        try { return JSON.parse(record.values); } catch { return {}; }
-      })() : (record.values || {});
+      const parsedValues =
+        typeof record.values === "string"
+          ? (() => {
+              try {
+                return JSON.parse(record.values);
+              } catch {
+                return {};
+              }
+            })()
+          : record.values || {};
 
       if (searchField !== "all" && selectedField) {
-        return String(parsedValues[selectedField.fieldName] ?? "").toLowerCase().includes(searchQuery);
+        return String(parsedValues[selectedField.fieldName] ?? "")
+          .toLowerCase()
+          .includes(searchQuery);
       }
 
       const searchableText = fields
@@ -344,7 +435,14 @@ console.log(
 
       return searchableText.includes(searchQuery);
     });
-  }, [records, search, fieldSearch, searchField, stockFilter, fields]);
+  }, [
+    normalizedRecords,
+    search,
+    fieldSearch,
+    searchField,
+    stockFilter,
+    fields,
+  ]);
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -357,7 +455,10 @@ console.log(
 
   const totalPages = Math.ceil(filteredRecords.length / pageSize);
   const paginatedRecords = useMemo(() => {
-    return filteredRecords.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+    return filteredRecords.slice(
+      (currentPage - 1) * pageSize,
+      currentPage * pageSize,
+    );
   }, [filteredRecords, currentPage, pageSize]);
 
   const getVisiblePages = () => {
@@ -367,7 +468,11 @@ console.log(
     let l: number | null = null;
 
     for (let i = 1; i <= totalPages; i++) {
-      if (i === 1 || i === totalPages || (i >= currentPage - delta && i <= currentPage + delta)) {
+      if (
+        i === 1 ||
+        i === totalPages ||
+        (i >= currentPage - delta && i <= currentPage + delta)
+      ) {
         range.push(i);
       }
     }
@@ -410,37 +515,151 @@ console.log(
 
     try {
       setImporting(true);
+
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: "" });
+      const firstSheetName = workbook.SheetNames[0];
 
-      let created = 0;
-      for (const row of rows) {
-        const values: Record<string, any> = {};
-        Object.entries(row).forEach(([key, value]) => {
-          const normalizedKey = String(key).trim().toLowerCase();
-          const field = fields.find((candidate) => {
-            const candidateName = candidate.fieldName.toLowerCase();
-            const candidateLabel = candidate.label.toLowerCase();
-            return candidateName === normalizedKey || candidateLabel === normalizedKey;
-          });
-
-          if (field) {
-            values[field.fieldName] = value;
-          }
-        });
-
-        if (Object.keys(values).length > 0) {
-          await createRecord(values);
-          created += 1;
-        }
+      if (!firstSheetName) {
+        toast.error("The Excel file does not contain a worksheet");
+        return;
       }
 
-      toast.success(`Imported ${created} inventory record${created === 1 ? "" : "s"}`);
-    } catch (error) {
-      console.error(error);
-      toast.error("Unable to import Excel file");
+      const sheet = workbook.Sheets[firstSheetName];
+      const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, {
+        defval: "",
+      });
+
+      if (rows.length === 0) {
+        toast.error("The Excel file does not contain any records");
+        return;
+      }
+
+      // Convert an Excel header into a safe DynamicField fieldName.
+      // Existing fields are matched against their fieldName/label first,
+      // so existing columns keep their original fieldName.
+      const toFieldName = (header: string) => {
+        const cleaned = header
+          .trim()
+          .replace(/[^a-zA-Z0-9]+(.)/g, (_, char: string) =>
+            char ? char.toUpperCase() : "",
+          )
+          .replace(/[^a-zA-Z0-9]/g, "");
+
+        if (!cleaned) return "field";
+
+        return cleaned.charAt(0).toLowerCase() + cleaned.slice(1);
+      };
+
+      const inferColumnType = (header: string, values: any[]) => {
+        const field = fields.find((candidate) => {
+          const normalizedHeader = header.trim().toLowerCase();
+          return (
+            candidate.fieldName.toLowerCase() === normalizedHeader ||
+            candidate.label.toLowerCase() === normalizedHeader
+          );
+        });
+
+        if (field) {
+          if (field.type === "NUMBER") return "NUMBER" as const;
+          if (field.type === "DATE") return "DATE" as const;
+          return "TEXT" as const;
+        }
+
+        const nonEmptyValues = values.filter(
+          (value) => value !== null && value !== undefined && value !== "",
+        );
+
+        if (
+          nonEmptyValues.length > 0 &&
+          nonEmptyValues.every(
+            (value) =>
+              typeof value === "number" ||
+              (typeof value === "string" &&
+                value.trim() !== "" &&
+                !Number.isNaN(Number(value))),
+          )
+        ) {
+          return "NUMBER" as const;
+        }
+
+        // SheetJS commonly returns Excel dates as numbers unless cellDates
+        // is enabled. We keep generic imported values as TEXT unless an
+        // existing field already tells us that the column is a DATE.
+        return "TEXT" as const;
+      };
+
+      const firstRow = rows[0];
+      const headers = Object.keys(firstRow);
+
+      if (headers.length === 0) {
+        toast.error("The Excel file does not contain column headers");
+        return;
+      }
+
+      // Build the schema expected by the dynamic import API.
+      // Existing columns are matched by fieldName or label.
+      // New Excel columns automatically become new DynamicFields.
+      const columns = headers.map((header) => {
+        const normalizedHeader = header.trim().toLowerCase();
+        const existingField = fields.find(
+          (field) =>
+            field.fieldName.toLowerCase() === normalizedHeader ||
+            field.label.toLowerCase() === normalizedHeader,
+        );
+
+        return {
+          label: header.trim(),
+          fieldName: existingField?.fieldName ?? toFieldName(header),
+          type: inferColumnType(
+            header,
+            rows.map((row) => row[header]),
+          ),
+        };
+      });
+
+      // Prevent duplicate field definitions if Excel contains headers that
+      // normalize to the same fieldName.
+      const uniqueColumns = Array.from(
+        new Map(columns.map((column) => [column.fieldName, column])).values(),
+      );
+
+      // Send the complete Excel dataset to the backend in one request.
+      // The backend creates missing DynamicFields and DynamicRecords and,
+      // for inventory, synchronizes Material + Inventory records.
+      const response = await apiClient.post(
+        "/dynamic/record/import/inventory",
+        {
+          columns: uniqueColumns,
+          rows,
+        },
+      );
+
+      const result = response.data?.data;
+      const importedCount = result?.rowCount ?? rows.length;
+      const createdFieldCount = result?.createdFields?.length ?? 0;
+
+      // Refresh the dynamic schema and records so newly created columns
+      // immediately appear in the Inventory table.
+      await loadFields();
+      await loadRecords();
+
+      if (createdFieldCount > 0) {
+        toast.success(
+          `Imported ${importedCount} record${importedCount === 1 ? "" : "s"} and added ${createdFieldCount} new column${createdFieldCount === 1 ? "" : "s"}`,
+        );
+      } else {
+        toast.success(
+          `Imported ${importedCount} inventory record${importedCount === 1 ? "" : "s"}`,
+        );
+      }
+    } catch (error: any) {
+      console.error("Excel import failed:", error);
+
+      const message =
+        error?.response?.data?.message || "Unable to import Excel file";
+
+      toast.error(message);
     } finally {
       setImporting(false);
       event.target.value = "";
@@ -480,7 +699,7 @@ console.log(
     return String(
       nameField?.fieldName
         ? record.values?.[nameField.fieldName]
-        : record.values?.name ?? record.values?.materialCode ?? "Item",
+        : (record.values?.name ?? record.values?.materialCode ?? "Item"),
     );
   };
 
@@ -491,7 +710,11 @@ console.log(
       return label.includes("unit") || key === "unit";
     });
 
-    return String(unitField?.fieldName ? record.values?.[unitField.fieldName] : record.values?.unit ?? "");
+    return String(
+      unitField?.fieldName
+        ? record.values?.[unitField.fieldName]
+        : (record.values?.unit ?? ""),
+    );
   };
 
   const resetStockForm = () => {
@@ -523,7 +746,12 @@ console.log(
       return;
     }
 
-    if ((stockMovType === "IN" || stockMovType === "OUT" || stockMovType === "RETURN") && qty <= 0) {
+    if (
+      (stockMovType === "IN" ||
+        stockMovType === "OUT" ||
+        stockMovType === "RETURN") &&
+      qty <= 0
+    ) {
       toast.error("Quantity must be greater than zero");
       return;
     }
@@ -573,7 +801,9 @@ console.log(
       await loadRecords();
     } catch (error: any) {
       console.error(error);
-      toast.error(error?.response?.data?.message ?? "Failed to submit stock transaction");
+      toast.error(
+        error?.response?.data?.message ?? "Failed to submit stock transaction",
+      );
     } finally {
       setStockLoading(false);
     }
@@ -627,12 +857,22 @@ console.log(
             Export Excel
           </Button>
 
-          <Button variant="outline" onClick={() => importInputRef.current?.click()} disabled={importing}>
+          <Button
+            variant="outline"
+            onClick={() => importInputRef.current?.click()}
+            disabled={importing}
+          >
             <Upload className="mr-2 h-4 w-4" />
             {importing ? "Importing..." : "Import Excel"}
           </Button>
 
-          <input ref={importInputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleImportExcel} />
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+            onChange={handleImportExcel}
+          />
 
           <Button variant="outline" onClick={() => setMainView("tracking")}>
             <Truck className="mr-2 h-4 w-4" />
@@ -683,7 +923,11 @@ console.log(
             </Select>
 
             <Input
-              placeholder={searchField === "all" ? "Search in selected field" : `Search ${fields.find((field) => field.fieldName === searchField)?.label ?? "field"}`}
+              placeholder={
+                searchField === "all"
+                  ? "Search in selected field"
+                  : `Search ${fields.find((field) => field.fieldName === searchField)?.label ?? "field"}`
+              }
               value={fieldSearch}
               onChange={(e) => setFieldSearch(e.target.value)}
               disabled={searchField === "all"}
@@ -744,7 +988,7 @@ console.log(
                             "h-9 w-9 p-0 rounded-lg text-xs font-semibold transition-all duration-150",
                             isCurrent
                               ? "bg-primary text-white hover:bg-primary/95 shadow-sm"
-                              : "text-muted-foreground hover:text-foreground hover:bg-card border border-transparent hover:border-border/30 hover:shadow-3xs"
+                              : "text-muted-foreground hover:text-foreground hover:bg-card border border-transparent hover:border-border/30 hover:shadow-3xs",
                           )}
                           onClick={() => setCurrentPage(page as number)}
                         >
@@ -759,7 +1003,9 @@ console.log(
                     variant="ghost"
                     size="sm"
                     className="h-9 w-9 p-0 rounded-lg text-muted-foreground hover:text-foreground hover:bg-card border border-transparent hover:border-border/30 hover:shadow-3xs transition-all duration-150 disabled:opacity-30 disabled:pointer-events-none"
-                    onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(p + 1, totalPages))
+                    }
                     disabled={currentPage === totalPages}
                   >
                     <ChevronRight className="h-4.5 w-4.5" />
@@ -786,7 +1032,10 @@ console.log(
                       }
                     }}
                     onBlur={() => {
-                      if (!customPageSize || parseInt(customPageSize, 10) <= 0) {
+                      if (
+                        !customPageSize ||
+                        parseInt(customPageSize, 10) <= 0
+                      ) {
                         setPageSize(10);
                         setCustomPageSize("10");
                         setCurrentPage(1);
@@ -799,8 +1048,14 @@ console.log(
                     type="button"
                     className="text-primary hover:text-primary/80 font-bold uppercase text-[10px] tracking-wider transition-colors"
                     onClick={() => {
-                      setPageSize(filteredRecords.length || Number.MAX_SAFE_INTEGER);
-                      setCustomPageSize(String(filteredRecords.length || Number.MAX_SAFE_INTEGER));
+                      setPageSize(
+                        filteredRecords.length || Number.MAX_SAFE_INTEGER,
+                      );
+                      setCustomPageSize(
+                        String(
+                          filteredRecords.length || Number.MAX_SAFE_INTEGER,
+                        ),
+                      );
                       setCurrentPage(1);
                     }}
                   >
@@ -811,8 +1066,13 @@ console.log(
 
               {/* Right Side: Info */}
               <div className="text-xs text-muted-foreground font-medium">
-                Showing {Math.min((currentPage - 1) * pageSize + 1, filteredRecords.length)} to{" "}
-                {Math.min(currentPage * pageSize, filteredRecords.length)} of {filteredRecords.length} entries
+                Showing{" "}
+                {Math.min(
+                  (currentPage - 1) * pageSize + 1,
+                  filteredRecords.length,
+                )}{" "}
+                to {Math.min(currentPage * pageSize, filteredRecords.length)} of{" "}
+                {filteredRecords.length} entries
               </div>
             </div>
           )}
@@ -829,7 +1089,11 @@ console.log(
         </>
       ) : (
         <>
-          <Button variant="outline" onClick={() => setMainView("inventory")} className="gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setMainView("inventory")}
+            className="gap-2"
+          >
             <ArrowLeft className="h-4 w-4" />
             Back to Inventory
           </Button>
@@ -895,7 +1159,8 @@ console.log(
                   <p className="font-medium">{getNameValue(stockRecord)}</p>
                 </div>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Current stock: {getCurrentStock(stockRecord)} {getUnitValue(stockRecord)}
+                  Current stock: {getCurrentStock(stockRecord)}{" "}
+                  {getUnitValue(stockRecord)}
                 </p>
               </div>
 
@@ -946,7 +1211,6 @@ console.log(
 
                 {stockMovType === "IN" && (
                   <div className="grid grid-cols-1 gap-4">
-                    
                     <div className="flex flex-col gap-2">
                       <label className="text-xs font-bold tracking-wider text-muted-foreground">
                         Supplier Name
@@ -957,7 +1221,6 @@ console.log(
                         onChange={(e) => setStockVendorName(e.target.value)}
                       />
                     </div>
-                    
                   </div>
                 )}
 
@@ -989,8 +1252,12 @@ console.log(
                 {stockQty && (
                   <div className="p-3 border rounded-lg bg-primary/5 text-sm text-muted-foreground">
                     <div className="font-semibold text-foreground">
-                      Stock Level Preview: {stockPreview.current} {stockPreview.unit} ?{' '}
-                      <strong className="text-primary">{stockPreview.calculatedAfter}</strong> {stockPreview.unit}
+                      Stock Level Preview: {stockPreview.current}{" "}
+                      {stockPreview.unit} ?{" "}
+                      <strong className="text-primary">
+                        {stockPreview.calculatedAfter}
+                      </strong>{" "}
+                      {stockPreview.unit}
                     </div>
                     {stockPreview.isNegative && (
                       <div className="text-rose-500 font-bold mt-1">
@@ -1033,198 +1300,192 @@ console.log(
         onConfirm={handleConfirmDeleteRecord}
         loading={isDeletingRecord}
       />
-    
-<Dialog
-  open={vendorDialogOpen}
-  onOpenChange={setVendorDialogOpen}
->
-  <DialogContent className="w-[95vw] max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
-    <DialogHeader className="px-6 py-4 border-b shrink-0">
-      <DialogTitle className="text-lg">
-        Vendors Supplying This Item
-      </DialogTitle>
 
-      {selectedVendorItem && (
-        <p className="text-sm text-muted-foreground">
-          Select a supplier below to contact them about this item.
-        </p>
-      )}
-    </DialogHeader>
+      <Dialog open={vendorDialogOpen} onOpenChange={setVendorDialogOpen}>
+        <DialogContent className="w-[95vw] max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-6 py-4 border-b shrink-0">
+            <DialogTitle className="text-lg">
+              Vendors Supplying This Item
+            </DialogTitle>
 
-    {/* Content */}
-    <div className="flex-1 min-h-0 overflow-hidden">
-      {itemVendorsLoading ? (
-        <div className="h-48 flex items-center justify-center text-sm text-muted-foreground">
-          Loading vendors...
-        </div>
-      ) : itemVendors.length === 0 ? (
-        <div className="h-48 flex flex-col items-center justify-center text-center px-6">
-          <Users className="h-10 w-10 text-muted-foreground/50 mb-3" />
+            {selectedVendorItem && (
+              <p className="text-sm text-muted-foreground">
+                Select a supplier below to contact them about this item.
+              </p>
+            )}
+          </DialogHeader>
 
-          <p className="text-sm font-medium">
-            No vendors found
-          </p>
+          {/* Content */}
+          <div className="flex-1 min-h-0 overflow-hidden">
+            {itemVendorsLoading ? (
+              <div className="h-48 flex items-center justify-center text-sm text-muted-foreground">
+                Loading vendors...
+              </div>
+            ) : itemVendors.length === 0 ? (
+              <div className="h-48 flex flex-col items-center justify-center text-center px-6">
+                <Users className="h-10 w-10 text-muted-foreground/50 mb-3" />
 
-          <p className="text-xs text-muted-foreground mt-1">
-            No suppliers are currently associated with this item.
-          </p>
-        </div>
-      ) : (
-        <div className="h-full overflow-y-auto px-6 py-4">
-          <div className="space-y-3">
-            {itemVendors.map((association) => {
-              const vendor = association.vendor;
-              const material = association.material;
+                <p className="text-sm font-medium">No vendors found</p>
 
-              return (
-                <div
-                  key={association.id}
-                  className="rounded-lg border bg-background p-4 hover:bg-muted/30 transition-colors"
-                >
-                  {/* Vendor Header */}
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-semibold truncate">
-                          {vendor?.name ?? "Unnamed Vendor"}
-                        </h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  No suppliers are currently associated with this item.
+                </p>
+              </div>
+            ) : (
+              <div className="h-full overflow-y-auto px-6 py-4">
+                <div className="space-y-3">
+                  {itemVendors.map((association) => {
+                    const vendor = association.vendor;
+                    const material = association.material;
 
-                        {association.isPreferred && (
-                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary shrink-0">
-                            Preferred
-                          </span>
+                    return (
+                      <div
+                        key={association.id}
+                        className="rounded-lg border bg-background p-4 hover:bg-muted/30 transition-colors"
+                      >
+                        {/* Vendor Header */}
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-semibold truncate">
+                                {vendor?.name ?? "Unnamed Vendor"}
+                              </h3>
+
+                              {association.isPreferred && (
+                                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary shrink-0">
+                                  Preferred
+                                </span>
+                              )}
+                            </div>
+
+                            {vendor?.contactPerson && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Contact: {vendor.contactPerson}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Email Button */}
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="shrink-0"
+                            onClick={() =>
+                              openSupplierMail(
+                                vendor,
+                                material?.name ?? "this item",
+                              )
+                            }
+                            disabled={!vendor?.email}
+                          >
+                            <Mail className="h-4 w-4 mr-1.5" />
+                            Email Vendor
+                          </Button>
+                        </div>
+
+                        {/* Vendor Contact */}
+                        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div className="rounded-md bg-muted/40 px-3 py-2">
+                            <p className="text-[11px] text-muted-foreground">
+                              Email
+                            </p>
+
+                            <p className="text-sm truncate">
+                              {vendor?.email ?? "No email available"}
+                            </p>
+                          </div>
+
+                          <div className="rounded-md bg-muted/40 px-3 py-2">
+                            <p className="text-[11px] text-muted-foreground">
+                              Phone
+                            </p>
+
+                            <p className="text-sm">
+                              {vendor?.phone ?? "No phone available"}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Material Details */}
+                        <div className="mt-3 pt-3 border-t">
+                          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
+                            <div>
+                              <span className="text-muted-foreground">
+                                Item:
+                              </span>{" "}
+                              <span className="font-medium">
+                                {material?.name ?? "Unknown"}
+                              </span>
+                            </div>
+
+                            <div>
+                              <span className="text-muted-foreground">
+                                Code:
+                              </span>{" "}
+                              <span className="font-medium">
+                                {material?.materialCode ?? "—"}
+                              </span>
+                            </div>
+
+                            <div>
+                              <span className="text-muted-foreground">
+                                Unit:
+                              </span>{" "}
+                              <span className="font-medium">
+                                {material?.unit ?? "—"}
+                              </span>
+                            </div>
+
+                            <div>
+                              <span className="text-muted-foreground">
+                                Vendor Rate:
+                              </span>{" "}
+                              <span className="font-medium">
+                                {association.vendorRate ?? "—"}
+                              </span>
+                            </div>
+
+                            {association.vendorMaterialCode && (
+                              <div>
+                                <span className="text-muted-foreground">
+                                  Vendor Code:
+                                </span>{" "}
+                                <span className="font-medium">
+                                  {association.vendorMaterialCode}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Notes */}
+                        {association.notes && (
+                          <div className="mt-3 text-xs text-muted-foreground">
+                            <span className="font-medium text-foreground">
+                              Notes:
+                            </span>{" "}
+                            {association.notes}
+                          </div>
                         )}
                       </div>
-
-                      {vendor?.contactPerson && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Contact: {vendor.contactPerson}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Email Button */}
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="shrink-0"
-                      onClick={() =>
-                        openSupplierMail(
-                          vendor,
-                          material?.name ?? "this item",
-                        )
-                      }
-                      disabled={!vendor?.email}
-                    >
-                      <Mail className="h-4 w-4 mr-1.5" />
-                      Email Vendor
-                    </Button>
-                  </div>
-
-                  {/* Vendor Contact */}
-                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div className="rounded-md bg-muted/40 px-3 py-2">
-                      <p className="text-[11px] text-muted-foreground">
-                        Email
-                      </p>
-
-                      <p className="text-sm truncate">
-                        {vendor?.email ?? "No email available"}
-                      </p>
-                    </div>
-
-                    <div className="rounded-md bg-muted/40 px-3 py-2">
-                      <p className="text-[11px] text-muted-foreground">
-                        Phone
-                      </p>
-
-                      <p className="text-sm">
-                        {vendor?.phone ?? "No phone available"}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Material Details */}
-                  <div className="mt-3 pt-3 border-t">
-                    <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
-                      <div>
-                        <span className="text-muted-foreground">
-                          Item:
-                        </span>{" "}
-                        <span className="font-medium">
-                          {material?.name ?? "Unknown"}
-                        </span>
-                      </div>
-
-                      <div>
-                        <span className="text-muted-foreground">
-                          Code:
-                        </span>{" "}
-                        <span className="font-medium">
-                          {material?.materialCode ?? "—"}
-                        </span>
-                      </div>
-
-                      <div>
-                        <span className="text-muted-foreground">
-                          Unit:
-                        </span>{" "}
-                        <span className="font-medium">
-                          {material?.unit ?? "—"}
-                        </span>
-                      </div>
-
-                      <div>
-                        <span className="text-muted-foreground">
-                          Vendor Rate:
-                        </span>{" "}
-                        <span className="font-medium">
-                          {association.vendorRate ?? "—"}
-                        </span>
-                      </div>
-
-                      {association.vendorMaterialCode && (
-                        <div>
-                          <span className="text-muted-foreground">
-                            Vendor Code:
-                          </span>{" "}
-                          <span className="font-medium">
-                            {association.vendorMaterialCode}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Notes */}
-                  {association.notes && (
-                    <div className="mt-3 text-xs text-muted-foreground">
-                      <span className="font-medium text-foreground">
-                        Notes:
-                      </span>{" "}
-                      {association.notes}
-                    </div>
-                  )}
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            )}
           </div>
-        </div>
-      )}
-    </div>
 
-    {/* Footer */}
-    {!itemVendorsLoading && itemVendors.length > 0 && (
-      <div className="px-6 py-3 border-t bg-muted/20 shrink-0">
-        <p className="text-xs text-muted-foreground">
-          {itemVendors.length}{" "}
-          {itemVendors.length === 1 ? "vendor" : "vendors"} found
-        </p>
-      </div>
-    )}
-  </DialogContent>
-</Dialog>
-
+          {/* Footer */}
+          {!itemVendorsLoading && itemVendors.length > 0 && (
+            <div className="px-6 py-3 border-t bg-muted/20 shrink-0">
+              <p className="text-xs text-muted-foreground">
+                {itemVendors.length}{" "}
+                {itemVendors.length === 1 ? "vendor" : "vendors"} found
+              </p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={!!supplierMailRecipient}
@@ -1244,7 +1505,10 @@ console.log(
               To: {supplierMailRecipient?.email}
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium" htmlFor="supplier-mail-subject">
+              <label
+                className="text-sm font-medium"
+                htmlFor="supplier-mail-subject"
+              >
                 Subject
               </label>
               <Input
@@ -1255,7 +1519,10 @@ console.log(
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium" htmlFor="supplier-mail-message">
+              <label
+                className="text-sm font-medium"
+                htmlFor="supplier-mail-message"
+              >
                 Message
               </label>
               <Textarea
