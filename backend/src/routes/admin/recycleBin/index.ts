@@ -22,7 +22,7 @@ type RecycleBinModelConfig = {
   select: Record<string, boolean>;
   where?: Record<string, any>;
   formatName: (record: Record<string, any>) => string;
-  permanentDelete?: (fastify: FastifyInstance, id: string) => Promise<void>;
+  permanentDelete?: (fastify: FastifyInstance, id: string, adminId: string) => Promise<void>;
 };
 
 const recycleBinModels: RecycleBinModelConfig[] = [
@@ -74,14 +74,165 @@ const recycleBinModels: RecycleBinModelConfig[] = [
     delegate: "user",
     select: { id: true, name: true, email: true, deletedAt: true, updatedAt: true },
     formatName: (record) => `${record.name || "User"}${record.email ? ` (${record.email})` : ""}`,
-    permanentDelete: async (fastify, id) => {
+    permanentDelete: async (fastify, id, adminId) => {
       await fastify.prisma.userRole.deleteMany({ where: { userId: id } });
       await fastify.prisma.userPermission.deleteMany({ where: { userId: id } });
+      await fastify.prisma.userAccessProfile.deleteMany({ where: { userId: id } });
+      await fastify.prisma.userSession.deleteMany({ where: { userId: id } });
+      await fastify.prisma.refreshToken.deleteMany({ where: { userId: id } });
+      await fastify.prisma.otpRequest.deleteMany({ where: { userId: id } });
+      await fastify.prisma.passwordReset.deleteMany({ where: { userId: id } });
+      await fastify.prisma.auditLog.deleteMany({ where: { userId: id } });
+      await fastify.prisma.dashboardWidget.deleteMany({ where: { createdById: id } });
+
       await fastify.prisma.employee.updateMany({
         where: { userId: id },
         data: { userId: null },
       });
-      await fastify.prisma.userAccessProfile.deleteMany({ where: { userId: id } });
+
+      if (adminId && adminId !== id) {
+        await fastify.prisma.salesOrder.updateMany({
+          where: { createdById: id },
+          data: { createdById: adminId },
+        });
+        await fastify.prisma.salesOrder.updateMany({
+          where: { orderTakenById: id },
+          data: { orderTakenById: null },
+        });
+        await fastify.prisma.tender.updateMany({
+          where: { createdById: id },
+          data: { createdById: adminId },
+        });
+        await fastify.prisma.tender.updateMany({
+          where: { assignedToId: id },
+          data: { assignedToId: null },
+        });
+        await fastify.prisma.tenderRequest.updateMany({
+          where: { assignedToId: id },
+          data: { assignedToId: null },
+        });
+        await fastify.prisma.purchaseOrder.updateMany({
+          where: { createdById: id },
+          data: { createdById: adminId },
+        });
+        await fastify.prisma.purchaseOrder.updateMany({
+          where: { approvedById: id },
+          data: { approvedById: null },
+        });
+        await fastify.prisma.purchaseRequest.updateMany({
+          where: { requestedById: id },
+          data: { requestedById: adminId },
+        });
+        await fastify.prisma.purchaseRequest.updateMany({
+          where: { approvedById: id },
+          data: { approvedById: null },
+        });
+        await fastify.prisma.invoice.updateMany({
+          where: { createdById: id },
+          data: { createdById: adminId },
+        });
+        await fastify.prisma.invoice.updateMany({
+          where: { approvedById: id },
+          data: { approvedById: null },
+        });
+        await fastify.prisma.creditNote.updateMany({
+          where: { createdById: id },
+          data: { createdById: adminId },
+        });
+        await fastify.prisma.creditNote.updateMany({
+          where: { approvedById: id },
+          data: { approvedById: null },
+        });
+        await fastify.prisma.debitNote.updateMany({
+          where: { createdById: id },
+          data: { createdById: adminId },
+        });
+        await fastify.prisma.debitNote.updateMany({
+          where: { approvedById: id },
+          data: { approvedById: null },
+        });
+        await fastify.prisma.expense.updateMany({
+          where: { createdById: id },
+          data: { createdById: adminId },
+        });
+        await fastify.prisma.expense.updateMany({
+          where: { approvedById: id },
+          data: { approvedById: null },
+        });
+        await fastify.prisma.bOM.updateMany({
+          where: { createdById: id },
+          data: { createdById: adminId },
+        });
+        await fastify.prisma.bOM.updateMany({
+          where: { approvedById: id },
+          data: { approvedById: null },
+        });
+        await fastify.prisma.engineeringDrawing.updateMany({
+          where: { createdById: id },
+          data: { createdById: adminId },
+        });
+        await fastify.prisma.engineeringDrawing.updateMany({
+          where: { approvedById: id },
+          data: { approvedById: null },
+        });
+        await fastify.prisma.drawingRevision.updateMany({
+          where: { createdById: id },
+          data: { createdById: adminId },
+        });
+        await fastify.prisma.drawingRevision.updateMany({
+          where: { approvedById: id },
+          data: { approvedById: null },
+        });
+        await fastify.prisma.bOMRevision.updateMany({
+          where: { revisedById: id },
+          data: { revisedById: adminId },
+        });
+        await fastify.prisma.productionPlan.updateMany({
+          where: { createdById: id },
+          data: { createdById: adminId },
+        });
+        await fastify.prisma.productionPlan.updateMany({
+          where: { approvedById: id },
+          data: { approvedById: null },
+        });
+        await fastify.prisma.workOrder.updateMany({
+          where: { createdById: id },
+          data: { createdById: adminId },
+        });
+        await fastify.prisma.workOrder.updateMany({
+          where: { approvedById: id },
+          data: { approvedById: null },
+        });
+        await fastify.prisma.workOrder.updateMany({
+          where: { assignedToId: id },
+          data: { assignedToId: null },
+        });
+        await fastify.prisma.approvalRequest.updateMany({
+          where: { requestedById: id },
+          data: { requestedById: adminId },
+        });
+        await fastify.prisma.approvalRequest.updateMany({
+          where: { assignedToId: id },
+          data: { assignedToId: null },
+        });
+        await fastify.prisma.approvalHistory.updateMany({
+          where: { performedById: id },
+          data: { performedById: adminId },
+        });
+        await fastify.prisma.vendor.updateMany({
+          where: { createdById: id },
+          data: { createdById: adminId },
+        });
+        await fastify.prisma.vendorRevision.updateMany({
+          where: { createdById: id },
+          data: { createdById: adminId },
+        });
+        await fastify.prisma.vendorProduct.updateMany({
+          where: { createdById: id },
+          data: { createdById: adminId },
+        });
+      }
+
       await (fastify.prisma as any).user.deleteMany({ where: { id } });
     },
   },
@@ -480,8 +631,9 @@ export async function recycleBinRoutes(
           return reply.status(400).send({ success: false, message: "Invalid module specified." });
         }
 
+        const adminId = (request as any).admin?.id || "";
         if (config.permanentDelete) {
-          await config.permanentDelete(fastify, id);
+          await config.permanentDelete(fastify, id, adminId);
         } else {
           await getDelegate(fastify, config).delete({ where: { id } });
         }
@@ -512,6 +664,7 @@ export async function recycleBinRoutes(
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
+        const adminId = (request as any).admin?.id || "";
         for (const config of recycleBinModels) {
           const delegate = getDelegate(fastify, config);
           const deletedRecords = await delegate.findMany({
@@ -521,7 +674,7 @@ export async function recycleBinRoutes(
 
           for (const record of deletedRecords) {
             if (config.permanentDelete) {
-              await config.permanentDelete(fastify, record.id);
+              await config.permanentDelete(fastify, record.id, adminId);
             } else {
               await delegate.delete({ where: { id: record.id } });
             }

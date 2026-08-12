@@ -144,17 +144,29 @@ async function authPlugin(fastify: FastifyInstance) {
         }
 
         const up = dbUser.accessProfile;
+        const mainRole = dbUser.userRoles[0]?.role;
+        const hasOverride = up?.hasOverride ?? false;
+
+        const resolvedPageAccess = hasOverride
+          ? (up?.pageAccess as string[] || [])
+          : (mainRole?.pageAccess && (mainRole.pageAccess as any[]).length > 0
+              ? (mainRole.pageAccess as string[])
+              : (up?.pageAccess as string[] || []));
+
+        const resolvedActionPermissions = hasOverride
+          ? (up?.actionPermissions || { create: true, edit: true, delete: false, export: true })
+          : (mainRole?.actionPermissions && Object.keys(mainRole.actionPermissions).length > 0
+              ? mainRole.actionPermissions
+              : (up?.actionPermissions || { create: true, edit: true, delete: false, export: true }));
 
         const tokenUser = {
           id: decoded.userId,
           companyId: activeCompanyId,
           roles: dbUser.userRoles.map((ur) => ur.role.name) || [],
-          uiAccessProfile: up
-            ? {
-                pageAccess: up.pageAccess as string[],
-                actionPermissions: up.actionPermissions,
-              }
-            : null,
+          uiAccessProfile: {
+            pageAccess: resolvedPageAccess,
+            actionPermissions: resolvedActionPermissions,
+          },
         };
         (request as any).user = tokenUser;
         (request as any).admin = tokenUser;

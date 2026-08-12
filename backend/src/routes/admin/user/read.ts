@@ -62,6 +62,25 @@ async function readUsersRoute(
           message: "Users fetched successfully.",
           data: users.map((user: any) => {
             const up = user.accessProfile;
+            const mainRole = user.userRoles[0]?.role;
+            const hasOverride = up?.hasOverride ?? false;
+
+            const pageAccess = hasOverride
+              ? (up?.pageAccess || [])
+              : (mainRole?.pageAccess && (mainRole.pageAccess as any[]).length > 0
+                  ? mainRole.pageAccess
+                  : (up?.pageAccess || []));
+            const fieldPermissions = hasOverride
+              ? (up?.fieldPermissions || {})
+              : (mainRole?.fieldPermissions && Object.keys(mainRole.fieldPermissions).length > 0
+                  ? mainRole.fieldPermissions
+                  : (up?.fieldPermissions || {}));
+            const actionPermissions = hasOverride
+              ? (up?.actionPermissions || { create: true, edit: true, delete: false, export: true })
+              : (mainRole?.actionPermissions && Object.keys(mainRole.actionPermissions).length > 0
+                  ? mainRole.actionPermissions
+                  : (up?.actionPermissions || { create: true, edit: true, delete: false, export: true }));
+
             return {
               id: user.id,
               name: user.name,
@@ -72,11 +91,12 @@ async function readUsersRoute(
               isActive: user.isActive,
               createdAt: user.createdAt,
               updatedAt: user.updatedAt,
-              role: user.userRoles[0]?.role?.name || "",
+              role: mainRole?.name || "",
               designation: up?.designation || "Team Member",
-              pageAccess: up?.pageAccess || [],
-              fieldPermissions: up?.fieldPermissions || {},
-              actionPermissions: up?.actionPermissions || { create: true, edit: true, delete: false, export: true },
+              hasOverride,
+              pageAccess,
+              fieldPermissions,
+              actionPermissions,
               teamId: user.employee?.teamId || null,
               teamName: user.employee?.team?.name || null,
               roles: user.userRoles.map((ur: any) => ({

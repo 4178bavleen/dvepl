@@ -229,6 +229,9 @@ export interface Role {
   name: string;
   description?: string | null;
   isSystem: boolean;
+  pageAccess?: any;
+  fieldPermissions?: any;
+  actionPermissions?: any;
   createdAt: string;
   updatedAt: string;
   deletedAt?: string | null;

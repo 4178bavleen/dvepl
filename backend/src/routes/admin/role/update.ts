@@ -49,7 +49,7 @@ async function updateRoleRoute(
 
         const { id } = request.params as { id: string };
 
-        const { name, description, permissionIds } = validation.data;
+        const { name, description, permissionIds, pageAccess, fieldPermissions, actionPermissions } = validation.data;
 
         const companyId = (request.admin as any)?.companyId;
 
@@ -132,6 +132,9 @@ async function updateRoleRoute(
             data: {
               name,
               description,
+              ...(pageAccess !== undefined ? { pageAccess } : {}),
+              ...(fieldPermissions !== undefined ? { fieldPermissions } : {}),
+              ...(actionPermissions !== undefined ? { actionPermissions } : {}),
             },
           });
 

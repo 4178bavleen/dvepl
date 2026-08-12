@@ -62,6 +62,7 @@ interface UserItem {
   designation?: string | null;
   phone?: string | null;
   role: string;
+  hasOverride?: boolean;
   pageAccess?: string[];
   fieldPermissions?: Record<string, { view: boolean; edit: boolean }>;
   actionPermissions?: StoredActionPermissions;
@@ -151,6 +152,13 @@ export function SettingsPage() {
   >({});
   const [actionPermsState, setActionPermsState] = useState<PageActionPermissions>({});
   const [selectedActionModule, setSelectedActionModule] = useState("dashboard");
+
+  // Standard PRBAC UI state
+  const [permissionMode, setPermissionMode] = useState<"role" | "user">("role");
+  const [selectedPermissionRole, setSelectedPermissionRole] = useState("");
+  const [selectedPermissionUserId, setSelectedPermissionUserId] = useState("");
+  const [permissionRoleSearch, setPermissionRoleSearch] = useState("");
+  const [permissionUserSearch, setPermissionUserSearch] = useState("");
 
   // Create single user form state
   const [newUserName, setNewUserName] = useState("");
@@ -299,6 +307,7 @@ export function SettingsPage() {
               ? u.designation.title || "Team Member"
               : u.designation || "Team Member",
           role: u.role || "user",
+          hasOverride: u.hasOverride ?? false,
           pageAccess: u.pageAccess || ["dashboard", "vendors", "orders"],
           fieldPermissions: u.fieldPermissions || {},
           actionPermissions: u.actionPermissions || {
@@ -664,6 +673,7 @@ export function SettingsPage() {
     { key: "settings", label: "⚙️ Settings" },
   ];
 
+
   // Fields Access List
   const fieldsAccessList = [
     // Organization
@@ -770,49 +780,110 @@ export function SettingsPage() {
     { key: "reference_code", label: "Reference Code", tag: "reference_codes" }
   ];
 
-  // Handle Permissions Modal
-  const handleOpenPermModal = async (user: UserItem) => {
+  const selectedResourceFields = fieldsAccessList.filter(
+    (field) => field.tag === selectedActionModule
+  );
+
+  // Standard PRBAC permission helpers
+  const permissionRoles = useMemo(() => {
+    const roles = Array.from(
+      new Set(users.map((user) => user.role?.trim()).filter(Boolean)),
+    ) as string[];
+
+    return roles.sort((a, b) => a.localeCompare(b));
+  }, [users]);
+
+  const roleLabel = (role: string) =>
+    role
+      .replace(/[_-]+/g, " ")
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+
+  const initializePermissionState = (user: UserItem) => {
     setPermUser(user);
 
-    // Initial page checkboxes
     const pageObj: Record<string, boolean> = {};
-    modulesList.forEach((m) => {
-      pageObj[m.key] = user.pageAccess?.includes(m.key) ?? false;
+    modulesList.forEach((module) => {
+      pageObj[module.key] = user.pageAccess?.includes(module.key) ?? false;
     });
     setPageAccessState(pageObj);
 
-    // Initial field settings
     const fieldObj: Record<string, { view: boolean; edit: boolean }> = {};
-    fieldsAccessList.forEach((f) => {
-      fieldObj[f.key] = user.fieldPermissions?.[f.key] ?? {
+    fieldsAccessList.forEach((field) => {
+      fieldObj[field.key] = user.fieldPermissions?.[field.key] ?? {
         view: true,
         edit: true,
       };
     });
     setFieldPermsState(fieldObj);
 
-    // Actions settings
     setActionPermsState(
       normalizePageActionPermissions(
         user.actionPermissions ?? LEGACY_ACTION_DEFAULTS,
         modulesList.map((module) => module.key),
       ),
     );
-    setSelectedActionModule("dashboard");
 
+    setSelectedActionModule(
+      user.pageAccess?.find((key) => modulesList.some((module) => module.key === key)) ||
+        "dashboard",
+    );
+  };
+
+  // Open the permission editor from an existing user row.
+  // The editor starts in Role Permissions mode because PRBAC is role-first.
+  const handleOpenPermModal = async (user: UserItem) => {
+    setPermissionMode("role");
+    setSelectedPermissionRole(user.role || "user");
+    setSelectedPermissionUserId(user.id);
+    setPermissionRoleSearch("");
+    setPermissionUserSearch("");
+    initializePermissionState(user);
     setIsPermModalOpen(true);
+  };
+
+  const handleSelectPermissionRole = (role: string) => {
+    setPermissionMode("role");
+    setSelectedPermissionRole(role);
+
+    const store = useERPStore.getState();
+    const roleObj = store.roles?.find((r: any) => r.name === role);
+    if (roleObj) {
+      const simulatedUser: any = {
+        id: "",
+        name: "",
+        email: "",
+        role: role,
+        pageAccess: roleObj.pageAccess || [],
+        fieldPermissions: roleObj.fieldPermissions || {},
+        actionPermissions: roleObj.actionPermissions || {},
+      };
+      initializePermissionState(simulatedUser);
+    } else {
+      const roleUser = users.find((user) => user.role === role);
+      if (roleUser) {
+        setSelectedPermissionUserId(roleUser.id);
+        initializePermissionState(roleUser);
+      }
+    }
+  };
+
+  const handleSelectPermissionUser = (user: UserItem) => {
+    setPermissionMode("user");
+    setSelectedPermissionUserId(user.id);
+    setSelectedPermissionRole(user.role || "user");
+    initializePermissionState(user);
   };
 
   const applyPreset = (preset: "full" | "viewer" | "none") => {
     const pageObj: Record<string, boolean> = {};
     const fieldObj: Record<string, { view: boolean; edit: boolean }> = {};
 
-    modulesList.forEach((m) => {
-      pageObj[m.key] = preset === "full" || preset === "viewer";
+    modulesList.forEach((module) => {
+      pageObj[module.key] = preset === "full" || preset === "viewer";
     });
 
-    fieldsAccessList.forEach((f) => {
-      fieldObj[f.key] = {
+    fieldsAccessList.forEach((field) => {
+      fieldObj[field.key] = {
         view: preset === "full" || preset === "viewer",
         edit: preset === "full",
       };
@@ -826,7 +897,9 @@ export function SettingsPage() {
           module.key,
           preset === "full"
             ? { create: true, edit: true, delete: true, export: true }
-            : NO_ACTIONS,
+            : preset === "viewer"
+              ? { create: false, edit: false, delete: false, export: true }
+              : NO_ACTIONS,
         ]),
       ),
     );
@@ -834,58 +907,123 @@ export function SettingsPage() {
 
   const savePermissions = async () => {
     if (!permUser) return;
+
     try {
       const pageAccess = Object.keys(pageAccessState).filter(
-        (k) => pageAccessState[k],
+        (key) => pageAccessState[key],
       );
 
-      // A field cannot be editable when its own module's edit action is disabled.
+      // A field cannot be editable if its resource-level Update action is disabled.
       const finalFieldPerms = { ...fieldPermsState };
       fieldsAccessList.forEach((field) => {
         if (!actionPermsState[field.tag]?.edit) {
-          const key = field.key;
-          finalFieldPerms[key] = {
-            ...finalFieldPerms[key],
+          finalFieldPerms[field.key] = {
+            ...finalFieldPerms[field.key],
             edit: false,
           };
         }
       });
 
-      const updatedUser = {
-        ...permUser,
+      const permissionPayload = {
         pageAccess,
         fieldPermissions: finalFieldPerms,
         actionPermissions: actionPermsState,
       };
 
-      if (securityApi.users.update) {
-        await securityApi.users.update(permUser.id, {
-          pageAccess,
-          fieldPermissions: finalFieldPerms,
-          actionPermissions: actionPermsState,
-        });
+      if (permissionMode === "role") {
+        const storeRoles = store.roles || [];
+        const roleObj = storeRoles.find((r: any) => r.name === selectedPermissionRole);
+        if (!roleObj) {
+          toast.error("Role not found");
+          return;
+        }
+        if (securityApi.roles.update) {
+          await securityApi.roles.update(roleObj.id, permissionPayload);
+        }
+
+        // Update local roles store
+        const updatedRoles = storeRoles.map((r: any) =>
+          r.id === roleObj.id
+            ? {
+                ...r,
+                pageAccess,
+                fieldPermissions: finalFieldPerms,
+                actionPermissions: actionPermsState,
+              }
+            : r
+        );
+        useERPStore.setState({ roles: updatedRoles });
+      } else {
+        if (!permUser) return;
+        if (securityApi.users.update) {
+          await securityApi.users.update(permUser.id, {
+            ...permissionPayload,
+            hasOverride: true,
+          });
+        }
       }
 
-      setUsers((prev) =>
-        prev.map((u) => (u.id === permUser.id ? updatedUser : u)),
-      );
-
-      // Sync to global Zustand store so table changes apply immediately
-      const updatedStoreUsers = store.users.map((u: any) =>
-        u.id === permUser.id
-          ? {
-              ...u,
+      // Sync users local state
+      const updatedUsers = users.map((user) => {
+        if (permissionMode === "role") {
+          if (user.role === selectedPermissionRole && !user.hasOverride) {
+            return {
+              ...user,
               pageAccess,
               fieldPermissions: finalFieldPerms,
               actionPermissions: actionPermsState,
-            }
-          : u,
-      );
+            };
+          }
+        } else {
+          if (permUser && user.id === permUser.id) {
+            return {
+              ...user,
+              pageAccess,
+              fieldPermissions: finalFieldPerms,
+              actionPermissions: actionPermsState,
+              hasOverride: true,
+            };
+          }
+        }
+        return user;
+      });
+
+      setUsers(updatedUsers);
+
+      // Sync Zustand users store
+      const updatedStoreUsers = store.users.map((user: any) => {
+        if (permissionMode === "role") {
+          if (user.role === selectedPermissionRole && !user.hasOverride) {
+            return {
+              ...user,
+              pageAccess,
+              fieldPermissions: finalFieldPerms,
+              actionPermissions: actionPermsState,
+            };
+          }
+        } else {
+          if (permUser && user.id === permUser.id) {
+            return {
+              ...user,
+              pageAccess,
+              fieldPermissions: finalFieldPerms,
+              actionPermissions: actionPermsState,
+              hasOverride: true,
+            };
+          }
+        }
+        return user;
+      });
       useERPStore.setState({ users: updatedStoreUsers });
 
-      toast.success("Permissions updated successfully");
+      toast.success(
+        permissionMode === "role"
+          ? `${roleLabel(selectedPermissionRole)} permissions updated`
+          : "User permission override updated",
+      );
       setIsPermModalOpen(false);
     } catch (err) {
+      console.error(err);
       toast.error("Failed to save permissions");
     }
   };
@@ -3791,247 +3929,662 @@ export function SettingsPage() {
         </div>
       )}
 
-      {/* PERMISSIONS MODAL */}
+      {/* STANDARD PRBAC PERMISSIONS MODAL */}
       {isPermModalOpen && permUser && (
-        <div className="modal-overlay">
-          <div className="modal-box perm-modal">
-            <div className="modal-header">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-lg">
-                  🔐
+        <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 md:p-6">
+          <div className="w-full max-w-7xl h-[92vh] overflow-hidden rounded-2xl border border-border bg-background shadow-2xl flex flex-col">
+            {/* Header */}
+            <div className="shrink-0 border-b border-border bg-card px-5 md:px-6 py-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="h-11 w-11 shrink-0 rounded-xl bg-primary/10 text-primary flex items-center justify-center text-xl">
+                    🛡️
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h2 className="text-lg font-bold text-foreground">
+                        Permission Management
+                      </h2>
+                      <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-primary">
+                        PRBAC
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Manage role-based access, resource actions, scopes and field-level permissions.
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <div className="modal-title text-base font-bold">
-                    Manage Permissions
-                  </div>
-                  <div className="text-[11px] text-muted-foreground mt-0.5">
-                    Configuring access matrix for:{" "}
-                    <span className="font-semibold text-primary">
-                      {permUser.name}
-                    </span>
-                  </div>
+                <button
+                  onClick={() => setIsPermModalOpen(false)}
+                  className="h-9 w-9 shrink-0 rounded-lg border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-muted transition"
+                  aria-label="Close permission management"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Permission mode */}
+              <div className="mt-4 flex items-center justify-between gap-3 flex-wrap">
+                <div className="inline-flex rounded-lg border border-border bg-muted/40 p-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPermissionMode("role");
+                      const roleUser = users.find(
+                        (user) => user.role === selectedPermissionRole,
+                      );
+                      if (roleUser) initializePermissionState(roleUser);
+                    }}
+                    className={`rounded-md px-4 py-2 text-[11px] font-bold transition ${
+                      permissionMode === "role"
+                        ? "bg-card text-primary shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Role Permissions
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPermissionMode("user");
+                      const currentUser = users.find(
+                        (user) => user.id === selectedPermissionUserId,
+                      );
+                      if (currentUser) initializePermissionState(currentUser);
+                    }}
+                    className={`rounded-md px-4 py-2 text-[11px] font-bold transition ${
+                      permissionMode === "user"
+                        ? "bg-card text-primary shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    User Overrides
+                  </button>
+                </div>
+
+                <div className="text-[10px] text-muted-foreground">
+                  {permissionMode === "role"
+                    ? `Changes apply to users assigned to ${roleLabel(selectedPermissionRole)}`
+                    : `Override permissions for ${permUser.name}`}
                 </div>
               </div>
-              <button
-                onClick={() => setIsPermModalOpen(false)}
-                className="modal-close"
-              >
-                ✕
-              </button>
             </div>
-            <div className="modal-body space-y-6">
-                  {/* Presets */}
-                  <div className="space-y-2">
-                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                      Quick Preset Profile
+
+            {/* Body */}
+            <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)]">
+              {/* Left navigation */}
+              <aside className="min-h-0 overflow-y-auto border-r border-border bg-card">
+                {permissionMode === "role" ? (
+                  <>
+                    <div className="sticky top-0 z-20 border-b border-border bg-card p-4">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Roles
+                      </div>
+                      <input
+                        value={permissionRoleSearch}
+                        onChange={(e) => setPermissionRoleSearch(e.target.value)}
+                        placeholder="Search roles..."
+                        className="mt-3 w-full rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:border-primary"
+                      />
                     </div>
-                    <div className="perm-presets">
+                    <div className="p-2">
+                      {permissionRoles
+                        .filter((role) =>
+                          roleLabel(role)
+                            .toLowerCase()
+                            .includes(permissionRoleSearch.toLowerCase()),
+                        )
+                        .map((role) => {
+                          const roleUsers = users.filter((user) => user.role === role);
+                          const selected = role === selectedPermissionRole;
+                          const rolePermissionSource = roleUsers[0];
+                          const count = rolePermissionSource?.pageAccess?.length ?? 0;
+
+                          return (
+                            <button
+                              key={role}
+                              type="button"
+                              onClick={() => handleSelectPermissionRole(role)}
+                              className={`mb-1 w-full rounded-xl border p-3 text-left transition ${
+                                selected
+                                  ? "border-primary/30 bg-primary/5"
+                                  : "border-transparent hover:border-border hover:bg-muted/40"
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <div className="text-xs font-bold text-foreground truncate">
+                                    {roleLabel(role)}
+                                  </div>
+                                  <div className="mt-1 text-[10px] text-muted-foreground">
+                                    {roleUsers.length} user{roleUsers.length === 1 ? "" : "s"} • {count} resources
+                                  </div>
+                                </div>
+                                <span
+                                  className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
+                                    selected ? "bg-primary" : "bg-muted-foreground/30"
+                                  }`}
+                                />
+                              </div>
+                            </button>
+                          );
+                        })}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="sticky top-0 z-20 border-b border-border bg-card p-4">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Users
+                      </div>
+                      <input
+                        value={permissionUserSearch}
+                        onChange={(e) => setPermissionUserSearch(e.target.value)}
+                        placeholder="Search users..."
+                        className="mt-3 w-full rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div className="p-2">
+                      {users
+                        .filter((user) => {
+                          const q = permissionUserSearch.toLowerCase();
+                          return (
+                            user.name.toLowerCase().includes(q) ||
+                            user.email.toLowerCase().includes(q) ||
+                            user.role.toLowerCase().includes(q)
+                          );
+                        })
+                        .map((user) => {
+                          const selected = user.id === selectedPermissionUserId;
+                          return (
+                            <button
+                              key={user.id}
+                              type="button"
+                              onClick={() => handleSelectPermissionUser(user)}
+                              className={`mb-1 w-full rounded-xl border p-3 text-left transition ${
+                                selected
+                                  ? "border-primary/30 bg-primary/5"
+                                  : "border-transparent hover:border-border hover:bg-muted/40"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <div className="h-8 w-8 shrink-0 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[11px] font-bold">
+                                  {user.name
+                                    .split(" ")
+                                    .map((part) => part[0])
+                                    .join("")
+                                    .slice(0, 2)
+                                    .toUpperCase()}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="text-xs font-bold text-foreground truncate">
+                                    {user.name}
+                                  </div>
+                                  <div className="mt-0.5 text-[10px] text-muted-foreground truncate">
+                                    {roleLabel(user.role)}
+                                  </div>
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                    </div>
+                  </>
+                )}
+              </aside>
+
+              {/* Main permission editor */}
+              <main className="min-h-0 overflow-y-auto bg-background">
+                <div className="p-5 md:p-6 space-y-5">
+                  {/* Context card */}
+                  <div className="rounded-2xl border border-border bg-card p-5">
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                      <div>
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-primary">
+                          {permissionMode === "role" ? "Role" : "User Override"}
+                        </div>
+                        <h3 className="mt-1 text-xl font-bold text-foreground">
+                          {permissionMode === "role"
+                            ? roleLabel(selectedPermissionRole)
+                            : permUser.name}
+                        </h3>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {permissionMode === "role"
+                            ? `${users.filter((user) => user.role === selectedPermissionRole).length} users inherit this permission policy.`
+                            : `Overrides inherited role permissions for ${permUser.name}.`}
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-border bg-muted/30 px-3 py-2">
+                        <div className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                          Permission model
+                        </div>
+                        <div className="mt-1 text-[11px] font-semibold text-foreground">
+                          Resource → Action → Scope → Field
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Presets */}
+                    <div className="mt-5 flex items-center gap-2 flex-wrap border-t border-border pt-4">
+                      <span className="mr-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Presets
+                      </span>
                       <button
                         onClick={() => applyPreset("full")}
-                        className="perm-preset-btn"
+                        className="rounded-lg border border-border bg-background px-3 py-2 text-[10px] font-bold text-foreground hover:border-primary hover:text-primary transition"
                       >
-                        ⚡ Full Access
+                        Full Access
                       </button>
                       <button
                         onClick={() => applyPreset("viewer")}
-                        className="perm-preset-btn"
+                        className="rounded-lg border border-border bg-background px-3 py-2 text-[10px] font-bold text-foreground hover:border-primary hover:text-primary transition"
                       >
-                        👁 View Only
+                        View Only
                       </button>
                       <button
                         onClick={() => applyPreset("none")}
-                        className="perm-preset-btn preset-danger"
+                        className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[10px] font-bold text-red-600 hover:bg-red-100 transition"
                       >
-                        🚫 No Access
+                        No Access
                       </button>
                     </div>
                   </div>
 
-                  {/* Page Access */}
-                  <div className="space-y-2">
-                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                      Page / Module Navigation Access
-                    </div>
-                    <div className="perm-page-access-grid">
-                      {modulesList.map((m) => (
-                        <label key={m.key} className="perm-page-toggle">
-                          <input
-                            type="checkbox"
-                            checked={pageAccessState[m.key] ?? false}
-                            onChange={(e) => {
-                              const hasPageAccess = e.target.checked;
-                              setPageAccessState({
-                                ...pageAccessState,
-                                [m.key]: hasPageAccess,
-                              });
-                              if (!hasPageAccess) {
-                                setActionPermsState({
-                                  ...actionPermsState,
-                                  [m.key]: NO_ACTIONS,
-                                });
-                              }
-                            }}
-                          />
-                          <div className="perm-page-card">{m.label}</div>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Action Permissions */}
-                  <div className="space-y-2">
-                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                      Action Rules for Selected Module
-                    </div>
-                    <select
-                      value={selectedActionModule}
-                      onChange={(event) => setSelectedActionModule(event.target.value)}
-                      className="w-full rounded-md border border-border bg-card px-3 py-2 text-xs text-foreground"
-                    >
-                      {modulesList.map((module) => (
-                        <option key={module.key} value={module.key}>
-                          {module.label} {pageAccessState[module.key] ? "" : "(No View Access)"}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {[
-                        {
-                          key: "create",
-                          label: "➕ Create Records",
-                          desc: "Can insert new entries",
-                        },
-                        {
-                          key: "edit",
-                          label: "✏️ Edit Records",
-                          desc: "Can update existing fields",
-                        },
-                        {
-                          key: "delete",
-                          label: "🗑 Delete Records",
-                          desc: "Can delete data rows",
-                        },
-                        {
-                          key: "export",
-                          label: "📤 Export Data",
-                          desc: "Can download csv/reports",
-                        },
-                      ].map((act) => (
-                        <div key={act.key} className="perm-action-card">
-                          <div>
-                            <div className="text-xs font-bold text-foreground">
-                              {act.label}
-                            </div>
-                            <div className="text-[10px] text-muted-foreground">
-                              {act.desc}
-                            </div>
+                  {/* Resource matrix */}
+                  <section className="rounded-2xl border border-border bg-card overflow-hidden">
+                    <div className="border-b border-border px-5 py-4">
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div>
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-primary">
+                            Resource permissions
                           </div>
-                          <label className="toggle-wrap">
+                          <h3 className="mt-1 text-sm font-bold text-foreground">
+                            Resource access matrix
+                          </h3>
+                          <p className="mt-1 text-[10px] text-muted-foreground">
+                            Grant access to resources and control the actions available within each one.
+                          </p>
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {Object.values(pageAccessState).filter(Boolean).length}/{modulesList.length} resources enabled
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[760px] text-left">
+                        <thead>
+                          <tr className="border-b border-border bg-muted/50">
+                            <th className="px-5 py-3 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                              Resource
+                            </th>
+                            <th className="px-3 py-3 text-center text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                              View
+                            </th>
+                            {ACTION_PERMISSION_KEYS.map((key) => (
+                              <th
+                                key={key}
+                                className="px-3 py-3 text-center text-[9px] font-bold uppercase tracking-wider text-muted-foreground"
+                              >
+                                {key === "edit" ? "Update" : key.charAt(0).toUpperCase() + key.slice(1)}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {modulesList.map((module) => {
+                            const accessible = pageAccessState[module.key] ?? false;
+                            const actions = actionPermsState[module.key] ?? NO_ACTIONS;
+                            const selected = selectedActionModule === module.key;
+
+                            return (
+                              <tr
+                                key={module.key}
+                                onClick={() => setSelectedActionModule(module.key)}
+                                className={`cursor-pointer border-b border-border/70 transition ${
+                                  selected ? "bg-primary/5" : "hover:bg-muted/30"
+                                }`}
+                              >
+                                <td className="px-5 py-3">
+                                  <div className="flex items-center gap-2.5">
+                                    <input
+                                      type="checkbox"
+                                      checked={accessible}
+                                      onClick={(e) => e.stopPropagation()}
+                                      onChange={(e) => {
+                                        const enabled = e.target.checked;
+                                        setPageAccessState({
+                                          ...pageAccessState,
+                                          [module.key]: enabled,
+                                        });
+                                        if (!enabled) {
+                                          setActionPermsState({
+                                            ...actionPermsState,
+                                            [module.key]: NO_ACTIONS,
+                                          });
+                                        }
+                                      }}
+                                      className="h-4 w-4 accent-primary"
+                                    />
+                                    <div>
+                                      <div className="text-xs font-semibold text-foreground">
+                                        {module.label}
+                                      </div>
+                                      <div className="text-[9px] text-muted-foreground">
+                                        {accessible ? "Accessible" : "No access"}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-3 py-3 text-center">
+                                  <span
+                                    className={`inline-flex h-6 w-6 items-center justify-center rounded-md text-[11px] font-bold ${
+                                      accessible
+                                        ? "bg-emerald-500/10 text-emerald-600"
+                                        : "bg-muted text-muted-foreground"
+                                    }`}
+                                  >
+                                    {accessible ? "✓" : "—"}
+                                  </span>
+                                </td>
+                                {ACTION_PERMISSION_KEYS.map((key) => {
+                                  const checked = Boolean(actions[key]);
+                                  return (
+                                    <td key={key} className="px-3 py-3 text-center">
+                                      <input
+                                        type="checkbox"
+                                        checked={checked}
+                                        disabled={!accessible}
+                                        onClick={(e) => e.stopPropagation()}
+                                        onChange={(e) =>
+                                          setActionPermsState({
+                                            ...actionPermsState,
+                                            [module.key]: {
+                                              ...(actionPermsState[module.key] ?? NO_ACTIONS),
+                                              [key]: e.target.checked,
+                                            },
+                                          })
+                                        }
+                                        className={`h-4 w-4 accent-primary ${
+                                          !accessible ? "opacity-40" : ""
+                                        }`}
+                                      />
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+
+                  {/* Selected resource */}
+                  <section className="rounded-2xl border border-border bg-card p-5">
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                      <div>
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-primary">
+                          Selected resource
+                        </div>
+                        <h3 className="mt-1 text-lg font-bold text-foreground">
+                          {modulesList.find((module) => module.key === selectedActionModule)?.label ||
+                            selectedActionModule}
+                        </h3>
+                      </div>
+                      <span
+                        className={`rounded-full px-3 py-1.5 text-[9px] font-bold ${
+                          pageAccessState[selectedActionModule]
+                            ? "bg-emerald-500/10 text-emerald-600"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {pageAccessState[selectedActionModule]
+                          ? "ACCESS GRANTED"
+                          : "NO ACCESS"}
+                      </span>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="mt-5 grid grid-cols-2 xl:grid-cols-4 gap-3">
+                      {[
+                        { key: "create", label: "Create", description: "Add records" },
+                        { key: "edit", label: "Update", description: "Modify records" },
+                        { key: "delete", label: "Delete", description: "Remove records" },
+                        { key: "export", label: "Export", description: "Download data" },
+                      ].map((action) => {
+                        const checked = Boolean(
+                          actionPermsState[selectedActionModule]?.[
+                            action.key as keyof typeof actionPermsState[string]
+                          ],
+                        );
+                        const disabled = !pageAccessState[selectedActionModule];
+
+                        return (
+                          <label
+                            key={action.key}
+                            className={`rounded-xl border p-4 transition ${
+                              disabled
+                                ? "opacity-50 cursor-not-allowed bg-muted/30"
+                                : checked
+                                  ? "border-primary/40 bg-primary/5 cursor-pointer"
+                                  : "border-border bg-background hover:border-primary/30 cursor-pointer"
+                            }`}
+                          >
                             <input
                               type="checkbox"
-                              checked={actionPermsState[selectedActionModule]?.[act.key as keyof typeof actionPermsState[string]] ?? false}
-                              disabled={!pageAccessState[selectedActionModule]}
+                              checked={checked}
+                              disabled={disabled}
                               onChange={(e) =>
                                 setActionPermsState({
                                   ...actionPermsState,
                                   [selectedActionModule]: {
                                     ...(actionPermsState[selectedActionModule] ?? NO_ACTIONS),
-                                    [act.key]: e.target.checked,
+                                    [action.key]: e.target.checked,
                                   },
                                 })
                               }
+                              className="sr-only"
                             />
-                            <span className="toggle-slider"></span>
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <div className="text-xs font-bold text-foreground">
+                                  {action.label}
+                                </div>
+                                <div className="mt-1 text-[10px] text-muted-foreground">
+                                  {action.description}
+                                </div>
+                              </div>
+                              <span
+                                className={`h-5 w-5 rounded-md border flex items-center justify-center text-[10px] font-bold ${
+                                  checked
+                                    ? "border-primary bg-primary text-white"
+                                    : "border-border bg-background"
+                                }`}
+                              >
+                                {checked ? "✓" : ""}
+                              </span>
+                            </div>
                           </label>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
-                  </div>
 
-                  {/* Field Permissions */}
-                  <div className="space-y-2">
-                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                      Field-Level Visibility Restrictions
-                    </div>
-                    <div className="perm-fields-table">
-                      <div className="perm-fields-header">
-                        <div>Fieldname</div>
-                        <div className="text-center">👁 View</div>
-                        <div className="text-center">✏️ Edit</div>
+                    {/* Scope */}
+                    <div className="mt-6 rounded-xl border border-border bg-muted/20 p-4">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-primary">
+                        Data scope
                       </div>
-                      <div className="divide-y divide-border max-h-[380px] overflow-y-auto">
-                        {fieldsAccessList
-                          .filter((f) => {
-                            return pageAccessState[f.tag] !== false;
-                          })
-                          .map((f) => (
-                            <div key={f.key} className="perm-fields-row">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-foreground text-xs">
-                                {f.label}
-                              </span>
-                              <span className={`field-tag tag-${f.tag}`}>
-                                {f.tag}
-                              </span>
-                            </div>
-                            <div className="flex justify-center">
-                              <input
-                                type="checkbox"
-                                checked={fieldPermsState[f.key]?.view ?? true}
-                                onChange={(e) =>
-                                  setFieldPermsState({
-                                    ...fieldPermsState,
-                                    [f.key]: {
-                                      ...(fieldPermsState[f.key] ?? {
-                                        view: true,
-                                        edit: true,
-                                      }),
-                                      view: e.target.checked,
-                                    },
-                                  })
-                                }
-                                className="perm-checkbox"
-                              />
-                            </div>
-                            <div className="flex justify-center">
-                              <input
-                                type="checkbox"
-                                checked={actionPermsState[f.tag]?.edit ? (fieldPermsState[f.key]?.edit ?? true) : false}
-                                disabled={!actionPermsState[f.tag]?.edit}
-                                onChange={(e) =>
-                                  setFieldPermsState({
-                                    ...fieldPermsState,
-                                    [f.key]: {
-                                      ...(fieldPermsState[f.key] ?? {
-                                        view: true,
-                                        edit: true,
-                                      }),
-                                      edit: e.target.checked,
-                                    },
-                                  })
-                                }
-                                className={`perm-checkbox ${!actionPermsState[f.tag]?.edit ? "opacity-40 cursor-not-allowed" : ""}`}
-                              />
-                            </div>
-                          </div>
+                      <div className="mt-1 text-xs font-bold text-foreground">
+                        Record visibility scope
+                      </div>
+                      <p className="mt-1 text-[10px] text-muted-foreground">
+                        Choose which records are visible to this role. Choose which records this role can access.
+                      </p>
+                      <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
+                        {[
+                          ["all", "All records"],
+                          ["own", "Own records"],
+                          ["team", "Team records"],
+                          ["department", "Department records"],
+                        ].map(([value, label], index) => (
+                          <label
+                            key={value}
+                            className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2.5 text-[10px] font-semibold text-foreground"
+                          >
+                            <input
+                              type="radio"
+                              name={`scope-${selectedActionModule}`}
+                              defaultChecked={index === 1}
+                              className="accent-primary"
+                              disabled
+                            />
+                            {label}
+                          </label>
                         ))}
                       </div>
                     </div>
-                  </div>
+                  </section>
+
+                  {/* Field-level permissions */}
+                  <section className="rounded-2xl border border-border bg-card overflow-hidden">
+                    <div className="border-b border-border px-5 py-4">
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div>
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-primary">
+                            Field permissions
+                          </div>
+                          <h3 className="mt-1 text-sm font-bold text-foreground">
+                            Visibility and edit policy
+                          </h3>
+                          <p className="mt-1 text-[10px] text-muted-foreground">
+                            Control which fields users can see and modify for the selected resource.
+                          </p>
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">
+                          View → Edit hierarchy enforced
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="max-h-[430px] overflow-y-auto">
+                      <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_80px_80px] border-b border-border bg-muted/90 backdrop-blur px-5 py-2.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                        <div>Field</div>
+                        <div className="text-center">View</div>
+                        <div className="text-center">Edit</div>
+                      </div>
+
+                      {fieldsAccessList
+                        .filter((field) => field.tag === selectedActionModule)
+                        .map((field) => {
+                          const current = fieldPermsState[field.key] ?? {
+                            view: true,
+                            edit: true,
+                          };
+                          const resourceCanEdit = Boolean(
+                            actionPermsState[selectedActionModule]?.edit,
+                          );
+
+                          return (
+                            <div
+                              key={field.key}
+                              className="grid grid-cols-[minmax(0,1fr)_80px_80px] items-center border-b border-border/70 px-5 py-3 hover:bg-muted/30 transition"
+                            >
+                              <div className="min-w-0">
+                                <div className="text-xs font-semibold text-foreground truncate">
+                                  {field.label}
+                                </div>
+                                <div className="mt-0.5 text-[9px] text-muted-foreground">
+                                  {field.key}
+                                </div>
+                              </div>
+                              <div className="flex justify-center">
+                                <input
+                                  type="checkbox"
+                                  checked={current.view}
+                                  onChange={(e) =>
+                                    setFieldPermsState({
+                                      ...fieldPermsState,
+                                      [field.key]: {
+                                        ...current,
+                                        view: e.target.checked,
+                                        edit: e.target.checked ? current.edit : false,
+                                      },
+                                    })
+                                  }
+                                  className="h-4 w-4 accent-primary"
+                                />
+                              </div>
+                              <div className="flex justify-center">
+                                <input
+                                  type="checkbox"
+                                  checked={resourceCanEdit && current.view && current.edit}
+                                  disabled={!resourceCanEdit || !current.view}
+                                  onChange={(e) =>
+                                    setFieldPermsState({
+                                      ...fieldPermsState,
+                                      [field.key]: {
+                                        ...current,
+                                        edit: e.target.checked,
+                                      },
+                                    })
+                                  }
+                                  className={`h-4 w-4 accent-primary ${
+                                    !resourceCanEdit || !current.view
+                                      ? "opacity-40 cursor-not-allowed"
+                                      : ""
+                                  }`}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                      {selectedResourceFields.length === 0 && (
+                        <div className="px-5 py-12 text-center">
+                          <div className="text-2xl">🔒</div>
+                          <div className="mt-2 text-sm font-semibold text-foreground">
+                            No fields available
+                          </div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            This resource has no field definitions in the permission registry.
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </section>
+                </div>
+              </main>
             </div>
-            <div className="modal-footer">
-              <button
-                onClick={() => setIsPermModalOpen(false)}
-                className="px-4 py-2.5 border border-border rounded-lg bg-card text-xs font-bold text-muted-foreground hover:text-foreground transition cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={savePermissions}
-                className="px-5 py-2.5 bg-primary text-white font-bold rounded-lg text-xs hover:bg-primary/95 transition shadow-sm cursor-pointer"
-              >
-                Save Permissions →
-              </button>
+
+            {/* Footer */}
+            <div className="shrink-0 flex items-center justify-between gap-4 border-t border-border bg-card px-5 md:px-6 py-4">
+              <div className="text-[10px] text-muted-foreground">
+                {permissionMode === "role" ? (
+                  <>
+                    Saving for <span className="font-semibold text-foreground">{roleLabel(selectedPermissionRole)}</span> role
+                    ({users.filter((user) => user.role === selectedPermissionRole).length} users)
+                  </>
+                ) : (
+                  <>
+                    Saving override for <span className="font-semibold text-foreground">{permUser.name}</span>
+                  </>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsPermModalOpen(false)}
+                  className="px-4 py-2.5 border border-border rounded-lg bg-background text-xs font-bold text-muted-foreground hover:text-foreground transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={savePermissions}
+                  className="px-5 py-2.5 bg-primary text-white font-bold rounded-lg text-xs hover:bg-primary/95 transition shadow-sm"
+                >
+                  {permissionMode === "role" ? "Save Role Permissions" : "Save Override"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
