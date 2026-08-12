@@ -61,6 +61,8 @@ import recycleBinRoutes from "./recycleBin/index";
 import purchaseOrderRoutes from './purchaseOrder'
 import workflowRoutes from "./workflow"
 
+import quoteTenderOrderRoutes from "./quotetender";
+
 
 async function adminRoutes(
   fastify: FastifyInstance,
@@ -110,6 +112,15 @@ async function adminRoutes(
         requiredPermissions = ["company.update", "company.create", "role.update"];
       } else if (url.includes("/order/")) {
         if (url.includes("/create") || url.includes("/update") || url.includes("/delete") || url.includes("/bulk")) {
+          requiredPermissions = ["company.create", "tender.update"];
+        } else {
+          requiredPermissions = ["company.view", "tender.view"];
+        }
+      } else if (url.includes("/quotetender/")) {
+        if (url.includes("/create") ||
+          url.includes("/update") ||
+          url.includes("/delete") ||
+          url.includes("/bulk")) {
           requiredPermissions = ["company.create", "tender.update"];
         } else {
           requiredPermissions = ["company.view", "tender.view"];
@@ -239,22 +250,25 @@ async function adminRoutes(
       prefix: "/vendor-product",
     });
     fastify.register(inventoryTrackingRoutes, {
-    prefix: "/inventory-tracking",
-});
-   fastify.register(goodsReceiptRoutes, {
-  prefix: "/goods-receipt",
-});
-  fastify.register(purchaseOrderRoutes, {
-  prefix: "/purchase-order",
-});
+      prefix: "/inventory-tracking",
+    });
+    fastify.register(goodsReceiptRoutes, {
+      prefix: "/goods-receipt",
+    });
+    fastify.register(purchaseOrderRoutes, {
+      prefix: "/purchase-order",
+    });
+    fastify.register(quoteTenderOrderRoutes, {
+      prefix: "/quotetender",
+    });
 
-fastify.register(dynamicRoutes, { prefix: "/dynamic" });
-  fastify.register(adminUploadRouteGroup, {
-  prefix: "/upload",
-});
-  fastify.register(adminExportOrdersRouteGroup, {
-  prefix: "/export-orders",
-});
+    fastify.register(dynamicRoutes, { prefix: "/dynamic" });
+    fastify.register(adminUploadRouteGroup, {
+      prefix: "/upload",
+    });
+    fastify.register(adminExportOrdersRouteGroup, {
+      prefix: "/export-orders",
+    });
   });
 
   fastify.register(workflowRoutes, { prefix: "/workflow" });
