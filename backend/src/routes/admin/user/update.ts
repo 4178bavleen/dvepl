@@ -54,7 +54,7 @@ async function updateUserRoute(
         }
 
         const { id } = request.params as { id: string };
-        const { name, email, phone, isActive, role, designation, pageAccess, fieldPermissions, actionPermissions, password, teamId } = request.body as any;
+        const { name, email, phone, isActive, role, designation, pageAccess, fieldPermissions, actionPermissions, password, teamId, hasOverride } = request.body as any;
 
         if (actionPermissions !== undefined && !isValidActionPermissions(actionPermissions)) {
           return reply.status(400).send({
@@ -218,12 +218,14 @@ async function updateUserRoute(
         });
 
         // Save custom access metadata in the database.
-        if (pageAccess || fieldPermissions || actionPermissions || designation !== undefined) {
+        if (pageAccess || fieldPermissions || actionPermissions || designation !== undefined || hasOverride !== undefined) {
+          const profileOverride = hasOverride !== undefined ? !!hasOverride : (pageAccess !== undefined || fieldPermissions !== undefined || actionPermissions !== undefined);
           await fastify.prisma.userAccessProfile.upsert({
             where: { userId: id },
             create: {
               userId: id,
               designation: designation || "Team Member",
+              hasOverride: profileOverride,
               pageAccess: pageAccess || [],
               fieldPermissions: fieldPermissions || {},
               actionPermissions: actionPermissions || { create: true, edit: true, delete: false, export: true },
@@ -233,6 +235,7 @@ async function updateUserRoute(
               ...(fieldPermissions !== undefined ? { fieldPermissions } : {}),
               ...(actionPermissions !== undefined ? { actionPermissions } : {}),
               ...(designation !== undefined ? { designation } : {}),
+              ...(hasOverride !== undefined ? { hasOverride } : (pageAccess !== undefined || fieldPermissions !== undefined || actionPermissions !== undefined ? { hasOverride: true } : {})),
             },
           });
         }

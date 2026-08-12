@@ -336,14 +336,17 @@ model PasswordReset {
 }
 
 model Role {
-  id              String           @id @default(uuid())
-  companyId       String
-  name            String
-  description     String?
-  isSystem        Boolean          @default(false)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  deletedAt       DateTime?
+  id                String           @id @default(uuid())
+  companyId         String
+  name              String
+  description       String?
+  isSystem          Boolean          @default(false)
+  pageAccess        Json             @default("[]")
+  fieldPermissions  Json             @default("{}")
+  actionPermissions Json             @default("{}")
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  deletedAt         DateTime?
   approvalLevels  ApprovalLevel[]
   rolePermissions RolePermission[]
   company         Company          @relation(fields: [companyId], references: [id])
@@ -427,6 +430,7 @@ model UserAccessProfile {
   id                String   @id @default(uuid())
   userId            String   @unique
   designation       String   @default("Team Member")
+  hasOverride       Boolean  @default(false)
   pageAccess        Json     @default("[]")
   fieldPermissions  Json     @default("{}")
   actionPermissions Json     @default("{\"edit\": true, \"create\": true, \"delete\": false, \"export\": true}")

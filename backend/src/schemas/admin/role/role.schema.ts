@@ -16,6 +16,10 @@ export const createRoleSchema = z.object({
     .array(z.string().uuid())
     .optional()
     .default([]),
+
+  pageAccess: z.array(z.string()).optional(),
+  fieldPermissions: z.any().optional(),
+  actionPermissions: z.any().optional(),
 });
 
 
@@ -23,4 +27,7 @@ export const updateRoleSchema = z.object({
   name: z.string().min(2).max(100),
   description: z.string().optional().nullable(),
   permissionIds: z.array(z.string().uuid()).optional().default([]),
+  pageAccess: z.array(z.string()).optional(),
+  fieldPermissions: z.any().optional(),
+  actionPermissions: z.any().optional(),
 });
