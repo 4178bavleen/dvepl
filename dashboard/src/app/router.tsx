@@ -6,7 +6,7 @@ import { UiConfigProvider } from "@/contexts/ui/uiConfigContext";
 import NotFound from "@/pages/notFound";
 import PageLoader from "@/components/ui/pageLoader";
 import InventoryPage from "@/pages/inventory/inventoryPage";
-import WorkflowTrackerPage from "../pages/workflow/WorkflowTrackerPage(org)";
+import WorkflowTrackerPage from "../pages/workflow/WorkflowTrackerPage";
 // const InventoryTrackingPage = lazy(
 //   () => import("@/pages/inventory/inventoryTrackingPage"),
 // );

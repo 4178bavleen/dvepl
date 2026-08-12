@@ -248,6 +248,9 @@ model User {
   approvedWorkOrders                WorkOrder[]                        @relation("WorkOrderApprovedBy")
   assignedWorkOrders                WorkOrder[]                        @relation("WorkOrderAssignedTo")
   createdWorkOrders                 WorkOrder[]                        @relation("WorkOrderCreatedBy")
+  customerDrawingReviews            CustomerDrawingReview[]
+  drawingReviewsSent                CustomerDrawingReview[]            @relation("DrawingReviewSentBy")
+  drawingReviewsReviewed            CustomerDrawingReview[]            @relation("DrawingReviewReviewedBy")
 
   @@index([companyId])
   @@map("users")
@@ -347,10 +350,10 @@ model Role {
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
   deletedAt         DateTime?
-  approvalLevels  ApprovalLevel[]
-  rolePermissions RolePermission[]
-  company         Company          @relation(fields: [companyId], references: [id])
-  userRoles       UserRole[]
+  approvalLevels    ApprovalLevel[]
+  rolePermissions   RolePermission[]
+  company           Company          @relation(fields: [companyId], references: [id])
+  userRoles         UserRole[]
 
   @@unique([companyId, name])
   @@map("roles")
@@ -673,17 +676,18 @@ model Customer {
 }
 
 model ContactPerson {
-  id          String    @id @default(uuid())
-  customerId  String
-  name        String
-  designation String?
-  phone       String?
-  email       String?
-  isPrimary   Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
-  customer    Customer  @relation(fields: [customerId], references: [id])
+  id             String                  @id @default(uuid())
+  customerId     String
+  name           String
+  designation    String?
+  phone          String?
+  email          String?
+  isPrimary      Boolean                 @default(false)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  deletedAt      DateTime?
+  customer       Customer                @relation(fields: [customerId], references: [id])
+  drawingReviews CustomerDrawingReview[]
 
   @@map("contact_persons")
 }
@@ -1346,7 +1350,7 @@ model WorkflowEvent {
   performedById String?
   createdAt     DateTime      @default(now())
 
-  salesOrder SalesOrder @relation(fields: [salesOrderId],references: [id],onDelete: Cascade)
+  salesOrder SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
 
   @@index([salesOrderId])
   @@index([createdAt])
@@ -1454,28 +1458,29 @@ model EngineeringProject {
 }
 
 model EngineeringDrawing {
-  id           String             @id @default(uuid())
-  projectId    String
-  drawingNo    String             @unique
-  title        String
-  description  String?
-  drawingType  DrawingType
-  fileUrl      String
-  fileName     String
-  fileSize     Int?
-  mimeType     String?
-  status       DrawingStatus      @default(PENDING)
-  approvedById String?
-  approvedAt   DateTime?
-  createdById  String
-  version      Int                @default(1)
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-  deletedAt    DateTime?
-  revisions    DrawingRevision[]
-  approvedBy   User?              @relation("DrawingApprovedBy", fields: [approvedById], references: [id])
-  createdBy    User               @relation("DrawingCreatedBy", fields: [createdById], references: [id])
-  project      EngineeringProject @relation(fields: [projectId], references: [id])
+  id              String                  @id @default(uuid())
+  projectId       String
+  drawingNo       String                  @unique
+  title           String
+  description     String?
+  drawingType     DrawingType
+  fileUrl         String
+  fileName        String
+  fileSize        Int?
+  mimeType        String?
+  status          DrawingStatus           @default(PENDING)
+  approvedById    String?
+  approvedAt      DateTime?
+  createdById     String
+  version         Int                     @default(1)
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  deletedAt       DateTime?
+  revisions       DrawingRevision[]
+  approvedBy      User?                   @relation("DrawingApprovedBy", fields: [approvedById], references: [id])
+  createdBy       User                    @relation("DrawingCreatedBy", fields: [createdById], references: [id])
+  project         EngineeringProject      @relation(fields: [projectId], references: [id])
+  customerReviews CustomerDrawingReview[]
 
   @@index([projectId])
   @@index([drawingType])
@@ -1483,19 +1488,20 @@ model EngineeringDrawing {
 }
 
 model DrawingRevision {
-  id           String             @id @default(uuid())
-  drawingId    String
-  revisionNo   Int
-  fileUrl      String
-  fileName     String
-  changes      String?
-  approvedById String?
-  approvedAt   DateTime?
-  createdById  String
-  createdAt    DateTime           @default(now())
-  aapprovedBy  User?              @relation("RevisionApprovedBy", fields: [approvedById], references: [id])
-  createdBy    User               @relation("RevisionCreatedBy", fields: [createdById], references: [id])
-  drawing      EngineeringDrawing @relation(fields: [drawingId], references: [id])
+  id                     String                  @id @default(uuid())
+  drawingId              String
+  revisionNo             Int
+  fileUrl                String
+  fileName               String
+  changes                String?
+  approvedById           String?
+  approvedAt             DateTime?
+  createdById            String
+  createdAt              DateTime                @default(now())
+  approvedBy             User?                   @relation("RevisionApprovedBy", fields: [approvedById], references: [id])
+  createdBy              User                    @relation("RevisionCreatedBy", fields: [createdById], references: [id])
+  drawing                EngineeringDrawing      @relation(fields: [drawingId], references: [id])
+  customerDrawingReviews CustomerDrawingReview[]
 
   @@unique([drawingId, revisionNo])
   @@index([drawingId])
@@ -3132,4 +3138,52 @@ enum WorkflowStage {
   PO_PLACED
   INVENTORY_FOLLOW_UP
   PRODUCTION_FOLLOW_UP
+}
+
+enum CustomerDrawingReviewStatus {
+  NOT_SENT
+  SENT_FOR_REVIEW
+  UNDER_REVIEW
+  REVISION_REQUESTED
+  APPROVED
+}
+
+model CustomerDrawingReview {
+  id String @id @default(uuid())
+
+  drawingId  String
+  revisionId String
+
+  contactPersonId String
+
+  sentById     String
+  reviewedById String?
+
+  status CustomerDrawingReviewStatus @default(NOT_SENT)
+
+  message String?
+
+  sentAt     DateTime?
+  reviewedAt DateTime?
+
+  customerComment String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  drawing  EngineeringDrawing @relation(fields: [drawingId], references: [id])
+  revision DrawingRevision    @relation(fields: [revisionId], references: [id])
+
+  contactPerson ContactPerson @relation(fields: [contactPersonId], references: [id])
+
+  sentBy     User    @relation("DrawingReviewSentBy", fields: [sentById], references: [id])
+  reviewedBy User?   @relation("DrawingReviewReviewedBy", fields: [reviewedById], references: [id])
+  user       User?   @relation(fields: [userId], references: [id])
+  userId     String?
+
+  @@index([drawingId])
+  @@index([revisionId])
+  @@index([contactPersonId])
+  @@index([status])
+  @@map("customer_drawing_reviews")
 }
