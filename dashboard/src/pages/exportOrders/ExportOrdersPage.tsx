@@ -205,6 +205,7 @@ export default function ExportOrdersPage() {
             selectedDrawingIds={selectedDrawingIds}
             setSelectedDrawingIds={setSelectedDrawingIds}
             onStatusChanged={handleDrawingCreated}
+            orders={orders}
           />
         </CardContent>
       </Card>

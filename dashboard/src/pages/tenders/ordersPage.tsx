@@ -8,6 +8,8 @@ import {
   CheckCircle2,
   XCircle,
   Users,
+  ExternalLink,
+  Eye,
 } from "lucide-react";
 
 import {
@@ -77,6 +79,14 @@ interface RawQuoteTenderOrder {
 
 interface QuoteTenderOrder extends RawQuoteTenderOrder {
   id: string;
+  drawingAttached: boolean;
+  drawings?: Array<{
+    id: string;
+    drawingNo: string;
+    title: string;
+    fileName: string;
+    fileUrl: string;
+  }>;
 }
 
 // ============================================================
@@ -99,6 +109,7 @@ const ALL_COLUMN_KEYS = [
   { id: "referenceCode", label: "REFERENCE CODE" },
   { id: "remark", label: "REMARK" },
   { id: "remarkedAt", label: "REMARKED AT" },
+  { id: "drawingAttached", label: "DRAWING" },
   { id: "fileName", label: "FILE" },
 ] as const;
 
@@ -198,6 +209,7 @@ function parseSalesOrderRemarks(remarks: string) {
     location: "",
     tenderId: "",
     referenceCode: "",
+    fileName: "",
   };
   if (!remarks) return fields;
 
@@ -215,6 +227,7 @@ function parseSalesOrderRemarks(remarks: string) {
       else if (key === "location") fields.location = val;
       else if (key === "tender id") fields.tenderId = val;
       else if (key === "reference code") fields.referenceCode = val;
+      else if (key === "file name") fields.fileName = val;
     }
   });
   return fields;
@@ -249,6 +262,8 @@ export function OrdersPage() {
   const [viewingTender, setViewingTender] =
     useState<QuoteTenderOrder | null>(null);
 
+  const [isSyncing, setIsSyncing] = useState(false);
+
   // ============================================================
   // COLUMN VISIBILITY
   // ============================================================
@@ -262,7 +277,13 @@ export function OrdersPage() {
       );
 
       if (saved) {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        ALL_COLUMN_KEYS.forEach((col) => {
+          if (parsed[col.id] === undefined) {
+            parsed[col.id] = true;
+          }
+        });
+        return parsed;
       }
     } catch {
       // Fall back to defaults
@@ -320,7 +341,9 @@ export function OrdersPage() {
             reference_code: remarksFields.referenceCode || "",
             remark: order.status || "",
             remarked_at: order.createdAt || "",
-            file_name: null,
+            drawingAttached: order.engineeringProjects?.some((proj: any) => proj.drawings?.length > 0) || false,
+            drawings: order.engineeringProjects?.flatMap((proj: any) => proj.drawings || []) || [],
+            file_name: remarksFields.fileName || null,
           };
         });
 
@@ -343,6 +366,34 @@ export function OrdersPage() {
 
   useEffect(() => {
     void loadQuoteTenders();
+  }, [loadQuoteTenders]);
+
+  const handleSync = useCallback(async () => {
+    setIsSyncing(true);
+    const syncToast = toast.loading("Syncing orders from portal...");
+    try {
+      const response = await apiClient.get("/quotetender/read");
+      if (response.data?.success) {
+        const syncedCount = response.data?.syncedCount ?? 0;
+        toast.success(`Successfully synced ${syncedCount} new orders!`, {
+          id: syncToast,
+        });
+        // Reload list
+        await loadQuoteTenders();
+      } else {
+        toast.error(
+          response.data?.message ?? "Unable to sync orders.",
+          { id: syncToast }
+        );
+      }
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.message ?? "Failed to sync orders from portal.",
+        { id: syncToast }
+      );
+    } finally {
+      setIsSyncing(false);
+    }
   }, [loadQuoteTenders]);
 
   // ============================================================
@@ -654,6 +705,78 @@ export function OrdersPage() {
           },
         },
 
+        drawingAttached: {
+          id: "drawingAttached",
+          header: "DRAWING",
+          cell: ({ row }) => {
+            const drawings = row.original.drawings || [];
+            if (drawings.length === 0) {
+              return (
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground bg-muted/30 px-2.5 py-1 rounded border border-muted/20">
+                  <XCircle className="size-3.5" />
+                  No
+                </span>
+              );
+            }
+
+            return (
+              <Popover>
+                <PopoverTrigger
+                  render={
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 h-7 text-[11px] font-bold text-emerald-600 border-emerald-200 hover:border-emerald-300 bg-emerald-50 hover:bg-emerald-100 transition-all duration-150 px-2.5 rounded"
+                    >
+                      <CheckCircle2 className="size-3.5" />
+                      {drawings.length} {drawings.length === 1 ? "Drawing" : "Drawings"}
+                    </Button>
+                  }
+                />
+                <PopoverContent align="center" className="w-80 p-4 space-y-3 z-50">
+                  <div className="border-b pb-2">
+                    <h4 className="font-semibold text-sm text-foreground">
+                      Attached Drawings ({drawings.length})
+                    </h4>
+                  </div>
+                  <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                    {drawings.map((dwg) => {
+                      const backendUrl = apiClient.defaults.baseURL?.replace("/admin", "") || "";
+                      const fullUrl = dwg.fileUrl.startsWith("http") ? dwg.fileUrl : `${backendUrl}${dwg.fileUrl}`;
+                      return (
+                        <div
+                          key={dwg.id}
+                          className="flex items-center justify-between gap-2 p-2 border rounded-md hover:bg-muted/30 transition-colors"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-foreground truncate" title={dwg.drawingNo}>
+                              {dwg.drawingNo}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground truncate" title={dwg.title || dwg.fileName}>
+                              {dwg.title || dwg.fileName || "Untitled Drawing"}
+                            </p>
+                          </div>
+                          {dwg.fileUrl && (
+                            <a
+                              href={fullUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center justify-center size-7 rounded-md border bg-background hover:bg-muted text-muted-foreground hover:text-foreground shrink-0 transition-colors"
+                              title="Open Drawing"
+                            >
+                              <Eye className="size-3.5" />
+                            </a>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            );
+          },
+        },
+
         fileName: {
           accessorKey: "file_name",
           header: "FILE",
@@ -810,6 +933,18 @@ export function OrdersPage() {
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
+
+          {/* Sync Portal Orders */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSync}
+            disabled={isSyncing}
+            className="gap-1.5 h-8 border-primary/30 hover:border-primary/60 text-primary hover:bg-primary/5 transition-all duration-200"
+          >
+            <RefreshCw className={`size-3.5 ${isSyncing ? "animate-spin" : ""}`} />
+            {isSyncing ? "Syncing..." : "Sync Portal Orders"}
+          </Button>
 
           {/* Fields */}
           <Popover>

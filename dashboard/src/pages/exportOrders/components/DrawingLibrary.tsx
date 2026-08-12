@@ -13,10 +13,14 @@ import {
   LayoutGrid,
   List,
   ChevronDown,
+  Mail,
+  MessageSquare,
+  Send,
+  MoreVertical,
 } from "lucide-react";
 import { exportOrdersApi } from "@/services/modules";
 import toast from "react-hot-toast";
-import { useState } from "react";
+import React, { useState } from "react";
 import type { EngineeringDrawing } from "@/types/exportOrders";
 
 interface Props {
@@ -24,6 +28,7 @@ interface Props {
   selectedDrawingIds: string[];
   setSelectedDrawingIds: (ids: string[]) => void;
   onStatusChanged?: () => void;
+  orders?: any[];
 }
 
 const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"];
@@ -33,14 +38,31 @@ function buildFileUrl(rawUrl: string): string {
   if (!rawUrl) return "";
   if (/^https?:\/\//i.test(rawUrl)) return rawUrl;
 
-  // API requests are sent to /admin, while uploaded files are served from
-  // the backend root at /uploads. Use the API origin rather than the dashboard
-  // origin so opening a relative stored path reaches port 8000.
   try {
     return new URL(rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`, API_BASE_URL).toString();
   } catch {
     return rawUrl;
   }
+}
+
+function parseContactDetails(details?: string) {
+  if (!details) return { name: "", phone: "", email: "" };
+  const parts = details.split("|").map((p) => p.trim());
+  if (parts.length >= 3) {
+    return { name: parts[0], phone: parts[1], email: parts[2] };
+  }
+  // Try to find email and phone in any part
+  let email = "";
+  let phone = "";
+  let name = parts[0] || "";
+  for (const part of parts) {
+    if (part.includes("@")) {
+      email = part;
+    } else if (/^[+\d\s-]{10,20}$/.test(part)) {
+      phone = part;
+    }
+  }
+  return { name, phone, email };
 }
 
 const STATUS_CONFIG = {
@@ -109,10 +131,21 @@ export default function DrawingLibrary({
   selectedDrawingIds,
   setSelectedDrawingIds,
   onStatusChanged,
+  orders = [],
 }: Props) {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [openActionsMenu, setOpenActionsMenu] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+
+  // Send drawing states
+  const [sendModalDrawing, setSendModalDrawing] = useState<EngineeringDrawing | null>(null);
+  const [sendMethod, setSendMethod] = useState<"EMAIL" | "WHATSAPP" | "BOTH">("EMAIL");
+  const [recipientEmail, setRecipientEmail] = useState("");
+  const [recipientPhone, setRecipientPhone] = useState("");
+  const [customSubject, setCustomSubject] = useState("");
+  const [customMessage, setCustomMessage] = useState("");
+  const [isSending, setIsSending] = useState(false);
 
   const toggle = (id: string) =>
     setSelectedDrawingIds(
@@ -128,6 +161,7 @@ export default function DrawingLibrary({
 
   const openFile = (e: React.MouseEvent, url: string) => {
     e.stopPropagation();
+    setOpenActionsMenu(null);
     const fileUrl = buildFileUrl(url);
     if (!fileUrl) {
       toast.error("This drawing does not have an attached file.");
@@ -151,6 +185,78 @@ export default function DrawingLibrary({
     }
   };
 
+  const handleOpenSendModal = (e: React.MouseEvent, drawing: EngineeringDrawing) => {
+    e.stopPropagation();
+    setOpenActionsMenu(null);
+
+    // Find matching order contact details
+    let initialEmail = "";
+    let initialPhone = "";
+    let orderCode = "";
+
+    const salesOrderId = drawing.project?.salesOrderId;
+    if (salesOrderId && orders) {
+      const order = orders.find((o) => o.id === salesOrderId);
+      if (order) {
+        orderCode = order.dveplCode || "";
+        const contact = parseContactDetails(order.contactDetails);
+        initialEmail = contact.email;
+        initialPhone = contact.phone;
+      }
+    }
+
+    setSendModalDrawing(drawing);
+    setRecipientEmail(initialEmail);
+    setRecipientPhone(initialPhone);
+    setCustomSubject(`Engineering Drawing for Order ${orderCode}: ${drawing.drawingNo}`);
+    setCustomMessage(
+      `Dear Customer,\n\nPlease find attached the engineering drawing: ${drawing.title} (${drawing.drawingNo}) for your order ${orderCode}.\n\nBest Regards,\nDVEPL Team`
+    );
+    setSendMethod("EMAIL");
+  };
+
+  const handleSendSubmit = async () => {
+    if (!sendModalDrawing) return;
+
+    if ((sendMethod === "EMAIL" || sendMethod === "BOTH") && !recipientEmail) {
+      toast.error("Please enter a recipient email address.");
+      return;
+    }
+    if ((sendMethod === "WHATSAPP" || sendMethod === "BOTH") && !recipientPhone) {
+      toast.error("Please enter a customer mobile number.");
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      const res = await exportOrdersApi.sendDrawing({
+        drawingId: sendModalDrawing.id,
+        method: sendMethod,
+        email: recipientEmail || null,
+        phone: recipientPhone || null,
+        subject: customSubject || null,
+        message: customMessage || null,
+      });
+
+      if (res.success) {
+        if (res.data.emailSent) {
+          toast.success("Drawing sent via email successfully!");
+        }
+        if (res.data.whatsappLink) {
+          toast.success("WhatsApp link generated. Opening WhatsApp...");
+          window.open(res.data.whatsappLink, "_blank", "noopener,noreferrer");
+        }
+        setSendModalDrawing(null);
+      } else {
+        toast.error(res.message || "Failed to send drawing.");
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? "An error occurred while sending the drawing.");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
   // Stats
   const counts = drawings.reduce<Record<string, number>>((acc, d) => {
     acc[d.status] = (acc[d.status] ?? 0) + 1;
@@ -158,7 +264,7 @@ export default function DrawingLibrary({
   }, {});
 
   return (
-    <div className="rounded-xl border bg-background overflow-hidden">
+    <div className="rounded-xl border bg-background overflow-hidden relative">
 
       {/* ── Header ─────────────────────────────────────────────── */}
       <div className="border-b px-6 py-4 flex items-center justify-between gap-4">
@@ -225,7 +331,6 @@ export default function DrawingLibrary({
             const fileUrl = buildFileUrl(d.fileUrl);
             const isUpdating = updatingId === d.id;
             const statusCfg = STATUS_CONFIG[d.status as DrawingStatus] ?? STATUS_CONFIG.PENDING;
-            const StatusIcon = statusCfg.icon;
 
             return (
               <div
@@ -237,22 +342,23 @@ export default function DrawingLibrary({
                     : "hover:shadow-md hover:border-primary/40 border-border"
                 }`}
               >
-                {/* Thumbnail — tall, generous */}
-                <div className="relative h-44 bg-muted/40 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                {/* Thumbnail — clean preview layout */}
+                <div className="relative h-44 bg-muted/40 flex items-center justify-center flex-shrink-0 overflow-hidden border-b">
 
                   {/* Selection overlay ring */}
                   {isSelected && (
                     <div className="absolute inset-0 bg-primary/10 z-10 pointer-events-none" />
                   )}
 
-                  {/* Checkbox top-right */}
+                  {/* Checkbox top-right (Used to choose which drawings to bundle in export/PDF options) */}
                   <div
                     className="absolute top-3 right-3 z-20"
                     onClick={(e) => { e.stopPropagation(); toggle(d.id); }}
+                    title="Select drawing for bulk export/PDF"
                   >
                     {isSelected
                       ? <CheckSquare className="w-5 h-5 text-primary drop-shadow-sm" />
-                      : <Square className="w-5 h-5 text-white/70 opacity-0 group-hover:opacity-100 transition-opacity drop-shadow" />
+                      : <Square className="w-5 h-5 text-gray-400 bg-background/80 rounded border-gray-300 opacity-80 hover:opacity-100 transition-opacity" />
                     }
                   </div>
 
@@ -263,31 +369,58 @@ export default function DrawingLibrary({
                   </span>
 
                   <DrawingThumbnail mimeType={d.mimeType ?? undefined} fileName={d.fileName} fileUrl={fileUrl} />
-
-                  {/* Hover action overlay — only Open File */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-200 flex flex-col justify-end p-3 z-10">
-                    <button
-                      onClick={(e) => openFile(e, d.fileUrl)}
-                      className="flex items-center justify-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-white text-gray-900 hover:bg-gray-100 transition-colors w-full"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      Open File
-                    </button>
-                  </div>
                 </div>
 
-                {/* Card footer */}
+                {/* Card footer info */}
                 <div className="p-3 flex flex-col gap-2 bg-background">
-                  {/* Drawing info */}
+                  {/* Drawing info and Action Menu (Three dots) */}
                   <div className="flex items-start justify-between gap-2">
-                    <p className="font-bold text-sm leading-tight">{d.drawingNo}</p>
-                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-muted text-muted-foreground flex-shrink-0">
-                      {TYPE_LABELS[d.drawingType] ?? d.drawingType}
-                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-bold text-sm leading-tight truncate">{d.drawingNo}</p>
+                        <span className="text-[9px] font-medium px-1 py-0.2 rounded bg-muted text-muted-foreground flex-shrink-0">
+                          {TYPE_LABELS[d.drawingType] ?? d.drawingType}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate leading-snug mt-1">{d.title}</p>
+                    </div>
+
+                    {/* Actions Menu (Three dots) */}
+                    <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenActionsMenu(openActionsMenu === d.id ? null : d.id);
+                          setOpenDropdown(null);
+                        }}
+                        className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors border bg-background"
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+
+                      {openActionsMenu === d.id && (
+                        <div className="absolute right-0 top-full mt-1 z-40 w-44 rounded-xl border bg-background shadow-2xl py-1 overflow-hidden">
+                          <button
+                            onClick={(e) => openFile(e, d.fileUrl)}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-muted text-foreground transition-colors text-left"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5 text-muted-foreground" />
+                            Open File
+                          </button>
+                          <button
+                            onClick={(e) => handleOpenSendModal(e, d)}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-muted text-foreground transition-colors font-semibold text-left"
+                          >
+                            <Send className="w-3.5 h-3.5 text-primary" />
+                            Send to Customer
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-xs text-muted-foreground truncate leading-snug">{d.title}</p>
+
                   {d.project?.name && (
-                    <p className="text-[10px] text-muted-foreground/50 truncate">{d.project.name}</p>
+                    <p className="text-[10px] text-muted-foreground/50 truncate -mt-0.5">{d.project.name}</p>
                   )}
 
                   {/* Status dropdown */}
@@ -297,6 +430,7 @@ export default function DrawingLibrary({
                       onClick={(e) => {
                         e.stopPropagation();
                         setOpenDropdown(openDropdown === d.id ? null : d.id);
+                        setOpenActionsMenu(null);
                       }}
                       className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors disabled:opacity-50 hover:bg-muted ${statusCfg.pill}`}
                     >
@@ -309,7 +443,7 @@ export default function DrawingLibrary({
                     </button>
 
                     {openDropdown === d.id && (
-                      <div className="absolute bottom-full mb-1 left-0 right-0 z-50 rounded-xl border bg-background shadow-2xl py-1 overflow-hidden">
+                      <div className="absolute bottom-full mb-1 left-0 right-0 z-40 rounded-xl border bg-background shadow-2xl py-1 overflow-hidden">
                         {STATUS_ACTIONS.map((action) => {
                           const Icon = STATUS_CONFIG[action.status].icon;
                           const isCurrent = d.status === action.status;
@@ -389,7 +523,7 @@ export default function DrawingLibrary({
                     <td className="px-4 py-3 text-xs text-muted-foreground">{d.project?.name ?? "—"}</td>
                     <td className="px-4 py-3"><StatusPill status={d.status} /></td>
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={(e) => openFile(e, d.fileUrl)}
                           title="Open file"
@@ -397,13 +531,20 @@ export default function DrawingLibrary({
                         >
                           <ExternalLink className="w-3.5 h-3.5" />
                         </button>
+                        <button
+                          onClick={(e) => handleOpenSendModal(e, d)}
+                          title="Send to Customer"
+                          className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                        </button>
                         <div className="relative">
                           <button
                             disabled={isUpdating}
-                            onClick={(e) => { e.stopPropagation(); setOpenDropdown(openDropdown === d.id ? null : d.id); }}
+                            onClick={(e) => { e.stopPropagation(); setOpenDropdown(openDropdown === d.id ? null : d.id); setOpenActionsMenu(null); }}
                             className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg border hover:bg-muted transition-colors disabled:opacity-50"
                           >
-                            {isUpdating ? <Loader2 className="w-3 h-3 animate-spin" /> : <ChevronDown className="w-3 h-3" />}
+                            {isUpdating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ChevronDown className="w-3.5 h-3.5" />}
                             {isUpdating ? "Saving…" : "Status"}
                           </button>
                           {openDropdown === d.id && (
@@ -438,8 +579,161 @@ export default function DrawingLibrary({
         </div>
       )}
 
-      {openDropdown && (
-        <div className="fixed inset-0 z-40" onClick={() => setOpenDropdown(null)} />
+      {(openDropdown || openActionsMenu) && (
+        <div className="fixed inset-0 z-30" onClick={() => { setOpenDropdown(null); setOpenActionsMenu(null); }} />
+      )}
+
+      {/* ── Send Modal ─────────────────────────────────────────── */}
+      {sendModalDrawing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-background rounded-2xl border max-w-lg w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            {/* Modal Header */}
+            <div className="border-b px-6 py-4 flex items-center justify-between bg-muted/20">
+              <div>
+                <h3 className="font-bold text-lg text-foreground">Send Engineering Drawing</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Send {sendModalDrawing.drawingNo} ({sendModalDrawing.title})
+                </p>
+              </div>
+              <button
+                onClick={() => setSendModalDrawing(null)}
+                className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4">
+              {/* Method Selection */}
+              <div>
+                <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
+                  Send Method
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(["EMAIL", "WHATSAPP", "BOTH"] as const).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setSendMethod(m)}
+                      className={`flex flex-col items-center justify-center gap-1.5 py-3 rounded-xl border text-xs font-bold transition-all ${
+                        sendMethod === m
+                          ? "border-primary bg-primary/5 text-primary ring-1 ring-primary"
+                          : "border-input bg-background hover:bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {m === "EMAIL" && <Mail className="w-4.5 h-4.5" />}
+                      {m === "WHATSAPP" && <MessageSquare className="w-4.5 h-4.5" />}
+                      {m === "BOTH" && (
+                        <div className="flex gap-0.5">
+                          <Mail className="w-3.5 h-3.5" />
+                          <MessageSquare className="w-3.5 h-3.5" />
+                        </div>
+                      )}
+                      {m === "EMAIL" && "Email"}
+                      {m === "WHATSAPP" && "WhatsApp"}
+                      {m === "BOTH" && "Both"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Email Input */}
+              {(sendMethod === "EMAIL" || sendMethod === "BOTH") && (
+                <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-150">
+                  <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    Customer Email Address
+                  </label>
+                  <input
+                    type="email"
+                    value={recipientEmail}
+                    onChange={(e) => setRecipientEmail(e.target.value)}
+                    placeholder="customer@example.com"
+                    className="w-full h-10 px-3.5 text-sm rounded-xl border border-input bg-background focus:ring-2 focus:ring-primary/20 outline-none font-medium"
+                  />
+                </div>
+              )}
+
+              {/* WhatsApp Phone Input */}
+              {(sendMethod === "WHATSAPP" || sendMethod === "BOTH") && (
+                <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-150">
+                  <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    Customer Mobile Number
+                  </label>
+                  <input
+                    type="tel"
+                    value={recipientPhone}
+                    onChange={(e) => setRecipientPhone(e.target.value)}
+                    placeholder="e.g. 919876543210 (with country code)"
+                    className="w-full h-10 px-3.5 text-sm rounded-xl border border-input bg-background focus:ring-2 focus:ring-primary/20 outline-none font-medium"
+                  />
+                  <p className="text-[10px] text-muted-foreground font-semibold">
+                    Ensure the phone number includes the country code (e.g. 91 for India) without '+' or spaces.
+                  </p>
+                </div>
+              )}
+
+              {/* Subject (for email) */}
+              {(sendMethod === "EMAIL" || sendMethod === "BOTH") && (
+                <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-150">
+                  <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    Email Subject
+                  </label>
+                  <input
+                    type="text"
+                    value={customSubject}
+                    onChange={(e) => setCustomSubject(e.target.value)}
+                    placeholder="Enter custom email subject..."
+                    className="w-full h-10 px-3.5 text-sm rounded-xl border border-input bg-background focus:ring-2 focus:ring-primary/20 outline-none font-medium"
+                  />
+                </div>
+              )}
+
+              {/* Message Box */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Message Details
+                </label>
+                <textarea
+                  value={customMessage}
+                  onChange={(e) => setCustomMessage(e.target.value)}
+                  placeholder="Type your message to the customer..."
+                  rows={4}
+                  className="w-full p-3.5 text-sm rounded-xl border border-input bg-background focus:ring-2 focus:ring-primary/20 outline-none font-medium resize-none"
+                />
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="border-t px-6 py-4 flex items-center justify-end gap-3 bg-muted/10">
+              <button
+                type="button"
+                onClick={() => setSendModalDrawing(null)}
+                className="px-4.5 py-2.5 rounded-xl border text-sm font-bold hover:bg-muted transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isSending}
+                onClick={handleSendSubmit}
+                className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-bold shadow-sm hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50"
+              >
+                {isSending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    Send Drawing
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

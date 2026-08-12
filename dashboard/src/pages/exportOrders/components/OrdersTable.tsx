@@ -1,5 +1,6 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import type { ExportOrder } from "@/types/exportOrders";
+import { FileText } from "lucide-react";
 
 interface Props {
   orders: ExportOrder[];
@@ -67,6 +68,7 @@ export default function OrdersTable({
               </th>
               <th className="px-4 py-3 text-left">SO Number</th>
               <th className="px-4 py-3 text-left">Customer</th>
+              <th className="px-4 py-3 text-left">Drawing</th>
               <th className="px-4 py-3 text-left">Status</th>
               <th className="px-4 py-3 text-left">Amount</th>
               <th className="px-4 py-3 text-left">Delivery Target</th>
@@ -77,7 +79,7 @@ export default function OrdersTable({
             {isLoading &&
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i} className="border-t">
-                  {Array.from({ length: 6 }).map((__, j) => (
+                  {Array.from({ length: 7 }).map((__, j) => (
                     <td key={j} className="px-4 py-3">
                       <div className="h-4 w-full rounded bg-muted animate-pulse" />
                     </td>
@@ -87,17 +89,21 @@ export default function OrdersTable({
 
             {!isLoading && orders.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
                   No orders found. Use the filter above to search.
                 </td>
               </tr>
             )}
 
             {!isLoading &&
-              orders.map((row) => {
+              orders.map((row: any) => {
                 const isSelected = selectedOrderIds.includes(row.id);
                 const statusClass =
                   STATUS_COLORS[row.status] ?? "bg-gray-100 text-gray-600";
+                
+                const hasDrawing = row.engineeringProjects?.some(
+                  (p: any) => p.drawings?.length > 0
+                );
 
                 return (
                   <tr
@@ -116,6 +122,20 @@ export default function OrdersTable({
 
                     <td className="px-4 py-3 font-medium">{row.dveplCode}</td>
                     <td className="px-4 py-3">{row.partyName}</td>
+                    
+                    <td className="px-4 py-3">
+                      {hasDrawing ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <FileText className="w-3 h-3 text-emerald-500" />
+                          Attached
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground border">
+                          —
+                        </span>
+                      )}
+                    </td>
+
                     <td className="px-4 py-3">
                       <span
                         className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full ${statusClass}`}

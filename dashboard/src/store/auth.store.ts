@@ -11,9 +11,13 @@ export const useAuthStore = create<AuthStore>((set) => ({
   isAuthenticated: Boolean(localStorage.getItem('token')),
   login: () => set({ isAuthenticated: true }),
   logout: () => {
-  localStorage.removeItem('token');
-  set({ isAuthenticated: false });
+    localStorage.removeItem('token');
+    set({ isAuthenticated: false });
 
-  useERPStore.getState().setCurrentUser('', '');
-}
+    useERPStore.getState().setCurrentUser('', '');
+    
+    if (window.location.pathname !== '/login') {
+      window.location.replace('/login');
+    }
+  }
 }));
