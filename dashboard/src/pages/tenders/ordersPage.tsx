@@ -185,6 +185,51 @@ function DetailSectionTitle({
 }
 
 // ============================================================
+// PARSERS
+// ============================================================
+
+function parseSalesOrderRemarks(remarks: string) {
+  const fields = {
+    workName: "",
+    department: "",
+    section: "",
+    division: "",
+    subDivision: "",
+    location: "",
+    tenderId: "",
+    referenceCode: "",
+  };
+  if (!remarks) return fields;
+
+  const lines = remarks.split("\n");
+  lines.forEach((line) => {
+    const parts = line.split(":");
+    if (parts.length >= 2) {
+      const key = parts[0].trim().toLowerCase();
+      const val = parts.slice(1).join(":").trim();
+      if (key === "work") fields.workName = val;
+      else if (key === "department") fields.department = val;
+      else if (key === "section") fields.section = val;
+      else if (key === "division") fields.division = val;
+      else if (key === "sub division") fields.subDivision = val;
+      else if (key === "location") fields.location = val;
+      else if (key === "tender id") fields.tenderId = val;
+      else if (key === "reference code") fields.referenceCode = val;
+    }
+  });
+  return fields;
+}
+
+function parseContactDetails(contactDetails: string) {
+  const parts = (contactDetails || "").split("|").map(p => p.trim());
+  return {
+    name: parts[0] || "",
+    mobile: parts[1] || "",
+    email: parts[2] || "",
+  };
+}
+
+// ============================================================
 // PAGE
 // ============================================================
 
@@ -247,28 +292,49 @@ export function OrdersPage() {
     setIsLoading(true);
 
     try {
-      const response = await apiClient.get("/quotetender/read");
+      const response = await apiClient.get("/order/read?page=1&limit=100");
 
       if (response.data?.success) {
-        const rawRows: RawQuoteTenderOrder[] =
-          response.data?.data?.data ?? [];
+        const rawSalesOrders = response.data?.data ?? [];
 
-        const rows: QuoteTenderOrder[] = rawRows.map((r) => ({
-          ...r,
-          id: String(r.t_id),
-        }));
+        const rows: QuoteTenderOrder[] = rawSalesOrders.map((order: any) => {
+          const remarksFields = parseSalesOrderRemarks(order.remarks || "");
+          const contactFields = parseContactDetails(order.contactDetails || "");
+
+          return {
+            id: order.id,
+            t_id: order.dveplCode ? parseInt(order.dveplCode.replace(/\D/g, ""), 10) || 0 : 0,
+            tender_no: order.caNo || "",
+            name_of_work: remarksFields.workName || "",
+            firm_name: order.partyName || "",
+            name: contactFields.name || "",
+            mobile: contactFields.mobile || "",
+            email_id: contactFields.email || "",
+            department_name: remarksFields.department || "",
+            section_name: remarksFields.section || "",
+            division_name: remarksFields.division || "",
+            subdivision: remarksFields.subDivision || "",
+            state_name: remarksFields.location || "",
+            city_name: null,
+            tenderID: remarksFields.tenderId || "",
+            reference_code: remarksFields.referenceCode || "",
+            remark: order.status || "",
+            remarked_at: order.createdAt || "",
+            file_name: null,
+          };
+        });
 
         setQuoteTenders(rows);
       } else {
         toast.error(
           response.data?.message ??
-            "Unable to load quote tender orders."
+            "Unable to load orders."
         );
       }
     } catch (error: any) {
       toast.error(
         error.response?.data?.message ??
-          "Unable to load quote tender orders."
+          "Unable to load orders."
       );
     } finally {
       setIsLoading(false);
