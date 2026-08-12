@@ -59,6 +59,8 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import adminCustomFieldRouteGroup from "./customField/index";
 import recycleBinRoutes from "./recycleBin/index";
 import purchaseOrderRoutes from './purchaseOrder'
+import workflowRoutes from "./workflow"
+
 import quoteTenderOrderRoutes from "./quotetender";
 
 
@@ -268,6 +270,8 @@ async function adminRoutes(
       prefix: "/export-orders",
     });
   });
+
+  fastify.register(workflowRoutes, { prefix: "/workflow" });
 }
 
 export default adminRoutes;
