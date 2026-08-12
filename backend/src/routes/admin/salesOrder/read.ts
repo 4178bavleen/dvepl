@@ -122,6 +122,19 @@ async function adminSalesOrderReadRoutes(
               },
 
               items: true,
+              engineeringProjects: {
+                include: {
+                  drawings: {
+                    select: {
+                      id: true,
+                      drawingNo: true,
+                      title: true,
+                      fileName: true,
+                      fileUrl: true,
+                    },
+                  },
+                },
+              },
             },
           });
 

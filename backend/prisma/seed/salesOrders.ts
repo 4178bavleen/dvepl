@@ -1,6 +1,5 @@
-import { PrismaClient, SalesOrderStatus } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { SalesOrderStatus } from "@prisma/client";
+import { prisma } from "../../src/lib/prisma";
 
 const REFERENCE_EMAIL = "bavleenmodi15@gmail.com";
 const REFERENCE_PHONE = "9501519405";
@@ -198,7 +197,7 @@ function getStatus(status: string): SalesOrderStatus {
   return statusMap[status] ?? ("PENDING" as SalesOrderStatus);
 }
 
-async function main() {
+export async function seedSalesOrders() {
   console.log("🌱 Starting SalesOrder seeder...\n");
 
   let user = await prisma.user.findUnique({
@@ -337,12 +336,18 @@ async function main() {
   console.log("----------------------------------------\n");
 }
 
-main()
-  .catch((error) => {
-    console.error("❌ Seeder failed:");
-    console.error(error);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+async function main() {
+  await seedSalesOrders();
+}
+
+if (require.main === module) {
+  main()
+    .catch((error) => {
+      console.error("❌ Seeder failed:");
+      console.error(error);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}

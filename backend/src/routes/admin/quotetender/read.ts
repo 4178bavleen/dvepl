@@ -5,6 +5,21 @@ import {
 } from "fastify";
 
 import { fetchAwardTenders } from "../../../services/quoteTender.service";
+import { SalesOrderStatus } from "@prisma/client";
+
+function getSalesOrderStatus(statusStr: string): SalesOrderStatus {
+  const s = (statusStr || "").toUpperCase();
+  if (s.includes("ACCEPT") || s.includes("CONFIRM") || s.includes("PROGRESS")) {
+    return "IN_PROGRESS";
+  }
+  if (s.includes("COMPLET")) {
+    return "COMPLETED";
+  }
+  if (s.includes("HOLD")) {
+    return "ON_HOLD";
+  }
+  return "PENDING";
+}
 
 async function quoteTenderOrderReadRoutes(
   fastify: FastifyInstance,
@@ -18,23 +33,124 @@ async function quoteTenderOrderReadRoutes(
       },
     },
     async (
-      _request: FastifyRequest,
+      request: FastifyRequest,
       reply: FastifyReply,
     ) => {
       try {
         const awardTenders = await fetchAwardTenders();
 
+        const companyId = (request as any).user?.companyId;
+        const userId = (request as any).user?.id;
+
+        if (!companyId || !userId) {
+          return reply.status(401).send({
+            success: false,
+            message: "Unauthorized: Missing user or company context.",
+          });
+        }
+
+        let tendersArray: any[] = [];
+        if (Array.isArray(awardTenders)) {
+          tendersArray = awardTenders;
+        } else if (awardTenders && Array.isArray((awardTenders as any).data)) {
+          tendersArray = (awardTenders as any).data;
+        } else if (awardTenders && (awardTenders as any).data && Array.isArray((awardTenders as any).data.data)) {
+          tendersArray = (awardTenders as any).data.data;
+        }
+
+        fastify.log.info(`Sync found ${tendersArray.length} tenders to process.`);
+
+        const syncedOrders: any[] = [];
+
+        for (const order of tendersArray) {
+          const t_id = order.t_id;
+          if (!t_id) continue;
+
+          const dveplCode = `QT-ORDER-${t_id}`;
+          const referenceCode = order.reference_code || order.tenderID || String(t_id);
+
+          // Check if already exists in database
+          const existing = await fastify.prisma.salesOrder.findFirst({
+            where: {
+              OR: [
+                { dveplCode },
+                { remarks: { contains: `Reference Code: ${t_id}` } },
+                { remarks: { contains: `Reference Code: ${referenceCode}` } }
+              ],
+            },
+          });
+
+          if (!existing) {
+            fastify.log.info(`Sync creating new order for t_id: ${t_id}`);
+
+            const subtotal = Number((order as any).amount || (order as any).tender_value || (order as any).value || 0);
+            const gstTotal = Math.round(subtotal * 0.18 * 100) / 100;
+            const grandTotal = subtotal + gstTotal;
+
+            const contactDetails = [order.name, order.mobile, order.email_id]
+              .filter(Boolean)
+              .join(" | ");
+
+            const remarks = [
+              `Work: ${order.name_of_work || ""}`,
+              `Department: ${order.department_name || ""}`,
+              `Section: ${order.section_name || ""}`,
+              `Division: ${order.division_name || ""}`,
+              `Sub Division: ${order.subdivision || ""}`,
+              `Location: ${[order.state_name, order.city_name].filter(Boolean).join(", ")}`,
+              `Tender ID: ${order.tenderID || ""}`,
+              `Reference Code: ${referenceCode}`,
+              `File Name: ${order.file_name || ""}`,
+            ].join("\n");
+
+            const newOrder = await fastify.prisma.salesOrder.create({
+              data: {
+                companyId,
+                createdById: userId,
+                orderTakenById: userId,
+                partyName: order.firm_name || "Unknown Firm",
+                caNo: order.tender_no || null,
+                dveplCode,
+                contactDetails,
+                status: getSalesOrderStatus(order.remark || order.status),
+                subtotal,
+                gstTotal,
+                grandTotal,
+                remarks,
+                assignedToIds: [userId],
+                createdAt: order.remarked_at ? new Date(order.remarked_at) : new Date(),
+                sendNotification: false,
+              },
+            });
+            syncedOrders.push(newOrder);
+          } else {
+            // Update the existing order to backport the file name if it was previously synced without one
+            const existingRemarks = existing.remarks || "";
+            const hasFileNameLine = existingRemarks.includes("File Name:");
+            if (!hasFileNameLine && order.file_name) {
+              fastify.log.info(`Sync updating file name for t_id: ${t_id}`);
+              const updatedRemarks = `${existingRemarks}\nFile Name: ${order.file_name}`;
+              const updatedOrder = await fastify.prisma.salesOrder.update({
+                where: { id: existing.id },
+                data: { remarks: updatedRemarks },
+              });
+              syncedOrders.push(updatedOrder);
+            }
+          }
+        }
+
         return reply.status(200).send({
           success: true,
-          message: "Quote Tender Orders fetched successfully.",
+          message: "Quote Tender Orders fetched and synced successfully.",
           data: awardTenders,
+          syncedCount: syncedOrders.length,
         });
       } catch (error: any) {
         fastify.log.error(error);
 
         return reply.status(502).send({
           success: false,
-          message: "Failed to fetch orders from Quote Tender Portal.",
+          message: "Failed to fetch and sync orders from Quote Tender Portal.",
           error: error.message,
         });
       }
