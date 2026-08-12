@@ -7,6 +7,14 @@
 -- AlterTable
 ALTER TABLE "DynamicRecord" ADD COLUMN     "inventoryId" TEXT;
 
+-- Existing dynamic inventory records and inventory rows were created with
+-- the same primary key. Link those rows before enforcing the relation.
+UPDATE "DynamicRecord" AS "dynamicRecord"
+SET "inventoryId" = "inventory"."id"
+FROM "inventories" AS "inventory"
+WHERE "dynamicRecord"."id" = "inventory"."id"
+  AND "dynamicRecord"."inventoryId" IS NULL;
+
 -- CreateIndex
 CREATE UNIQUE INDEX "DynamicRecord_inventoryId_key" ON "DynamicRecord"("inventoryId");
 
