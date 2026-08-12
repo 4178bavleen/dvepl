@@ -169,18 +169,7 @@ async function adminExportOrdersRouteGroup(
           },
         });
 
-        const availableDrawings = drawings.filter((drawing) =>
-          hasStoredDrawingFile(drawing.fileUrl),
-        );
-
-        const missingFileCount = drawings.length - availableDrawings.length;
-        if (missingFileCount > 0) {
-          adminLogs.warn("Excluded drawings whose uploaded files are missing", {
-            missingFileCount,
-          });
-        }
-
-        return reply.send({ success: true, data: availableDrawings });
+        return reply.send({ success: true, data: drawings });
       } catch (error: any) {
         adminLogs.error("Failed to fetch drawings for orders", { error });
         return reply.status(500).send({
@@ -387,6 +376,192 @@ async function adminExportOrdersRouteGroup(
         return reply.status(500).send({
           success: false,
           message: "Server error updating drawing status.",
+          error: error.message,
+        });
+      }
+    }
+  );
+
+  // 6. Send drawing via Email / WhatsApp
+  fastify.post(
+    "/drawing/send",
+    {
+      schema: {
+        tags: ["Export Orders"],
+        summary: "Send drawing via Email / WhatsApp",
+      },
+      preHandler: preHandlers,
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const bodySchema = z.object({
+          drawingId: z.string().uuid(),
+          method: z.enum(["EMAIL", "WHATSAPP", "BOTH"]),
+          email: z.string().email().optional().nullable(),
+          phone: z.string().optional().nullable(),
+          subject: z.string().optional().nullable(),
+          message: z.string().optional().nullable(),
+        });
+
+        const validation = bodySchema.safeParse(request.body);
+        if (!validation.success) {
+          return reply.status(400).send({
+            success: false,
+            message: "Invalid request data.",
+            error: validation.error.issues,
+          });
+        }
+
+        const { drawingId, method, email, phone, subject, message } = validation.data;
+        const companyId = request.admin?.companyId;
+
+        if (!companyId) {
+          return reply.status(401).send({
+            success: false,
+            message: "Unauthorized. Missing company info.",
+          });
+        }
+
+        // Find drawing with project and salesOrder details
+        const drawing = await fastify.prisma.engineeringDrawing.findFirst({
+          where: { id: drawingId, project: { companyId } },
+          include: {
+            project: {
+              include: {
+                salesOrder: {
+                  include: {
+                    customer: {
+                      include: {
+                        contacts: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        if (!drawing) {
+          return reply.status(404).send({
+            success: false,
+            message: "Drawing not found.",
+          });
+        }
+
+        const salesOrder = drawing.project?.salesOrder;
+
+        // Auto-fetch target details if not provided
+        let targetEmail = email;
+        let targetPhone = phone;
+
+        if (!targetEmail || !targetPhone) {
+          // Parse contact details
+          if (salesOrder?.contactDetails) {
+            const parts = salesOrder.contactDetails.split("|").map(p => p.trim());
+            // Format is: Name | Phone | Email
+            if (parts.length >= 3) {
+              if (!targetEmail && parts[2]?.includes("@")) targetEmail = parts[2];
+              if (!targetPhone) targetPhone = parts[1];
+            } else {
+              // Try to find email and phone in any part
+              for (const part of parts) {
+                if (!targetEmail && part.includes("@")) targetEmail = part;
+                if (!targetPhone && /^[+\d\s-]{10,20}$/.test(part)) targetPhone = part;
+              }
+            }
+          }
+
+          // Fallback to customer contacts
+          if (salesOrder?.customer?.contacts) {
+            const primaryContact = salesOrder.customer.contacts.find(c => c.isPrimary) || salesOrder.customer.contacts[0];
+            if (primaryContact) {
+              if (!targetEmail && primaryContact.email) targetEmail = primaryContact.email;
+              if (!targetPhone && primaryContact.phone) targetPhone = primaryContact.phone;
+            }
+          }
+        }
+
+        const defaultSubject = subject || `Engineering Drawing for Order ${salesOrder?.dveplCode || ""}: ${drawing.drawingNo}`;
+        const defaultMessage = message || `Dear Customer,\n\nPlease find attached the engineering drawing: ${drawing.title} (${drawing.drawingNo}) for your order ${salesOrder?.dveplCode || ""}.\n\nBest Regards,\nDVEPL Team`;
+
+        let emailSent = false;
+        let whatsappLink = "";
+
+        // Get API base URL dynamically
+        const host = request.headers.host || "localhost:8000";
+        const protocol = (request.raw as any).socket?.encrypted ? "https" : "http";
+        const apiBaseUrl = `${protocol}://${host}`;
+
+        // 1. Process Email
+        if ((method === "EMAIL" || method === "BOTH") && targetEmail) {
+          // Verify file exists if local
+          let attachmentOptions: any[] = [];
+          if (drawing.fileUrl) {
+            if (/^https?:\/\//i.test(drawing.fileUrl)) {
+              // Remote URL attachment
+              attachmentOptions.push({
+                filename: drawing.fileName,
+                path: drawing.fileUrl,
+              });
+            } else {
+              const fileName = path.basename(drawing.fileUrl);
+              const filePath = path.join(uploadsDirectory, fileName);
+              if (existsSync(filePath)) {
+                attachmentOptions.push({
+                  filename: drawing.fileName,
+                  path: filePath,
+                });
+              }
+            }
+          }
+
+          const { default: EmailService } = await import("../../../services/notification/email.service");
+          const config = await EmailService.getConfiguration();
+          const transporter = await EmailService.createTransporter();
+
+          await transporter.sendMail({
+            from: `"${config.smtpFromName || "DVEPL"}" <${config.smtpFromEmail}>`,
+            to: targetEmail,
+            subject: defaultSubject,
+            html: defaultMessage.replace(/\n/g, "<br>"),
+            attachments: attachmentOptions,
+          });
+
+          emailSent = true;
+          adminLogs.info("Drawing email sent successfully", { drawingId, to: targetEmail });
+        }
+
+        // 2. Process WhatsApp (generate link)
+        if (method === "WHATSAPP" || method === "BOTH") {
+          const rawPhone = targetPhone ? targetPhone.replace(/\D/g, "") : "";
+          // Format text for whatsapp url
+          const text = encodeURIComponent(
+            `${defaultSubject}\n\n${defaultMessage}\n\nDrawing Link: ${
+              /^https?:\/\//i.test(drawing.fileUrl) 
+                ? drawing.fileUrl 
+                : `${apiBaseUrl}${drawing.fileUrl}`
+            }`
+          );
+          whatsappLink = `https://wa.me/${rawPhone ? rawPhone : ""}?text=${text}`;
+        }
+
+        return reply.send({
+          success: true,
+          message: "Action processed successfully.",
+          data: {
+            emailSent,
+            whatsappLink,
+            recipientEmail: targetEmail || null,
+            recipientPhone: targetPhone || null,
+          }
+        });
+
+      } catch (error: any) {
+        adminLogs.error("Failed to send drawing", { error });
+        return reply.status(500).send({
+          success: false,
+          message: "Failed to process send action.",
           error: error.message,
         });
       }

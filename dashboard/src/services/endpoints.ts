@@ -432,5 +432,6 @@ export const API_ENDPOINTS = {
     nextDrawingNo: '/export-orders/next-drawing-no',
     createDrawing: '/export-orders/create-drawing',
     updateDrawing: (id: string) => `/export-orders/drawing/update/${id}`,
+    sendDrawing: '/export-orders/drawing/send',
   },
 } as const;

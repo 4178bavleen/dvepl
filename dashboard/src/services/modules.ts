@@ -271,4 +271,15 @@ export const exportOrdersApi = {
   updateDrawingStatus: (id: string, status: string) =>
     apiClient.put(API_ENDPOINTS.exportOrders.updateDrawing(id), { status })
       .then((res) => drawingResponseSchema.parse(res.data)),
+
+  // Send a drawing to a customer via Email/WhatsApp
+  sendDrawing: (data: {
+    drawingId: string;
+    method: "EMAIL" | "WHATSAPP" | "BOTH";
+    email?: string | null;
+    phone?: string | null;
+    subject?: string | null;
+    message?: string | null;
+  }) => apiClient.post(API_ENDPOINTS.exportOrders.sendDrawing, data)
+    .then((res) => res.data),
 };
