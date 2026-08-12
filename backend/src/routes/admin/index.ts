@@ -59,6 +59,8 @@ import { FastifyInstance, FastifyPluginOptions } from "fastify";
 import adminCustomFieldRouteGroup from "./customField/index";
 import recycleBinRoutes from "./recycleBin/index";
 import purchaseOrderRoutes from './purchaseOrder'
+import workflowRoutes from "./workflow"
+
 
 async function adminRoutes(
   fastify: FastifyInstance,
@@ -254,6 +256,8 @@ fastify.register(dynamicRoutes, { prefix: "/dynamic" });
   prefix: "/export-orders",
 });
   });
+
+  fastify.register(workflowRoutes, { prefix: "/workflow" });
 }
 
 export default adminRoutes;

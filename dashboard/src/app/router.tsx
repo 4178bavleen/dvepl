@@ -5,7 +5,8 @@ import { PublicRoute } from "@/app/routes/public";
 import { UiConfigProvider } from "@/contexts/ui/uiConfigContext";
 import NotFound from "@/pages/notFound";
 import PageLoader from "@/components/ui/pageLoader";
-import InventoryPage  from "@/pages/inventory/inventoryPage";
+import InventoryPage from "@/pages/inventory/inventoryPage";
+import WorkflowTrackerPage from "../pages/workflow/WorkflowTrackerPage(org)";
 // const InventoryTrackingPage = lazy(
 //   () => import("@/pages/inventory/inventoryTrackingPage"),
 // );
@@ -74,7 +75,6 @@ const OrdersPage = lazy(() => import("@/pages/tenders/ordersPage"));
 const VendorsPage = lazy(() => import("@/pages/vendors/vendorsPage"));
 const BoqsPage = lazy(() => import("@/pages/tenders/boqsPage"));
 
-
 // Security & Audit
 const RolesPage = lazy(() => import("@/pages/roles/rolesPage"));
 const ApprovalRequestsPage = lazy(
@@ -133,8 +133,9 @@ const NotificationsPage = lazy(
   () => import("@/pages/notifications/notificationsPage"),
 );
 const DeliveryPage = lazy(() => import("@/pages/delivery/deliveryPage"));
-const ExportOrdersPage = lazy(() => import("@/pages/exportOrders/ExportOrdersPage"));
-
+const ExportOrdersPage = lazy(
+  () => import("@/pages/exportOrders/ExportOrdersPage"),
+);
 
 export function AppRouter() {
   return (
@@ -272,6 +273,7 @@ export function AppRouter() {
                 path="/finance/history/:orderId"
                 element={<PaymentHistoryPage />}
               />
+              <Route path="/workflow" element={<WorkflowTrackerPage />} />
 
               <Route path="/audit-logs" element={<AuditLogsPage />} />
               <Route path="/reports" element={<ReportsPage />} />
@@ -290,10 +292,7 @@ export function AppRouter() {
                 path="/settings/notifications"
                 element={<NotificationsPage />}
               />
-              <Route
-                path="/export-orders"
-                element={<ExportOrdersPage />}
-              />
+              <Route path="/export-orders" element={<ExportOrdersPage />} />
             </Route>
 
             {/* 404 Fallback */}

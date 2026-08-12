@@ -1321,11 +1321,31 @@ model SalesOrder {
   quotation              Quotation?             @relation(fields: [quotationId], references: [id])
   tender                 Tender?                @relation(fields: [tenderId], references: [id])
   workOrders             WorkOrder[]
+  workflowStage          WorkflowStage          @default(ORDER_CONFIRMED)
+  nextAction             String?
+  dueDate                DateTime?
+  workflowUpdatedAt      DateTime               @default(now())
+  workflowEvents         WorkflowEvent[]
 
   @@index([companyId])
   @@index([status])
   @@index([orderTakenById])
   @@map("sales_orders")
+}
+
+model WorkflowEvent {
+  id            String        @id @default(uuid())
+  salesOrderId  String
+  stage         WorkflowStage
+  title         String
+  description   String?
+  performedById String?
+  createdAt     DateTime      @default(now())
+
+  salesOrder SalesOrder @relation(fields: [salesOrderId],references: [id],onDelete: Cascade)
+
+  @@index([salesOrderId])
+  @@index([createdAt])
 }
 
 model SalesOrderAssignment {
@@ -3098,4 +3118,14 @@ enum DynamicFieldType {
   DATE
 }
 
-
+enum WorkflowStage {
+  ORDER_CONFIRMED
+  PO_READY
+  DRAWING_ASSIGNED
+  DRAWING_SENT
+  REVISION_REQUIRED
+  DRAWING_APPROVED
+  PO_PLACED
+  INVENTORY_FOLLOW_UP
+  PRODUCTION_FOLLOW_UP
+}
