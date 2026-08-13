@@ -6,6 +6,7 @@ import {
 } from "fastify";
 
 import { Prisma , PurchaseOrderStatus } from "@prisma/client";
+import { syncSalesOrderWorkflowFromPo } from "../../../utils/workflowSync";
 interface UpdatePurchaseOrderBody {
   vendorId?: string;
   expectedDelivery?: string | null;
@@ -226,6 +227,14 @@ async function adminPurchaseOrderUpdateRoutes(
             }
           }
         });
+
+        // Sync with SalesOrder workflow stage if referenceCode is present
+        await syncSalesOrderWorkflowFromPo(
+          fastify.prisma,
+          referenceCode || existing.referenceCode,
+          status,
+          request.user.id
+        );
 
         const result = await fastify.prisma.purchaseOrder.findUnique({
           where: { id },

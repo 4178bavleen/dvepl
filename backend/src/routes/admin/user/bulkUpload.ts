@@ -103,13 +103,6 @@ async function adminUserBulkUploadRoutes(
           createdUsers: [] as string[],
         };
 
-        const fallbackRole = await fastify.prisma.role.findFirst({
-          where: {
-            companyId,
-            deletedAt: null,
-          },
-        });
-
         for (const userData of usersList) {
           try {
             // Check existing email
@@ -120,10 +113,10 @@ async function adminUserBulkUploadRoutes(
               throw new Error(`Email '${userData.email}' already exists.`);
             }
 
-            // Resolve role
-            let activeRoleId = fallbackRole?.id || "";
+            // Resolve role (only when explicitly provided; never auto-assign)
+            let activeRole: any = null;
             if (userData.role) {
-              const foundRole = await fastify.prisma.role.findFirst({
+              activeRole = await fastify.prisma.role.findFirst({
                 where: {
                   OR: [
                     { id: userData.role },
@@ -133,13 +126,9 @@ async function adminUserBulkUploadRoutes(
                   deletedAt: null
                 }
               });
-              if (foundRole) {
-                activeRoleId = foundRole.id;
+              if (!activeRole) {
+                throw new Error(`Role '${userData.role}' not found.`);
               }
-            }
-
-            if (!activeRoleId) {
-              throw new Error("No valid role found and no system fallback roles available.");
             }
 
             // Resolve team
@@ -173,12 +162,14 @@ async function adminUserBulkUploadRoutes(
                 },
               });
 
-              await tx.userRole.create({
-                data: {
-                  userId: user.id,
-                  roleId: activeRoleId,
-                },
-              });
+              if (activeRole) {
+                await tx.userRole.create({
+                  data: {
+                    userId: user.id,
+                    roleId: activeRole.id,
+                  },
+                });
+              }
 
               // Create a brand new employee and contact record automatically
               const nameParts = (userData.name || "").trim().split(/\s+/);
@@ -239,12 +230,31 @@ async function adminUserBulkUploadRoutes(
               return user;
             });
 
+            const rolePageAccess = Array.isArray(activeRole?.pageAccess)
+              ? (activeRole.pageAccess as string[])
+              : [];
+            const roleActionPermissions =
+              activeRole?.actionPermissions &&
+              typeof activeRole.actionPermissions === "object" &&
+              !Array.isArray(activeRole.actionPermissions) &&
+              Object.keys(activeRole.actionPermissions).length > 0
+                ? activeRole.actionPermissions
+                : null;
+            const roleFieldPermissions =
+              activeRole?.fieldPermissions &&
+              typeof activeRole.fieldPermissions === "object" &&
+              !Array.isArray(activeRole.fieldPermissions)
+                ? activeRole.fieldPermissions
+                : null;
+
             await fastify.prisma.userAccessProfile.create({ data: {
               userId: createdUser.id,
               designation: userData.designation,
-              pageAccess: ["dashboard", "vendors", "orders"],
-              fieldPermissions: {},
-              actionPermissions: {
+              pageAccess: rolePageAccess.length > 0
+                ? rolePageAccess
+                : ["dashboard", "vendors", "orders"],
+              fieldPermissions: roleFieldPermissions || {},
+              actionPermissions: roleActionPermissions || {
                 dashboard: { create: false, edit: false, delete: false, export: false },
                 vendors: { create: true, edit: true, delete: false, export: true },
                 orders: { create: true, edit: true, delete: false, export: true },

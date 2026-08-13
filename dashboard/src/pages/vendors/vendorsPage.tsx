@@ -5337,7 +5337,13 @@ export function VendorsPage() {
                 >
                   👁️ View PO
                 </button>
-                <button className="btn-save-rev" onClick={() => handleSavePoRevision()}>
+                <button
+                  className="btn-save-rev"
+                  onClick={() => {
+                    setPoStatus("Ready");
+                    handleSavePoRevision("Ready");
+                  }}
+                >
                   ✅ PO Ready
                 </button>
                 <button

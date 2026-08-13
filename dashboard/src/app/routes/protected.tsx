@@ -54,7 +54,7 @@ const getRequiredPermission = (pathname: string): string | null => {
     '/material/materials': 'materials',
     '/material/categories': 'material_categories',
     '/purchase/requests': 'purchase_requests',
-    '/purchase/orders': 'purchase_orders',
+    '/purchase/orders': 'orders',
     '/inventory/warehouses': 'inventory',
     '/inventory/stocks': 'inventory',
     '/inventory/transfers': 'inventory',

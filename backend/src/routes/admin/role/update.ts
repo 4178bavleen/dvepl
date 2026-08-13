@@ -83,41 +83,45 @@ async function updateRoleRoute(
         // Duplicate Name
         //--------------------------------
 
-        const existingRole = await fastify.prisma.role.findFirst({
-          where: {
-            companyId,
-            name,
-            NOT: {
-              id,
+        if (name) {
+          const existingRole = await fastify.prisma.role.findFirst({
+            where: {
+              companyId,
+              name,
+              NOT: {
+                id,
+              },
+              deletedAt: null,
             },
-            deletedAt: null,
-          },
-        });
-
-        if (existingRole) {
-          return reply.status(409).send({
-            success: false,
-            message: "Role name already exists.",
           });
+
+          if (existingRole) {
+            return reply.status(409).send({
+              success: false,
+              message: "Role name already exists.",
+            });
+          }
         }
 
         //--------------------------------
         // Validate Permissions
         //--------------------------------
 
-        const permissions = await fastify.prisma.permission.findMany({
-          where: {
-            id: {
-              in: permissionIds,
+        if (permissionIds) {
+          const permissions = await fastify.prisma.permission.findMany({
+            where: {
+              id: {
+                in: permissionIds,
+              },
             },
-          },
-        });
-
-        if (permissions.length !== permissionIds.length) {
-          return reply.status(400).send({
-            success: false,
-            message: "One or more permissions are invalid.",
           });
+
+          if (permissions.length !== permissionIds.length) {
+            return reply.status(400).send({
+              success: false,
+              message: "One or more permissions are invalid.",
+            });
+          }
         }
 
         //--------------------------------
@@ -130,26 +134,28 @@ async function updateRoleRoute(
               id,
             },
             data: {
-              name,
-              description,
+              ...(name !== undefined ? { name } : {}),
+              ...(description !== undefined ? { description } : {}),
               ...(pageAccess !== undefined ? { pageAccess } : {}),
               ...(fieldPermissions !== undefined ? { fieldPermissions } : {}),
               ...(actionPermissions !== undefined ? { actionPermissions } : {}),
             },
           });
 
-          await tx.rolePermission.deleteMany({
-            where: {
-              roleId: id,
-            },
-          });
+          if (permissionIds) {
+            await tx.rolePermission.deleteMany({
+              where: {
+                roleId: id,
+              },
+            });
 
-          await tx.rolePermission.createMany({
-            data: permissionIds.map((permissionId) => ({
-              roleId: id,
-              permissionId,
-            })),
-          });
+            await tx.rolePermission.createMany({
+              data: permissionIds.map((permissionId) => ({
+                roleId: id,
+                permissionId,
+              })),
+            });
+          }
         });
 
         return reply.status(200).send({

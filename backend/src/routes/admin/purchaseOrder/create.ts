@@ -9,6 +9,7 @@ import { Prisma, PurchaseOrderStatus } from "@prisma/client";
 import { z } from "zod";
 
 import { adminLogs } from "../../../services/logger/contextLogger";
+import { syncSalesOrderWorkflowFromPo } from "../../../utils/workflowSync";
 
 const purchaseOrderSchema = z.object({
   poNo: z.string().min(1),
@@ -25,6 +26,7 @@ const purchaseOrderSchema = z.object({
 
   remarks: z.string().optional().nullable(),
   referenceCode: z.string().optional().nullable(),
+  status: z.nativeEnum(PurchaseOrderStatus).optional(),
 
   items: z
     .array(
@@ -75,6 +77,7 @@ async function adminPurchaseOrderCreateRoutes(
           shippingTerms,
           remarks,
           referenceCode,
+          status,
           items,
         } = validation.data;
 
@@ -250,7 +253,7 @@ async function adminPurchaseOrderCreateRoutes(
 
               createdById: request.user.id,
 
-              status: PurchaseOrderStatus.DRAFT,
+              status: status || PurchaseOrderStatus.DRAFT,
             },
           });
 
@@ -276,6 +279,15 @@ async function adminPurchaseOrderCreateRoutes(
 
           return createdPO;
         });
+
+        // Sync with SalesOrder workflow stage if referenceCode is present
+        await syncSalesOrderWorkflowFromPo(
+          fastify.prisma,
+          referenceCode,
+          status,
+          request.user.id
+        );
+
         const result = await fastify.prisma.purchaseOrder.findUnique({
           where: {
             id: po.id,

@@ -4,7 +4,8 @@ import { securityApi } from "@/services/modules";
 import { organizationApi } from "@/services/organization";
 import { toast } from "react-hot-toast";
 import * as XLSX from "xlsx";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, AlertTriangle } from "lucide-react";
+import { ConfirmDialog } from "@/components/shared/confirmDialog";
 import {
   ACTION_PERMISSION_KEYS,
   LEGACY_ACTION_DEFAULTS,
@@ -142,6 +143,8 @@ export function SettingsPage() {
 
   const [isPermModalOpen, setIsPermModalOpen] = useState(false);
   const [permUser, setPermUser] = useState<UserItem | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleteTemplateId, setDeleteTemplateId] = useState<string | null>(null);
 
   // Quick Preset state
   const [pageAccessState, setPageAccessState] = useState<
@@ -601,14 +604,20 @@ export function SettingsPage() {
     }
   };
 
-  // Handle User Deletion
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm("Are you sure you want to delete this user?")) return;
+  // Handle User Deletion (Open Custom Confirm Modal)
+  const handleDeleteUser = (userId: string) => {
+    setDeleteConfirmId(userId);
+  };
+
+  // Perform actual deletion
+  const handleConfirmDeleteUser = async () => {
+    if (!deleteConfirmId) return;
     try {
       if (securityApi.users.remove) {
-        await securityApi.users.remove(userId);
+        await securityApi.users.remove(deleteConfirmId);
       }
       toast.success("User deleted successfully");
+      setDeleteConfirmId(null);
       loadUsersList();
     } catch (err) {
       toast.error("Failed to delete user");
@@ -786,12 +795,16 @@ export function SettingsPage() {
 
   // Standard PRBAC permission helpers
   const permissionRoles = useMemo(() => {
+    const dbRoles = store.roles || [];
+    if (dbRoles.length > 0) {
+      return dbRoles.map((r: any) => r.name);
+    }
     const roles = Array.from(
       new Set(users.map((user) => user.role?.trim()).filter(Boolean)),
     ) as string[];
 
     return roles.sort((a, b) => a.localeCompare(b));
-  }, [users]);
+  }, [users, store.roles]);
 
   const roleLabel = (role: string) =>
     role
@@ -830,10 +843,19 @@ export function SettingsPage() {
   };
 
   // Open the permission editor from an existing user row.
-  // The editor starts in Role Permissions mode because PRBAC is role-first.
+  // The editor starts in Role Permissions mode if the role exists in the database.
+  // Otherwise, it falls back to User Overrides mode.
   const handleOpenPermModal = async (user: UserItem) => {
-    setPermissionMode("role");
-    setSelectedPermissionRole(user.role || "user");
+    const storeObj = useERPStore.getState();
+    const hasRoleInDb = storeObj.roles?.some((r: any) => r.name === user.role);
+
+    if (hasRoleInDb) {
+      setPermissionMode("role");
+      setSelectedPermissionRole(user.role);
+    } else {
+      setPermissionMode("user");
+      setSelectedPermissionRole("");
+    }
     setSelectedPermissionUserId(user.id);
     setPermissionRoleSearch("");
     setPermissionUserSearch("");
@@ -1485,12 +1507,17 @@ export function SettingsPage() {
   };
 
   const handleDeleteTemplate = (id: string) => {
-    if (!confirm("Are you sure you want to delete this template?")) return;
-    const updated = templates.filter((t) => t.id !== id);
+    setDeleteTemplateId(id);
+  };
+
+  const handleConfirmDeleteTemplate = () => {
+    if (!deleteTemplateId) return;
+    const updated = templates.filter((t) => t.id !== deleteTemplateId);
     setTemplates(updated);
     localStorage.setItem("dvepl_email_templates", JSON.stringify(updated));
     updateStoreSettings({ templates: updated });
     toast.success("Template deleted");
+    setDeleteTemplateId(null);
   };
 
   const cancelTemplateForm = () => {
@@ -3928,6 +3955,31 @@ export function SettingsPage() {
           </div>
         </div>
       )}
+
+      {/* DELETE CONFIRMATION MODALS */}
+      <ConfirmDialog
+        open={!!deleteConfirmId}
+        onOpenChange={(open) => !open && setDeleteConfirmId(null)}
+        title="Delete User Account?"
+        description={`Are you sure you want to delete ${
+          users.find((u) => u.id === deleteConfirmId)?.name ||
+          users.find((u) => u.id === deleteConfirmId)?.email ||
+          "this user"
+        }? This action is permanent and cannot be undone.`}
+        confirmText="Delete User"
+        variant="danger"
+        onConfirm={handleConfirmDeleteUser}
+      />
+
+      <ConfirmDialog
+        open={!!deleteTemplateId}
+        onOpenChange={(open) => !open && setDeleteTemplateId(null)}
+        title="Delete Template?"
+        description="Are you sure you want to delete this email template? This action is permanent and cannot be undone."
+        confirmText="Delete Template"
+        variant="danger"
+        onConfirm={handleConfirmDeleteTemplate}
+      />
 
       {/* STANDARD PRBAC PERMISSIONS MODAL */}
       {isPermModalOpen && permUser && (

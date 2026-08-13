@@ -24,9 +24,14 @@ export const createRoleSchema = z.object({
 
 
 export const updateRoleSchema = z.object({
-  name: z.string().min(2).max(100),
+  name: z
+    .string()
+    .trim()
+    .min(2, "Role name is required")
+    .max(100)
+    .optional(),
   description: z.string().optional().nullable(),
-  permissionIds: z.array(z.string().uuid()).optional().default([]),
+  permissionIds: z.array(z.string().uuid()).optional(),
   pageAccess: z.array(z.string()).optional(),
   fieldPermissions: z.any().optional(),
   actionPermissions: z.any().optional(),

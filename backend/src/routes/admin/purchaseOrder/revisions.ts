@@ -6,6 +6,7 @@ import {
 } from "fastify";
 
 import { adminLogs } from "../../../services/logger/contextLogger";
+import { syncSalesOrderWorkflowFromPo } from "../../../utils/workflowSync";
 
 async function adminPurchaseOrderRevisionsRoutes(
   fastify: FastifyInstance,
@@ -248,6 +249,14 @@ async function adminPurchaseOrderRevisionsRoutes(
             referenceCode: body.referenceCode,
           },
         });
+
+        // Sync with SalesOrder workflow stage if referenceCode is present
+        await syncSalesOrderWorkflowFromPo(
+          fastify.prisma,
+          body.referenceCode,
+          body.poStatus,
+          request.user.id
+        );
 
         adminLogs.info("PO Revision created", {
           revisionId: created.id,

@@ -112,20 +112,13 @@ async function createUserRoute(
               deletedAt: null
             }
           });
-          if (foundRole) {
-            activeRoleIds = [foundRole.id];
+          if (!foundRole) {
+            return reply.status(400).send({
+              success: false,
+              message: "Invalid role selected.",
+            });
           }
-        }
-
-        if (activeRoleIds.length === 0) {
-          const fallbackRole = await fastify.prisma.role.findFirst({
-            where: {
-              deletedAt: null,
-            },
-          });
-          if (fallbackRole) {
-            activeRoleIds = [fallbackRole.id];
-          }
+          activeRoleIds = [foundRole.id];
         }
 
         const roles = await fastify.prisma.role.findMany({
@@ -258,16 +251,39 @@ async function createUserRoute(
           }
         );
 
+        // ======================================================
+        // Access Profile (derived from the main assigned role)
+        // ======================================================
+        const mainRole = roles[0] as any;
+        const rolePageAccess = Array.isArray(mainRole?.pageAccess)
+          ? (mainRole.pageAccess as string[])
+          : [];
+        const roleActionPermissions =
+          mainRole?.actionPermissions &&
+          typeof mainRole.actionPermissions === "object" &&
+          !Array.isArray(mainRole.actionPermissions) &&
+          Object.keys(mainRole.actionPermissions).length > 0
+            ? mainRole.actionPermissions
+            : null;
+        const roleFieldPermissions =
+          mainRole?.fieldPermissions &&
+          typeof mainRole.fieldPermissions === "object" &&
+          !Array.isArray(mainRole.fieldPermissions)
+            ? mainRole.fieldPermissions
+            : null;
+
         await fastify.prisma.userAccessProfile.create({ data: {
           userId: createdUser.id,
           designation: designation || "Team Member",
-          pageAccess: ["dashboard", "vendors", "orders"],
-          fieldPermissions: {},
-          actionPermissions: {
+          pageAccess: rolePageAccess.length > 0
+            ? rolePageAccess
+            : ["dashboard", "vendors", "orders"],
+          fieldPermissions: roleFieldPermissions || {},
+          actionPermissions: roleActionPermissions || {
             dashboard: { create: false, edit: false, delete: false, export: false },
             vendors: { create: true, edit: true, delete: false, export: true },
             orders: { create: true, edit: true, delete: false, export: true },
-          }
+          },
         }});
 
         // ======================================================

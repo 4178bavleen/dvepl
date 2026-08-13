@@ -104,6 +104,26 @@ async function adminLoginRoutes(
         });
 
         const up = existingUser.accessProfile;
+        const mainRole = existingUser.userRoles[0]?.role as any;
+        const hasOverride = up?.hasOverride ?? false;
+
+        const resolvedPageAccess = hasOverride
+          ? (up?.pageAccess as string[]) || []
+          : Array.isArray(mainRole?.pageAccess) && (mainRole.pageAccess as any[]).length > 0
+            ? (mainRole.pageAccess as string[])
+            : (up?.pageAccess as string[]) || [];
+
+        const resolvedActionPermissions = hasOverride
+          ? up?.actionPermissions || { create: true, edit: true, delete: false, export: true }
+          : mainRole?.actionPermissions && Object.keys(mainRole.actionPermissions).length > 0
+            ? mainRole.actionPermissions
+            : up?.actionPermissions || { create: true, edit: true, delete: false, export: true };
+
+        const resolvedFieldPermissions = hasOverride
+          ? up?.fieldPermissions || {}
+          : mainRole?.fieldPermissions && Object.keys(mainRole.fieldPermissions).length > 0
+            ? mainRole.fieldPermissions
+            : up?.fieldPermissions || {};
 
         return reply.status(200).send({
           success: true,
@@ -118,9 +138,9 @@ async function adminLoginRoutes(
             company: existingUser.company?.name ?? null,
             roles,
             designation: up?.designation || "Team Member",
-            pageAccess: up?.pageAccess || [],
-            fieldPermissions: up?.fieldPermissions || {},
-            actionPermissions: up?.actionPermissions || { create: true, edit: true, delete: false, export: true },
+            pageAccess: resolvedPageAccess,
+            fieldPermissions: resolvedFieldPermissions,
+            actionPermissions: resolvedActionPermissions,
           },
         });
       } catch (error: any) {

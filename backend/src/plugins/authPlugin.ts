@@ -46,7 +46,7 @@ const getModuleForRequest = (url: string): string | null => {
   const routeModules: Array<[string, string]> = [
     ["/company/", "companies"], ["/branch/", "branches"], ["/department/", "departments"],
     ["/team/", "teams"], ["/designation/", "designations"], ["/cost-center/", "cost_centers"],
-    ["/employee/", "employees"], ["/attendance/", "attendance"], ["/leave/", "leaves"],
+    ["/employee/", "employees"], ["/employee-shift/", "shift_management"], ["/attendance/", "attendance"], ["/leave/", "leaves"],
     ["/holiday/", "holidays"], ["/shift/", "shift_management"], ["/salary/", "payroll"],
     ["/employee-document/", "documents"], ["/task/", "tasks"], ["/customer/", "customers"],
     ["/contact/", "contacts"], ["/communication/", "communication"], ["/sales-order/", "orders"],

@@ -43,9 +43,6 @@ async function deleteRoleRoute(
             companyId,
             deletedAt: null,
           },
-          include: {
-            userRoles: true,
-          },
         });
 
         if (!role) {
@@ -66,7 +63,16 @@ async function deleteRoleRoute(
         // Check Users
         //--------------------------------
 
-        if (role.userRoles.length > 0) {
+        const assignedActiveUsers = await fastify.prisma.userRole.count({
+          where: {
+            roleId: id,
+            user: {
+              deletedAt: null,
+            },
+          },
+        });
+
+        if (assignedActiveUsers > 0) {
           return reply.status(400).send({
             success: false,
             message: "Role is assigned to users and cannot be deleted.",
