@@ -12,6 +12,7 @@ interface UpdatePurchaseOrderBody {
   paymentTerms?: string;
   shippingTerms?: string;
   remarks?: string;
+  referenceCode?: string | null;
   status?: PurchaseOrderStatus;
   items?: {
     materialId: string;
@@ -51,6 +52,7 @@ async function adminPurchaseOrderUpdateRoutes(
           paymentTerms,
           shippingTerms,
           remarks,
+          referenceCode,
           status,
           items,
         } = request.body;
@@ -188,6 +190,7 @@ async function adminPurchaseOrderUpdateRoutes(
               paymentTerms,
               shippingTerms,
               remarks,
+              referenceCode,
               status,
               expectedDelivery: expectedDelivery
                 ? new Date(expectedDelivery)

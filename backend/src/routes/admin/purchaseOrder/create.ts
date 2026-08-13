@@ -24,6 +24,7 @@ const purchaseOrderSchema = z.object({
   shippingTerms: z.string().optional().nullable(),
 
   remarks: z.string().optional().nullable(),
+  referenceCode: z.string().optional().nullable(),
 
   items: z
     .array(
@@ -73,6 +74,7 @@ async function adminPurchaseOrderCreateRoutes(
           paymentTerms,
           shippingTerms,
           remarks,
+          referenceCode,
           items,
         } = validation.data;
 
@@ -238,6 +240,7 @@ async function adminPurchaseOrderCreateRoutes(
               shippingTerms,
 
               remarks,
+              referenceCode,
 
               subtotal: new Prisma.Decimal(subtotal),
 

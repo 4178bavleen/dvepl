@@ -1756,6 +1756,7 @@ model PurchaseOrder {
   approvedAt       DateTime?
   sentAt           DateTime?
   remarks          String?
+  referenceCode    String?
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
   deletedAt        DateTime?
@@ -1769,11 +1770,46 @@ model PurchaseOrder {
   customer         Customer?           @relation(fields: [customerId], references: [id])
   request          PurchaseRequest?    @relation(fields: [requestId], references: [id])
   vendor           Vendor              @relation(fields: [vendorId], references: [id])
+  revisions        PurchaseOrderRevision[]
 
   @@index([companyId])
   @@index([status])
   @@index([poNo])
   @@map("purchase_orders")
+}
+
+model PurchaseOrderRevision {
+  id                 String         @id @default(uuid())
+  purchaseOrderId    String?
+  vendorId           String
+  poNumber           String
+  poDate             String
+  poStatus           String
+  paymentTerms       String?
+  materialStatus     String?
+  advance            Float          @default(0)
+  remarks            String?
+  cgstPercent        Float          @default(0)
+  sgstPercent        Float          @default(0)
+  igstPercent        Float          @default(0)
+  subtotal           Float          @default(0)
+  cgstAmount         Float          @default(0)
+  sgstAmount         Float          @default(0)
+  igstAmount         Float          @default(0)
+  grandTotal         Float          @default(0)
+  termsAndConditions String?
+  lineItems          Json
+  companyDetails     Json
+  createdAt          DateTime       @default(now())
+  createdBy          String
+  revisionNo         Int
+  customColumns      Json?
+  referenceCode      String?
+
+  purchaseOrder      PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  vendor             Vendor         @relation("VendorPurchaseOrderRevisions", fields: [vendorId], references: [id])
+
+  @@map("purchase_order_revisions")
 }
 
 model PurchaseOrderItem {
@@ -2549,6 +2585,7 @@ model Vendor {
   purchaseOrders        PurchaseOrder[]
   vendorProducts        VendorProduct[]
   revisions             VendorRevision[]
+  poRevisions           PurchaseOrderRevision[] @relation("VendorPurchaseOrderRevisions")
   company               Company          @relation(fields: [companyId], references: [id])
   createdBy             User             @relation("VendorCreatedBy", fields: [createdById], references: [id])
 

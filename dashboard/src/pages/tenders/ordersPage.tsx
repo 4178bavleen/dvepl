@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ColumnDef } from "@tanstack/react-table";
+import { useNavigate } from "react-router-dom";
 import {
   Search,
   RefreshCw,
@@ -87,6 +88,8 @@ interface QuoteTenderOrder extends RawQuoteTenderOrder {
     fileName: string;
     fileUrl: string;
   }>;
+  poStatus?: string;
+  poNumber?: string;
 }
 
 // ============================================================
@@ -107,6 +110,7 @@ const ALL_COLUMN_KEYS = [
   { id: "stateCity", label: "STATE / CITY" },
   { id: "tenderID", label: "TENDER ID" },
   { id: "referenceCode", label: "REFERENCE CODE" },
+  { id: "poStatus", label: "PO STATUS" },
   { id: "remark", label: "REMARK" },
   { id: "remarkedAt", label: "REMARKED AT" },
   { id: "drawingAttached", label: "DRAWING" },
@@ -247,6 +251,7 @@ function parseContactDetails(contactDetails: string) {
 // ============================================================
 
 export function OrdersPage() {
+  const navigate = useNavigate();
   const [quoteTenders, setQuoteTenders] =
     useState<QuoteTenderOrder[]>(EMPTY_ARRAY);
 
@@ -313,6 +318,28 @@ export function OrdersPage() {
     setIsLoading(true);
 
     try {
+      // 1. Fetch backend purchase orders
+      let backendPOs: any[] = [];
+      try {
+        const poRes = await apiClient.get("/purchase-order/read");
+        if (poRes.data?.success) {
+          backendPOs = poRes.data.data ?? [];
+        }
+      } catch (err) {
+        console.error("Error loading purchase orders:", err);
+      }
+
+      // 2. Fetch PO revisions from backend database
+      let dbRevisions: any[] = [];
+      try {
+        const revRes = await apiClient.get("/purchase-order/revisions/list");
+        if (revRes.data?.success) {
+          dbRevisions = revRes.data.data ?? [];
+        }
+      } catch (err) {
+        console.error("Error loading revisions:", err);
+      }
+
       const response = await apiClient.get("/order/read?page=1&limit=100");
 
       if (response.data?.success) {
@@ -321,6 +348,34 @@ export function OrdersPage() {
         const rows: QuoteTenderOrder[] = rawSalesOrders.map((order: any) => {
           const remarksFields = parseSalesOrderRemarks(order.remarks || "");
           const contactFields = parseContactDetails(order.contactDetails || "");
+          const refCode = remarksFields.referenceCode || "";
+
+          // Resolve PO Status
+          const matchedRev = dbRevisions.find(
+            (rev) => rev.referenceCode && String(rev.referenceCode).trim() === String(refCode).trim()
+          );
+          const matchedPO = backendPOs.find(
+            (po) => po.referenceCode && String(po.referenceCode).trim() === String(refCode).trim()
+          );
+
+          let poStatus = "No PO";
+          let poNumber = "";
+
+          if (matchedRev) {
+            poStatus = matchedRev.poStatus;
+            poNumber = matchedRev.poNumber;
+          } else if (matchedPO) {
+            poStatus = matchedPO.status; // e.g. DRAFT, APPROVED, SENT, etc.
+            poNumber = matchedPO.poNo;
+
+            // Map backend status to human-readable/friendly
+            if (poStatus === "DRAFT") poStatus = "Draft";
+            else if (poStatus === "APPROVED") poStatus = "Approved";
+            else if (poStatus === "SENT") poStatus = "Sent";
+            else if (poStatus === "PARTIAL_RECEIVED") poStatus = "Partially Received";
+            else if (poStatus === "COMPLETED") poStatus = "Received";
+            else if (poStatus === "CANCELLED") poStatus = "Cancelled";
+          }
 
           return {
             id: order.id,
@@ -338,7 +393,9 @@ export function OrdersPage() {
             state_name: remarksFields.location || "",
             city_name: null,
             tenderID: remarksFields.tenderId || "",
-            reference_code: remarksFields.referenceCode || "",
+            reference_code: refCode,
+            poStatus,
+            poNumber,
             remark: order.status || "",
             remarked_at: order.createdAt || "",
             drawingAttached: order.engineeringProjects?.some((proj: any) => proj.drawings?.length > 0) || false,
@@ -460,6 +517,8 @@ export function OrdersPage() {
           item.remark,
           item.state_name,
           item.city_name,
+          item.poStatus,
+          item.poNumber,
         ]
           .filter(Boolean)
           .some((val) =>
@@ -657,6 +716,53 @@ export function OrdersPage() {
           header: "REFERENCE CODE",
           cell: ({ getValue }) =>
             (getValue() as string) || "—",
+        },
+
+        poStatus: {
+          accessorKey: "poStatus",
+          header: "PO STATUS",
+          cell: ({ row }) => {
+            const val = String(row.original.poStatus || "No PO");
+            const poNo = row.original.poNumber;
+            const refCode = row.original.reference_code;
+
+            const badge: Record<string, string> = {
+              ready: "bg-emerald-500/15 text-emerald-500 border-emerald-500/20",
+              "needs revision": "bg-rose-500/15 text-rose-500 border-rose-500/20",
+              placed: "bg-blue-500/15 text-blue-500 border-blue-500/20",
+              ordered: "bg-indigo-500/15 text-indigo-500 border-indigo-500/20",
+              pending: "bg-amber-500/15 text-amber-500 border-amber-500/20",
+              "no po": "bg-muted text-muted-foreground border-muted-foreground/20",
+            };
+
+            return (
+              <div className="flex flex-col gap-1 items-start">
+                <span
+                  className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border uppercase ${
+                    badge[val.toLowerCase()] || "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {val}
+                </span>
+                {poNo && (
+                  <span className="text-[10px] font-medium text-muted-foreground">
+                    {poNo}
+                  </span>
+                )}
+                {refCode && (
+                  <button
+                    onClick={() => {
+                      const mode = val === "No PO" ? "generate" : "view";
+                      navigate(`/purchase/vendors?ref=${encodeURIComponent(refCode)}&mode=${mode}`);
+                    }}
+                    className="text-[10px] text-primary hover:underline font-semibold mt-0.5 flex items-center gap-0.5"
+                  >
+                    {val === "No PO" ? "＋ Generate PO" : "📂 View/Edit PO"}
+                  </button>
+                )}
+              </div>
+            );
+          },
         },
 
         remark: {

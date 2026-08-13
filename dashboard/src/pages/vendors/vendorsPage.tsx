@@ -62,6 +62,7 @@ import { toast } from "react-hot-toast";
 import { jsPDF } from "jspdf";
 import { tenderApi, inventoryApi, securityApi } from "@/services/modules";
 
+import { useLocation } from "react-router-dom";
 import { apiClient } from "@/services/axios";
 import { useERPStore } from "@/store/erpStore";
 import { DynamicFormRenderer } from "@/components/customFields/dynamicFormRenderer";
@@ -286,37 +287,21 @@ export const apiService = {
   },
   revisions: {
     list: async (): Promise<PORevision[]> => {
-      await new Promise((resolve) => setTimeout(resolve, 150));
-      const saved = localStorage.getItem("dvepl_po_revisions");
-      return saved ? JSON.parse(saved) : [];
+      const response = await apiClient.get("/purchase-order/revisions/list");
+      if (response.data?.success) {
+        return response.data.data ?? [];
+      }
+      return [];
     },
     create: async (revision: PORevision): Promise<PORevision> => {
-      await new Promise((resolve) => setTimeout(resolve, 150));
-      const saved = localStorage.getItem("dvepl_po_revisions");
-      const list: PORevision[] = saved ? JSON.parse(saved) : [];
-      list.unshift(revision);
-      localStorage.setItem("dvepl_po_revisions", JSON.stringify(list));
+      const response = await apiClient.post("/purchase-order/revisions/create", revision);
+      if (response.data?.success) {
+        return response.data.data;
+      }
       return revision;
     },
     delete: async (id: string): Promise<void> => {
-      await new Promise((resolve) => setTimeout(resolve, 150));
-      const saved = localStorage.getItem("dvepl_po_revisions");
-      const list: PORevision[] = saved ? JSON.parse(saved) : [];
-      const toDelete = list.find((r) => r.id === id);
-      if (toDelete) {
-        const trashSaved = localStorage.getItem("dvepl_po_revisions_trash");
-        const trashList: PORevision[] = trashSaved
-          ? JSON.parse(trashSaved)
-          : [];
-        (toDelete as any).deletedAt = new Date().toISOString();
-        trashList.unshift(toDelete);
-        localStorage.setItem(
-          "dvepl_po_revisions_trash",
-          JSON.stringify(trashList),
-        );
-      }
-      const filtered = list.filter((r) => r.id !== id);
-      localStorage.setItem("dvepl_po_revisions", JSON.stringify(filtered));
+      await apiClient.delete(`/purchase-order/revisions/${id}`);
     },
   },
   inventory: {
@@ -376,6 +361,7 @@ export const apiService = {
 };
 
 export function VendorsPage() {
+  const location = useLocation();
   const { currentCompanyId, companies, users, currentUserId } = useERPStore();
   const currentUser = users?.find((u: any) => u.id === currentUserId) as any;
   const canCreate = canPerformPageAction(currentUser?.actionPermissions, "vendors", "create");
@@ -1133,6 +1119,43 @@ export function VendorsPage() {
   const [selectedRevisionId, setSelectedRevisionId] = useState<string | null>(
     null,
   );
+  const [linkedRefCode, setLinkedRefCode] = useState("");
+  const [linkedMode, setLinkedMode] = useState<"generate" | "view" | "">("");
+
+  const clearLinkedPoParams = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("ref");
+    url.searchParams.delete("mode");
+    window.history.replaceState({}, "", url.toString());
+    setLinkedRefCode("");
+    setLinkedMode("");
+  };
+
+  useEffect(() => {
+    const queryParams = new URLSearchParams(location.search);
+    const ref = queryParams.get("ref");
+    const mode = queryParams.get("mode") as "generate" | "view" | null;
+    if (ref) {
+      setLinkedRefCode(ref);
+      setLinkedMode(mode || "generate");
+
+      // Auto-open existing revision if it matches
+      if (revisions.length > 0 && vendors.length > 0) {
+        const foundRev = revisions.find(
+          (r) => r.referenceCode && String(r.referenceCode).trim() === String(ref).trim()
+        );
+        if (foundRev) {
+          const v = vendors.find((vendor) => vendor.id === foundRev.vendorId);
+          if (v) {
+            loadRevision(foundRev);
+            setActivePoVendor(v);
+            setIsDataEntryOpen(true);
+            toast.success(`Auto-opened existing PO revision for reference: ${ref}`);
+          }
+        }
+      }
+    }
+  }, [revisions, vendors, location.search]);
 
   useEffect(() => {
     if (isDataEntryOpen && !selectedRevisionId) {
@@ -1483,22 +1506,52 @@ export function VendorsPage() {
 
       setTerms("");
 
-      const mappedItems = (po.items || []).map((it, idx) => ({
-        id: it.id || `item-${idx}`,
-        materialId: it.materialId,
-        inventoryId: inventoryItems.find(
-          (inv) => inv.materialId === it.materialId,
-        )?.id,
-        description: it.material?.name || "Unknown Material",
-        qty: it.quantity,
-        unit: it.material?.unit || "Nos",
-        hsnCode: it.material?.hsnCode || "",
-        catNo: "",
-        rate: Number(it.unitPrice),
-        discountPercent: 0,
-        net: it.quantity * Number(it.unitPrice),
-        total: it.quantity * Number(it.unitPrice),
-      }));
+      const mappedItems = (po.items || []).map((it, idx) => {
+        const qtyNum = Number(it.quantity) || 0;
+        const rateNum = Number(it.unitPrice) || 0;
+
+        const invItem = inventoryItems.find((inv) => inv.materialId === it.materialId);
+        const invRecord = invItem ? inventoryRecords.find((rec) => rec.id === invItem.id) : null;
+
+        const mappedItem: any = {
+          id: it.id || `item-${idx}`,
+          materialId: it.materialId,
+          inventoryId: invItem?.id,
+          description: it.material?.name || (it as any).remarks || "Unknown Material",
+          qty: qtyNum,
+          unit: it.material?.unit || "Nos",
+          hsnCode: it.material?.hsnCode || "",
+          catNo: "",
+          rate: rateNum,
+          discountPercent: 0,
+          net: qtyNum * rateNum,
+          total: qtyNum * rateNum,
+        };
+
+        if (invRecord && invRecord.values) {
+          inventoryFields.forEach((f) => {
+            mappedItem[f.fieldName] = invRecord.values?.[f.fieldName] ?? "";
+          });
+        } else {
+          inventoryFields.forEach((f) => {
+            if (f.label.toLowerCase().includes("name") || f.label.toLowerCase().includes("desc")) {
+              mappedItem[f.fieldName] = it.material?.name || (it as any).remarks || "";
+            } else if (f.label.toLowerCase().includes("unit") || f.label.toLowerCase().includes("uom")) {
+              mappedItem[f.fieldName] = it.material?.unit || "Nos";
+            } else if (f.label.toLowerCase().includes("hsn")) {
+              mappedItem[f.fieldName] = it.material?.hsnCode || "";
+            } else {
+              mappedItem[f.fieldName] = "";
+            }
+          });
+          const primaryField = inventoryFields[0];
+          if (primaryField && !mappedItem[primaryField.fieldName]) {
+            mappedItem[primaryField.fieldName] = it.material?.name || (it as any).remarks || "";
+          }
+        }
+
+        return mappedItem;
+      });
       setPoItems(mappedItems);
       setSelectedRevisionId("");
       setReferenceCode("");
@@ -1811,29 +1864,8 @@ export function VendorsPage() {
       const list = await apiService.vendors.list();
       setVendors(list);
 
-      const savedRev = localStorage.getItem("dvepl_po_revisions");
-      if (savedRev) {
-        const revList: PORevision[] = JSON.parse(savedRev);
-        const toTrash = revList.filter((r) => r.vendorId === vendorToDelete);
-        const remaining = revList.filter((r) => r.vendorId !== vendorToDelete);
-        localStorage.setItem("dvepl_po_revisions", JSON.stringify(remaining));
-        setRevisions(remaining);
-
-        if (toTrash.length > 0) {
-          const trashSaved = localStorage.getItem("dvepl_po_revisions_trash");
-          const trashList: PORevision[] = trashSaved
-            ? JSON.parse(trashSaved)
-            : [];
-          toTrash.forEach((r) => {
-            (r as any).deletedAt = new Date().toISOString();
-            trashList.unshift(r);
-          });
-          localStorage.setItem(
-            "dvepl_po_revisions_trash",
-            JSON.stringify(trashList),
-          );
-        }
-      }
+      const updatedRevisions = await apiService.revisions.list();
+      setRevisions(updatedRevisions);
       toast.success("Vendor deleted successfully");
     } catch (err: any) {
       toast.error("Failed to delete vendor");
@@ -2265,7 +2297,7 @@ export function VendorsPage() {
   };
 
   // Save revision
-  const handleSavePoRevision = async () => {
+  const handleSavePoRevision = async (overrideStatus?: string) => {
     if (!activePoVendor) return;
 
     // PO header validations
@@ -2347,12 +2379,14 @@ export function VendorsPage() {
         ? 0
         : Math.max(...existingRevisions.map((r) => r.revisionNo)) + 1;
 
+    const statusToSave = (typeof overrideStatus === "string" ? overrideStatus : "") || poStatus;
+
     const newRevision: PORevision = {
       id: `rev-${Date.now()}`,
       vendorId: activePoVendor.id,
       poNumber,
       poDate,
-      poStatus,
+      poStatus: statusToSave,
       paymentTerms,
       materialStatus,
       advance,
@@ -2376,64 +2410,99 @@ export function VendorsPage() {
     };
 
     try {
-      // 1. Create Purchase Order in Backend
-      await apiService.purchaseOrders.create({
-        poNo: poNumber,
-        vendorId: activePoVendor.id,
-        orderDate: poDate,
-        expectedDelivery: null, // ya jo date field hai
-        paymentTerms,
-        shippingTerms: "",
-        remarks,
+      // 1. Resolve Status
+      let mappedStatus: "DRAFT" | "APPROVED" | "SENT" = "DRAFT";
+      if (statusToSave === "Placed") {
+        mappedStatus = "SENT";
+      } else if (statusToSave === "Ready") {
+        mappedStatus = "APPROVED";
+      }
 
-        items: poItems.map((item) => {
-          let resolvedMaterialId = item.materialId || item.inventoryId;
-          if (
-            !resolvedMaterialId &&
-            item.description &&
-            inventoryFields.length > 0
-          ) {
-            const primaryFieldName = inventoryFields[0]?.fieldName;
-            const descLower = item.description.trim().toLowerCase();
-            const matchedRecord = inventoryRecords.find((rec) => {
-              const recName = String(rec.values?.[primaryFieldName] || "")
-                .trim()
-                .toLowerCase();
-              return recName === descLower;
-            });
-            if (matchedRecord) {
-              resolvedMaterialId = matchedRecord.id;
-            }
+      // 2. Prepare items with description-to-materialId resolution
+      const resolvedItems = poItems.map((item) => {
+        let resolvedMaterialId = item.materialId || item.inventoryId;
+        if (
+          !resolvedMaterialId &&
+          item.description &&
+          inventoryFields.length > 0
+        ) {
+          const primaryFieldName = inventoryFields[0]?.fieldName;
+          const descLower = item.description.trim().toLowerCase();
+          const matchedRecord = inventoryRecords.find((rec) => {
+            const recName = String(rec.values?.[primaryFieldName] || "")
+              .trim()
+              .toLowerCase();
+            return recName === descLower;
+          });
+          if (matchedRecord) {
+            resolvedMaterialId = matchedRecord.id;
           }
-          if (!resolvedMaterialId && item.description) {
-            const descLower = item.description.trim().toLowerCase();
-            const matched = inventoryItems.find(
-              (inv) => inv.material?.name?.trim().toLowerCase() === descLower,
-            );
-            if (matched?.materialId) resolvedMaterialId = matched.materialId;
-          }
-          if (!resolvedMaterialId && inventoryItems.length > 0) {
-            resolvedMaterialId = inventoryItems[0].materialId;
-          }
-          return {
-            materialId: resolvedMaterialId || "",
-            quantity: (Number(item.qty) || 0) > 0 ? Number(item.qty) : 1,
-            unitPrice: item.rate > 0 ? item.rate : 0.01,
-            remarks: item.description || "",
-          };
-        }),
+        }
+        if (!resolvedMaterialId && item.description) {
+          const descLower = item.description.trim().toLowerCase();
+          const matched = inventoryItems.find(
+            (inv) => inv.material?.name?.trim().toLowerCase() === descLower,
+          );
+          if (matched?.materialId) resolvedMaterialId = matched.materialId;
+        }
+        if (!resolvedMaterialId && inventoryItems.length > 0) {
+          resolvedMaterialId = inventoryItems[0].materialId;
+        }
+        return {
+          materialId: resolvedMaterialId || "",
+          quantity: (Number(item.qty) || 0) > 0 ? Number(item.qty) : 1,
+          unitPrice: item.rate > 0 ? item.rate : 0.01,
+          remarks: item.description || "",
+        };
       });
 
-      // 2. Save Revision
-      await apiService.revisions.create(newRevision);
+      // 3. Check if the Purchase Order already exists in the backend
+      const existingPOsRes = await apiClient.get("/purchase-order/read");
+      const existingPOs = existingPOsRes.data?.data ?? [];
+      const matchedPO = existingPOs.find((p: any) => p.poNo === poNumber);
 
-      // 3. Refresh
+      if (matchedPO) {
+        // Update existing PO
+        await apiClient.patch(`/purchase-order/update/${matchedPO.id}`, {
+          vendorId: activePoVendor.id,
+          expectedDelivery: null,
+          paymentTerms,
+          shippingTerms: "",
+          remarks,
+          referenceCode,
+          status: mappedStatus,
+          items: resolvedItems,
+        });
+      } else {
+        // Create new PO
+        await apiClient.post("/purchase-order/create", {
+          poNo: poNumber,
+          vendorId: activePoVendor.id,
+          orderDate: poDate,
+          expectedDelivery: null,
+          paymentTerms,
+          shippingTerms: "",
+          remarks,
+          referenceCode,
+          status: mappedStatus,
+          items: resolvedItems,
+        });
+      }
+
+      // 4. Save Revision
+      const savedRevision = await apiService.revisions.create(newRevision);
+
+      // 5. Refresh revisions list
       const list = await apiService.revisions.list();
       setRevisions(list);
-      setSelectedRevisionId(newRevision.id);
+      setSelectedRevisionId(savedRevision?.id || newRevision.id);
+
+      // Clear URL parameter and linked reference code
+      clearLinkedPoParams();
 
       toast.success(`Revision R${newRevision.revisionNo} saved successfully`);
     } catch (err: any) {
+      console.error(err);
       toast.error("Failed to save PO revision");
     }
   };
@@ -2451,7 +2520,49 @@ export function VendorsPage() {
     setSgstPercent(rev.sgstPercent);
     setIgstPercent(rev.igstPercent);
     setTerms(rev.termsAndConditions);
-    setPoItems(rev.lineItems);
+
+    const mappedItems = (rev.lineItems || []).map((item) => {
+      const mappedItem: any = { ...item };
+
+      const invItem = inventoryItems.find((inv) => inv.materialId === item.materialId);
+      const invRecord = invItem ? inventoryRecords.find((rec) => rec.id === invItem.id) : null;
+
+      if (invRecord && invRecord.values) {
+        inventoryFields.forEach((f) => {
+          mappedItem[f.fieldName] = invRecord.values?.[f.fieldName] ?? mappedItem[f.fieldName] ?? "";
+        });
+      } else {
+        inventoryFields.forEach((f) => {
+          if (mappedItem[f.fieldName] === undefined) {
+            if (f.label.toLowerCase().includes("name") || f.label.toLowerCase().includes("desc")) {
+              mappedItem[f.fieldName] = item.description || "";
+            } else if (f.label.toLowerCase().includes("unit") || f.label.toLowerCase().includes("uom")) {
+              mappedItem[f.fieldName] = item.unit || "Nos";
+            } else if (f.label.toLowerCase().includes("hsn")) {
+              mappedItem[f.fieldName] = item.hsnCode || "";
+            } else {
+              mappedItem[f.fieldName] = "";
+            }
+          }
+        });
+      }
+
+      mappedItem.description = mappedItem.description || item.description || "";
+      mappedItem.qty = item.qty !== undefined && item.qty !== "" ? Number(item.qty) || 0 : "";
+      mappedItem.rate = Number(item.rate) || 0;
+      mappedItem.discountPercent = Number(item.discountPercent) || 0;
+      mappedItem.net = Number(item.net) || (mappedItem.rate * (1 - mappedItem.discountPercent / 100));
+      mappedItem.total = Number(item.total) || ((mappedItem.qty || 0) * mappedItem.net);
+
+      const primaryField = inventoryFields[0];
+      if (primaryField && !mappedItem[primaryField.fieldName]) {
+        mappedItem[primaryField.fieldName] = mappedItem.description;
+      }
+
+      return mappedItem;
+    });
+
+    setPoItems(mappedItems);
     setCompanyDetails(rev.companyDetails);
     setSelectedRevisionId(rev.id);
     setCustomColumns(rev.customColumns || []);
@@ -2484,7 +2595,7 @@ export function VendorsPage() {
     setPoStatus("Pending");
     setPaymentTerms("30 days net");
     setMaterialStatus("Pending");
-    setReferenceCode("");
+    setReferenceCode(linkedRefCode || "");
     setAdvance(0);
     setRemarks("");
     setCgstPercent(9);
@@ -3160,6 +3271,7 @@ export function VendorsPage() {
     }
 
     setPoStatus("Placed");
+    await handleSavePoRevision("Placed");
     toast.success(
       "PO marked as Placed - PDF generated and sent via " +
         sentChannels.join(" & "),
@@ -3191,6 +3303,30 @@ export function VendorsPage() {
           </Button>
         )}
       </div>
+
+      {/* ── Linked Reference Code Alert Banner ── */}
+      {linkedRefCode && linkedMode === "generate" && (
+        <div className="flex items-center justify-between p-4 rounded-xl border border-primary/20 bg-primary/5 animate-in fade-in-50 duration-200">
+          <div className="flex items-center gap-3">
+            <span className="text-xl">🔗</span>
+            <div>
+              <h3 className="text-sm font-bold text-primary">Linked PO Creation Mode</h3>
+              <p className="text-xs text-muted-foreground">
+                Generating or updating purchase order for Sales Order Reference: <span className="font-semibold text-foreground bg-[#e8f0fe] px-1.5 py-0.5 rounded border border-[#b6cffb]">{linkedRefCode}</span>
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              clearLinkedPoParams();
+            }}
+          >
+            Clear Link
+          </Button>
+        </div>
+      )}
 
       {/* ── Add/Edit Vendor Form Section ── */}
       {isFormOpen && (
@@ -4536,7 +4672,10 @@ export function VendorsPage() {
                 <span className="de-status-pill">Draft</span>
                 <button
                   className="de-close-btn"
-                  onClick={() => setIsDataEntryOpen(false)}
+                  onClick={() => {
+                    setIsDataEntryOpen(false);
+                    clearLinkedPoParams();
+                  }}
                 >
                   ✕
                 </button>
@@ -4591,6 +4730,7 @@ export function VendorsPage() {
                 onClick={() => {
                   setSelectedVendorForRevisions(activePoVendor);
                   setIsDataEntryOpen(false);
+                  clearLinkedPoParams();
                 }}
               >
                 📄 View All
@@ -4793,6 +4933,9 @@ export function VendorsPage() {
                     onChange={(e) => setPoStatus(e.target.value)}
                   >
                     <option value="Pending">Pending</option>
+                    <option value="Ready">Ready</option>
+                    <option value="Needs Revision">Needs Revision</option>
+                    <option value="Placed">Placed</option>
                     <option value="Ordered">Ordered</option>
                     <option value="Partially Received">
                       Partially Received
@@ -5180,7 +5323,10 @@ export function VendorsPage() {
                 <button
                   className="de-tbtn"
                   style={{ padding: "10px 18px", fontSize: "13.5px" }}
-                  onClick={() => setIsDataEntryOpen(false)}
+                  onClick={() => {
+                    setIsDataEntryOpen(false);
+                    clearLinkedPoParams();
+                  }}
                 >
                   Cancel
                 </button>
@@ -5191,7 +5337,7 @@ export function VendorsPage() {
                 >
                   👁️ View PO
                 </button>
-                <button className="btn-save-rev" onClick={handleSavePoRevision}>
+                <button className="btn-save-rev" onClick={() => handleSavePoRevision()}>
                   ✅ PO Ready
                 </button>
                 <button
