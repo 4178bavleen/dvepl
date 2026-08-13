@@ -169,15 +169,15 @@ function DetailItem({
 
   return (
     <div
-      className={`rounded-xl border bg-card px-4 py-3 min-w-0 ${className}`}
+      className={`rounded-xl border border-border/60 bg-muted/10 hover:bg-muted/20 transition-all duration-200 px-4 py-3 min-w-0 shadow-3xs ${className}`}
     >
-      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
         {label}
       </p>
 
       <p
-        className={`mt-1.5 text-sm font-semibold text-foreground break-words ${
-          multiline ? "leading-6 whitespace-pre-wrap" : ""
+        className={`mt-1 text-xs sm:text-sm font-semibold text-foreground break-words ${
+          multiline ? "leading-relaxed whitespace-pre-wrap text-muted-foreground/90 font-medium" : ""
         }`}
       >
         {displayValue}
@@ -198,10 +198,10 @@ function DetailSectionTitle({
   color?: string;
 }) {
   return (
-    <div className="flex items-center gap-3 mb-4">
-      <div className={`h-7 w-1 rounded-full ${color}`} />
+    <div className="flex items-center gap-2 mb-4">
+      <div className={`h-4.5 w-1 rounded-full ${color}`} />
 
-      <h3 className="text-sm font-bold uppercase tracking-wide">
+      <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
         {title}
       </h3>
     </div>
@@ -651,10 +651,17 @@ export function OrdersPage() {
         tenderNo: {
           accessorKey: "tender_no",
           header: sortableHeader("TENDER NO"),
-          cell: ({ getValue }) => (
-            <span className="font-semibold text-foreground">
-              {(getValue() as string) || "—"}
-            </span>
+          cell: ({ row }) => (
+            <div className="flex flex-col gap-0.5 py-0.5">
+              <span className="font-bold text-foreground text-xs md:text-sm">
+                {row.original.tender_no || "—"}
+              </span>
+              {row.original.dveplCode && (
+                <span className="text-[10px] text-muted-foreground font-semibold">
+                  {row.original.dveplCode}
+                </span>
+              )}
+            </div>
           ),
         },
 
@@ -662,12 +669,10 @@ export function OrdersPage() {
           accessorKey: "name_of_work",
           header: "NAME OF WORK",
           cell: ({ getValue }) => {
-            const val =
-              (getValue() as string) || "—";
-
+            const val = (getValue() as string) || "—";
             return (
               <span
-                className="line-clamp-2 max-w-[260px] inline-block"
+                className="line-clamp-2 max-w-[280px] text-xs text-muted-foreground font-medium leading-relaxed"
                 title={val}
               >
                 {val}
@@ -679,8 +684,18 @@ export function OrdersPage() {
         firmName: {
           accessorKey: "firm_name",
           header: sortableHeader("FIRM NAME"),
-          cell: ({ getValue }) =>
-            (getValue() as string) || "—",
+          cell: ({ row }) => (
+            <div className="flex flex-col gap-0.5 py-0.5">
+              <span className="font-semibold text-foreground text-xs">
+                {row.original.firm_name || "—"}
+              </span>
+              {row.original.name && (
+                <span className="text-[10px] text-muted-foreground font-medium">
+                  {row.original.name}
+                </span>
+              )}
+            </div>
+          ),
         },
 
         assignedUsers: {
@@ -691,28 +706,28 @@ export function OrdersPage() {
             const assignments = item.assignments || [];
 
             return (
-              <div className="flex items-center gap-1.5 min-w-[140px]">
+              <div className="flex items-center gap-2 min-w-[140px]">
                 {assignments.length > 0 ? (
                   <div
-                    className="flex items-center -space-x-1.5 overflow-hidden max-w-[120px]"
+                    className="flex items-center -space-x-1.5 overflow-hidden"
                     title={assignments.map((a) => a.user?.name || a.userId).join(", ")}
                   >
-                    {assignments.slice(0, 2).map((a, idx) => (
+                    {assignments.slice(0, 3).map((a, idx) => (
                       <span
                         key={a.id || a.userId || idx}
-                        className="inline-flex items-center justify-center size-6 rounded-full bg-primary/10 border-2 border-background text-[10px] font-bold text-primary shrink-0 uppercase"
+                        className="inline-flex items-center justify-center size-6.5 rounded-full bg-primary/10 border-2 border-background text-[9px] font-bold text-primary shrink-0 uppercase shadow-3xs"
                       >
                         {(a.user?.name || "U").charAt(0)}
                       </span>
                     ))}
-                    {assignments.length > 2 && (
-                      <span className="inline-flex items-center justify-center size-6 rounded-full bg-muted border-2 border-background text-[9px] font-bold text-muted-foreground shrink-0">
-                        +{assignments.length - 2}
+                    {assignments.length > 3 && (
+                      <span className="inline-flex items-center justify-center size-6.5 rounded-full bg-muted border-2 border-background text-[9px] font-bold text-muted-foreground shrink-0 shadow-3xs">
+                        +{assignments.length - 3}
                       </span>
                     )}
                   </div>
                 ) : (
-                  <span className="text-[11px] font-medium text-muted-foreground italic">
+                  <span className="text-[10px] font-semibold text-muted-foreground/60 italic pl-1">
                     Unassigned
                   </span>
                 )}
@@ -726,10 +741,10 @@ export function OrdersPage() {
                     if (!isAdmin) return;
                     setAssigningTender(item);
                   }}
-                  className="size-7 rounded-md hover:bg-primary/10 hover:text-primary transition-colors ml-auto shrink-0"
+                  className="size-7 rounded-lg hover:bg-primary/10 hover:text-primary transition-all duration-150 ml-auto shrink-0 border border-transparent hover:border-primary/10"
                   title={isAdmin ? "Assign Users" : "Only administrators can manage assignments"}
                 >
-                  <Users className="size-3.5" />
+                  <UserPlus className="size-3.5" />
                 </Button>
               </div>
             );
@@ -754,7 +769,7 @@ export function OrdersPage() {
           accessorKey: "email_id",
           header: "EMAIL",
           cell: ({ getValue }) => (
-            <span className="truncate max-w-[180px] inline-block">
+            <span className="truncate max-w-[180px] text-xs text-muted-foreground inline-block">
               {(getValue() as string) || "—"}
             </span>
           ),
@@ -828,25 +843,25 @@ export function OrdersPage() {
             const refCode = row.original.reference_code;
 
             const badge: Record<string, string> = {
-              ready: "bg-emerald-500/15 text-emerald-500 border-emerald-500/20",
-              "needs revision": "bg-rose-500/15 text-rose-500 border-rose-500/20",
-              placed: "bg-blue-500/15 text-blue-500 border-blue-500/20",
-              ordered: "bg-indigo-500/15 text-indigo-500 border-indigo-500/20",
-              pending: "bg-amber-500/15 text-amber-500 border-amber-500/20",
-              "no po": "bg-muted text-muted-foreground border-muted-foreground/20",
+              ready: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+              "needs revision": "bg-rose-500/10 text-rose-600 border-rose-500/20",
+              placed: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+              ordered: "bg-indigo-500/10 text-indigo-600 border-indigo-500/20",
+              pending: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+              "no po": "bg-muted text-muted-foreground border-muted-foreground/10",
             };
 
             return (
-              <div className="flex flex-col gap-1 items-start">
+              <div className="flex flex-col gap-1 items-start py-0.5">
                 <span
-                  className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border uppercase ${
+                  className={`text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${
                     badge[val.toLowerCase()] || "bg-muted text-muted-foreground"
                   }`}
                 >
                   {val}
                 </span>
                 {poNo && (
-                  <span className="text-[10px] font-medium text-muted-foreground">
+                  <span className="text-[10px] font-bold text-muted-foreground">
                     {poNo}
                   </span>
                 )}
@@ -856,9 +871,9 @@ export function OrdersPage() {
                       const mode = val === "No PO" ? "generate" : "view";
                       navigate(`/purchase/vendors?ref=${encodeURIComponent(refCode)}&mode=${mode}`);
                     }}
-                    className="text-[10px] text-primary hover:underline font-semibold mt-0.5 flex items-center gap-0.5"
+                    className="text-[10px] text-primary hover:text-primary-hover font-bold mt-0.5 flex items-center gap-0.5 transition-colors"
                   >
-                    {val === "No PO" ? "＋ Generate PO" : "📂 View/Edit PO"}
+                    {val === "No PO" ? "＋ Generate PO" : "📂 View PO"}
                   </button>
                 )}
               </div>
@@ -877,18 +892,18 @@ export function OrdersPage() {
 
             const badge: Record<string, string> = {
               accepted:
-                "bg-emerald-500/15 text-emerald-500 border-emerald-500/20",
+                "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
 
               rejected:
-                "bg-rose-500/15 text-rose-500 border-rose-500/20",
+                "bg-rose-500/10 text-rose-600 border-rose-500/20",
 
               pending:
-                "bg-amber-500/15 text-amber-500 border-amber-500/20",
+                "bg-amber-500/10 text-amber-600 border-amber-500/20",
             };
 
             return (
               <span
-                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border uppercase ${
+                className={`text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${
                   badge[val.toLowerCase()] ||
                   "bg-muted text-muted-foreground"
                 }`}
@@ -919,8 +934,8 @@ export function OrdersPage() {
             const drawings = row.original.drawings || [];
             if (drawings.length === 0) {
               return (
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground bg-muted/30 px-2.5 py-1 rounded border border-muted/20">
-                  <XCircle className="size-3.5" />
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground/60 bg-muted/20 px-2 py-0.5 rounded border">
+                  <XCircle className="size-3" />
                   No
                 </span>
               );
@@ -933,29 +948,29 @@ export function OrdersPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="gap-1.5 h-7 text-[11px] font-bold text-emerald-600 border-emerald-200 hover:border-emerald-300 bg-emerald-50 hover:bg-emerald-100 transition-all duration-150 px-2.5 rounded"
+                      className="gap-1 h-7 text-[10px] font-bold text-emerald-600 border-emerald-200/50 hover:border-emerald-300 bg-emerald-50/50 hover:bg-emerald-50 transition-all duration-150 px-2 rounded-full cursor-pointer"
                     >
                       <CheckCircle2 className="size-3.5" />
-                      {drawings.length} {drawings.length === 1 ? "Drawing" : "Drawings"}
+                      <span>{drawings.length} {drawings.length === 1 ? "Dwg" : "Dwgs"}</span>
                     </Button>
                   }
                 />
-                <PopoverContent align="center" className="w-80 p-4 space-y-3 z-50">
-                  <div className="border-b pb-2">
-                    <h4 className="font-semibold text-sm text-foreground">
+                <PopoverContent align="center" className="w-80 p-3 space-y-2 z-50 bg-background/98 backdrop-blur-md border border-border/80 rounded-xl shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200">
+                  <div className="border-b pb-1.5 mb-1">
+                    <h4 className="font-bold text-xs text-foreground uppercase tracking-wider">
                       Attached Drawings ({drawings.length})
                     </h4>
                   </div>
-                  <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                  <div className="space-y-1 max-h-[220px] overflow-y-auto pr-1">
                     {drawings.map((dwg) => {
                       const backendUrl = apiClient.defaults.baseURL?.replace("/admin", "") || "";
                       const fullUrl = dwg.fileUrl.startsWith("http") ? dwg.fileUrl : `${backendUrl}${dwg.fileUrl}`;
                       return (
                         <div
                           key={dwg.id}
-                          className="flex items-center justify-between gap-2 p-2 border rounded-md hover:bg-muted/30 transition-colors"
+                          className="flex items-center justify-between gap-2 p-2 border rounded-lg hover:bg-muted/40 transition-colors"
                         >
-                          <div className="min-w-0">
+                          <div className="min-w-0 flex-1">
                             <p className="text-xs font-bold text-foreground truncate" title={dwg.drawingNo}>
                               {dwg.drawingNo}
                             </p>
@@ -968,7 +983,7 @@ export function OrdersPage() {
                               href={fullUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center justify-center size-7 rounded-md border bg-background hover:bg-muted text-muted-foreground hover:text-foreground shrink-0 transition-colors"
+                              className="inline-flex items-center justify-center size-7 rounded-lg border bg-background hover:bg-muted text-muted-foreground hover:text-foreground shrink-0 transition-colors shadow-2xs"
                               title="Open Drawing"
                             >
                               <Eye className="size-3.5" />
@@ -998,7 +1013,7 @@ export function OrdersPage() {
 
             return (
               <span
-                className="truncate max-w-[160px] inline-flex items-center gap-1"
+                className="truncate max-w-[160px] inline-flex items-center gap-1 text-xs text-muted-foreground"
                 title={val}
               >
                 <FileText className="size-3.5 text-muted-foreground shrink-0" />
@@ -1025,21 +1040,23 @@ export function OrdersPage() {
           HEADER
           ======================================================== */}
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-5">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Orders
+          <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
+            Tender Orders
           </h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Manage your client tenders, purchase order status, and drawing synchronizations in real-time.
+          </p>
         </div>
 
         <Button
           variant="outline"
-          onClick={() =>
-            void loadQuoteTenders()
-          }
-          className="gap-2"
+          size="sm"
+          onClick={() => void loadQuoteTenders()}
+          className="gap-2 self-start sm:self-center h-9 shadow-2xs hover:bg-muted/60 transition-colors"
         >
-          <RefreshCw className="size-4" />
+          <RefreshCw className="size-3.5" />
           Refresh
         </Button>
       </div>
@@ -1051,13 +1068,13 @@ export function OrdersPage() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
 
         {/* Total */}
-        <div className="rounded-2xl border border-border bg-gradient-to-br from-card to-blue-500/[0.02] p-5 shadow-xs hover:shadow-md transition-all duration-300 hover:border-blue-500/30 group">
+        <div className="rounded-2xl border bg-gradient-to-br from-card to-indigo-500/[0.02] p-5 shadow-2xs hover:shadow-xs transition-all duration-300 hover:border-indigo-500/30 group">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
               Total Tenders
             </p>
 
-            <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform duration-300">
+            <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-600 group-hover:scale-105 transition-transform duration-300">
               <FileText className="size-5" />
             </div>
           </div>
@@ -1065,16 +1082,19 @@ export function OrdersPage() {
           <p className="mt-3 text-3xl font-bold tracking-tight">
             {totalTenders}
           </p>
+          <p className="text-[10px] text-muted-foreground/80 mt-1.5 font-medium">
+            Total records synced from portal
+          </p>
         </div>
 
         {/* Accepted */}
-        <div className="rounded-2xl border border-border bg-gradient-to-br from-card to-emerald-500/[0.02] p-5 shadow-xs hover:shadow-md transition-all duration-300 hover:border-emerald-500/30 group">
+        <div className="rounded-2xl border bg-gradient-to-br from-card to-emerald-500/[0.02] p-5 shadow-2xs hover:shadow-xs transition-all duration-300 hover:border-emerald-500/30 group">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
               Accepted
             </p>
 
-            <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform duration-300">
+            <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600 group-hover:scale-105 transition-transform duration-300">
               <CheckCircle2 className="size-5" />
             </div>
           </div>
@@ -1082,16 +1102,19 @@ export function OrdersPage() {
           <p className="mt-3 text-3xl font-bold tracking-tight">
             {acceptedCount}
           </p>
+          <p className="text-[10px] text-muted-foreground/80 mt-1.5 font-medium">
+            Tenders ready for purchase orders
+          </p>
         </div>
 
         {/* Rejected */}
-        <div className="rounded-2xl border border-border bg-gradient-to-br from-card to-rose-500/[0.02] p-5 shadow-xs hover:shadow-md transition-all duration-300 hover:border-rose-500/30 group">
+        <div className="rounded-2xl border bg-gradient-to-br from-card to-rose-500/[0.02] p-5 shadow-2xs hover:shadow-xs transition-all duration-300 hover:border-rose-500/30 group">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
               Rejected
             </p>
 
-            <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 group-hover:scale-110 transition-transform duration-300">
+            <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-600 group-hover:scale-105 transition-transform duration-300">
               <XCircle className="size-5" />
             </div>
           </div>
@@ -1099,22 +1122,28 @@ export function OrdersPage() {
           <p className="mt-3 text-3xl font-bold tracking-tight">
             {rejectedCount}
           </p>
+          <p className="text-[10px] text-muted-foreground/80 mt-1.5 font-medium">
+            Tenders requiring revision
+          </p>
         </div>
 
         {/* Firms */}
-        <div className="rounded-2xl border border-border bg-gradient-to-br from-card to-amber-500/[0.02] p-5 shadow-xs hover:shadow-md transition-all duration-300 hover:border-amber-500/30 group">
+        <div className="rounded-2xl border bg-gradient-to-br from-card to-violet-500/[0.02] p-5 shadow-2xs hover:shadow-xs transition-all duration-300 hover:border-violet-500/30 group">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Firms
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+              Active Firms
             </p>
 
-            <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 group-hover:scale-110 transition-transform duration-300">
+            <div className="p-2.5 rounded-xl bg-violet-500/10 text-violet-600 group-hover:scale-105 transition-transform duration-300">
               <Users className="size-5" />
             </div>
           </div>
 
           <p className="mt-3 text-3xl font-bold tracking-tight">
             {uniqueFirms}
+          </p>
+          <p className="text-[10px] text-muted-foreground/80 mt-1.5 font-medium">
+            Unique partner firms registered
           </p>
         </div>
       </div>
@@ -1123,10 +1152,10 @@ export function OrdersPage() {
           TOOLBAR
           ======================================================== */}
 
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-card border rounded-xl p-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-card border rounded-2xl p-3 shadow-3xs">
 
         {/* Search */}
-        <div className="flex items-center gap-2 flex-1 min-w-[240px] border border-input rounded-md px-3 bg-background focus-within:ring-1 focus-within:ring-primary">
+        <div className="flex items-center gap-2 flex-1 min-w-[260px] border border-muted-foreground/15 rounded-xl px-3 bg-muted/30 focus-within:bg-background focus-within:border-primary/40 focus-within:ring-1 focus-within:ring-primary/20 shadow-inner-sm transition-all duration-200">
           <Search className="size-4 text-muted-foreground" />
 
           <Input
@@ -1135,7 +1164,7 @@ export function OrdersPage() {
             onChange={(e) =>
               setSearch(e.target.value)
             }
-            className="h-9 border-none shadow-none focus-visible:ring-0 px-0"
+            className="h-9 border-none shadow-none focus-visible:ring-0 px-0 text-xs font-medium"
           />
         </div>
 
@@ -1147,7 +1176,7 @@ export function OrdersPage() {
             size="sm"
             onClick={handleSync}
             disabled={isSyncing}
-            className="gap-1.5 h-8 border-primary/30 hover:border-primary/60 text-primary hover:bg-primary/5 transition-all duration-200"
+            className="gap-1.5 h-9 rounded-xl border-primary/20 hover:border-primary/40 text-primary bg-primary/5 hover:bg-primary/10 transition-all duration-200 text-xs font-semibold"
           >
             <RefreshCw className={`size-3.5 ${isSyncing ? "animate-spin" : ""}`} />
             {isSyncing ? "Syncing..." : "Sync Portal Orders"}
@@ -1160,17 +1189,17 @@ export function OrdersPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-1.5 h-8"
-                />
+                  className="gap-1.5 h-9 rounded-xl border-muted-foreground/15 text-xs font-semibold shadow-3xs"
+                >
+                  <SlidersHorizontal className="size-3.5" />
+                  <span>Fields</span>
+                </Button>
               }
-            >
-              <SlidersHorizontal className="size-3.5" />
-              Fields
-            </PopoverTrigger>
+            />
 
             <PopoverContent
               align="end"
-              className="w-64 p-3 space-y-3"
+              className="w-64 p-3 space-y-3 z-50 bg-background border border-border/80 rounded-xl shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200"
             >
               <div className="flex items-center justify-between border-b pb-2">
                 <span className="font-bold text-xs">
@@ -1224,9 +1253,9 @@ export function OrdersPage() {
           </Popover>
 
           {/* Remark Filter */}
-          <div className="flex items-center gap-1.5 text-xs">
-            <span className="font-semibold text-muted-foreground">
-              REMARK:
+          <div className="flex items-center gap-2 text-xs">
+            <span className="font-bold text-muted-foreground uppercase tracking-wider text-[10px]">
+              Remark
             </span>
 
             <Select
@@ -1235,7 +1264,7 @@ export function OrdersPage() {
                 setFilterRemark(val ?? "")
               }
             >
-              <SelectTrigger className="h-8 w-[130px]">
+              <SelectTrigger className="h-9 w-[130px] rounded-xl border-muted-foreground/15 bg-background shadow-3xs font-semibold focus:ring-1 focus:ring-primary/20">
                 <SelectValue placeholder="All" />
               </SelectTrigger>
 
@@ -1258,9 +1287,9 @@ export function OrdersPage() {
           </div>
 
           {/* Sort */}
-          <div className="flex items-center gap-1.5 text-xs">
-            <span className="font-semibold text-muted-foreground">
-              SORT:
+          <div className="flex items-center gap-2 text-xs">
+            <span className="font-bold text-muted-foreground uppercase tracking-wider text-[10px]">
+              Sort
             </span>
 
             <Select
@@ -1271,7 +1300,7 @@ export function OrdersPage() {
                 )
               }
             >
-              <SelectTrigger className="h-8 w-[140px]">
+              <SelectTrigger className="h-9 w-[140px] rounded-xl border-muted-foreground/15 bg-background shadow-3xs font-semibold focus:ring-1 focus:ring-primary/20">
                 <SelectValue />
               </SelectTrigger>
 
@@ -1327,6 +1356,12 @@ export function OrdersPage() {
             overflow-hidden
             p-0
             gap-0
+            rounded-2xl
+            border
+            border-border/80
+            bg-background/98
+            backdrop-blur-md
+            shadow-2xl
           "
         >
           {viewingTender && (
@@ -1335,40 +1370,40 @@ export function OrdersPage() {
                   DIALOG HEADER
                   ================================================== */}
 
-              <DialogHeader className="px-6 py-5 border-b bg-muted/20">
-                <div className="flex items-start justify-between gap-4 pr-8">
+              <DialogHeader className="px-6 py-5 border-b bg-muted/30">
+                <div className="flex items-center justify-between gap-4 pr-8">
 
                   <div className="min-w-0">
-                    <DialogTitle className="text-xl font-bold">
-                      Tender Overview
+                    <DialogTitle className="text-lg font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
+                      Tender Detail Overview
                     </DialogTitle>
 
-                    <DialogDescription className="mt-1">
-                      Complete information for tender{" "}
-                      <span className="font-semibold text-foreground">
-                        {viewingTender.tender_no ||
-                          "—"}
+                    <DialogDescription className="mt-1 text-xs font-medium text-muted-foreground">
+                      Complete parameters and assignments for tender{" "}
+                      <span className="font-bold text-foreground">
+                        {viewingTender.tender_no || "—"}
                       </span>
                     </DialogDescription>
                   </div>
 
                   {/* Status */}
-                  <span
-                    className="
-                      shrink-0
-                      text-xs
-                      font-bold
-                      px-3
-                      py-1.5
-                      rounded-full
-                      border
-                      bg-primary/10
-                      text-primary
-                      uppercase
-                    "
-                  >
-                    {viewingTender.remark || "—"}
-                  </span>
+                  {(() => {
+                    const r = String(viewingTender.remark || "").toLowerCase();
+                    const remarkStyles: Record<string, string> = {
+                      accepted: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+                      rejected: "bg-rose-500/10 text-rose-600 border-rose-500/20",
+                      pending: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+                    };
+                    return (
+                      <span
+                        className={`shrink-0 text-[10px] font-bold px-3 py-1 rounded-full border uppercase tracking-wider ${
+                          remarkStyles[r] || "bg-muted text-muted-foreground border-muted-foreground/10"
+                        }`}
+                      >
+                        {viewingTender.remark || "—"}
+                      </span>
+                    );
+                  })()}
                 </div>
               </DialogHeader>
 
@@ -1376,7 +1411,7 @@ export function OrdersPage() {
                   SCROLLABLE CONTENT
                   ================================================== */}
 
-              <div className="overflow-y-auto max-h-[calc(90vh-110px)] px-6 py-6">
+              <div className="overflow-y-auto max-h-[calc(90vh-110px)] px-6 py-6 scrollbar-thin">
 
                 <div className="space-y-7">
 
@@ -1439,7 +1474,7 @@ export function OrdersPage() {
                     <div className="flex items-center justify-between mb-4">
                       <DetailSectionTitle
                         title="Assigned Users"
-                        color="bg-purple-500"
+                        color="bg-violet-500"
                       />
 
                       <Button
@@ -1451,30 +1486,30 @@ export function OrdersPage() {
                           setAssigningTender(viewingTender);
                         }}
                         title={isAdmin ? "Manage Assignments" : "Only administrators can manage assignments"}
-                        className="gap-1.5 h-8 text-xs font-semibold border-purple-500/30 text-purple-600 dark:text-purple-400 hover:bg-purple-500/10"
+                        className="gap-1.5 h-8 text-xs font-bold border-violet-500/20 text-violet-600 dark:text-violet-400 hover:bg-violet-500/5 hover:border-violet-500/40 rounded-xl transition-all duration-200"
                       >
-                        <Users className="size-3.5" />
+                        <UserPlus className="size-3.5" />
                         Manage Assignments
                       </Button>
                     </div>
 
-                    <div className="rounded-xl border bg-card p-4">
+                    <div className="rounded-2xl border border-border/80 bg-muted/10 p-4 shadow-3xs">
                       {viewingTender.assignments && viewingTender.assignments.length > 0 ? (
                         <div className="flex flex-wrap gap-2">
                           {viewingTender.assignments.map((assignment, idx) => (
                             <div
                               key={assignment.id || assignment.userId || idx}
-                              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-muted/20 text-xs font-semibold"
+                              className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border bg-background shadow-3xs"
                             >
-                              <div className="size-6 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[10px] uppercase">
+                              <div className="size-7 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[10px] uppercase border">
                                 {(assignment.user?.name || "U").charAt(0)}
                               </div>
-                              <div>
-                                <p className="font-semibold text-foreground">
+                              <div className="min-w-0">
+                                <p className="font-bold text-xs text-foreground">
                                   {assignment.user?.name || "User ID: " + assignment.userId}
                                 </p>
                                 {assignment.user?.email && (
-                                  <p className="text-[10px] text-muted-foreground">
+                                  <p className="text-[10px] text-muted-foreground truncate">
                                     {assignment.user.email}
                                   </p>
                                 )}
@@ -1483,8 +1518,8 @@ export function OrdersPage() {
                           ))}
                         </div>
                       ) : (
-                        <div className="flex items-center justify-between text-xs text-muted-foreground p-2">
-                          <span>No users are currently assigned to this order.</span>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground p-1">
+                          <span className="italic font-medium">No users are currently assigned to this order.</span>
                           <Button
                             variant="secondary"
                             size="sm"
@@ -1494,9 +1529,9 @@ export function OrdersPage() {
                               setAssigningTender(viewingTender);
                             }}
                             title={isAdmin ? "Assign Users" : "Only administrators can manage assignments"}
-                            className="h-7 text-xs font-semibold"
+                            className="h-8 text-xs font-bold rounded-lg px-3"
                           >
-                            + Assign Now
+                            ＋ Assign Now
                           </Button>
                         </div>
                       )}
@@ -1508,7 +1543,7 @@ export function OrdersPage() {
                       ================================================== */}
                   <section className="border-t pt-7">
                     <DetailSectionTitle
-                      title="Work Access"
+                      title="Work Access Status"
                       color={
                         isOrderAssignedToCurrentUser(viewingTender)
                           ? "bg-emerald-500"
@@ -1517,22 +1552,29 @@ export function OrdersPage() {
                     />
 
                     <div
-                      className={`rounded-xl border p-4 ${
+                      className={`rounded-2xl border p-4 flex items-start gap-3 shadow-3xs ${
                         isOrderAssignedToCurrentUser(viewingTender)
-                          ? "border-emerald-500/20 bg-emerald-500/5"
-                          : "border-amber-500/20 bg-amber-500/5"
+                          ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-950 dark:text-emerald-300"
+                          : "border-amber-500/20 bg-amber-500/5 text-amber-950 dark:text-amber-300"
                       }`}
                     >
-                      <p className="text-sm font-semibold">
-                        {isOrderAssignedToCurrentUser(viewingTender)
-                          ? "This order is assigned to you."
-                          : "This is a view-only order for you."}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {isOrderAssignedToCurrentUser(viewingTender)
-                          ? "You can perform order-specific work actions for this order."
-                          : "Order-specific work actions should only be available on orders assigned to you."}
-                      </p>
+                      {isOrderAssignedToCurrentUser(viewingTender) ? (
+                        <CheckCircle2 className="size-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                      ) : (
+                        <XCircle className="size-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                      )}
+                      <div>
+                        <p className="text-sm font-bold leading-none">
+                          {isOrderAssignedToCurrentUser(viewingTender)
+                            ? "Assigned to You"
+                            : "View-only Mode"}
+                        </p>
+                        <p className="mt-1.5 text-xs text-muted-foreground/80 leading-normal font-medium">
+                          {isOrderAssignedToCurrentUser(viewingTender)
+                            ? "You have full write access to manage this tender order, upload engineering drawings, and transition workflow states."
+                            : "You are not assigned to this tender. You have read-only access. Please request assignment from an administrator if modifications are needed."}
+                        </p>
+                      </div>
                     </div>
                   </section>
 
@@ -1706,70 +1748,65 @@ export function OrdersPage() {
 
                   <section className="border-t pt-7">
 
-                    <div className="rounded-xl border bg-muted/20 p-5">
+                    <div className="rounded-2xl border border-border/80 bg-muted/10 p-5 shadow-3xs">
 
                       <div className="flex items-center gap-3 mb-5">
 
-                        <div className="p-2 rounded-lg bg-primary/10 text-primary">
-                          <FileText className="size-5" />
+                        <div className="p-2.5 rounded-xl bg-primary/10 text-primary border border-primary/15">
+                          <FileText className="size-4.5" />
                         </div>
 
                         <div>
-                          <h3 className="text-sm font-bold">
+                          <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
                             Record Information
                           </h3>
 
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            Information associated with
-                            this tender record.
+                          <p className="text-[10px] text-muted-foreground mt-0.5 font-semibold">
+                            Metadata associated with this synchronized tender record.
                           </p>
                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
 
-                        <div className="rounded-lg bg-background border p-3">
-                          <p className="text-[10px] uppercase font-semibold text-muted-foreground">
+                        <div className="rounded-xl bg-background border border-border/80 p-3 shadow-3xs hover:border-primary/25 transition-all duration-200">
+                          <p className="text-[9px] uppercase font-bold text-muted-foreground/80 tracking-wider">
                             Record ID
                           </p>
 
-                          <p className="mt-1 text-sm font-semibold break-all">
-                            {viewingTender.id ||
-                              "—"}
+                          <p className="mt-1 text-xs font-bold text-foreground break-all">
+                            {viewingTender.id || "—"}
                           </p>
                         </div>
 
-                        <div className="rounded-lg bg-background border p-3">
-                          <p className="text-[10px] uppercase font-semibold text-muted-foreground">
+                        <div className="rounded-xl bg-background border border-border/80 p-3 shadow-3xs hover:border-primary/25 transition-all duration-200">
+                          <p className="text-[9px] uppercase font-bold text-muted-foreground/80 tracking-wider">
                             Tender ID
                           </p>
 
-                          <p className="mt-1 text-sm font-semibold break-all">
-                            {viewingTender.tenderID ||
-                              "—"}
+                          <p className="mt-1 text-xs font-bold text-foreground break-all">
+                            {viewingTender.tenderID || "—"}
                           </p>
                         </div>
 
-                        <div className="rounded-lg bg-background border p-3">
-                          <p className="text-[10px] uppercase font-semibold text-muted-foreground">
+                        <div className="rounded-xl bg-background border border-border/80 p-3 shadow-3xs hover:border-primary/25 transition-all duration-200">
+                          <p className="text-[9px] uppercase font-bold text-muted-foreground/80 tracking-wider">
                             Status
                           </p>
 
-                          <p className="mt-1 text-sm font-semibold capitalize">
-                            {viewingTender.remark ||
-                              "—"}
+                          <p className="mt-1 text-xs font-bold text-foreground capitalize">
+                            {viewingTender.remark || "—"}
                           </p>
                         </div>
 
-                        <div className="rounded-lg bg-background border p-3">
-                          <p className="text-[10px] uppercase font-semibold text-muted-foreground">
+                        <div className="rounded-xl bg-background border border-border/80 p-3 shadow-3xs hover:border-primary/25 transition-all duration-200">
+                          <p className="text-[9px] uppercase font-bold text-muted-foreground/80 tracking-wider">
                             File
                           </p>
 
-                          <p className="mt-1 text-sm font-semibold truncate">
+                          <p className="mt-1 text-xs font-bold text-foreground truncate">
                             {viewingTender.file_name &&
-                            viewingTender.file_name !==
-                              "null"
+                            viewingTender.file_name !== "null"
                               ? viewingTender.file_name
                               : "—"}
                           </p>

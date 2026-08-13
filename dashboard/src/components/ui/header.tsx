@@ -145,27 +145,27 @@ const Header: React.FC<HeaderProps> = ({
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
-                  className="absolute right-0 mt-2.5 w-80 bg-card border border-border rounded-xl shadow-lg z-50 overflow-hidden"
+                  className="absolute right-0 mt-2.5 w-80 bg-card/95 backdrop-blur-md border border-border/80 rounded-2xl shadow-xl z-50 overflow-hidden"
                 >
-                  <div className="p-3 border-b border-border bg-muted/30 font-semibold text-xs flex justify-between items-center">
+                  <div className="p-3.5 border-b border-border/80 bg-muted/30 font-semibold text-xs flex justify-between items-center">
                     <span>Notifications</span>
-                    <span className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded">3 New</span>
+                    <span className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded font-bold">3 New</span>
                   </div>
                   <div className="max-h-60 overflow-y-auto divide-y divide-border/60">
-                    <div className="p-3 hover:bg-muted/40 cursor-pointer transition-colors">
+                    <div className="p-3.5 hover:bg-muted/40 cursor-pointer transition-colors">
                       <p className="text-xs font-bold">New Tender Request Assigned</p>
                       <p className="text-[10px] text-muted-foreground mt-0.5">Central Railway Valve Supply needs review</p>
-                      <span className="text-[9px] text-muted-foreground/80 mt-1 block">5m ago</span>
+                      <span className="text-[9px] text-muted-foreground/80 mt-1.5 block">5m ago</span>
                     </div>
-                    <div className="p-3 hover:bg-muted/40 cursor-pointer transition-colors">
+                    <div className="p-3.5 hover:bg-muted/40 cursor-pointer transition-colors">
                       <p className="text-xs font-bold">Leave Approved</p>
                       <p className="text-[10px] text-muted-foreground mt-0.5">Priya Sharma leave approved by Rajesh</p>
-                      <span className="text-[9px] text-muted-foreground/80 mt-1 block">2h ago</span>
+                      <span className="text-[9px] text-muted-foreground/80 mt-1.5 block">2h ago</span>
                     </div>
-                    <div className="p-3 hover:bg-muted/40 cursor-pointer transition-colors">
+                    <div className="p-3.5 hover:bg-muted/40 cursor-pointer transition-colors">
                       <p className="text-xs font-bold">Audit Alert</p>
                       <p className="text-[10px] text-muted-foreground mt-0.5">Role permissions modified for HR Manager</p>
-                      <span className="text-[9px] text-muted-foreground/80 mt-1 block">1d ago</span>
+                      <span className="text-[9px] text-muted-foreground/80 mt-1.5 block">1d ago</span>
                     </div>
                   </div>
                 </motion.div>
@@ -184,7 +184,7 @@ const Header: React.FC<HeaderProps> = ({
               {(currentUser?.name as string)?.slice(0, 2).toUpperCase() ?? 'DU'}
             </AvatarFallback>
           </Avatar>
-
+ 
           <AnimatePresence>
             {isProfileOpen && (
               <>
@@ -193,9 +193,9 @@ const Header: React.FC<HeaderProps> = ({
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
-                  className="absolute right-0 mt-2.5 w-48 bg-card border border-border rounded-xl shadow-lg z-50 p-1 divide-y divide-border/60"
+                  className="absolute right-0 mt-2.5 w-48 bg-card/95 backdrop-blur-md border border-border/80 rounded-2xl shadow-xl z-50 p-1.5 divide-y divide-border/60"
                 >
-                  <div className="px-3 py-2">
+                  <div className="px-3 py-2.5">
                     <p className="text-xs font-bold text-foreground">{currentUser?.name as string}</p>
                     <p className="text-[9px] text-muted-foreground truncate mt-0.5">{currentUser?.email as string}</p>
                   </div>

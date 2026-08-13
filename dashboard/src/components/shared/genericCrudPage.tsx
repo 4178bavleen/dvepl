@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Select,
   SelectContent,
@@ -507,6 +508,15 @@ export function GenericCrudPage<TRecord extends { id: string }>({
   relationManager,
 }: GenericCrudPageProps<TRecord>) {
   const [searchParams] = useSearchParams();
+  const globalStore = useERPStore();
+  const [profileTab, setProfileTab] = useState<"overview" | "attendance" | "leave" | "salary">("overview");
+  const [payrollStep, setPayrollStep] = useState(1);
+  const [payrollMonth, setPayrollMonth] = useState("August 2026");
+  const [payrollAllowances, setPayrollAllowances] = useState(15000);
+  const [payrollDeductions, setPayrollDeductions] = useState(5000);
+  const [isPayrollRunning, setIsPayrollRunning] = useState(false);
+  const [isPayrollDone, setIsPayrollDone] = useState(false);
+
   const localRecords = useERPStore(
     (state) =>
       ((state as unknown as Record<string, unknown>)[tableName] as TRecord[]) ??
@@ -933,16 +943,388 @@ export function GenericCrudPage<TRecord extends { id: string }>({
     setSelectedEmployeeIds([]);
   }, [viewingRecord, tableName, relationManager]);
 
-  if (isLoading && records.length === 0) {
+  const renderEmployeeProfile = (record: any) => {
+    const employeeAttendances = globalStore.attendances.filter((a) => a.employeeId === record.id);
+    const employeeLeaves = globalStore.leaves.filter((l) => l.employeeId === record.id);
+    const employeeSalary = globalStore.salaries.find((s) => s.employeeId === record.id);
+
     return (
-      <div className="flex flex-col items-center justify-center min-h-[450px] w-full gap-3">
-        <Loader2 className="animate-spin text-primary size-10" />
-        <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground/80 animate-pulse">
-          Loading {pluralName}...
-        </span>
+      <div className="flex flex-col h-full bg-card">
+        {/* Profile Header */}
+        <div className="flex items-start gap-4 p-6 border-b border-border bg-muted/5">
+          <Avatar className="h-16 w-16 rounded-2xl border-2 border-border shadow-sm">
+            <AvatarFallback className="text-lg bg-primary/10 text-primary font-bold rounded-2xl">
+              {record.firstName?.slice(0, 1)}{record.lastName?.slice(0, 1) || ""}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-bold text-foreground">
+                {record.firstName} {record.lastName}
+              </h2>
+              {getStatusBadge(record.status)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5 font-medium">
+              Employee Code: <span className="font-semibold text-foreground">{record.employeeCode}</span>
+            </p>
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground mt-2 font-medium">
+              <div>
+                Dept: <span className="font-semibold text-foreground">{renderDisplayValue("departmentId", record.departmentId, record)}</span>
+              </div>
+              <div>
+                Desg: <span className="font-semibold text-foreground">{renderDisplayValue("designationId", record.designationId, record)}</span>
+              </div>
+              <div>
+                Branch: <span className="font-semibold text-foreground">{renderDisplayValue("branchId", record.branchId, record)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Tab Buttons */}
+        <div className="flex border-b border-border/80 px-6 bg-muted/10">
+          {(["overview", "attendance", "leave", "salary"] as const).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setProfileTab(tab)}
+              className={`py-3.5 px-4 text-xs font-semibold uppercase tracking-wider border-b-2 transition-all relative -mb-px capitalize ${
+                profileTab === tab
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab Content */}
+        <div className="p-6 overflow-y-auto max-h-[50vh]">
+          {profileTab === "overview" && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
+                <div>
+                  <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Date of Joining</span>
+                  <span className="font-medium text-foreground mt-1 block">
+                    {record.dateOfJoining ? new Date(record.dateOfJoining).toLocaleDateString() : "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Date of Birth</span>
+                  <span className="font-medium text-foreground mt-1 block">
+                    {record.dateOfBirth ? new Date(record.dateOfBirth).toLocaleDateString() : "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Gender</span>
+                  <span className="font-medium text-foreground mt-1 block capitalize">{record.gender || "—"}</span>
+                </div>
+                <div>
+                  <span className="block text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Reports To</span>
+                  <span className="font-medium text-foreground mt-1 block">
+                    {renderDisplayValue("reportsToId", record.reportsToId, record)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {profileTab === "attendance" && (
+            <div className="space-y-4">
+              {employeeAttendances.length === 0 ? (
+                <div className="p-8 text-center text-xs text-muted-foreground border border-dashed rounded-xl">
+                  No attendance records logged for this employee.
+                </div>
+              ) : (
+                <div className="border border-border/80 rounded-xl overflow-hidden shadow-2xs">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-muted/30 border-b border-border/80 text-muted-foreground uppercase tracking-wider font-semibold">
+                      <tr>
+                        <th className="p-3">Date</th>
+                        <th className="p-3">Status</th>
+                        <th className="p-3">Check-In</th>
+                        <th className="p-3">Check-Out</th>
+                        <th className="p-3">Remarks</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/60">
+                      {employeeAttendances.map((att) => (
+                        <tr key={att.id} className="hover:bg-muted/10">
+                          <td className="p-3 font-semibold">{new Date(att.date).toLocaleDateString()}</td>
+                          <td className="p-3">{getStatusBadge(att.status)}</td>
+                          <td className="p-3 font-medium text-muted-foreground">{att.checkIn ? att.checkIn : "—"}</td>
+                          <td className="p-3 font-medium text-muted-foreground">{att.checkOut ? att.checkOut : "—"}</td>
+                          <td className="p-3 text-muted-foreground italic">{att.remarks || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {profileTab === "leave" && (
+            <div className="space-y-4">
+              {employeeLeaves.length === 0 ? (
+                <div className="p-8 text-center text-xs text-muted-foreground border border-dashed rounded-xl">
+                  No leaves requested yet.
+                </div>
+              ) : (
+                <div className="border border-border/80 rounded-xl overflow-hidden shadow-2xs">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-muted/30 border-b border-border/80 text-muted-foreground uppercase tracking-wider font-semibold">
+                      <tr>
+                        <th className="p-3">Period</th>
+                        <th className="p-3">Type</th>
+                        <th className="p-3">Reason</th>
+                        <th className="p-3">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/60">
+                      {employeeLeaves.map((lv) => (
+                        <tr key={lv.id} className="hover:bg-muted/10">
+                          <td className="p-3 font-semibold">
+                            {new Date(lv.fromDate).toLocaleDateString()} - {new Date(lv.toDate).toLocaleDateString()}
+                          </td>
+                          <td className="p-3">
+                            <span className="font-semibold text-foreground uppercase text-[10px] bg-muted/60 border px-2 py-0.5 rounded">
+                              {lv.leaveType}
+                            </span>
+                          </td>
+                          <td className="p-3 text-muted-foreground font-medium max-w-[200px] truncate" title={lv.reason ?? undefined}>
+                            {lv.reason || "—"}
+                          </td>
+                          <td className="p-3">{getStatusBadge(lv.status)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {profileTab === "salary" && (
+            <div className="space-y-4">
+              {!employeeSalary ? (
+                <div className="p-8 text-center text-xs text-muted-foreground border border-dashed rounded-xl">
+                  No salary/CTC details configured yet for this employee.
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="rounded-xl border border-border/80 bg-muted/5 p-4 flex flex-col justify-between">
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Base Salary</span>
+                      <span className="text-xl font-bold text-foreground mt-1">₹{employeeSalary.basic?.toLocaleString()}</span>
+                    </div>
+                    <div className="rounded-xl border border-border/80 bg-muted/5 p-4 flex flex-col justify-between">
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">HRA</span>
+                      <span className="text-xl font-bold text-foreground mt-1">₹{employeeSalary.hra?.toLocaleString()}</span>
+                    </div>
+                    <div className="rounded-xl border border-border/80 bg-muted/5 p-4 flex flex-col justify-between">
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Allowances</span>
+                      <span className="text-xl font-bold text-foreground mt-1">₹{employeeSalary.allowances?.toLocaleString()}</span>
+                    </div>
+                    <div className="rounded-xl border border-border/80 bg-muted/5 p-4 flex flex-col justify-between">
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Deductions</span>
+                      <span className="text-xl font-bold text-rose-600 dark:text-rose-400 mt-1">₹{employeeSalary.deductions?.toLocaleString()}</span>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-primary/20 bg-primary/5 p-5 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Net CTC (Annualized)</span>
+                      <span className="text-xs text-muted-foreground block mt-0.5">Effective from {new Date(employeeSalary.effectiveFrom).toLocaleDateString()}</span>
+                    </div>
+                    <span className="text-3xl font-extrabold text-primary">₹{employeeSalary.ctc?.toLocaleString()}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="bg-muted/10 border-t border-border p-4 px-6 flex items-center justify-end">
+          <Button type="button" onClick={() => setViewingRecord(null)}>
+            Close Profile
+          </Button>
+        </div>
       </div>
     );
-  }
+  };
+
+  const renderPayrollWizard = () => {
+    const totalEmployeesCount = globalStore.employees.filter((e) => e.status === "ACTIVE").length;
+    const totalBasic = globalStore.salaries.reduce((sum, s) => sum + (s.basic || 0), 0);
+    const totalHra = globalStore.salaries.reduce((sum, s) => sum + (s.hra || 0), 0);
+    const finalPayout = totalBasic + totalHra + payrollAllowances - payrollDeductions;
+
+    return (
+      <div className="rounded-2xl border border-border/80 bg-card p-6 shadow-sm mb-6 space-y-6">
+        <div className="flex items-center justify-between gap-4 border-b border-border/80 pb-4">
+          <div>
+            <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+              <CheckSquare className="w-5 h-5 text-primary" /> Run Monthly Payroll
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Verify employee details, adjust allowances, and authorize disbursement.
+            </p>
+          </div>
+          <span className="text-xs font-semibold text-primary bg-primary/10 px-2.5 py-1 rounded-full uppercase tracking-wider">
+            Period: {payrollMonth}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-4 gap-2 relative">
+          {[
+            { step: 1, label: "Select Month" },
+            { step: 2, label: "Review Timecards" },
+            { step: 3, label: "Adjustments" },
+            { step: 4, label: "Authorize" },
+          ].map((s) => (
+            <div
+              key={s.step}
+              className={`flex flex-col items-center text-center p-2 rounded-xl transition-all duration-200 border ${
+                payrollStep === s.step
+                  ? "border-primary bg-primary/5 text-primary ring-1 ring-primary"
+                  : payrollStep > s.step
+                  ? "border-emerald-500/25 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400"
+                  : "border-transparent text-muted-foreground"
+              }`}
+            >
+              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold mb-1.5 border ${
+                payrollStep >= s.step ? "bg-primary text-white border-primary" : "bg-muted text-muted-foreground border-border"
+              }`}>
+                {s.step}
+              </span>
+              <span className="text-[10px] font-bold uppercase tracking-wider">{s.label}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="p-4 rounded-xl border border-border/60 bg-muted/5 min-h-[140px] flex flex-col justify-center">
+          {payrollStep === 1 && (
+            <div className="space-y-3.5">
+              <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Step 1: Select Disbursement Month</p>
+              <div className="flex items-center gap-3">
+                <select
+                  value={payrollMonth}
+                  onChange={(e) => setPayrollMonth(e.target.value)}
+                  className="bg-card border border-border text-xs font-semibold p-2 rounded-xl outline-none focus:ring-2 focus:ring-primary/20 h-10 w-48 cursor-pointer"
+                >
+                  {["June 2026", "July 2026", "August 2026", "September 2026"].map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+                <Button onClick={() => setPayrollStep(2)} className="h-10">Next: Review Timecards</Button>
+              </div>
+            </div>
+          )}
+
+          {payrollStep === 2 && (
+            <div className="space-y-4">
+              <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Step 2: Review Attendance and Leave Approvals</p>
+              <div className="grid grid-cols-3 gap-4 text-xs text-muted-foreground font-medium">
+                <div className="p-3 border rounded-xl bg-card">
+                  Active Staff Count: <span className="font-bold text-foreground text-sm block mt-1">{totalEmployeesCount} Employees</span>
+                </div>
+                <div className="p-3 border rounded-xl bg-card">
+                  Present Days Logged: <span className="font-bold text-foreground text-sm block mt-1">
+                    {globalStore.attendances.filter(a => a.status === "PRESENT").length} Days
+                  </span>
+                </div>
+                <div className="p-3 border rounded-xl bg-card">
+                  Approved Leaves: <span className="font-bold text-foreground text-sm block mt-1">
+                    {globalStore.leaves.filter(l => l.status === "APPROVED").length} Requests
+                  </span>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="ghost" onClick={() => setPayrollStep(1)}>Back</Button>
+                <Button onClick={() => setPayrollStep(3)}>Next: Adjustments</Button>
+              </div>
+            </div>
+          )}
+
+          {payrollStep === 3 && (
+            <div className="space-y-4">
+              <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Step 3: Enter Allowances & Deductions Adjustments</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Special Monthly Allowances (All Staff)</Label>
+                  <Input
+                    type="number"
+                    value={payrollAllowances}
+                    onChange={(e) => setPayrollAllowances(Number(e.target.value))}
+                    className="h-10"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Standard Deductions (TDS, PF, ESI)</Label>
+                  <Input
+                    type="number"
+                    value={payrollDeductions}
+                    onChange={(e) => setPayrollDeductions(Number(e.target.value))}
+                    className="h-10"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="ghost" onClick={() => setPayrollStep(2)}>Back</Button>
+                <Button onClick={() => setPayrollStep(4)}>Next: Authorize Run</Button>
+              </div>
+            </div>
+          )}
+
+          {payrollStep === 4 && (
+            <div className="space-y-4">
+              <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Step 4: Authorize and Disburse Monthly Salaries</p>
+              {isPayrollDone ? (
+                <div className="flex items-center gap-3 p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-400 rounded-xl">
+                  <span className="text-xl">🎉</span>
+                  <div className="text-xs font-semibold">
+                    Payroll processed and disbursed successfully! Net payout: ₹{finalPayout.toLocaleString()}.
+                  </div>
+                  <Button variant="outline" size="sm" className="ml-auto h-8 text-[11px] font-bold" onClick={() => {
+                    setIsPayrollDone(false);
+                    setPayrollStep(1);
+                  }}>
+                    Run Again
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="text-xs font-semibold text-muted-foreground space-y-1">
+                    <div>Gross Base Salary: <span className="text-foreground font-bold">₹{totalBasic.toLocaleString()}</span></div>
+                    <div>Gross HRA: <span className="text-foreground font-bold">₹{totalHra.toLocaleString()}</span></div>
+                    <div>Net Disbursement Payout: <span className="text-primary font-bold text-sm">₹{finalPayout.toLocaleString()}</span></div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" onClick={() => setPayrollStep(3)}>Back</Button>
+                    <Button
+                      disabled={isPayrollRunning}
+                      type="button"
+                      onClick={() => {
+                        setIsPayrollRunning(true);
+                        setTimeout(() => {
+                          setIsPayrollRunning(false);
+                          setIsPayrollDone(true);
+                          toast.success(`Payroll processed for ${payrollMonth}`);
+                        }, 1200);
+                      }}
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
+                    >
+                      {isPayrollRunning ? "Processing..." : "Confirm & Run Payroll"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
@@ -981,17 +1363,19 @@ export function GenericCrudPage<TRecord extends { id: string }>({
         )}
       </div>
 
+      {tableName === "salaries" && renderPayrollWizard()}
+
       {cards.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 animate-in fade-in duration-200">
           {cards.map((card) => (
             <div
               key={card.label}
-              className="rounded-xl border bg-card p-4 shadow-sm"
+              className="rounded-2xl border border-border bg-card p-5 shadow-sm hover:shadow-md transition-all duration-200"
             >
-              <p className="text-sm text-muted-foreground">{card.label}</p>
-              <p className="mt-2 text-2xl font-semibold">{card.value}</p>
+              <p className="text-xs font-bold text-muted-foreground/60 uppercase tracking-widest">{card.label}</p>
+              <p className="mt-2.5 text-2xl font-extrabold tracking-tight text-foreground">{card.value}</p>
               {card.change && (
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1.5 text-xs text-muted-foreground font-semibold">
                   {card.change}
                 </p>
               )}
@@ -1158,185 +1542,192 @@ export function GenericCrudPage<TRecord extends { id: string }>({
         onOpenChange={(open) => !open && setViewingRecord(null)}
       >
         <DialogContent className="w-[95vw] max-w-3xl max-h-[85vh] overflow-y-auto p-0">
-          <DialogHeader className="px-6 pt-6">
-            <DialogTitle>{moduleName} Overview</DialogTitle>
-            <DialogDescription>
-              View complete {moduleName.toLowerCase()} details.
-            </DialogDescription>
-          </DialogHeader>
+          {viewingRecord && (
+            tableName === "employees" ? (
+              renderEmployeeProfile(viewingRecord)
+            ) : (
+              <>
+                <DialogHeader className="px-6 pt-6">
+                  <DialogTitle>{moduleName} Overview</DialogTitle>
+                  <DialogDescription>
+                    View complete {moduleName.toLowerCase()} details.
+                  </DialogDescription>
+                </DialogHeader>
 
-          <div className="px-6 pb-6">
-            {viewingRecord && viewingGroups && (
-              <div className="space-y-6 py-4">
-                {"status" in (viewingRecord as any) && (
-                  <div>
-                    {getStatusBadge(String((viewingRecord as any).status))}
-                  </div>
-                )}
-
-                {viewingGroups.core.length > 0 && (
-                  <section className="space-y-2">
-                    <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground/80">
-                      <Info className="size-3.5" /> Details
-                    </h3>
-                    <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                      {viewingGroups.core.map(({ key, value }) => (
-                        <React.Fragment key={key}>
-                          <dt className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mt-1">
-                            {formatFieldLabel(key)}
-                          </dt>
-                          <dd className="break-words text-foreground font-medium">
-                            {renderDisplayValue(
-                              key,
-                              value,
-                              viewingRecord as Record<string, any>,
-                              optionValues,
-                              fields,
-                            )}
-                          </dd>
-                        </React.Fragment>
-                      ))}
-                    </dl>
-                  </section>
-                )}
-
-                {viewingGroups.dates.length > 0 && (
-                  <section className="space-y-2">
-                    <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground/80">
-                      <Calendar className="size-3.5" /> Dates
-                    </h3>
-                    <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                      {viewingGroups.dates.map(({ key, value }) => (
-                        <React.Fragment key={key}>
-                          <dt className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mt-1">
-                            {formatFieldLabel(key)}
-                          </dt>
-                          <dd className="break-words text-foreground font-medium">
-                            {renderDisplayValue(
-                              key,
-                              value,
-                              viewingRecord as Record<string, any>,
-                              optionValues,
-                              fields,
-                            )}
-                          </dd>
-                        </React.Fragment>
-                      ))}
-                    </dl>
-                  </section>
-                )}
-
-                {viewingGroups.relations.length > 0 && (
-                  <section className="space-y-2">
-                    <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground/80">
-                      <Layers className="size-3.5" /> Related records
-                    </h3>
-                    <dl className="grid grid-cols-1 gap-y-3 text-sm">
-                      {viewingGroups.relations.map(({ key, value }) => (
-                        <React.Fragment key={key}>
-                          <dt className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mt-1">
-                            {formatFieldLabel(key)}
-                          </dt>
-                          <dd className="break-words text-foreground font-medium">
-                            {renderDisplayValue(
-                              key,
-                              value,
-                              viewingRecord as Record<string, any>,
-                              optionValues,
-                              fields,
-                            )}
-                          </dd>
-                        </React.Fragment>
-                      ))}
-                    </dl>
-                  </section>
-                )}
-
-                {tableName === "teams" &&
-                  relationManager &&
-                  viewingRecord && (
-                    <section className="space-y-3 rounded-xl border bg-card p-4">
-                      <div className="flex items-center justify-between gap-3">
+                <div className="px-6 pb-6">
+                  {viewingGroups && (
+                    <div className="space-y-6 py-4">
+                      {"status" in (viewingRecord as any) && (
                         <div>
-                          <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground/80">
-                            <User className="size-3.5" />{" "}
-                            {relationManager.title ?? "Team members"}
-                          </h3>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            Add or remove employees assigned to this team.
-                          </p>
-                        </div>
-
-                        {!readOnly && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            className="gap-1.5"
-                            onClick={() => void openTeamMemberDialog()}
-                          >
-                            <UserPlus className="size-4" />
-                            Add members
-                          </Button>
-                        )}
-                      </div>
-
-                      {currentTeamMembers.length === 0 ? (
-                        <div className="rounded-lg border border-dashed p-5 text-center text-sm text-muted-foreground">
-                          No employees are assigned to this team yet.
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          {currentTeamMembers.map((member) => {
-                            const employee =
-                              member?.employee ?? member;
-                            const employeeId =
-                              member?.employeeId ?? employee?.id;
-
-                            return (
-                              <div
-                                key={employeeId}
-                                className="flex items-center justify-between gap-3 rounded-lg border bg-background p-3"
-                              >
-                                <div className="min-w-0">
-                                  <p className="truncate text-sm font-semibold">
-                                    {getEmployeeName(employee)}
-                                  </p>
-                                  {getEmployeeSubtitle(employee) && (
-                                    <p className="truncate text-xs text-muted-foreground">
-                                      {getEmployeeSubtitle(employee)}
-                                    </p>
-                                  )}
-                                </div>
-
-                                {!readOnly && employeeId && (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    className="shrink-0 gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                    disabled={removeMemberId === employeeId}
-                                    onClick={() =>
-                                      void removeTeamMember(employeeId)
-                                    }
-                                  >
-                                    {removeMemberId === employeeId ? (
-                                      <Loader2 className="size-4 animate-spin" />
-                                    ) : (
-                                      <UserMinus className="size-4" />
-                                    )}
-                                    Remove
-                                  </Button>
-                                )}
-                              </div>
-                            );
-                          })}
+                          {getStatusBadge(String((viewingRecord as any).status))}
                         </div>
                       )}
-                    </section>
+
+                      {viewingGroups.core.length > 0 && (
+                        <section className="space-y-2">
+                          <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground/80">
+                            <Info className="size-3.5" /> Details
+                          </h3>
+                          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                            {viewingGroups.core.map(({ key, value }) => (
+                              <React.Fragment key={key}>
+                                <dt className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mt-1">
+                                  {formatFieldLabel(key)}
+                                </dt>
+                                <dd className="break-words text-foreground font-medium">
+                                  {renderDisplayValue(
+                                    key,
+                                    value,
+                                    viewingRecord as Record<string, any>,
+                                    optionValues,
+                                    fields,
+                                  )}
+                                </dd>
+                              </React.Fragment>
+                            ))}
+                          </dl>
+                        </section>
+                      )}
+
+                      {viewingGroups.dates.length > 0 && (
+                        <section className="space-y-2">
+                          <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground/80">
+                            <Calendar className="size-3.5" /> Dates
+                          </h3>
+                          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                            {viewingGroups.dates.map(({ key, value }) => (
+                              <React.Fragment key={key}>
+                                <dt className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mt-1">
+                                  {formatFieldLabel(key)}
+                                </dt>
+                                <dd className="break-words text-foreground font-medium">
+                                  {renderDisplayValue(
+                                    key,
+                                    value,
+                                    viewingRecord as Record<string, any>,
+                                    optionValues,
+                                    fields,
+                                  )}
+                                </dd>
+                              </React.Fragment>
+                            ))}
+                          </dl>
+                        </section>
+                      )}
+
+                      {viewingGroups.relations.length > 0 && (
+                        <section className="space-y-2">
+                          <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground/80">
+                            <Layers className="size-3.5" /> Related records
+                          </h3>
+                          <dl className="grid grid-cols-1 gap-y-3 text-sm">
+                            {viewingGroups.relations.map(({ key, value }) => (
+                              <React.Fragment key={key}>
+                                <dt className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mt-1">
+                                  {formatFieldLabel(key)}
+                                </dt>
+                                <dd className="break-words text-foreground font-medium">
+                                  {renderDisplayValue(
+                                    key,
+                                    value,
+                                    viewingRecord as Record<string, any>,
+                                    optionValues,
+                                    fields,
+                                  )}
+                                </dd>
+                              </React.Fragment>
+                            ))}
+                          </dl>
+                        </section>
+                      )}
+
+                      {tableName === "teams" &&
+                        relationManager && (
+                          <section className="space-y-3 rounded-xl border bg-card p-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground/80">
+                                  <User className="size-3.5" />{" "}
+                                  {relationManager.title ?? "Team members"}
+                                </h3>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  Add or remove employees assigned to this team.
+                                </p>
+                              </div>
+
+                              {!readOnly && (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  className="gap-1.5"
+                                  onClick={() => void openTeamMemberDialog()}
+                                >
+                                  <UserPlus className="size-4" />
+                                  Add members
+                                </Button>
+                              )}
+                            </div>
+
+                            {currentTeamMembers.length === 0 ? (
+                              <div className="rounded-lg border border-dashed p-5 text-center text-sm text-muted-foreground">
+                                No employees are assigned to this team yet.
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                {currentTeamMembers.map((member) => {
+                                  const employee =
+                                    member?.employee ?? member;
+                                  const employeeId =
+                                    member?.employeeId ?? employee?.id;
+
+                                  return (
+                                    <div
+                                      key={employeeId}
+                                      className="flex items-center justify-between gap-3 rounded-lg border bg-background p-3"
+                                    >
+                                      <div className="min-w-0">
+                                        <p className="truncate text-sm font-semibold">
+                                          {getEmployeeName(employee)}
+                                        </p>
+                                        {getEmployeeSubtitle(employee) && (
+                                          <p className="truncate text-xs text-muted-foreground">
+                                            {getEmployeeSubtitle(employee)}
+                                          </p>
+                                        )}
+                                      </div>
+
+                                      {!readOnly && employeeId && (
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          className="shrink-0 gap-1.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                          disabled={removeMemberId === employeeId}
+                                          onClick={() =>
+                                            void removeTeamMember(employeeId)
+                                          }
+                                        >
+                                          {removeMemberId === employeeId ? (
+                                            <Loader2 className="size-4 animate-spin" />
+                                          ) : (
+                                            <UserMinus className="size-4" />
+                                          )}
+                                          Remove
+                                        </Button>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </section>
+                        )}
+                    </div>
                   )}
-              </div>
-            )}
-          </div>
+                </div>
+              </>
+            )
+          )}
         </DialogContent>
       </Dialog>
 

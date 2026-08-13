@@ -427,68 +427,68 @@ export function DeliveryPage() {
   };
 
   return (
-    <div className="p-6 space-y-6 bg-slate-50/50 min-h-screen">
+    <div className="p-6 space-y-6 bg-background min-h-screen text-foreground">
       {/* Top Banner KPI Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs space-y-1">
-          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Total Orders</span>
+        <div className="bg-card p-4 rounded-xl border border-border shadow-2xs space-y-1">
+          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">Total Orders</span>
           <div className="flex items-center justify-between">
-            <span className="text-xl font-bold text-slate-900">{metrics.total}</span>
-            <ClipboardList className="h-4 w-4 text-slate-400" />
+            <span className="text-xl font-bold text-foreground">{metrics.total}</span>
+            <ClipboardList className="h-4 w-4 text-muted-foreground" />
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs space-y-1">
-          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Planned</span>
+        <div className="bg-card p-4 rounded-xl border border-border shadow-2xs space-y-1">
+          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">Planned</span>
           <div className="flex items-center justify-between">
-            <span className="text-xl font-bold text-amber-600">{metrics.planned}</span>
+            <span className="text-xl font-bold text-amber-500">{metrics.planned}</span>
             <Clock className="h-4 w-4 text-amber-500" />
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs space-y-1">
-          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">In Progress</span>
+        <div className="bg-card p-4 rounded-xl border border-border shadow-2xs space-y-1">
+          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">In Progress</span>
           <div className="flex items-center justify-between">
-            <span className="text-xl font-bold text-blue-600">{metrics.inProgress}</span>
+            <span className="text-xl font-bold text-blue-500">{metrics.inProgress}</span>
             <Cog className="h-4 w-4 text-blue-500" />
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs space-y-1">
-          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Dispatched</span>
+        <div className="bg-card p-4 rounded-xl border border-border shadow-2xs space-y-1">
+          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">Dispatched</span>
           <div className="flex items-center justify-between">
-            <span className="text-xl font-bold text-purple-600">{metrics.dispatched}</span>
+            <span className="text-xl font-bold text-purple-500">{metrics.dispatched}</span>
             <Truck className="h-4 w-4 text-purple-500" />
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs space-y-1">
-          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Delivered</span>
+        <div className="bg-card p-4 rounded-xl border border-border shadow-2xs space-y-1">
+          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">Delivered</span>
           <div className="flex items-center justify-between">
-            <span className="text-xl font-bold text-emerald-600">{metrics.delivered}</span>
+            <span className="text-xl font-bold text-emerald-500">{metrics.delivered}</span>
             <CheckCircle2 className="h-4 w-4 text-emerald-500" />
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-2xs space-y-1">
-          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">Overdue</span>
+        <div className="bg-card p-4 rounded-xl border border-border shadow-2xs space-y-1">
+          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">Overdue</span>
           <div className="flex items-center justify-between">
-            <span className="text-xl font-bold text-rose-600">{metrics.overdue}</span>
+            <span className="text-xl font-bold text-rose-500">{metrics.overdue}</span>
             <AlertTriangle className="h-4 w-4 text-rose-500" />
           </div>
         </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 space-y-4">
+      <div className="bg-card rounded-2xl border border-border shadow-xs p-5 space-y-4 text-card-foreground">
         {/* Toolbar Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-border/60">
           {/* View Switcher Tabs */}
-          <div className="inline-flex p-1 bg-slate-100/80 rounded-xl border border-slate-200/60">
+          <div className="inline-flex p-1 bg-muted rounded-xl border border-border/40">
             <button
               onClick={() => setActiveView('table')}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-bold tracking-wide transition-all ${
-                activeView === 'table' ? 'bg-white text-slate-900 shadow-xs border border-slate-200/80' : 'text-slate-500 hover:text-slate-800'
+                activeView === 'table' ? 'bg-card text-foreground shadow-xs border border-border/80' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               TABLE
@@ -496,7 +496,7 @@ export function DeliveryPage() {
             <button
               onClick={() => setActiveView('calendar')}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-bold tracking-wide transition-all ${
-                activeView === 'calendar' ? 'bg-white text-slate-900 shadow-xs border border-slate-200/80' : 'text-slate-500 hover:text-slate-800'
+                activeView === 'calendar' ? 'bg-card text-foreground shadow-xs border border-border/80' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               CALENDAR
@@ -504,7 +504,7 @@ export function DeliveryPage() {
             <button
               onClick={() => setActiveView('timeline')}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-bold tracking-wide transition-all ${
-                activeView === 'timeline' ? 'bg-white text-slate-900 shadow-xs border border-slate-200/80' : 'text-slate-500 hover:text-slate-800'
+                activeView === 'timeline' ? 'bg-card text-foreground shadow-xs border border-border/80' : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               TIMELINE
@@ -514,22 +514,22 @@ export function DeliveryPage() {
           {/* Controls */}
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative w-64">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search delivery orders..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-9 text-xs border-slate-300 rounded-xl"
+                className="pl-9 h-9 text-xs border-border rounded-xl bg-background"
               />
             </div>
 
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">DELIVERY STATUS:</span>
+              <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">DELIVERY STATUS:</span>
               <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || 'all')}>
-                <SelectTrigger className="w-36 h-9 text-xs rounded-xl border-slate-200">
+                <SelectTrigger className="w-36 h-9 text-xs rounded-xl border-border bg-background">
                   <SelectValue placeholder="All" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[100]">
                   <SelectItem value="all">All</SelectItem>
                   <SelectItem value="planned">Planned</SelectItem>
                   <SelectItem value="in-progress">In Progress</SelectItem>
@@ -540,12 +540,12 @@ export function DeliveryPage() {
             </div>
 
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">MONTH:</span>
+              <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">MONTH:</span>
               <Select value={monthFilter} onValueChange={(val) => setMonthFilter(val || 'all')}>
-                <SelectTrigger className="w-32 h-9 text-xs rounded-xl border-slate-200">
+                <SelectTrigger className="w-32 h-9 text-xs rounded-xl border-border bg-background">
                   <SelectValue placeholder="All Months" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[100]">
                   <SelectItem value="all">All Months</SelectItem>
                   {uniqueMonths.map((m) => (
                     <SelectItem key={m} value={m}>
@@ -557,12 +557,12 @@ export function DeliveryPage() {
             </div>
 
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">USER:</span>
+              <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">USER:</span>
               <Select value={userFilter} onValueChange={(val) => setUserFilter(val || 'all')}>
-                <SelectTrigger className="w-32 h-9 text-xs rounded-xl border-slate-200">
+                <SelectTrigger className="w-32 h-9 text-xs rounded-xl border-border bg-background">
                   <SelectValue placeholder="All Users" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[100]">
                   <SelectItem value="all">All Users</SelectItem>
                   {uniqueUsers.map((u) => (
                     <SelectItem key={u} value={u}>
@@ -573,14 +573,14 @@ export function DeliveryPage() {
               </Select>
             </div>
 
-            <div className="flex items-center space-x-2 pl-3 border-l border-slate-200">
+            <div className="flex items-center space-x-2 pl-3 border-l border-border">
               <Checkbox
                 id="overdue-chk"
                 checked={showOverdueOnly}
                 onCheckedChange={(c) => setShowOverdueOnly(!!c)}
-                className="rounded-md border-slate-300 data-[state=checked]:bg-emerald-600"
+                className="rounded-md border-border data-[state=checked]:bg-emerald-600"
               />
-              <label htmlFor="overdue-chk" className="text-xs text-slate-600 font-semibold cursor-pointer select-none">
+              <label htmlFor="overdue-chk" className="text-xs text-muted-foreground font-semibold cursor-pointer select-none">
                 Overdue Only
               </label>
             </div>
@@ -694,28 +694,28 @@ export function DeliveryPage() {
                 </span>
               </div>
             )}
-            <div className="overflow-x-auto rounded-xl border border-slate-200/90 shadow-2xs">
-            <table className="w-full text-left text-xs text-slate-700">
-              <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-xs text-slate-800 font-bold border-b border-slate-200 uppercase tracking-wider text-[11px] shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)]">
+            <div className="overflow-x-auto rounded-xl border border-border shadow-2xs">
+            <table className="w-full text-left text-xs text-foreground/80">
+              <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur-xs text-foreground font-bold border-b border-border uppercase tracking-wider text-[11px]">
                 <tr>
-                  <th className="py-3.5 px-3 w-12 text-center bg-slate-50/95 backdrop-blur-xs">#</th>
-                  <th className="py-3.5 px-3 bg-slate-50/95 backdrop-blur-xs">DVEPL CODE</th>
-                  <th className="py-3.5 px-3 bg-slate-50/95 backdrop-blur-xs">PARTY NAME</th>
-                  <th className="py-3.5 px-3 bg-slate-50/95 backdrop-blur-xs">ITEMS</th>
-                  <th className="py-3.5 px-3 bg-slate-50/95 backdrop-blur-xs">ASSIGNED TO</th>
-                  <th className="py-3.5 px-3 bg-slate-50/95 backdrop-blur-xs">DELIVERY TARGET</th>
-                  <th className="py-3.5 px-3 bg-slate-50/95 backdrop-blur-xs">DISPATCH DATE</th>
-                  <th className="py-3.5 px-3 bg-slate-50/95 backdrop-blur-xs">DELIVERY DATE</th>
-                  <th className="py-3.5 px-3 bg-slate-50/95 backdrop-blur-xs">DELIVERY STATUS</th>
-                  <th className="py-3.5 px-3 bg-slate-50/95 backdrop-blur-xs">ORDER STATUS</th>
-                  <th className="py-3.5 px-3 bg-slate-50/95 backdrop-blur-xs">DAYS LEFT</th>
-                  <th className="py-3.5 px-3 text-right bg-slate-50/95 backdrop-blur-xs">ACTIONS</th>
+                  <th className="py-3.5 px-3 w-12 text-center bg-muted/95 backdrop-blur-xs">#</th>
+                  <th className="py-3.5 px-3 bg-muted/95 backdrop-blur-xs">DVEPL CODE</th>
+                  <th className="py-3.5 px-3 bg-muted/95 backdrop-blur-xs">PARTY NAME</th>
+                  <th className="py-3.5 px-3 bg-muted/95 backdrop-blur-xs">ITEMS</th>
+                  <th className="py-3.5 px-3 bg-muted/95 backdrop-blur-xs">ASSIGNED TO</th>
+                  <th className="py-3.5 px-3 bg-muted/95 backdrop-blur-xs">DELIVERY TARGET</th>
+                  <th className="py-3.5 px-3 bg-muted/95 backdrop-blur-xs">DISPATCH DATE</th>
+                  <th className="py-3.5 px-3 bg-muted/95 backdrop-blur-xs">DELIVERY DATE</th>
+                  <th className="py-3.5 px-3 bg-muted/95 backdrop-blur-xs">DELIVERY STATUS</th>
+                  <th className="py-3.5 px-3 bg-muted/95 backdrop-blur-xs">ORDER STATUS</th>
+                  <th className="py-3.5 px-3 bg-muted/95 backdrop-blur-xs">DAYS LEFT</th>
+                  <th className="py-3.5 px-3 text-right bg-muted/95 backdrop-blur-xs">ACTIONS</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-border">
                 {paginatedOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="py-10 text-center text-slate-400">
+                    <td colSpan={12} className="py-10 text-center text-muted-foreground">
                       No delivery orders found.
                     </td>
                   </tr>
@@ -723,20 +723,20 @@ export function DeliveryPage() {
                   paginatedOrders.map((order, idx) => {
                     const daysLeft = calculateDaysLeft(order.deliveryTarget, order.deliveryStatus, order.actualDeliveryDate, order.dispatchDate);
                     return (
-                      <tr key={order.id} className="hover:bg-slate-50/90 transition-all duration-150">
-                        <td className="py-3.5 px-3 text-center text-slate-400 font-mono text-[11px]">{(currentPage - 1) * rowsPerPage + idx + 1}</td>
-                        <td className="py-3.5 px-3 font-bold text-slate-900">{order.companyCode}</td>
-                        <td className="py-3.5 px-3 font-semibold text-slate-800">{order.customerName}</td>
-                        <td className="py-3.5 px-3 text-slate-600 max-w-xs truncate" title={order.itemName}>
+                      <tr key={order.id} className="hover:bg-muted/45 transition-all duration-150">
+                        <td className="py-3.5 px-3 text-center text-muted-foreground font-mono text-[11px]">{(currentPage - 1) * rowsPerPage + idx + 1}</td>
+                        <td className="py-3.5 px-3 font-bold text-foreground">{order.companyCode}</td>
+                        <td className="py-3.5 px-3 font-semibold text-foreground/90">{order.customerName}</td>
+                        <td className="py-3.5 px-3 text-muted-foreground max-w-xs truncate" title={order.itemName}>
                           {order.itemName}
                         </td>
-                        <td className="py-3.5 px-3 text-slate-600 font-medium">{order.assignedTo}</td>
-                        <td className="py-3.5 px-3 text-slate-800 font-semibold">{order.deliveryTarget}</td>
-                        <td className="py-3.5 px-3 text-slate-500 font-mono text-[11px]">{order.dispatchDate || '—'}</td>
-                        <td className="py-3.5 px-3 text-slate-800 font-mono font-semibold text-[11px]">{order.actualDeliveryDate || '—'}</td>
+                        <td className="py-3.5 px-3 text-muted-foreground font-medium">{order.assignedTo}</td>
+                        <td className="py-3.5 px-3 text-foreground/90 font-semibold">{order.deliveryTarget}</td>
+                        <td className="py-3.5 px-3 text-muted-foreground font-mono text-[11px]">{order.dispatchDate || '—'}</td>
+                        <td className="py-3.5 px-3 text-foreground/90 font-mono font-semibold text-[11px]">{order.actualDeliveryDate || '—'}</td>
                         <td className="py-3.5 px-3">{renderStatusBadge(order.deliveryStatus)}</td>
                         <td className="py-3.5 px-3">
-                          <span className="inline-block px-2.5 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-[11px]">
+                          <span className="inline-block px-2.5 py-0.5 rounded-md bg-muted border border-border text-foreground/80 font-semibold text-[11px]">
                             {order.orderStatus}
                           </span>
                         </td>
@@ -750,7 +750,7 @@ export function DeliveryPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
+                              className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg"
                               onClick={() => handleOpenDetailModal(order)}
                               title="View Details"
                             >
@@ -759,7 +759,7 @@ export function DeliveryPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg"
+                              className="h-8 w-8 text-emerald-600 hover:text-emerald-500 hover:bg-emerald-500/10 rounded-lg"
                               onClick={() => handleOpenUpdateModal(order)}
                               title="Update Delivery"
                             >
@@ -781,33 +781,33 @@ export function DeliveryPage() {
         {activeView === 'calendar' && (
           <div className="space-y-4 py-2">
             {/* Navigation & Status Legend */}
-            <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs">
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-card p-4 rounded-2xl border border-border shadow-2xs">
               <div className="flex items-center gap-3">
                 <Button
                   variant="outline"
                   size="icon"
-                  className="h-9 w-9 rounded-xl border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-2xs"
+                  className="h-9 w-9 rounded-xl border-border bg-muted/30 hover:bg-muted/50 shadow-2xs"
                   onClick={() => setCurrentCalendarDate(new Date(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth() - 1, 1))}
                 >
-                  <ChevronLeft className="h-4.5 w-4.5 text-slate-700" />
+                  <ChevronLeft className="h-4.5 w-4.5 text-foreground" />
                 </Button>
                 <div>
-                  <h3 className="text-base font-extrabold text-slate-900 tracking-tight">
+                  <h3 className="text-base font-extrabold text-foreground tracking-tight">
                     {currentCalendarDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
                   </h3>
-                  <p className="text-[11px] font-medium text-slate-400">Click any order badge for quick details</p>
+                  <p className="text-[11px] font-medium text-muted-foreground">Click any order badge for quick details</p>
                 </div>
                 <Button
                   variant="outline"
                   size="icon"
-                  className="h-9 w-9 rounded-xl border-slate-200 bg-slate-50 hover:bg-slate-100 shadow-2xs"
+                  className="h-9 w-9 rounded-xl border-border bg-muted/30 hover:bg-muted/50 shadow-2xs"
                   onClick={() => setCurrentCalendarDate(new Date(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth() + 1, 1))}
                 >
-                  <ChevronRight className="h-4.5 w-4.5 text-slate-700" />
+                  <ChevronRight className="h-4.5 w-4.5 text-foreground" />
                 </Button>
               </div>
 
-              <div className="flex items-center gap-2.5 text-xs font-bold">
+              <div className="flex flex-wrap items-center gap-2.5 text-xs font-bold">
                 <span className="inline-flex items-center gap-1.5 text-emerald-700 bg-emerald-50/80 px-3 py-1 rounded-xl border border-emerald-200/80">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Delivered
                 </span>
@@ -824,20 +824,20 @@ export function DeliveryPage() {
             </div>
 
             {/* Premium Full Month Grid Container */}
-            <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-xs">
+            <div className="border border-border rounded-2xl overflow-hidden bg-card shadow-xs">
               {/* Day Name Headers */}
-              <div className="grid grid-cols-7 bg-slate-50 border-b border-slate-200 text-center text-xs font-extrabold text-slate-700 uppercase tracking-wider py-3">
-                <div className="text-rose-600">Sun</div>
+              <div className="grid grid-cols-7 bg-muted/50 border-b border-border text-center text-xs font-extrabold text-foreground uppercase tracking-wider py-3">
+                <div className="text-rose-500">Sun</div>
                 <div>Mon</div>
                 <div>Tue</div>
                 <div>Wed</div>
                 <div>Thu</div>
                 <div>Fri</div>
-                <div className="text-indigo-600">Sat</div>
+                <div className="text-indigo-500">Sat</div>
               </div>
 
               {/* Day Cells Grid */}
-              <div className="grid grid-cols-7 gap-px bg-slate-200/90">
+              <div className="grid grid-cols-7 gap-px bg-border/60">
                 {(() => {
                   const year = currentCalendarDate.getFullYear();
                   const month = currentCalendarDate.getMonth();
@@ -850,8 +850,8 @@ export function DeliveryPage() {
                   // Previous Month Empty Days
                   for (let i = firstDayIndex - 1; i >= 0; i--) {
                     cells.push(
-                      <div key={`prev-${i}`} className="min-h-[125px] bg-slate-50/50 p-2.5 opacity-40 select-none">
-                        <span className="text-xs font-bold text-slate-400 font-mono">{prevMonthDays - i}</span>
+                      <div key={`prev-${i}`} className="min-h-[125px] bg-muted/20 p-2.5 opacity-40 select-none">
+                        <span className="text-xs font-bold text-muted-foreground font-mono">{prevMonthDays - i}</span>
                       </div>
                     );
                   }
@@ -871,20 +871,20 @@ export function DeliveryPage() {
                     cells.push(
                       <div
                         key={`day-${dayNum}`}
-                        className={`min-h-[125px] bg-white p-2.5 flex flex-col gap-2 transition-all hover:bg-slate-50/90 ${
-                          isToday ? 'ring-2 ring-emerald-500/40 bg-emerald-50/20' : ''
+                        className={`min-h-[125px] bg-card p-2.5 flex flex-col gap-2 transition-all hover:bg-muted/30 ${
+                          isToday ? 'ring-2 ring-emerald-500/40 bg-emerald-500/10' : ''
                         }`}
                       >
                         <div className="flex items-center justify-between">
                           <span
                             className={`text-xs font-mono font-extrabold h-6 w-6 rounded-full flex items-center justify-center ${
-                              isToday ? 'bg-emerald-600 text-white shadow-2xs' : 'text-slate-700'
+                              isToday ? 'bg-emerald-600 text-white shadow-2xs' : 'text-foreground'
                             }`}
                           >
                             {dayNum}
                           </span>
                           {matched.length > 0 && (
-                            <span className="text-[10px] font-extrabold bg-slate-900 text-white px-2 py-0.5 rounded-full shadow-2xs">
+                            <span className="text-[10px] font-extrabold bg-primary text-primary-foreground px-2 py-0.5 rounded-full shadow-2xs">
                               {matched.length} {matched.length === 1 ? 'order' : 'orders'}
                             </span>
                           )}
@@ -923,8 +923,8 @@ export function DeliveryPage() {
                   const remaining = 35 - totalCells > 0 ? 35 - totalCells : 42 - totalCells;
                   for (let i = 1; i <= remaining; i++) {
                     cells.push(
-                      <div key={`next-${i}`} className="min-h-[125px] bg-slate-50/50 p-2.5 opacity-40 select-none">
-                        <span className="text-xs font-bold text-slate-400 font-mono">{i}</span>
+                      <div key={`next-${i}`} className="min-h-[125px] bg-muted/20 p-2.5 opacity-40 select-none">
+                        <span className="text-xs font-bold text-muted-foreground font-mono">{i}</span>
                       </div>
                     );
                   }
@@ -939,20 +939,20 @@ export function DeliveryPage() {
         {/* Timeline View */}
         {activeView === 'timeline' && (
           <div className="space-y-4 py-4">
-            <div className="relative border-l-2 border-slate-200 ml-4 space-y-6">
+            <div className="relative border-l-2 border-border ml-4 space-y-6">
               {filteredOrders.map((order) => (
                 <div key={order.id} className="relative pl-6">
-                  <div className="absolute -left-[9px] top-1 h-4 w-4 rounded-full border-2 border-white bg-emerald-500 shadow-xs" />
-                  <div className="bg-slate-50/90 border border-slate-200/90 p-4 rounded-xl space-y-3 shadow-2xs hover:bg-white hover:shadow-xs transition-all">
+                  <div className="absolute -left-[9px] top-1 h-4 w-4 rounded-full border-2 border-background bg-emerald-500 shadow-xs" />
+                  <div className="bg-card border border-border p-4 rounded-xl space-y-3 shadow-2xs hover:bg-muted/20 hover:shadow-xs transition-all">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-bold text-slate-900 text-xs">{order.companyCode}</span>
+                      <span className="font-bold text-foreground text-xs">{order.companyCode}</span>
                       <div className="flex items-center gap-2">
                         {renderStatusBadge(order.deliveryStatus)}
-                        <div className="flex items-center gap-1 border-l border-slate-200 pl-2">
+                        <div className="flex items-center gap-1 border-l border-border pl-2">
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg"
                             onClick={() => handleOpenDetailModal(order)}
                             title="View Details"
                           >
@@ -961,7 +961,7 @@ export function DeliveryPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg"
+                            className="h-7 w-7 text-emerald-600 hover:text-emerald-500 hover:bg-emerald-500/10 rounded-lg"
                             onClick={() => handleOpenUpdateModal(order)}
                             title="Update Delivery"
                           >
@@ -970,11 +970,11 @@ export function DeliveryPage() {
                         </div>
                       </div>
                     </div>
-                    <p className="text-xs font-semibold text-slate-800">{order.customerName}</p>
-                    <p className="text-xs text-slate-500">{order.itemName}</p>
-                    <div className="flex items-center gap-4 text-[11px] text-slate-500 pt-1 border-t border-slate-100">
-                      <span>Target: <strong className="text-slate-700">{order.deliveryTarget}</strong></span>
-                      <span>Assigned: <strong className="text-slate-700">{order.assignedTo}</strong></span>
+                    <p className="text-xs font-semibold text-foreground/95">{order.customerName}</p>
+                    <p className="text-xs text-muted-foreground">{order.itemName}</p>
+                    <div className="flex items-center gap-4 text-[11px] text-muted-foreground pt-1 border-t border-border/80">
+                      <span>Target: <strong className="text-foreground/90">{order.deliveryTarget}</strong></span>
+                      <span>Assigned: <strong className="text-foreground/90">{order.assignedTo}</strong></span>
                     </div>
                   </div>
                 </div>
@@ -987,79 +987,79 @@ export function DeliveryPage() {
 
       {/* Update Delivery Modal */}
       <Dialog open={updateModalOpen} onOpenChange={setUpdateModalOpen}>
-        <DialogContent className="sm:max-w-4xl max-w-[92vw] w-full p-0 overflow-hidden rounded-3xl bg-white border border-slate-200 shadow-2xl">
+        <DialogContent className="sm:max-w-4xl max-w-[92vw] w-full p-0 overflow-hidden rounded-3xl bg-card border border-border shadow-2xl text-card-foreground">
           {/* Header */}
-          <div className="px-7 py-5 bg-white border-b border-slate-100 flex items-center justify-between">
+          <div className="px-7 py-5 bg-card border-b border-border flex items-center justify-between">
             <div className="flex items-center gap-3.5">
-              <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-200/60 shadow-2xs">
+              <div className="p-2.5 bg-emerald-500/10 text-emerald-500 rounded-2xl border border-emerald-500/20 shadow-2xs">
                 <Edit className="h-5 w-5" />
               </div>
               <div>
-                <DialogTitle className="text-base font-extrabold text-slate-900 tracking-tight">Update Delivery Details</DialogTitle>
-                <p className="text-xs font-medium text-slate-500 mt-0.5">Manage dispatch milestones, tracking remarks, and delivery schedules</p>
+                <DialogTitle className="text-base font-extrabold text-foreground tracking-tight">Update Delivery Details</DialogTitle>
+                <p className="text-xs font-medium text-muted-foreground mt-0.5">Manage dispatch milestones, tracking remarks, and delivery schedules</p>
               </div>
             </div>
           </div>
 
           {selectedOrder && (
-            <div className="p-7 text-xs bg-slate-50/50 max-h-[82vh] overflow-y-auto">
+            <div className="p-7 text-xs bg-background max-h-[82vh] overflow-y-auto">
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* Left Side: Order Specification Summary Card (4 cols) */}
                 <div className="lg:col-span-4 space-y-4">
-                  <div className="bg-white border border-slate-200/90 p-5 rounded-2xl shadow-2xs space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                      <span className="font-mono font-extrabold text-slate-900 text-sm">{selectedOrder.companyCode}</span>
+                  <div className="bg-card border border-border p-5 rounded-2xl shadow-2xs space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-border">
+                      <span className="font-mono font-extrabold text-foreground text-sm">{selectedOrder.companyCode}</span>
                       {renderStatusBadge(selectedOrder.deliveryStatus)}
                     </div>
 
                     <div className="space-y-3">
                       <div>
-                        <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Customer / Party</span>
-                        <p className="font-bold text-slate-900 text-xs mt-0.5">{selectedOrder.customerName}</p>
+                        <span className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider block">Customer / Party</span>
+                        <p className="font-bold text-foreground text-xs mt-0.5">{selectedOrder.customerName}</p>
                       </div>
 
                       <div>
-                        <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Equipment / Items</span>
-                        <p className="font-semibold text-slate-700 text-xs mt-0.5 leading-relaxed">{selectedOrder.itemName}</p>
+                        <span className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider block">Equipment / Items</span>
+                        <p className="font-semibold text-muted-foreground text-xs mt-0.5 leading-relaxed">{selectedOrder.itemName}</p>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border">
                         <div>
-                          <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Assigned Engineer</span>
-                          <p className="font-semibold text-slate-800 text-xs mt-0.5">{selectedOrder.assignedTo}</p>
+                          <span className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider block">Assigned Engineer</span>
+                          <p className="font-semibold text-foreground/95 text-xs mt-0.5">{selectedOrder.assignedTo}</p>
                         </div>
                         <div>
-                          <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Target Month</span>
-                          <p className="font-bold text-slate-900 text-xs mt-0.5">{selectedOrder.targetMonth || '—'}</p>
+                          <span className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider block">Target Month</span>
+                          <p className="font-bold text-foreground text-xs mt-0.5">{selectedOrder.targetMonth || '—'}</p>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="bg-emerald-50/70 border border-emerald-200/80 p-4 rounded-2xl space-y-1 text-emerald-900">
-                    <span className="font-extrabold text-xs flex items-center gap-1.5 text-emerald-800">
-                      <Truck className="h-4 w-4 text-emerald-600" /> Operational Notice
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl space-y-1 text-emerald-800 dark:text-emerald-200">
+                    <span className="font-extrabold text-xs flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300">
+                      <Truck className="h-4 w-4 text-emerald-500" /> Operational Notice
                     </span>
-                    <p className="text-[11px] text-emerald-700 leading-relaxed">
+                    <p className="text-[11px] text-emerald-700 dark:text-emerald-400 leading-relaxed">
                       Updating delivery status automatically logs an entry in the order audit history.
                     </p>
                   </div>
                 </div>
 
                 {/* Right Side: Form Inputs (8 cols) */}
-                <div className="lg:col-span-8 bg-white border border-slate-200/90 p-6 rounded-2xl shadow-2xs space-y-5">
-                  <h4 className="font-extrabold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-2 pb-2 border-b border-slate-100">
-                    <Clock className="h-4 w-4 text-emerald-600" /> Status & Schedule Update
+                <div className="lg:col-span-8 bg-card border border-border p-6 rounded-2xl shadow-2xs space-y-5">
+                  <h4 className="font-extrabold text-foreground text-xs uppercase tracking-wider flex items-center gap-2 pb-2 border-b border-border">
+                    <Clock className="h-4 w-4 text-emerald-500" /> Status & Schedule Update
                   </h4>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5 sm:col-span-2">
-                      <Label className="text-xs font-bold text-slate-800">Delivery Status *</Label>
+                      <Label className="text-xs font-bold text-foreground">Delivery Status *</Label>
                       <Select value={editStatus} onValueChange={(val) => { if (val) setEditStatus(val as any); }}>
-                        <SelectTrigger className="h-10 text-xs rounded-xl border-slate-200 focus:ring-2 focus:ring-emerald-500/20 bg-slate-50/50">
+                        <SelectTrigger className="h-10 text-xs rounded-xl border-border focus:ring-2 focus:ring-emerald-500/20 bg-background">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="z-[100]">
                           <SelectItem value="planned">Planned</SelectItem>
                           <SelectItem value="in-progress">In Progress</SelectItem>
                           <SelectItem value="dispatched">Dispatched</SelectItem>
@@ -1069,44 +1069,44 @@ export function DeliveryPage() {
                     </div>
 
                     <div className="space-y-1.5">
-                      <Label className="text-xs font-bold text-slate-800">Dispatch Date</Label>
+                      <Label className="text-xs font-bold text-foreground">Dispatch Date</Label>
                       <Input
                         type="date"
                         value={editDispatchDate}
                         onChange={(e) => setEditDispatchDate(e.target.value)}
-                        className="h-10 text-xs rounded-xl border-slate-200 bg-slate-50/50"
+                        className="h-10 text-xs rounded-xl border-border bg-background"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <Label className="text-xs font-bold text-slate-800">Delivery Target Month</Label>
+                      <Label className="text-xs font-bold text-foreground">Delivery Target Month</Label>
                       <Input
                         type="text"
                         placeholder="e.g. June 2026"
                         value={editTargetMonth}
                         onChange={(e) => setEditTargetMonth(e.target.value)}
-                        className="h-10 text-xs rounded-xl border-slate-200 bg-slate-50/50"
+                        className="h-10 text-xs rounded-xl border-border bg-background"
                       />
                     </div>
 
                     <div className="space-y-1.5 sm:col-span-2">
-                      <Label className="text-xs font-bold text-slate-800">Actual Delivery Date</Label>
+                      <Label className="text-xs font-bold text-foreground">Actual Delivery Date</Label>
                       <Input
                         type="date"
                         value={editActualDate}
                         onChange={(e) => setEditActualDate(e.target.value)}
-                        className="h-10 text-xs rounded-xl border-slate-200 bg-slate-50/50"
+                        className="h-10 text-xs rounded-xl border-border bg-background"
                       />
                     </div>
 
                     <div className="space-y-1.5 sm:col-span-2">
-                      <Label className="text-xs font-bold text-slate-800">Delivery Remarks & Transporter Notes</Label>
+                      <Label className="text-xs font-bold text-foreground">Delivery Remarks & Transporter Notes</Label>
                       <Textarea
                         rows={3}
                         placeholder="Enter LR tracking number, transporter details, or dispatch remarks..."
                         value={editRemarks}
                         onChange={(e) => setEditRemarks(e.target.value)}
-                        className="text-xs rounded-xl border-slate-200 focus:ring-2 focus:ring-emerald-500/20 bg-slate-50/50"
+                        className="text-xs rounded-xl border-border focus:ring-2 focus:ring-emerald-500/20 bg-background"
                       />
                     </div>
                   </div>
@@ -1116,8 +1116,8 @@ export function DeliveryPage() {
           )}
 
           {/* Footer */}
-          <div className="px-7 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
-            <Button variant="outline" size="sm" onClick={() => setUpdateModalOpen(false)} className="h-10 px-5 text-xs font-semibold rounded-xl border-slate-200">
+          <div className="px-7 py-4 bg-muted border-t border-border flex items-center justify-end gap-3">
+            <Button variant="outline" size="sm" onClick={() => setUpdateModalOpen(false)} className="h-10 px-5 text-xs font-semibold rounded-xl border-border">
               Cancel
             </Button>
             <Button size="sm" className="h-10 px-6 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs" onClick={handleSaveDelivery}>
@@ -1129,50 +1129,50 @@ export function DeliveryPage() {
 
       {/* Detail Modal (Overview) */}
       <Dialog open={detailModalOpen} onOpenChange={setDetailModalOpen}>
-        <DialogContent className="sm:max-w-4xl max-w-[92vw] w-full p-0 overflow-hidden rounded-3xl bg-white border border-slate-200 shadow-2xl">
+        <DialogContent className="sm:max-w-4xl max-w-[92vw] w-full p-0 overflow-hidden rounded-3xl bg-card border border-border shadow-2xl text-card-foreground">
           {/* Header */}
-          <div className="px-7 py-5 bg-white border-b border-slate-100 flex items-center justify-between">
+          <div className="px-7 py-5 bg-card border-b border-border flex items-center justify-between">
             <div className="flex items-center gap-3.5">
-              <div className="p-2.5 bg-cyan-50 text-cyan-600 rounded-2xl border border-cyan-200/60 shadow-2xs">
+              <div className="p-2.5 bg-cyan-500/10 text-cyan-500 rounded-2xl border border-cyan-500/20 shadow-2xs">
                 <Eye className="h-5 w-5" />
               </div>
               <div>
-                <DialogTitle className="text-base font-extrabold text-slate-900 tracking-tight">Delivery Overview</DialogTitle>
-                <p className="text-xs font-medium text-slate-500 mt-0.5">Order specifications, target timeline and status log</p>
+                <DialogTitle className="text-base font-extrabold text-foreground tracking-tight">Delivery Overview</DialogTitle>
+                <p className="text-xs font-medium text-muted-foreground mt-0.5">Order specifications, target timeline and status log</p>
               </div>
             </div>
           </div>
 
           {selectedOrder && (
-            <div className="p-7 text-xs bg-slate-50/50 max-h-[82vh] overflow-y-auto">
+            <div className="p-7 text-xs bg-background max-h-[82vh] overflow-y-auto">
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* Left Column: Order Specification Summary Card */}
                 <div className="lg:col-span-5 space-y-4">
-                  <div className="bg-white border border-slate-200/90 p-5 rounded-2xl shadow-2xs space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                      <span className="font-mono font-extrabold text-slate-900 text-sm">{selectedOrder.companyCode}</span>
+                  <div className="bg-card border border-border p-5 rounded-2xl shadow-2xs space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-border">
+                      <span className="font-mono font-extrabold text-foreground text-sm">{selectedOrder.companyCode}</span>
                       {renderStatusBadge(selectedOrder.deliveryStatus)}
                     </div>
 
                     <div className="space-y-3">
                       <div>
-                        <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Customer / Party</span>
-                        <p className="font-bold text-slate-900 text-xs mt-0.5">{selectedOrder.customerName}</p>
+                        <span className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider block">Customer / Party</span>
+                        <p className="font-bold text-foreground text-xs mt-0.5">{selectedOrder.customerName}</p>
                       </div>
 
                       <div>
-                        <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Equipment / Items</span>
-                        <p className="font-semibold text-slate-700 text-xs mt-0.5 leading-relaxed">{selectedOrder.itemName}</p>
+                        <span className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider block">Equipment / Items</span>
+                        <p className="font-semibold text-muted-foreground text-xs mt-0.5 leading-relaxed">{selectedOrder.itemName}</p>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border">
                         <div>
-                          <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Assigned Engineer</span>
-                          <p className="font-semibold text-slate-800 text-xs mt-0.5">{selectedOrder.assignedTo}</p>
+                          <span className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider block">Assigned Engineer</span>
+                          <p className="font-semibold text-foreground/95 text-xs mt-0.5">{selectedOrder.assignedTo}</p>
                         </div>
                         <div>
-                          <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Order Status</span>
-                          <p className="font-bold text-slate-900 text-xs mt-0.5">{selectedOrder.orderStatus}</p>
+                          <span className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider block">Order Status</span>
+                          <p className="font-bold text-foreground text-xs mt-0.5">{selectedOrder.orderStatus}</p>
                         </div>
                       </div>
                     </div>
@@ -1181,43 +1181,43 @@ export function DeliveryPage() {
 
                 {/* Right Column: Detailed Grid & Status Log */}
                 <div className="lg:col-span-7 space-y-5">
-                  <div className="bg-white border border-slate-200/90 p-6 rounded-2xl shadow-2xs space-y-4">
-                    <h4 className="font-extrabold text-slate-900 text-xs uppercase tracking-wider flex items-center gap-2 pb-2 border-b border-slate-100">
+                  <div className="bg-card border border-border p-6 rounded-2xl shadow-2xs space-y-4">
+                    <h4 className="font-extrabold text-foreground text-xs uppercase tracking-wider flex items-center gap-2 pb-2 border-b border-border">
                       <Clock className="h-4 w-4 text-cyan-600" /> Key Delivery Milestones
                     </h4>
 
                     <div className="grid grid-cols-3 gap-3">
-                      <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/70">
-                        <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Target Delivery</span>
-                        <p className="font-bold text-slate-900 text-xs mt-1">{selectedOrder.deliveryTarget}</p>
+                      <div className="bg-muted/40 p-3 rounded-xl border border-border">
+                        <span className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider block">Target Delivery</span>
+                        <p className="font-bold text-foreground text-xs mt-1">{selectedOrder.deliveryTarget}</p>
                       </div>
-                      <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/70">
-                        <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Dispatch Date</span>
-                        <p className="font-bold text-slate-800 text-xs mt-1">{selectedOrder.dispatchDate || '—'}</p>
+                      <div className="bg-muted/40 p-3 rounded-xl border border-border">
+                        <span className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider block">Dispatch Date</span>
+                        <p className="font-bold text-foreground/90 text-xs mt-1">{selectedOrder.dispatchDate || '—'}</p>
                       </div>
-                      <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/70">
-                        <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">Actual Delivery</span>
-                        <p className="font-bold text-slate-800 text-xs mt-1">{selectedOrder.actualDeliveryDate || '—'}</p>
+                      <div className="bg-muted/40 p-3 rounded-xl border border-border">
+                        <span className="text-[10px] font-extrabold text-muted-foreground uppercase tracking-wider block">Actual Delivery</span>
+                        <p className="font-bold text-foreground/90 text-xs mt-1">{selectedOrder.actualDeliveryDate || '—'}</p>
                       </div>
                     </div>
                   </div>
 
                   {/* Status Audit Log */}
-                  <div className="bg-white border border-slate-200/90 p-6 rounded-2xl shadow-2xs space-y-3">
-                    <h4 className="font-extrabold text-slate-900 text-xs uppercase tracking-wider">Status History Log</h4>
+                  <div className="bg-card border border-border p-6 rounded-2xl shadow-2xs space-y-3">
+                    <h4 className="font-extrabold text-foreground text-xs uppercase tracking-wider">Status History Log</h4>
                     <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
                       {selectedOrder.history && selectedOrder.history.length > 0 ? (
                         selectedOrder.history.map((h, i) => (
-                          <div key={i} className="p-3 rounded-xl border border-slate-200/80 bg-slate-50/70 space-y-1">
+                          <div key={i} className="p-3 rounded-xl border border-border bg-muted/30 space-y-1">
                             <div className="flex items-center justify-between text-[11px]">
-                              <span className="font-bold text-slate-800">{h.status}</span>
-                              <span className="text-slate-400 font-mono text-[10px]">{h.date}</span>
+                              <span className="font-bold text-foreground/90">{h.status}</span>
+                              <span className="text-muted-foreground font-mono text-[10px]">{h.date}</span>
                             </div>
-                            <p className="text-slate-600 text-[11px]">{h.remarks || 'No remarks provided.'}</p>
+                            <p className="text-muted-foreground text-[11px]">{h.remarks || 'No remarks provided.'}</p>
                           </div>
                         ))
                       ) : (
-                        <p className="text-slate-400 text-center py-4">No history records logged.</p>
+                        <p className="text-muted-foreground text-center py-4">No history records logged.</p>
                       )}
                     </div>
                   </div>
@@ -1227,8 +1227,8 @@ export function DeliveryPage() {
           )}
 
           {/* Footer */}
-          <div className="px-7 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
-            <Button variant="outline" size="sm" onClick={() => setDetailModalOpen(false)} className="h-10 px-5 text-xs font-semibold rounded-xl border-slate-200">
+          <div className="px-7 py-4 bg-muted border-t border-border flex items-center justify-end gap-3">
+            <Button variant="outline" size="sm" onClick={() => setDetailModalOpen(false)} className="h-10 px-5 text-xs font-semibold rounded-xl border-border">
               Close
             </Button>
             <Button

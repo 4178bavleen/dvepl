@@ -688,15 +688,17 @@ export default function DrawingLibrary({
                               <button
                                 disabled={isUpdating || !canWork}
                                 title={!canWork ? "View only — you cannot change the status of this drawing" : undefined}
-                                className={`group inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[11px] font-semibold transition-all duration-200 ${statusCfg.pill} ${canWork ? "hover:brightness-95 hover:shadow-xs cursor-pointer" : "cursor-default"}`}
+                                className={`group inline-flex items-center gap-2 px-3 py-1.5 min-w-[130px] justify-between rounded-full border text-[11px] font-semibold transition-all duration-200 ${statusCfg.pill} ${canWork ? "hover:brightness-95 hover:shadow-xs cursor-pointer" : "cursor-default"}`}
                               >
-                                <span className={`w-1.5 h-1.5 rounded-full ${statusCfg.dot} ${d.status === "PENDING" || d.status === "SUBMITTED" ? "animate-pulse" : ""}`} />
-                                <span>{statusCfg.label}</span>
+                                <div className="flex items-center gap-1.5 truncate">
+                                  <span className={`w-1.5 h-1.5 rounded-full ${statusCfg.dot} ${d.status === "PENDING" || d.status === "SUBMITTED" ? "animate-pulse" : ""}`} />
+                                  <span className="truncate">{statusCfg.label}</span>
+                                </div>
                                 {canWork && (
                                   isUpdating ? (
-                                    <Loader2 className="w-3 h-3 animate-spin opacity-60 ml-0.5" />
+                                    <Loader2 className="w-3 h-3 animate-spin opacity-60 flex-shrink-0" />
                                   ) : (
-                                    <ChevronDown className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity ml-0.5" />
+                                    <ChevronDown className="w-3 h-3 opacity-60 transition-opacity flex-shrink-0" />
                                   )
                                 )}
                               </button>
