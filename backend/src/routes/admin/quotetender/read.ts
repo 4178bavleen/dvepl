@@ -69,6 +69,18 @@ async function quoteTenderOrderReadRoutes(
           const dveplCode = `QT-ORDER-${t_id}`;
           const referenceCode = order.reference_code || order.tenderID || String(t_id);
 
+          const remarks = [
+            `Work: ${order.name_of_work || ""}`,
+            `Department: ${order.department_name || ""}`,
+            `Section: ${order.section_name || ""}`,
+            `Division: ${order.division_name || ""}`,
+            `Sub Division: ${order.subdivision || ""}`,
+            `Location: ${[order.state_name, order.city_name].filter(Boolean).join(", ")}`,
+            `Tender ID: ${order.tenderID || ""}`,
+            `Reference Code: ${referenceCode}`,
+            `File Name: ${order.file_name || ""}`,
+          ].join("\n");
+
           // Check if already exists in database
           const existing = await fastify.prisma.salesOrder.findFirst({
             where: {
@@ -91,18 +103,6 @@ async function quoteTenderOrderReadRoutes(
               .filter(Boolean)
               .join(" | ");
 
-            const remarks = [
-              `Work: ${order.name_of_work || ""}`,
-              `Department: ${order.department_name || ""}`,
-              `Section: ${order.section_name || ""}`,
-              `Division: ${order.division_name || ""}`,
-              `Sub Division: ${order.subdivision || ""}`,
-              `Location: ${[order.state_name, order.city_name].filter(Boolean).join(", ")}`,
-              `Tender ID: ${order.tenderID || ""}`,
-              `Reference Code: ${referenceCode}`,
-              `File Name: ${order.file_name || ""}`,
-            ].join("\n");
-
             const newOrder = await fastify.prisma.salesOrder.create({
               data: {
                 companyId,
@@ -112,6 +112,7 @@ async function quoteTenderOrderReadRoutes(
                 caNo: order.tender_no || null,
                 dveplCode,
                 contactDetails,
+                remarks,
                 status: getSalesOrderStatus(order.remark || order.status),
                 subtotal,
                 gstTotal,
@@ -126,12 +127,27 @@ async function quoteTenderOrderReadRoutes(
             });
             syncedOrders.push(newOrder);
           } else {
-            // Update the existing order to backport the file name if it was previously synced without one
+            // Update the existing order to backfill remarks if they were never set,
+            // or update the file name if it was previously synced without one.
             const existingRemarks = existing.remarks || "";
+            const hasWorkLine = existingRemarks.includes("Work:");
             const hasFileNameLine = existingRemarks.includes("File Name:");
-            if (!hasFileNameLine && order.file_name) {
-              fastify.log.info(`Sync updating file name for t_id: ${t_id}`);
-              const updatedRemarks = `${existingRemarks}\nFile Name: ${order.file_name}`;
+
+            let updatedRemarks = existingRemarks;
+            let needsUpdate = false;
+
+            if (!hasWorkLine) {
+              // The remarks were never set on creation (due to the bug)
+              updatedRemarks = remarks;
+              needsUpdate = true;
+            } else if (!hasFileNameLine && order.file_name) {
+              // Just append file name
+              updatedRemarks = `${existingRemarks}\nFile Name: ${order.file_name}`;
+              needsUpdate = true;
+            }
+
+            if (needsUpdate) {
+              fastify.log.info(`Sync updating remarks/file name for t_id: ${t_id}`);
               const updatedOrder = await fastify.prisma.salesOrder.update({
                 where: { id: existing.id },
                 data: { remarks: updatedRemarks },

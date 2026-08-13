@@ -24,6 +24,11 @@ import toast from "react-hot-toast";
 import React, { useState } from "react";
 import type { EngineeringDrawing } from "@/types/exportOrders";
 import { useSalesOrderAccess } from "@/utils/salesOrderAccess";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 interface Props {
   drawings: EngineeringDrawing[];
@@ -480,19 +485,28 @@ export default function DrawingLibrary({
 
                     {/* Actions Menu (Three dots) */}
                     <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenActionsMenu(openActionsMenu === d.id ? null : d.id);
-                          setOpenDropdown(null);
+                      <Popover
+                        open={openActionsMenu === d.id}
+                        onOpenChange={(open) => {
+                          if (open) {
+                            setOpenActionsMenu(d.id);
+                            setOpenDropdown(null);
+                          } else {
+                            setOpenActionsMenu(null);
+                          }
                         }}
-                        className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors border bg-background"
                       >
-                        <MoreVertical className="w-4 h-4" />
-                      </button>
-
-                      {openActionsMenu === d.id && (
-                        <div className="absolute right-0 top-full mt-1 z-40 w-44 rounded-xl border bg-background shadow-2xl py-1 overflow-hidden">
+                        <PopoverTrigger
+                          render={
+                            <button
+                              onClick={(e) => e.stopPropagation()}
+                              className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors border bg-background"
+                            >
+                              <MoreVertical className="w-4 h-4" />
+                            </button>
+                          }
+                        />
+                        <PopoverContent align="end" className="w-44 p-1 overflow-hidden z-50 bg-background border rounded-xl shadow-xl">
                           <button
                             onClick={(e) => openFile(e, d.fileUrl)}
                             className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-muted text-foreground transition-colors text-left"
@@ -514,8 +528,8 @@ export default function DrawingLibrary({
                               View only — no work actions available
                             </p>
                           )}
-                        </div>
-                      )}
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   </div>
 
@@ -534,46 +548,69 @@ export default function DrawingLibrary({
 
                   {/* Status dropdown */}
                   <div className="relative mt-0.5" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      disabled={isUpdating || !canWork}
-                      title={!canWork ? "View only — you cannot change the status of this drawing" : undefined}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenDropdown(openDropdown === d.id ? null : d.id);
-                        setOpenActionsMenu(null);
+                    <Popover
+                      open={openDropdown === d.id}
+                      onOpenChange={(open) => {
+                        if (open) {
+                          setOpenDropdown(d.id);
+                          setOpenActionsMenu(null);
+                        } else {
+                          setOpenDropdown(null);
+                        }
                       }}
-                      className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors disabled:opacity-50 hover:bg-muted ${statusCfg.pill}`}
                     >
-                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${statusCfg.dot}`} />
-                      <span className="flex-1 text-left">{statusCfg.label}</span>
-                      {isUpdating
-                        ? <Loader2 className="w-3 h-3 animate-spin ml-auto" />
-                        : <ChevronDown className="w-3 h-3 ml-auto opacity-60" />
-                      }
-                    </button>
-
-                    {openDropdown === d.id && (
-                      <div className="absolute bottom-full mb-1 left-0 right-0 z-40 rounded-xl border bg-background shadow-2xl py-1 overflow-hidden">
-                        {getStatusActions(d.status).map((action) => {
-                          const Icon = action.icon ?? STATUS_CONFIG[action.status].icon;
-                          const isCurrent = d.status === action.status;
-                          return (
-                            <button
-                              key={action.status}
-                              disabled={isCurrent}
-                              onClick={(e) => handleStatusAction(e, d, action)}
-                              className={`w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors disabled:cursor-default ${action.hoverBg} ${action.textColor} ${isCurrent ? "opacity-50" : ""}`}
-                            >
-                              <Icon className="w-3.5 h-3.5 flex-shrink-0" />
-                              <span className="flex-1 text-left">{action.label}</span>
-                              {isCurrent && (
-                                <span className="text-[10px] text-muted-foreground">Current</span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
+                      <PopoverTrigger
+                        render={
+                          <button
+                            disabled={isUpdating || !canWork}
+                            title={!canWork ? "View only — you cannot change the status of this drawing" : undefined}
+                            onClick={(e) => e.stopPropagation()}
+                            className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-semibold shadow-2xs transition-all duration-200 disabled:opacity-50 hover:brightness-95 hover:shadow-xs cursor-pointer ${statusCfg.pill}`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${statusCfg.dot} ${d.status === "PENDING" || d.status === "SUBMITTED" ? "animate-pulse" : ""}`} />
+                            <span className="flex-1 text-left">{statusCfg.label}</span>
+                            {isUpdating
+                              ? <Loader2 className="w-3.5 h-3.5 animate-spin ml-auto opacity-70" />
+                              : <ChevronDown className="w-3.5 h-3.5 ml-auto opacity-70" />
+                            }
+                          </button>
+                        }
+                      />
+                      <PopoverContent align="center" side="top" className="w-72 p-1.5 overflow-hidden z-50 bg-background/98 backdrop-blur-md border border-border/80 rounded-xl shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200">
+                        <div className="px-2.5 py-1.5 border-b border-muted mb-1.5">
+                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Change Status</p>
+                        </div>
+                        <div className="space-y-0.5">
+                          {getStatusActions(d.status).length === 0 ? (
+                            <p className="text-[11px] text-muted-foreground px-2.5 py-2 italic text-center">No workflow transitions available</p>
+                          ) : (
+                            getStatusActions(d.status).map((action) => {
+                              const Icon = action.icon ?? STATUS_CONFIG[action.status].icon;
+                              const isCurrent = d.status === action.status;
+                              return (
+                                <button
+                                  key={action.status}
+                                  disabled={isCurrent}
+                                  onClick={(e) => {
+                                    handleStatusAction(e, d, action);
+                                    setOpenDropdown(null);
+                                  }}
+                                  className={`w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-semibold rounded-lg transition-all duration-150 text-left disabled:cursor-default ${action.hoverBg} ${action.textColor} ${isCurrent ? "opacity-50 bg-muted/30" : "hover:bg-muted/60"}`}
+                                >
+                                  <div className="w-5 h-5 rounded-md bg-background border flex items-center justify-center flex-shrink-0 shadow-2xs">
+                                    <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+                                  </div>
+                                  <span className="flex-1">{action.label}</span>
+                                  {isCurrent && (
+                                    <span className="text-[10px] text-muted-foreground font-semibold bg-muted px-1.5 py-0.5 rounded-md">Current</span>
+                                  )}
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 </div>
               </div>
@@ -608,6 +645,7 @@ export default function DrawingLibrary({
                 const isUpdating = updatingId === d.id;
                 const rowBg = STATUS_CONFIG[d.status as DrawingStatus]?.row ?? "";
                 const canWork = canWorkOnOrder(orderForDrawing(d));
+                const statusCfg = STATUS_CONFIG[d.status as DrawingStatus] ?? STATUS_CONFIG.PENDING;
 
                 return (
                   <tr
@@ -632,12 +670,78 @@ export default function DrawingLibrary({
                       </span>
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">{d.project?.name ?? "—"}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <div className="flex flex-col items-start gap-1">
-                        <StatusPill status={d.status} />
+                        <Popover
+                          open={openDropdown === d.id}
+                          onOpenChange={(open) => {
+                            if (open) {
+                              setOpenDropdown(d.id);
+                              setOpenActionsMenu(null);
+                            } else {
+                              setOpenDropdown(null);
+                            }
+                          }}
+                        >
+                          <PopoverTrigger
+                            render={
+                              <button
+                                disabled={isUpdating || !canWork}
+                                title={!canWork ? "View only — you cannot change the status of this drawing" : undefined}
+                                className={`group inline-flex items-center gap-2 px-3 py-1.5 min-w-[130px] justify-between rounded-full border text-[11px] font-semibold transition-all duration-200 ${statusCfg.pill} ${canWork ? "hover:brightness-95 hover:shadow-xs cursor-pointer" : "cursor-default"}`}
+                              >
+                                <div className="flex items-center gap-1.5 truncate">
+                                  <span className={`w-1.5 h-1.5 rounded-full ${statusCfg.dot} ${d.status === "PENDING" || d.status === "SUBMITTED" ? "animate-pulse" : ""}`} />
+                                  <span className="truncate">{statusCfg.label}</span>
+                                </div>
+                                {canWork && (
+                                  isUpdating ? (
+                                    <Loader2 className="w-3 h-3 animate-spin opacity-60 flex-shrink-0" />
+                                  ) : (
+                                    <ChevronDown className="w-3 h-3 opacity-60 transition-opacity flex-shrink-0" />
+                                  )
+                                )}
+                              </button>
+                            }
+                          />
+                          <PopoverContent align="start" className="w-64 p-1.5 overflow-hidden z-50 bg-background/98 backdrop-blur-md border border-border/80 rounded-xl shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200">
+                            <div className="px-2.5 py-1.5 border-b border-muted mb-1.5">
+                              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Change Status</p>
+                            </div>
+                            <div className="space-y-0.5">
+                              {getStatusActions(d.status).length === 0 ? (
+                                <p className="text-[11px] text-muted-foreground px-2.5 py-2 italic text-center">No workflow transitions available</p>
+                              ) : (
+                                getStatusActions(d.status).map((action) => {
+                                  const Icon = action.icon ?? STATUS_CONFIG[action.status].icon;
+                                  const isCurrent = d.status === action.status;
+                                  return (
+                                    <button
+                                      key={action.status}
+                                      disabled={isCurrent}
+                                      onClick={(e) => {
+                                        handleStatusAction(e, d, action);
+                                        setOpenDropdown(null);
+                                      }}
+                                      className={`w-full flex items-center gap-2.5 px-2.5 py-2 text-xs font-semibold rounded-lg transition-all duration-150 text-left disabled:cursor-default ${action.hoverBg} ${action.textColor} ${isCurrent ? "opacity-50 bg-muted/30" : "hover:bg-muted/60"}`}
+                                    >
+                                      <div className="w-5 h-5 rounded-md bg-background border flex items-center justify-center flex-shrink-0 shadow-2xs">
+                                        <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+                                      </div>
+                                      <span className="flex-1">{action.label}</span>
+                                      {isCurrent && (
+                                        <span className="text-[10px] text-muted-foreground font-semibold bg-muted px-1.5 py-0.5 rounded-md">Current</span>
+                                      )}
+                                    </button>
+                                  );
+                                })
+                              )}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
                         {d.status === "REJECTED" && d.rejectionReason && (
                           <span
-                            className="text-[10px] text-red-600 max-w-[200px] truncate"
+                            className="text-[10px] text-red-600 max-w-[200px] truncate pl-1"
                             title={d.rejectionReason}
                           >
                             {d.rejectionReason}
@@ -663,38 +767,6 @@ export default function DrawingLibrary({
                             <Send className="w-3.5 h-3.5" />
                           </button>
                         )}
-                        <div className="relative">
-                          <button
-                            disabled={isUpdating || !canWork}
-                            title={!canWork ? "View only — you cannot change the status of this drawing" : undefined}
-                            onClick={(e) => { e.stopPropagation(); setOpenDropdown(openDropdown === d.id ? null : d.id); setOpenActionsMenu(null); }}
-                            className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg border hover:bg-muted transition-colors disabled:opacity-50"
-                          >
-                            {isUpdating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                            {isUpdating ? "Saving…" : "Status"}
-                          </button>
-                          {openDropdown === d.id && (
-                            <div className="absolute right-0 top-full mt-1 z-50 w-48 rounded-xl border bg-background shadow-xl py-1 overflow-hidden">
-                              {getStatusActions(d.status).map((action) => {
-                                const Icon = action.icon ?? STATUS_CONFIG[action.status].icon;
-                                return (
-                                  <button
-                                    key={action.status}
-                                    disabled={d.status === action.status}
-                                    onClick={(e) => handleStatusAction(e, d, action)}
-                                    className={`w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${action.hoverBg} ${action.textColor}`}
-                                  >
-                                    <Icon className="w-3.5 h-3.5" />
-                                    {action.label}
-                                    {d.status === action.status && (
-                                      <span className="ml-auto text-[10px] text-muted-foreground">Current</span>
-                                    )}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
                       </div>
                     </td>
                   </tr>
@@ -703,10 +775,6 @@ export default function DrawingLibrary({
             </tbody>
           </table>
         </div>
-      )}
-
-      {(openDropdown || openActionsMenu) && (
-        <div className="fixed inset-0 z-30" onClick={() => { setOpenDropdown(null); setOpenActionsMenu(null); }} />
       )}
 
       {/* ── Send Modal ─────────────────────────────────────────── */}

@@ -44,19 +44,19 @@ function stageLabel(stage: WorkflowStage) {
 function stageClass(stage: WorkflowStage) {
   switch (stage) {
     case "ORDER_CONFIRMED":
-      return "bg-blue-50 text-blue-700 border-blue-100";
+      return "bg-blue-500/15 text-blue-400 border-blue-500/20";
     case "PO_READY":
-      return "bg-violet-50 text-violet-700 border-violet-100";
+      return "bg-violet-500/15 text-violet-400 border-violet-500/20";
     case "DRAWING_ASSIGNED":
     case "DRAWING_SENT":
-      return "bg-purple-50 text-purple-700 border-purple-100";
+      return "bg-purple-500/15 text-purple-400 border-purple-500/20";
     case "REVISION_REQUIRED":
-      return "bg-orange-50 text-orange-700 border-orange-100";
+      return "bg-orange-500/15 text-orange-400 border-orange-500/20";
     case "DRAWING_APPROVED":
     case "PO_PLACED":
-      return "bg-green-50 text-green-700 border-green-100";
+      return "bg-emerald-500/15 text-emerald-400 border-emerald-500/20";
     default:
-      return "bg-amber-50 text-amber-700 border-amber-100";
+      return "bg-amber-500/15 text-amber-400 border-amber-500/20";
   }
 }
 
@@ -199,40 +199,40 @@ export default function WorkflowTrackerPage() {
     .slice(0, 5);
 
   return (
-    <div className="min-h-full bg-[#f8faf7] p-3 lg:p-5">
+    <div className="min-h-full bg-background text-foreground p-3 lg:p-5">
       <div className="mx-auto max-w-[1540px] space-y-4">
         {/* HEADER — deliberately compact like the reference */}
         <header className="flex items-center justify-between gap-4">
           <div>
-            <h1 className="text-[23px] font-semibold tracking-[-0.02em] text-[#171b18]">
+            <h1 className="text-[23px] font-semibold tracking-[-0.02em] text-foreground">
               Workflow Tracker
             </h1>
-            <p className="mt-0.5 text-[12px] text-[#7a817c]">
+            <p className="mt-0.5 text-[12px] text-muted-foreground">
               Track your orders, POs and follow ups
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <div className="hidden h-9 w-[245px] items-center rounded-lg border border-[#e4e9e3] bg-white px-3 shadow-[0_1px_2px_rgba(0,0,0,.02)] md:flex">
-              <Search className="mr-2 h-3.5 w-3.5 text-[#9aa09c]" />
+            <div className="hidden h-9 w-[245px] items-center rounded-lg border border-border bg-card px-3 shadow-[0_1px_2px_rgba(0,0,0,.02)] md:flex">
+              <Search className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && void loadOrders()}
                 placeholder="Search orders, POs, customers..."
-                className="w-full bg-transparent text-[11px] outline-none placeholder:text-[#a1a7a3]"
+                className="w-full bg-transparent text-[11px] outline-none placeholder:text-muted-foreground/75 text-foreground"
               />
               <button
                 onClick={() => void loadOrders()}
-                className="text-[#8b928d]"
+                className="text-muted-foreground hover:text-foreground"
               >
                 <Search className="h-3.5 w-3.5" />
               </button>
             </div>
-            <button className="flex h-9 items-center gap-1.5 rounded-lg border border-[#e4e9e3] bg-white px-3 text-[11px] text-[#333834]">
+            <button className="flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-[11px] text-foreground hover:bg-muted/50">
               <CalendarDays className="h-3.5 w-3.5" /> This Month{" "}
-              <ChevronDown className="h-3 w-3 text-[#9aa09c]" />
+              <ChevronDown className="h-3 w-3 text-muted-foreground" />
             </button>
-            <button className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-[#e4e9e3] bg-white text-[#555d57]">
+            <button className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-foreground hover:bg-muted/50">
               <Bell className="h-3.5 w-3.5" />
               <span className="absolute right-1.5 top-1.5 flex h-3 w-3 items-center justify-center rounded-full bg-[#3f8d32] text-[10px] text-white">
                 3
@@ -251,51 +251,50 @@ export default function WorkflowTrackerPage() {
             title="Total Orders"
             value={stats.total}
             note="Current view"
-            cls="bg-[#eef8eb] text-[#3f8d32]"
+            cls="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
           />
           <Summary
             icon={<Clock3 className="h-4 w-4" />}
             title="POs in Progress"
             value={stats.poInProgress}
             note="PO / stock workflow"
-            cls="bg-[#f4effa] text-[#8b65a9]"
+            cls="bg-violet-500/15 text-violet-600 dark:text-violet-400"
           />
           <Summary
             icon={<Clock3 className="h-4 w-4" />}
             title="Pending"
             value={stats.pending}
             note="Needs attention"
-            cls="bg-[#fff7e9] text-[#d59b32]"
+            cls="bg-amber-500/15 text-amber-600 dark:text-amber-400"
           />
           <Summary
             icon={<CheckCircle2 className="h-4 w-4" />}
             title="Completed"
             value={stats.completed}
             note="PO placed"
-            cls="bg-[#eef8eb] text-[#3f8d32]"
+            cls="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
           />
           <Summary
             icon={<AlertTriangle className="h-4 w-4" />}
             title="Overdue"
             value={stats.overdue}
             note="Past due date"
-            cls="bg-[#fff0ef] text-[#e05a50]"
+            cls="bg-red-500/15 text-red-600 dark:text-red-400"
           />
         </div>
 
         {/* MAIN REFERENCE GRID */}
         <div className="grid gap-3 xl:grid-cols-[minmax(0,1.65fr)_minmax(340px,.72fr)]">
           {/* PIPELINE */}
-          {/* PIPELINE */}
-          <section className="rounded-xl border border-[#e5e9e4] bg-white p-3.5 shadow-[0_1px_3px_rgba(20,30,20,.035)]">
+          <section className="rounded-xl border border-border bg-card p-3.5 shadow-[0_1px_3px_rgba(0,0,0,.035)] text-card-foreground">
             {/* Pipeline Header */}
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <h2 className="text-[13px] font-semibold text-[#202520]">
+                <h2 className="text-[13px] font-semibold text-foreground">
                   Pipeline View
                 </h2>
 
-                <p className="mt-0.5 text-[12px] text-[#969c98]">
+                <p className="mt-0.5 text-[12px] text-muted-foreground">
                   Move through your actual order workflow
                 </p>
               </div>
@@ -303,7 +302,7 @@ export default function WorkflowTrackerPage() {
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
-                  className="flex h-7 items-center gap-1 rounded-md border border-[#e7ebe6] px-2 text-[12px] text-[#68706b]"
+                  className="flex h-7 items-center gap-1 rounded-md border border-border bg-card hover:bg-muted/50 px-2 text-[12px] text-foreground"
                 >
                   Group by: <b>Status</b>
                   <ChevronDown className="h-3 w-3" />
@@ -311,14 +310,14 @@ export default function WorkflowTrackerPage() {
 
                 <button
                   type="button"
-                  className="flex h-7 w-7 items-center justify-center rounded-md border border-[#e7ebe6] text-[#737b76]"
+                  className="flex h-7 w-7 items-center justify-center rounded-md border border-border bg-card text-foreground hover:bg-muted/50"
                 >
                   <Filter className="h-3 w-3" />
                 </button>
 
                 <button
                   type="button"
-                  className="hidden h-7 items-center gap-1 rounded-md border border-[#e7ebe6] px-2 text-[12px] text-[#68706b] md:flex"
+                  className="hidden h-7 items-center gap-1 rounded-md border border-border bg-card px-2 text-[12px] text-foreground hover:bg-muted/50 md:flex"
                 >
                   <SlidersHorizontal className="h-3 w-3" />
                   Customize
@@ -328,15 +327,15 @@ export default function WorkflowTrackerPage() {
 
             {/* Selected Stage Bar */}
             {selectedStage && (
-              <div className="mb-3 flex items-center justify-between rounded-lg border border-[#dcebd8] bg-[#f7fbf5] px-3 py-2">
+              <div className="mb-3 flex items-center justify-between rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2">
                 <div className="flex min-w-0 items-center gap-2">
                   <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#3f8d32]" />
 
-                  <span className="text-[12px] text-[#8b928d]">
+                  <span className="text-[12px] text-muted-foreground">
                     Viewing stage:
                   </span>
 
-                  <span className="truncate text-[10px] font-semibold text-[#303631]">
+                  <span className="truncate text-[10px] font-semibold text-foreground">
                     {columns.find((column) => column.value === selectedStage)
                       ?.label || "Selected Stage"}
                   </span>
@@ -370,12 +369,12 @@ export default function WorkflowTrackerPage() {
 
           {/* UPCOMING + FOLLOWUP */}
           <div className="grid gap-3">
-            <section className="rounded-xl border border-[#e5e9e4] bg-white p-3.5 shadow-[0_1px_3px_rgba(20,30,20,.035)]">
+            <section className="rounded-xl border border-border bg-card p-3.5 shadow-[0_1px_3px_rgba(0,0,0,.035)] text-card-foreground">
               <div className="mb-2.5 flex items-center justify-between">
-                <h2 className="text-[13px] font-semibold text-[#202520]">
+                <h2 className="text-[13px] font-semibold text-foreground">
                   Upcoming Reminders
                 </h2>
-                <button className="text-[12px] font-semibold text-[#3f8d32]">
+                <button className="text-[12px] font-semibold text-[#3f8d32] hover:underline">
                   View All
                 </button>
               </div>
@@ -385,10 +384,10 @@ export default function WorkflowTrackerPage() {
                     <button
                       key={order.id}
                       onClick={() => setSelectedOrder(order)}
-                      className="flex w-full items-center gap-2 rounded-md px-1.5 py-2 text-left hover:bg-[#fafcf9]"
+                      className="flex w-full items-center gap-2 rounded-md px-1.5 py-2 text-left hover:bg-muted/40"
                     >
                       <span
-                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${overdue(order.dueDate) ? "bg-[#fff0ef] text-[#e05a50]" : "bg-[#eef8eb] text-[#4c963f]"}`}
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${overdue(order.dueDate) ? "bg-red-500/10 text-red-400 border border-red-500/20" : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"}`}
                       >
                         {overdue(order.dueDate) ? (
                           <AlertTriangle className="h-3.5 w-3.5" />
@@ -397,20 +396,20 @@ export default function WorkflowTrackerPage() {
                         )}
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[10px] font-semibold text-[#303631]">
+                        <span className="block truncate text-[10px] font-semibold text-foreground">
                           {order.dveplCode}
                         </span>
-                        <span className="mt-0.5 block truncate text-[12px] text-[#929994]">
+                        <span className="mt-0.5 block truncate text-[12px] text-muted-foreground">
                           {order.nextAction || "Follow up"}
                         </span>
                       </span>
                       <span className="text-right">
                         <span
-                          className={`block text-[12px] font-semibold ${overdue(order.dueDate) ? "text-[#e05a50]" : "text-[#3f8d32]"}`}
+                          className={`block text-[12px] font-semibold ${overdue(order.dueDate) ? "text-red-400" : "text-emerald-500"}`}
                         >
                           {overdue(order.dueDate) ? "Overdue" : "Upcoming"}
                         </span>
-                        <span className="block text-[8px] text-[#9ba19d]">
+                        <span className="block text-[8px] text-muted-foreground">
                           {formatDate(order.dueDate)}
                         </span>
                       </span>
@@ -422,12 +421,12 @@ export default function WorkflowTrackerPage() {
               </div>
             </section>
 
-            <section className="rounded-xl border border-[#e5e9e4] bg-white p-3.5 shadow-[0_1px_3px_rgba(20,30,20,.035)]">
+            <section className="rounded-xl border border-border bg-card p-3.5 shadow-[0_1px_3px_rgba(0,0,0,.035)] text-card-foreground">
               <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-[13px] font-semibold text-[#202520]">
+                <h2 className="text-[13px] font-semibold text-foreground">
                   Follow Up Summary
                 </h2>
-                <button className="rounded-md bg-[#f7faf6] px-2 py-1 text-[8px] text-[#667069]">
+                <button className="rounded-md bg-muted px-2 py-1 text-[8px] text-muted-foreground hover:bg-muted/80">
                   This Month <ChevronDown className="inline h-2.5 w-2.5" />
                 </button>
               </div>
@@ -438,14 +437,14 @@ export default function WorkflowTrackerPage() {
                     background: `conic-gradient(#3f8d32 0 42%, #8fc27f 42% 67%, #e7a51f 67% 84%, #e7ebe6 84% 100%)`,
                   }}
                 >
-                  <div className="absolute inset-[10px] flex flex-col items-center justify-center rounded-full bg-white">
-                    <span className="text-[18px] font-semibold text-[#222822]">
+                  <div className="absolute inset-[10px] flex flex-col items-center justify-center rounded-full bg-card">
+                    <span className="text-[18px] font-semibold text-foreground">
                       {followUps}
                     </span>
-                    <span className="text-[8px] text-[#979e99]">Total</span>
+                    <span className="text-[8px] text-muted-foreground">Total</span>
                   </div>
                 </div>
-                <div className="space-y-2 text-[12px] text-[#69716b]">
+                <div className="space-y-2 text-[12px] text-muted-foreground">
                   <Legend label="Today" value={Math.min(followUps, 5)} />
                   <Legend
                     label="This Week"
@@ -460,31 +459,31 @@ export default function WorkflowTrackerPage() {
 
         {/* ALL ORDERS + FOLLOW-UP SUMMARY — reference table density */}
         <div className="grid gap-3 xl:grid-cols-[minmax(0,1.65fr)_minmax(340px,.72fr)]">
-          <section className="rounded-xl border border-[#e5e9e4] bg-white shadow-[0_1px_3px_rgba(20,30,20,.035)]">
-            <div className="flex items-center justify-between border-b border-[#eef1ed] px-3.5 py-3">
-              <h2 className="text-[13px] font-semibold text-[#202520]">
+          <section className="rounded-xl border border-border bg-card shadow-[0_1px_3px_rgba(0,0,0,.035)] text-card-foreground">
+            <div className="flex items-center justify-between border-b border-border px-3.5 py-3">
+              <h2 className="text-[13px] font-semibold text-foreground">
                 All Orders
               </h2>
               <div className="flex items-center gap-1.5">
-                <div className="flex h-7 w-[175px] items-center rounded-md border border-[#e7ebe6] px-2">
-                  <Search className="mr-1.5 h-3 w-3 text-[#9aa19c]" />
+                <div className="flex h-7 w-[175px] items-center rounded-md border border-border bg-background px-2">
+                  <Search className="mr-1.5 h-3 w-3 text-muted-foreground" />
                   <input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && void loadOrders()}
                     placeholder="Search..."
-                    className="w-full bg-transparent text-[12px] outline-none"
+                    className="w-full bg-transparent text-[12px] outline-none text-foreground"
                   />
                 </div>
-                <button className="flex h-7 items-center gap-1 rounded-md border border-[#e7ebe6] px-2 text-[12px] text-[#68706b]">
+                <button className="flex h-7 items-center gap-1 rounded-md border border-border bg-card hover:bg-muted/50 px-2 text-[12px] text-foreground">
                   <ListFilter className="h-3 w-3" /> Columns
                 </button>
               </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[850px]">
-                <thead className="bg-[#fcfdfb]">
-                  <tr className="text-left text-[8px] font-medium text-[#8d948f]">
+                <thead className="bg-muted/30">
+                  <tr className="text-left text-[8px] font-medium text-muted-foreground">
                     <th className="px-3.5 py-2.5">Order / PO No.</th>
                     <th className="px-3.5 py-2.5">Customer / Vendor</th>
                     <th className="px-3.5 py-2.5">Order Value</th>
@@ -499,7 +498,7 @@ export default function WorkflowTrackerPage() {
                     <tr>
                       <td
                         colSpan={7}
-                        className="px-4 py-8 text-center text-[10px] text-[#9aa19c]"
+                        className="px-4 py-8 text-center text-[10px] text-muted-foreground"
                       >
                         Loading workflow...
                       </td>
@@ -508,7 +507,7 @@ export default function WorkflowTrackerPage() {
                     <tr>
                       <td
                         colSpan={7}
-                        className="px-4 py-8 text-center text-[10px] text-[#9aa19c]"
+                        className="px-4 py-8 text-center text-[10px] text-muted-foreground"
                       >
                         No orders found.
                       </td>
@@ -518,15 +517,15 @@ export default function WorkflowTrackerPage() {
                       <tr
                         key={order.id}
                         onClick={() => setSelectedOrder(order)}
-                        className={`cursor-pointer border-t border-[#f0f2ef] ${selectedOrder?.id === order.id ? "bg-[#f8fcf6]" : "hover:bg-[#fbfcfa]"}`}
+                        className={`cursor-pointer border-t border-border ${selectedOrder?.id === order.id ? "bg-muted" : "hover:bg-muted/40"}`}
                       >
                         <td className="px-3.5 py-2.5 text-[12px] font-semibold text-[#3f8d32]">
                           {order.dveplCode}
                         </td>
-                        <td className="px-3.5 py-2.5 text-[12px] text-[#626a64]">
+                        <td className="px-3.5 py-2.5 text-[12px] text-foreground/80">
                           Customer / Vendor
                         </td>
-                        <td className="px-3.5 py-2.5 text-[12px] text-[#626a64]">
+                        <td className="px-3.5 py-2.5 text-[12px] text-foreground/80">
                           -
                         </td>
                         <td className="px-3.5 py-2.5">
@@ -544,23 +543,23 @@ export default function WorkflowTrackerPage() {
                             className={`h-7 min-w-[130px] rounded-md border px-1.5 text-[8px] font-medium ${stageClass(order.workflowStage)} ${updatingOrderId === order.id ? "cursor-wait opacity-60" : "cursor-pointer"}`}
                           >
                             {pipelineStages.map((stage) => (
-                              <option key={stage.value} value={stage.value}>
+                              <option key={stage.value} value={stage.value} className="bg-card text-foreground">
                                 {stage.label}
                               </option>
                             ))}
                           </select>
                         </td>
-                        <td className="px-3.5 py-2.5 text-[12px] text-[#626a64]">
+                        <td className="px-3.5 py-2.5 text-[12px] text-foreground/80">
                           {order.nextAction || "Follow up"}
                         </td>
                         <td
-                          className={`px-3.5 py-2.5 text-[12px] ${overdue(order.dueDate) ? "font-semibold text-[#e05a50]" : "text-[#68706b]"}`}
+                          className={`px-3.5 py-2.5 text-[12px] ${overdue(order.dueDate) ? "font-semibold text-red-400" : "text-muted-foreground"}`}
                         >
                           {formatDate(order.dueDate)}
                         </td>
                         <td className="px-3.5 py-2.5">
                           <span
-                            className={`rounded-md px-1.5 py-0.5 text-[8px] font-medium ${overdue(order.dueDate) ? "bg-[#fff0ef] text-[#df594f]" : "bg-[#eef8eb] text-[#3f8d32]"}`}
+                            className={`rounded-md px-1.5 py-0.5 text-[8px] font-medium ${overdue(order.dueDate) ? "bg-red-950/40 text-red-400 border border-red-500/20" : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"}`}
                           >
                             {overdue(order.dueDate) ? "Overdue" : "Pending"}
                           </span>
@@ -573,12 +572,12 @@ export default function WorkflowTrackerPage() {
             </div>
           </section>
 
-          <section className="rounded-xl border border-[#e5e9e4] bg-white p-3.5 shadow-[0_1px_3px_rgba(20,30,20,.035)]">
+          <section className="rounded-xl border border-border bg-card p-3.5 shadow-[0_1px_3px_rgba(0,0,0,.035)] text-card-foreground">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-[13px] font-semibold text-[#202520]">
+              <h2 className="text-[13px] font-semibold text-foreground">
                 Follow Up Analytics
               </h2>
-              <button className="text-[#9aa19c]">×</button>
+              <button className="text-muted-foreground hover:text-foreground">×</button>
             </div>
             <div className="grid grid-cols-4 gap-1.5">
               <Mini label="Total" value={followUps} />
@@ -590,8 +589,8 @@ export default function WorkflowTrackerPage() {
               <Mini label="Overdue" value={stats.overdue} />
             </div>
             <div className="mt-3 grid gap-2 md:grid-cols-2">
-              <div className="rounded-lg border border-[#eef1ed] p-3">
-                <div className="mb-2 text-[12px] font-semibold text-[#4d554f]">
+              <div className="rounded-lg border border-border p-3 bg-muted/20">
+                <div className="mb-2 text-[12px] font-semibold text-foreground/90">
                   Follow Up Trend
                 </div>
                 <div className="flex h-[85px] items-end gap-1">
@@ -605,15 +604,15 @@ export default function WorkflowTrackerPage() {
                     ),
                   )}
                 </div>
-                <div className="mt-2 flex justify-between text-[10px] text-[#a0a6a2]">
+                <div className="mt-2 flex justify-between text-[10px] text-muted-foreground">
                   <span>1 Aug</span>
                   <span>10 Aug</span>
                   <span>20 Aug</span>
                   <span>Today</span>
                 </div>
               </div>
-              <div className="rounded-lg border border-[#eef1ed] p-3">
-                <div className="mb-2 text-[12px] font-semibold text-[#4d554f]">
+              <div className="rounded-lg border border-border p-3 bg-muted/20">
+                <div className="mb-2 text-[12px] font-semibold text-foreground/90">
                   By Status
                 </div>
                 <div className="flex items-center gap-3">
@@ -624,9 +623,9 @@ export default function WorkflowTrackerPage() {
                         "conic-gradient(#3f8d32 0 61%, #e7a51f 61% 86%, #e05a50 86% 100%)",
                     }}
                   >
-                    <div className="absolute inset-[12px] rounded-full bg-white" />
+                    <div className="absolute inset-[12px] rounded-full bg-card" />
                   </div>
-                  <div className="space-y-1.5 text-[8px] text-[#737a75]">
+                  <div className="space-y-1.5 text-[8px] text-muted-foreground">
                     <Legend label="Completed" value={stats.completed} />
                     <Legend
                       label="Pending"
@@ -642,14 +641,14 @@ export default function WorkflowTrackerPage() {
 
         {/* DETAIL + PO TRACKING */}
         <div className="grid gap-3 xl:grid-cols-[minmax(0,1.65fr)_minmax(340px,.72fr)]">
-          <section className="rounded-xl border border-[#e5e9e4] bg-white p-4 shadow-[0_1px_3px_rgba(20,30,20,.035)]">
+          <section className="rounded-xl border border-border bg-card p-4 shadow-[0_1px_3px_rgba(0,0,0,.035)] text-card-foreground">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
-                <button className="mb-2 text-[12px] font-semibold text-[#3f8d32]">
+                <button className="mb-2 text-[12px] font-semibold text-[#3f8d32] hover:underline">
                   ‹ Back
                 </button>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-[15px] font-semibold text-[#202520]">
+                  <h2 className="text-[15px] font-semibold text-foreground">
                     {selectedOrder?.dveplCode || "Select an order"}
                   </h2>
                   {selectedOrder && (
@@ -660,19 +659,19 @@ export default function WorkflowTrackerPage() {
                     </span>
                   )}
                 </div>
-                <p className="mt-1 text-[12px] text-[#969c98]">
+                <p className="mt-1 text-[12px] text-muted-foreground">
                   Order workflow details and activity
                 </p>
               </div>
               {selectedOrder && (
                 <div className="flex items-center gap-1.5">
-                  <button className="flex h-7 items-center gap-1 rounded-md border border-[#e7ebe6] px-2 text-[12px] text-[#59615b]">
+                  <button className="flex h-7 items-center gap-1 rounded-md border border-border bg-card px-2 text-[12px] text-foreground hover:bg-muted/50">
                     <Send className="h-3 w-3" /> Send Reminder
                   </button>
-                  <button className="flex h-7 items-center gap-1 rounded-md bg-[#3f8d32] px-2.5 text-[12px] font-semibold text-white">
+                  <button className="flex h-7 items-center gap-1 rounded-md bg-[#3f8d32] px-2.5 text-[12px] font-semibold text-white shadow-sm hover:bg-[#3f8d32]/90">
                     <Bell className="h-3 w-3" /> Follow Up
                   </button>
-                  <button className="flex h-7 w-7 items-center justify-center rounded-md border border-[#e7ebe6] text-[#737b76]">
+                  <button className="flex h-7 w-7 items-center justify-center rounded-md border border-border bg-card text-foreground hover:bg-muted/50">
                     <MoreVertical className="h-3 w-3" />
                   </button>
                 </div>
@@ -682,17 +681,17 @@ export default function WorkflowTrackerPage() {
             {selectedOrder ? (
               <>
                 {/* Workflow Summary */}
-                <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#eef1ed] pb-3 text-[12px] text-[#8a918c]">
+                <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-border pb-3 text-[12px] text-muted-foreground">
                   <span>
                     Current Stage{" "}
-                    <b className="ml-1 font-semibold text-[#333a35]">
+                    <b className="ml-1 font-semibold text-foreground">
                       {stageLabel(selectedOrder.workflowStage)}
                     </b>
                   </span>
 
                   <span>
                     Next Action{" "}
-                    <b className="ml-1 font-semibold text-[#333a35]">
+                    <b className="ml-1 font-semibold text-foreground">
                       {selectedOrder.nextAction || "No action assigned"}
                     </b>
                   </span>
@@ -702,8 +701,8 @@ export default function WorkflowTrackerPage() {
                     <b
                       className={`ml-1 font-semibold ${
                         overdue(selectedOrder.dueDate)
-                          ? "text-red-500"
-                          : "text-[#333a35]"
+                          ? "text-red-400"
+                          : "text-foreground"
                       }`}
                     >
                       {formatDate(selectedOrder.dueDate)}
@@ -712,7 +711,7 @@ export default function WorkflowTrackerPage() {
 
                   <span>
                     Workflow Status{" "}
-                    <b className="ml-1 font-semibold text-[#333a35]">
+                    <b className="ml-1 font-semibold text-foreground">
                       {overdue(selectedOrder.dueDate) ? "Overdue" : "On Track"}
                     </b>
                   </span>
@@ -766,24 +765,24 @@ export default function WorkflowTrackerPage() {
             )}
           </section>
 
-          <section className="rounded-xl border border-[#e5e9e4] bg-white p-3.5 shadow-[0_1px_3px_rgba(20,30,20,.035)]">
+          <section className="rounded-xl border border-border bg-card p-3.5 shadow-[0_1px_3px_rgba(0,0,0,.035)] text-card-foreground">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-[13px] font-semibold text-[#202520]">
+              <h2 className="text-[13px] font-semibold text-foreground">
                 PO Tracking
               </h2>
-              <button className="text-[12px] text-[#3f8d32]">View All</button>
+              <button className="text-[12px] text-[#3f8d32] hover:underline">View All</button>
             </div>
-            <div className="mb-2.5 flex h-7 items-center rounded-md border border-[#e7ebe6] px-2">
-              <Search className="mr-1.5 h-3 w-3 text-[#9aa19c]" />
+            <div className="mb-2.5 flex h-7 items-center rounded-md border border-border bg-background px-2">
+              <Search className="mr-1.5 h-3 w-3 text-muted-foreground" />
               <input
                 placeholder="Search POs..."
-                className="w-full bg-transparent text-[12px] outline-none"
+                className="w-full bg-transparent text-[12px] outline-none text-foreground"
               />
-              <Filter className="h-3 w-3 text-[#9aa19c]" />
+              <Filter className="h-3 w-3 text-muted-foreground" />
             </div>
-            <div className="overflow-hidden rounded-md border border-[#eef1ed]">
+            <div className="overflow-hidden rounded-md border border-border bg-muted/10">
               <table className="w-full">
-                <thead className="bg-[#fcfdfb] text-left text-[10px] text-[#8d948f]">
+                <thead className="bg-muted/40 text-left text-[10px] text-muted-foreground">
                   <tr>
                     <th className="px-2 py-2">PO No.</th>
                     <th className="px-2 py-2">Status</th>
@@ -796,7 +795,7 @@ export default function WorkflowTrackerPage() {
                     <tr
                       key={order.id}
                       onClick={() => setSelectedOrder(order)}
-                      className="cursor-pointer border-t border-[#f0f2ef] hover:bg-[#fbfcfa]"
+                      className="cursor-pointer border-t border-border hover:bg-muted/40"
                     >
                       <td className="px-2 py-2 text-[8px] font-semibold text-[#3f8d32]">
                         {order.dveplCode}
@@ -808,11 +807,11 @@ export default function WorkflowTrackerPage() {
                           {stageLabel(order.workflowStage)}
                         </span>
                       </td>
-                      <td className="px-2 py-2 text-[8px] text-[#737a75]">
+                      <td className="px-2 py-2 text-[8px] text-muted-foreground">
                         {formatDate(order.dueDate)}
                       </td>
                       <td className="px-2 py-2 text-right">
-                        <Bell className="ml-auto h-2.5 w-2.5 text-[#8c938e]" />
+                        <Bell className="ml-auto h-2.5 w-2.5 text-muted-foreground" />
                       </td>
                     </tr>
                   ))}
@@ -820,7 +819,7 @@ export default function WorkflowTrackerPage() {
                     <tr>
                       <td
                         colSpan={4}
-                        className="px-2 py-7 text-center text-[8px] text-[#9aa19c]"
+                        className="px-2 py-7 text-center text-[8px] text-muted-foreground"
                       >
                         No PO records yet.
                       </td>
@@ -834,21 +833,21 @@ export default function WorkflowTrackerPage() {
 
         {/* BOTTOM REFERENCE STRIP */}
         <div className="grid gap-3 xl:grid-cols-[1fr_1.15fr_1fr]">
-          <section className="rounded-xl border border-[#e5e9e4] bg-white p-3.5 shadow-[0_1px_3px_rgba(20,30,20,.035)]">
+          <section className="rounded-xl border border-border bg-card p-3.5 shadow-[0_1px_3px_rgba(0,0,0,.035)] text-card-foreground">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-[13px] font-semibold text-[#202520]">
+              <h2 className="text-[13px] font-semibold text-foreground">
                 Reminders
               </h2>
-              <button className="flex h-7 items-center gap-1 rounded-md bg-[#3f8d32] px-2.5 text-[12px] font-semibold text-white">
+              <button className="flex h-7 items-center gap-1 rounded-md bg-[#3f8d32] px-2.5 text-[12px] font-semibold text-white shadow-sm hover:bg-[#3f8d32]/90">
                 <Plus className="h-3 w-3" /> New Reminder
               </button>
             </div>
-            <div className="mb-2.5 flex gap-3 border-b border-[#eef1ed] text-[8px]">
+            <div className="mb-2.5 flex gap-3 border-b border-border text-[8px]">
               {["All", "Today", "This Week", "This Month", "Overdue"].map(
                 (tab, i) => (
                   <button
                     key={tab}
-                    className={`pb-2 ${i === 0 ? "border-b-2 border-[#3f8d32] font-semibold text-[#3f8d32]" : "text-[#969d98]"}`}
+                    className={`pb-2 ${i === 0 ? "border-b-2 border-[#3f8d32] font-semibold text-[#3f8d32]" : "text-muted-foreground"}`}
                   >
                     {tab}
                   </button>
@@ -858,33 +857,33 @@ export default function WorkflowTrackerPage() {
             {reminders.slice(0, 4).map((order) => (
               <div
                 key={order.id}
-                className="grid grid-cols-[1fr_auto_auto] items-center gap-2 border-b border-[#f1f3f0] py-2 last:border-0"
+                className="grid grid-cols-[1fr_auto_auto] items-center gap-2 border-b border-border py-2 last:border-0"
               >
                 <div>
-                  <div className="text-[12px] font-medium text-[#424a44]">
+                  <div className="text-[12px] font-medium text-foreground/90">
                     {order.nextAction || "Follow up"}
                   </div>
-                  <div className="mt-0.5 text-[10px] text-[#9aa19c]">
+                  <div className="mt-0.5 text-[10px] text-muted-foreground">
                     {order.dveplCode}
                   </div>
                 </div>
                 <div
-                  className={`text-[8px] ${overdue(order.dueDate) ? "text-[#e05a50]" : "text-[#3f8d32]"}`}
+                  className={`text-[8px] ${overdue(order.dueDate) ? "text-red-400" : "text-emerald-500"}`}
                 >
                   {formatDate(order.dueDate)}
                 </div>
-                <Bell className="h-2.5 w-2.5 text-[#8f9691]" />
+                <Bell className="h-2.5 w-2.5 text-muted-foreground" />
               </div>
             ))}
             {!reminders.length && <Empty text="No reminders" />}
           </section>
 
-          <section className="rounded-xl border border-[#e5e9e4] bg-white p-3.5 shadow-[0_1px_3px_rgba(20,30,20,.035)]">
+          <section className="rounded-xl border border-border bg-card p-3.5 shadow-[0_1px_3px_rgba(0,0,0,.035)] text-card-foreground">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-[13px] font-semibold text-[#202520]">
+              <h2 className="text-[13px] font-semibold text-foreground">
                 Workflow Summary
               </h2>
-              <button className="text-[12px] text-[#3f8d32]">
+              <button className="text-[12px] text-[#3f8d32] hover:underline">
                 This Month <ChevronDown className="inline h-2.5 w-2.5" />
               </button>
             </div>
@@ -895,8 +894,8 @@ export default function WorkflowTrackerPage() {
               <Mini label="Overdue" value={stats.overdue} />
             </div>
             <div className="mt-3 grid gap-2 md:grid-cols-2">
-              <div className="rounded-lg border border-[#eef1ed] p-3">
-                <div className="mb-2 text-[12px] font-semibold text-[#4d554f]">
+              <div className="rounded-lg border border-border bg-muted/20 p-3">
+                <div className="mb-2 text-[12px] font-semibold text-foreground/90">
                   Follow Up Trend
                 </div>
                 <div className="flex h-[70px] items-end gap-1">
@@ -910,15 +909,15 @@ export default function WorkflowTrackerPage() {
                     ),
                   )}
                 </div>
-                <div className="mt-2 flex justify-between text-[10px] text-[#a0a6a2]">
+                <div className="mt-2 flex justify-between text-[10px] text-muted-foreground">
                   <span>1 Aug</span>
                   <span>10 Aug</span>
                   <span>20 Aug</span>
                   <span>Today</span>
                 </div>
               </div>
-              <div className="rounded-lg border border-[#eef1ed] p-3">
-                <div className="mb-2 text-[12px] font-semibold text-[#4d554f]">
+              <div className="rounded-lg border border-border bg-muted/20 p-3">
+                <div className="mb-2 text-[12px] font-semibold text-foreground/90">
                   By Status
                 </div>
                 <div className="flex items-center gap-3">
@@ -929,9 +928,9 @@ export default function WorkflowTrackerPage() {
                         "conic-gradient(#3f8d32 0 61%,#e7a51f 61% 84%,#e05a50 84% 100%)",
                     }}
                   >
-                    <div className="absolute inset-[11px] rounded-full bg-white" />
+                    <div className="absolute inset-[11px] rounded-full bg-card" />
                   </div>
-                  <div className="space-y-1.5 text-[8px] text-[#737a75]">
+                  <div className="space-y-1.5 text-[8px] text-muted-foreground">
                     <Legend label="Completed" value={stats.completed} />
                     <Legend label="Pending" value={stats.pending} />
                     <Legend label="Overdue" value={stats.overdue} />
@@ -941,29 +940,29 @@ export default function WorkflowTrackerPage() {
             </div>
           </section>
 
-          <section className="rounded-xl border border-[#e5e9e4] bg-white p-3.5 shadow-[0_1px_3px_rgba(20,30,20,.035)]">
+          <section className="rounded-xl border border-border bg-card p-3.5 shadow-[0_1px_3px_rgba(0,0,0,.035)] text-card-foreground">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-[13px] font-semibold text-[#202520]">
+              <h2 className="text-[13px] font-semibold text-foreground">
                 Workflow Stages
               </h2>
-              <button className="text-[12px] text-[#3f8d32]">View All</button>
+              <button className="text-[12px] text-[#3f8d32] hover:underline">View All</button>
             </div>
             <div className="space-y-1.5">
               {columns.slice(0, 6).map((stage) => (
                 <button
                   key={stage.value}
                   onClick={() => setActiveStage(stage.value as WorkflowStage)}
-                  className="flex w-full items-center justify-between rounded-md border border-[#f0f2ef] px-2.5 py-2 text-left hover:bg-[#fbfcfa]"
+                  className="flex w-full items-center justify-between rounded-md border border-border px-2.5 py-2 text-left bg-muted/30 hover:bg-muted/60"
                 >
                   <span className="flex items-center gap-2">
                     <span
                       className={`h-1.5 w-1.5 rounded-full ${dotClass(stage.value as WorkflowStage)}`}
                     />
-                    <span className="text-[8px] text-[#626a64]">
+                    <span className="text-[8px] text-foreground/80">
                       {stage.label}
                     </span>
                   </span>
-                  <span className="text-[8px] font-semibold text-[#303631]">
+                  <span className="text-[8px] font-semibold text-foreground">
                     {stage.orders.length}
                   </span>
                 </button>
@@ -990,7 +989,7 @@ function Summary({
   cls: string;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-xl border border-border bg-card p-4 shadow-sm text-card-foreground">
       <div className="flex items-start gap-3">
         <div
           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${cls}`}
@@ -998,11 +997,11 @@ function Summary({
           {icon}
         </div>
         <div>
-          <div className="text-xs text-slate-400">{title}</div>
-          <div className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
+          <div className="text-xs text-muted-foreground">{title}</div>
+          <div className="mt-1 text-2xl font-semibold tracking-tight text-foreground">
             {value}
           </div>
-          <div className="mt-1 text-[10px] text-slate-400">{note}</div>
+          <div className="mt-1 text-[10px] text-muted-foreground">{note}</div>
         </div>
       </div>
     </div>
@@ -1021,74 +1020,74 @@ const stageHeaderStyles: Record<
 > = {
   ORDER_CONFIRMED: {
     dot: "bg-blue-500",
-    bg: "bg-blue-50/70",
-    border: "border-blue-100",
-    text: "text-blue-700",
-    soft: "bg-blue-100/60",
+    bg: "bg-blue-500/10",
+    border: "border-blue-500/20",
+    text: "text-blue-400",
+    soft: "bg-blue-500/20",
   },
 
   PO_READY: {
     dot: "bg-violet-500",
-    bg: "bg-violet-50/70",
-    border: "border-violet-100",
-    text: "text-violet-700",
-    soft: "bg-violet-100/60",
+    bg: "bg-violet-500/10",
+    border: "border-violet-500/20",
+    text: "text-violet-400",
+    soft: "bg-violet-500/20",
   },
 
   DRAWING_ASSIGNED: {
     dot: "bg-purple-500",
-    bg: "bg-purple-50/70",
-    border: "border-purple-100",
-    text: "text-purple-700",
-    soft: "bg-purple-100/60",
+    bg: "bg-purple-500/10",
+    border: "border-purple-500/20",
+    text: "text-purple-400",
+    soft: "bg-purple-500/20",
   },
 
   DRAWING_SENT: {
     dot: "bg-indigo-500",
-    bg: "bg-indigo-50/70",
-    border: "border-indigo-100",
-    text: "text-indigo-700",
-    soft: "bg-indigo-100/60",
+    bg: "bg-indigo-500/10",
+    border: "border-indigo-500/20",
+    text: "text-indigo-400",
+    soft: "bg-indigo-500/20",
   },
 
   REVISION_REQUIRED: {
     dot: "bg-orange-500",
-    bg: "bg-orange-50/70",
-    border: "border-orange-100",
-    text: "text-orange-700",
-    soft: "bg-orange-100/60",
+    bg: "bg-orange-500/10",
+    border: "border-orange-500/20",
+    text: "text-orange-400",
+    soft: "bg-orange-500/20",
   },
 
   DRAWING_APPROVED: {
     dot: "bg-green-500",
-    bg: "bg-green-50/70",
-    border: "border-green-100",
-    text: "text-green-700",
-    soft: "bg-green-100/60",
+    bg: "bg-green-500/10",
+    border: "border-green-500/20",
+    text: "text-green-400",
+    soft: "bg-green-500/20",
   },
 
   PO_PLACED: {
     dot: "bg-emerald-500",
-    bg: "bg-emerald-50/70",
-    border: "border-emerald-100",
-    text: "text-emerald-700",
-    soft: "bg-emerald-100/60",
+    bg: "bg-emerald-500/10",
+    border: "border-emerald-500/20",
+    text: "text-emerald-400",
+    soft: "bg-emerald-500/20",
   },
 
   INVENTORY_FOLLOW_UP: {
     dot: "bg-amber-500",
-    bg: "bg-amber-50/70",
-    border: "border-amber-100",
-    text: "text-amber-700",
-    soft: "bg-amber-100/60",
+    bg: "bg-amber-500/10",
+    border: "border-amber-500/20",
+    text: "text-amber-400",
+    soft: "bg-amber-500/20",
   },
 
   PRODUCTION_FOLLOW_UP: {
     dot: "bg-cyan-500",
-    bg: "bg-cyan-50/70",
-    border: "border-cyan-100",
-    text: "text-cyan-700",
-    soft: "bg-cyan-100/60",
+    bg: "bg-cyan-500/10",
+    border: "border-cyan-500/20",
+    text: "text-cyan-400",
+    soft: "bg-cyan-500/20",
   },
 };
 function PipelineColumnHeader({
@@ -1237,8 +1236,8 @@ function PipelineCard({
         w-full
         rounded-xl
         border
-        border-slate-200
-        bg-white
+        border-border
+        bg-card
         p-2.5
         text-left
         shadow-[0_1px_2px_rgba(0,0,0,0.03)]
@@ -1246,8 +1245,8 @@ function PipelineCard({
         duration-150
 
         hover:-translate-y-[1px]
-        hover:border-[#b9d9af]
-        hover:shadow-[0_5px_15px_rgba(50,90,40,0.08)]
+        hover:border-emerald-500/30
+        hover:bg-muted/20
 
         focus:outline-none
         focus:ring-2
@@ -1276,7 +1275,7 @@ function PipelineCard({
             </span>
 
             {isOverdue && (
-              <span className="shrink-0 rounded-full bg-red-50 px-1 py-0.5 text-[6px] font-semibold text-red-600">
+              <span className="shrink-0 rounded-full bg-red-950/40 border border-red-500/20 px-1 py-0.5 text-[6px] font-semibold text-red-400">
                 OVERDUE
               </span>
             )}
@@ -1286,18 +1285,18 @@ function PipelineCard({
 
       {/* Next Action */}
       <div className="mt-2 pl-1">
-        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.06em] text-slate-400">
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
           Next Action
         </p>
 
-        <p className="line-clamp-2 text-[12px] font-medium leading-4 text-slate-700">
+        <p className="line-clamp-2 text-[12px] font-medium leading-4 text-foreground/90">
           {order.nextAction || "No action assigned"}
         </p>
       </div>
 
       {/* Footer */}
-      <div className="mt-2.5 flex min-w-0 items-center justify-between gap-1 border-t border-slate-100 pt-2 pl-1">
-        <div className="flex min-w-0 items-center gap-1 text-[10px] text-slate-400">
+      <div className="mt-2.5 flex min-w-0 items-center justify-between gap-1 border-t border-border pt-2 pl-1">
+        <div className="flex min-w-0 items-center gap-1 text-[10px] text-muted-foreground">
           <CalendarDays className="h-2.5 w-2.5 shrink-0" />
 
           <span className="truncate">
@@ -1342,8 +1341,8 @@ function PipelineColumn({
 
         ${
           isSelected
-            ? "border-[#9bcf8c] bg-[#f5faf3] shadow-sm"
-            : "border-slate-200 bg-slate-50/70"
+            ? "border-emerald-500/40 bg-emerald-500/10 shadow-sm"
+            : "border-border bg-muted/30"
         }
       `}
     >
@@ -1359,12 +1358,12 @@ function PipelineColumn({
         ))}
 
         {!stage.orders.length && (
-          <div className="rounded-lg border border-dashed border-slate-200 bg-white/60 px-2 py-5 text-center">
-            <div className="mx-auto mb-1 flex h-6 w-6 items-center justify-center rounded-full bg-slate-100">
-              <span className="text-[10px] text-slate-400">—</span>
+          <div className="rounded-lg border border-dashed border-border bg-card/60 px-2 py-5 text-center">
+            <div className="mx-auto mb-1 flex h-6 w-6 items-center justify-center rounded-full bg-muted">
+              <span className="text-[10px] text-muted-foreground">—</span>
             </div>
 
-            <p className="text-[8px] text-slate-400">No orders</p>
+            <p className="text-[8px] text-muted-foreground">No orders</p>
           </div>
         )}
       </div>
@@ -1379,23 +1378,23 @@ function Timeline({ current }: { current: WorkflowStage }) {
   );
   const items = pipelineStages.slice(0, 5);
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-100 p-5">
+    <div className="overflow-x-auto rounded-lg border border-border p-5">
       <div className="flex min-w-[650px] items-start">
         {items.map((item, i) => (
           <React.Fragment key={item.value}>
             <div className="flex w-full flex-col items-center text-center">
               <span
-                className={`flex h-7 w-7 items-center justify-center rounded-full border-2 ${i <= index ? "border-[#76b95f] bg-[#eef7eb] text-[#3d8b2f]" : "border-slate-200 bg-white text-slate-300"}`}
+                className={`flex h-7 w-7 items-center justify-center rounded-full border-2 ${i <= index ? "border-emerald-500 bg-emerald-500/15 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400" : "border-border bg-card text-muted-foreground"}`}
               >
                 <CheckCircle2 className="h-3.5 w-3.5" />
               </span>
-              <span className="mt-2 text-[10px] font-medium text-slate-600">
+              <span className="mt-2 text-[10px] font-medium text-foreground/90">
                 {item.label}
               </span>
             </div>
             {i < items.length - 1 && (
               <div
-                className={`mt-3 h-0.5 flex-1 ${i < index ? "bg-[#76b95f]" : "bg-slate-200"}`}
+                className={`mt-3 h-0.5 flex-1 ${i < index ? "bg-emerald-500" : "bg-border"}`}
               />
             )}
           </React.Fragment>
@@ -1419,13 +1418,13 @@ function Action({
   button?: string;
 }) {
   return (
-    <div className="rounded-lg border border-slate-100 p-4">
-      <div className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+    <div className="rounded-lg border border-border p-4 bg-card text-card-foreground">
+      <div className="flex items-center gap-2 text-xs font-semibold text-foreground/90">
         <span className="text-[#3d8b2f]">{icon}</span>
         {title}
       </div>
-      <div className="mt-4 text-xs font-medium text-slate-700">{value}</div>
-      <div className="mt-1 text-[10px] text-slate-400">{sub}</div>
+      <div className="mt-4 text-xs font-medium text-foreground/80">{value}</div>
+      <div className="mt-1 text-[10px] text-muted-foreground">{sub}</div>
       {button && (
         <button className="mt-4 rounded-md bg-[#3d8b2f] px-3 py-2 text-[10px] font-medium text-white">
           {button}
@@ -1437,19 +1436,19 @@ function Action({
 
 function Mini({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-slate-100 p-3">
-      <div className="text-[10px] text-slate-400">{label}</div>
-      <div className="mt-1 text-xl font-semibold text-slate-900">{value}</div>
+    <div className="rounded-lg border border-border bg-card p-3 text-card-foreground">
+      <div className="text-[10px] text-muted-foreground">{label}</div>
+      <div className="mt-1 text-xl font-semibold text-foreground">{value}</div>
     </div>
   );
 }
 
 function Legend({ label, value }: { label: string; value: number }) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2 text-foreground/80">
       <span className="h-2 w-2 rounded-full bg-[#76b95f]" />
       <span>
-        {label} <span className="font-medium text-slate-700">{value}</span>
+        {label} <span className="font-medium text-foreground">{value}</span>
       </span>
     </div>
   );
@@ -1457,7 +1456,7 @@ function Legend({ label, value }: { label: string; value: number }) {
 
 function Empty({ text }: { text: string }) {
   return (
-    <div className="rounded-lg border border-dashed border-slate-200 p-8 text-center text-xs text-slate-400">
+    <div className="rounded-lg border border-dashed border-border p-8 text-center text-xs text-muted-foreground">
       {text}
     </div>
   );

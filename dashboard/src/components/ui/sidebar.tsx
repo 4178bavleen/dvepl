@@ -48,7 +48,22 @@ export default function Sidebar({
 
   const [expandedSections, setExpandedSections] = useState<
     Record<string, boolean>
-  >({});
+  >(() => {
+    // Expand core sections by default for a smoother first-time UX
+    return {
+      'Organization': true,
+      'HRMS': true,
+      'CRM': true,
+      'Tenders': true,
+      'Tender Management': true,
+      'Finance': true,
+      'Procurement': true,
+      'Inventory': true,
+      'Production': true,
+      'Security': true,
+      'Settings': true,
+    };
+  });
 
   const toggleSection = (secName: string) => {
     setExpandedSections((prev) => ({
@@ -217,14 +232,14 @@ export default function Sidebar({
                   <Link
                     key={item.name}
                     to={item.path}
-                    className={`flex items-center rounded-lg text-xs font-medium transition-all duration-200 relative group ${
+                    className={`flex items-center rounded-lg text-xs font-medium transition-all duration-150 relative group ${
                       isCollapsed
                         ? 'justify-center p-2'
                         : 'gap-3 px-3 py-2'
                     } ${
                       active
-                        ? 'bg-primary/10 text-primary border-l-2 border-primary font-semibold shadow-xs'
-                        : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground hover:translate-x-0.5'
+                        ? 'bg-primary/5 text-primary border-l-2 border-primary font-semibold shadow-2xs'
+                        : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground hover:translate-x-0.5'
                     }`}
                     title={item.name}
                   >
@@ -251,7 +266,7 @@ export default function Sidebar({
                 {!isCollapsed && (
                   <button
                     onClick={() => toggleSection(secName)}
-                    className="w-full flex items-center justify-between text-sm font-bold text-foreground uppercase tracking-wider px-3 py-1.5 hover:text-foreground hover:bg-muted/30 rounded-lg transition-colors group cursor-pointer"
+                    className="w-full flex items-center justify-between text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest px-3 py-2 hover:text-foreground hover:bg-muted/30 rounded-lg transition-colors group cursor-pointer"
                   >
                     <span>{t(secName)}</span>
 
@@ -306,14 +321,14 @@ export default function Sidebar({
                             <Link
                               key={item.name}
                               to={item.path || '#'}
-                              className={`flex items-center rounded-lg text-xs font-medium transition-all duration-200 relative group ${
+                              className={`flex items-center rounded-lg text-xs font-medium transition-all duration-150 relative group ${
                                 isCollapsed
                                   ? 'justify-center p-2'
                                   : 'gap-3 px-3 py-2'
                               } ${
                                 active
-                                  ? 'bg-primary/10 text-primary border-l-2 border-primary font-semibold shadow-xs'
-                                  : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground hover:translate-x-0.5'
+                                  ? 'bg-primary/5 text-primary border-l-2 border-primary font-semibold shadow-2xs'
+                                  : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground hover:translate-x-0.5'
                               }`}
                               title={item.name}
                             >
@@ -425,10 +440,10 @@ export default function Sidebar({
                           onClick={() =>
                             onMobileOpenChange(false)
                           }
-                          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150 ${
                             location.pathname === item.path
-                              ? 'bg-primary/10 text-primary border-l-2 border-primary font-semibold'
-                              : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground hover:translate-x-0.5'
+                              ? 'bg-primary/5 text-primary border-l-2 border-primary font-semibold shadow-2xs'
+                              : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground hover:translate-x-0.5'
                           }`}
                         >
                           <item.icon className="h-4.5 w-4.5" />
@@ -452,7 +467,7 @@ export default function Sidebar({
                           onClick={() =>
                             toggleSection(secName)
                           }
-                          className="w-full flex items-center justify-between text-sm font-bold text-foreground uppercase tracking-wider px-3 py-1.5 hover:text-foreground hover:bg-muted/30 rounded-lg transition-colors group cursor-pointer"
+                          className="w-full flex items-center justify-between text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest px-3 py-2 hover:text-foreground hover:bg-muted/30 rounded-lg transition-colors group cursor-pointer"
                         >
                           <span>{t(secName)}</span>
 
@@ -500,11 +515,11 @@ export default function Sidebar({
                                         false,
                                       )
                                     }
-                                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
+                                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150 ${
                                       location.pathname ===
                                       item.path
-                                        ? 'bg-primary/10 text-primary border-l-2 border-primary font-semibold'
-                                        : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground hover:translate-x-0.5'
+                                        ? 'bg-primary/5 text-primary border-l-2 border-primary font-semibold shadow-2xs'
+                                        : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground hover:translate-x-0.5'
                                     }`}
                                   >
                                     <item.icon className="h-4.5 w-4.5" />

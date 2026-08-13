@@ -299,18 +299,18 @@ export function RecycleBinPage() {
   const getModuleBadge = (module: string, moduleLabel?: string) => {
     const label = moduleLabel || modules.find((item) => item.module === module)?.label || module;
 
-    return <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">{label}</span>;
+    return <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-muted text-foreground border border-border">{label}</span>;
   };
 
   return (
-    <div className="p-6 space-y-6 bg-slate-50/50 min-h-screen">
+    <div className="p-6 space-y-6 bg-background text-foreground min-h-screen">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
+          <h1 className="text-2xl font-black text-foreground tracking-tight flex items-center gap-2.5">
             <Trash2 className="h-7 w-7 text-rose-600" /> Recycle Bin
           </h1>
-          <p className="text-xs text-slate-500 font-medium mt-1">
+          <p className="text-xs text-muted-foreground font-medium mt-1">
             Deleted items from all modules. Restore soft-deleted items or permanently remove them.
           </p>
         </div>
@@ -321,7 +321,7 @@ export function RecycleBinPage() {
             size="sm"
             onClick={fetchRecycleBin}
             disabled={loading}
-            className="h-9 px-3.5 text-xs font-semibold rounded-xl border-slate-200 bg-white hover:bg-slate-50 shadow-2xs"
+            className="h-9 px-3.5 text-xs font-semibold rounded-xl border-border bg-card hover:bg-muted/50 shadow-2xs text-foreground"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </Button>
@@ -446,24 +446,24 @@ export function RecycleBinPage() {
       )}
 
       {/* Main Container */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 space-y-4">
+      <div className="bg-card rounded-2xl border border-border shadow-xs p-5 space-y-4">
         {/* Toolbar */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-border">
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative w-72">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search deleted records..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-9 text-xs border-slate-300 rounded-xl"
+                className="pl-9 h-9 text-xs border-border bg-background text-foreground rounded-xl"
               />
             </div>
 
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">MODULE:</span>
+              <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">MODULE:</span>
               <Select value={moduleFilter} onValueChange={(val) => setModuleFilter(val || 'all')}>
-                <SelectTrigger className="w-40 h-9 text-xs rounded-xl border-slate-200">
+                <SelectTrigger className="w-40 h-9 text-xs rounded-xl border-border bg-background text-foreground">
                   <SelectValue placeholder="All Modules" />
                 </SelectTrigger>
                 <SelectContent>
@@ -479,15 +479,15 @@ export function RecycleBinPage() {
 
         {/* Bulk Actions Floating Bar */}
         {selectedIds.length > 0 && (
-          <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 p-3 rounded-xl shadow-2xs text-xs">
-            <div className="flex items-center gap-2 text-emerald-900 font-bold">
+          <div className="flex items-center justify-between bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl shadow-2xs text-xs">
+            <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-bold">
               <span>{selectedIds.length} item(s) selected</span>
             </div>
             <div className="flex items-center gap-2">
               <Button
                 size="sm"
                 variant="outline"
-                className="h-8 text-xs font-bold text-emerald-700 border-emerald-300 hover:bg-emerald-100 rounded-lg"
+                className="h-8 text-xs font-bold text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10 rounded-lg"
                 onClick={() => {
                   setModalAction('bulkRestore');
                   setConfirmModalOpen(true);
@@ -509,7 +509,7 @@ export function RecycleBinPage() {
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-8 text-xs text-slate-600 hover:bg-slate-200/50 rounded-lg"
+                className="h-8 text-xs text-muted-foreground hover:bg-muted rounded-lg"
                 onClick={() => setSelectedIds([])}
               >
                 Clear Selection
@@ -519,35 +519,35 @@ export function RecycleBinPage() {
         )}
 
         {/* Data Table */}
-        <div className="overflow-x-auto rounded-xl border border-slate-200/90 shadow-2xs">
-          <table className="w-full text-left text-xs text-slate-700">
-            <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-xs text-slate-800 font-bold border-b border-slate-200 uppercase tracking-wider text-[11px] shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)]">
+        <div className="overflow-x-auto rounded-xl border border-border shadow-2xs">
+          <table className="w-full text-left text-xs text-foreground/90">
+            <thead className="sticky top-0 z-10 bg-muted/95 backdrop-blur-xs text-foreground font-bold border-b border-border uppercase tracking-wider text-[11px] shadow-[inset_0_-1px_0_rgba(0,0,0,0.08)]">
               <tr>
-                <th className="py-3.5 px-3 w-10 text-center bg-slate-50/95 backdrop-blur-xs">
+                <th className="py-3.5 px-3 w-10 text-center bg-muted/95 backdrop-blur-xs">
                   <input
                     type="checkbox"
                     checked={paginatedItems.length > 0 && selectedIds.length === paginatedItems.length}
                     onChange={(e) => handleSelectAll(e.target.checked)}
-                    className="rounded border-slate-300 cursor-pointer"
+                    className="rounded border-border bg-background text-foreground cursor-pointer"
                   />
                 </th>
-                <th className="py-3.5 px-3 bg-slate-50/95 backdrop-blur-xs">MODULE</th>
-                <th className="py-3.5 px-3 bg-slate-50/95 backdrop-blur-xs">NAME / TITLE</th>
-                <th className="py-3.5 px-3 bg-slate-50/95 backdrop-blur-xs">DELETED BY</th>
-                <th className="py-3.5 px-3 bg-slate-50/95 backdrop-blur-xs">DELETED AT</th>
-                <th className="py-3.5 px-3 text-right bg-slate-50/95 backdrop-blur-xs">ACTIONS</th>
+                <th className="py-3.5 px-3 bg-muted/95 backdrop-blur-xs">MODULE</th>
+                <th className="py-3.5 px-3 bg-muted/95 backdrop-blur-xs">NAME / TITLE</th>
+                <th className="py-3.5 px-3 bg-muted/95 backdrop-blur-xs">DELETED BY</th>
+                <th className="py-3.5 px-3 bg-muted/95 backdrop-blur-xs">DELETED AT</th>
+                <th className="py-3.5 px-3 text-right bg-muted/95 backdrop-blur-xs">ACTIONS</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-border">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400 font-medium">
+                  <td colSpan={6} className="py-12 text-center text-muted-foreground font-medium">
                     Loading recycle bin records...
                   </td>
                 </tr>
               ) : paginatedItems.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400 font-medium">
+                  <td colSpan={6} className="py-12 text-center text-muted-foreground font-medium">
                     Recycle bin is empty. No deleted records found.
                   </td>
                 </tr>
@@ -555,27 +555,27 @@ export function RecycleBinPage() {
                 paginatedItems.map((item) => {
                   const isChecked = selectedIds.includes(item.id);
                   return (
-                    <tr key={item.id} className={`hover:bg-slate-50/90 transition-all duration-150 ${isChecked ? 'bg-emerald-50/30' : ''}`}>
+                    <tr key={item.id} className={`hover:bg-muted/40 transition-all duration-150 ${isChecked ? 'bg-emerald-500/10' : ''}`}>
                       <td className="py-3.5 px-3 text-center">
                         <input
                           type="checkbox"
                           checked={isChecked}
                           onChange={(e) => handleSelectOne(item.id, e.target.checked)}
-                          className="rounded border-slate-300 cursor-pointer"
+                          className="rounded border-border bg-background text-foreground cursor-pointer"
                         />
                       </td>
                       <td className="py-3.5 px-3">{getModuleBadge(item.module, item.moduleLabel)}</td>
-                      <td className="py-3.5 px-3 font-bold text-slate-900 max-w-sm truncate" title={item.name}>
+                      <td className="py-3.5 px-3 font-bold text-foreground max-w-sm truncate" title={item.name}>
                         {item.name}
                       </td>
-                      <td className="py-3.5 px-3 font-semibold text-slate-700">{item.deletedBy}</td>
-                      <td className="py-3.5 px-3 font-mono text-slate-500 text-[11px]">{item.deletedAt}</td>
+                      <td className="py-3.5 px-3 font-semibold text-foreground/90">{item.deletedBy}</td>
+                      <td className="py-3.5 px-3 font-mono text-muted-foreground text-[11px]">{item.deletedAt}</td>
                       <td className="py-3.5 px-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-8 text-xs font-semibold text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg px-2.5"
+                            className="h-8 text-xs font-semibold text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg px-2.5"
                             onClick={() => {
                               setTargetItem(item);
                               setModalAction('restore');
@@ -587,7 +587,7 @@ export function RecycleBinPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-8 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg px-2.5"
+                            className="h-8 text-xs font-semibold text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg px-2.5"
                             onClick={() => {
                               setTargetItem(item);
                               setModalAction('delete');
@@ -610,9 +610,9 @@ export function RecycleBinPage() {
 
       {/* Confirmation Modal */}
       <Dialog open={confirmModalOpen} onOpenChange={setConfirmModalOpen}>
-        <DialogContent className="sm:max-w-md p-6 rounded-2xl bg-white border border-slate-200 shadow-2xl">
+        <DialogContent className="sm:max-w-md p-6 rounded-2xl bg-card border border-border shadow-2xl text-card-foreground">
           <DialogHeader className="space-y-2">
-            <DialogTitle className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+            <DialogTitle className="text-base font-extrabold text-foreground flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-amber-500" />
               {modalAction === 'restore' || modalAction === 'bulkRestore'
                 ? 'Confirm Restoration'
@@ -620,7 +620,7 @@ export function RecycleBinPage() {
                 ? 'Empty Recycle Bin'
                 : 'Confirm Permanent Deletion'}
             </DialogTitle>
-            <p className="text-xs text-slate-600 leading-relaxed">
+            <p className="text-xs text-muted-foreground leading-relaxed">
               {modalAction === 'restore'
                 ? `Are you sure you want to restore "${targetItem?.name}" back to active module records?`
                 : modalAction === 'bulkRestore'
@@ -633,8 +633,8 @@ export function RecycleBinPage() {
             </p>
           </DialogHeader>
 
-          <DialogFooter className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
-            <Button variant="outline" size="sm" onClick={() => setConfirmModalOpen(false)} className="h-9 px-4 text-xs font-semibold rounded-xl border-slate-200">
+          <DialogFooter className="flex items-center justify-end gap-3 pt-4 border-t border-border">
+            <Button variant="outline" size="sm" onClick={() => setConfirmModalOpen(false)} className="h-9 px-4 text-xs font-semibold rounded-xl border-border">
               Cancel
             </Button>
             <Button
