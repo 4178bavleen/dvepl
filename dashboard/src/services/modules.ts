@@ -161,7 +161,7 @@ export const materialApi = {
 
 export const purchaseApi = {
   requests: crud((API_ENDPOINTS as any).purchase.requests),
-  orders: crud((API_ENDPOINTS as any).purchase.orders),
+  orders: crud((API_ENDPOINTS as any).purchase.orders, { updateMethod: 'patch' }),
   receipts: crud((API_ENDPOINTS as any).purchase.receipts),
 };
 

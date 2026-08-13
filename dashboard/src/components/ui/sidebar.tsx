@@ -12,7 +12,6 @@ import {
   ChevronRight,
   ChevronDown,
   X,
-  Workflow,
 } from 'lucide-react';
 
 import { useERPStore } from '@/store/erpStore';
@@ -37,32 +36,9 @@ export default function Sidebar({
   const { config } = useUiConfig();
 
   // ---------------------------------------------------------
-  // Workflow Tracker fallback item
-  // ---------------------------------------------------------
-  const workflowTrackerItem = {
-    name: 'Workflow Tracker',
-    path: '/workflow',
-    icon: Workflow,
-    section: 'Sales',
-  };
-
-  // ---------------------------------------------------------
   // Sidebar items
   // ---------------------------------------------------------
-  const sidebarItems = React.useMemo(() => {
-    const exists = config.sidebarItems.some(
-      (item) => item.path === '/workflow',
-    );
-
-    if (exists) {
-      return config.sidebarItems;
-    }
-
-    return [
-      ...config.sidebarItems,
-      workflowTrackerItem,
-    ];
-  }, [config.sidebarItems]);
+  const sidebarItems = config.sidebarItems;
 
   const location = useLocation();
 

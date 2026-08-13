@@ -27,6 +27,7 @@ const purchaseOrderSchema = z.object({
   remarks: z.string().optional().nullable(),
   referenceCode: z.string().optional().nullable(),
   status: z.nativeEnum(PurchaseOrderStatus).optional(),
+  poStatus: z.string().optional(),
 
   items: z
     .array(
@@ -79,6 +80,7 @@ async function adminPurchaseOrderCreateRoutes(
           referenceCode,
           status,
           items,
+          poStatus,
         } = validation.data;
 
         const companyId = request.user.companyId;
@@ -284,7 +286,7 @@ async function adminPurchaseOrderCreateRoutes(
         await syncSalesOrderWorkflowFromPo(
           fastify.prisma,
           referenceCode,
-          status,
+          poStatus || status,
           request.user.id
         );
 

@@ -1282,8 +1282,6 @@ function PipelineCard({
             )}
           </div>
         </div>
-
-        <MoreVertical className="h-3 w-3 shrink-0 text-slate-300 transition-colors group-hover:text-slate-500" />
       </div>
 
       {/* Next Action */}
@@ -1306,10 +1304,6 @@ function PipelineCard({
             {order.dueDate ? formatDate(order.dueDate) : "No due date"}
           </span>
         </div>
-
-        <span className="shrink-0 text-[10px] font-medium text-slate-300 transition-colors group-hover:text-[#3f8d32]">
-          Open →
-        </span>
       </div>
     </button>
   );

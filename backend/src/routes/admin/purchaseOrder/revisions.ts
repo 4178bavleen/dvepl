@@ -250,6 +250,30 @@ async function adminPurchaseOrderRevisionsRoutes(
           },
         });
 
+        // Sync parent PurchaseOrder status
+        if (po) {
+          let mappedStatus: any = "DRAFT";
+          const statusVal = body.poStatus || "";
+          if (statusVal === "Placed" || statusVal === "Ordered" || statusVal === "SENT") {
+            mappedStatus = "SENT";
+          } else if (statusVal === "Ready" || statusVal === "APPROVED") {
+            mappedStatus = "APPROVED";
+          } else if (statusVal === "Partially Received" || statusVal === "PARTIAL_RECEIVED") {
+            mappedStatus = "PARTIAL_RECEIVED";
+          } else if (statusVal === "Received" || statusVal === "COMPLETED") {
+            mappedStatus = "COMPLETED";
+          } else if (statusVal === "Cancelled" || statusVal === "CANCELLED") {
+            mappedStatus = "CANCELLED";
+          }
+
+          await fastify.prisma.purchaseOrder.update({
+            where: { id: po.id },
+            data: {
+              status: mappedStatus,
+            },
+          });
+        }
+
         // Sync with SalesOrder workflow stage if referenceCode is present
         await syncSalesOrderWorkflowFromPo(
           fastify.prisma,

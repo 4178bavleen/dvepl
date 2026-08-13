@@ -9,19 +9,44 @@ export async function syncSalesOrderWorkflowFromPo(
   if (!referenceCode || !poStatus) return;
 
   // 1. Find the SalesOrder by referenceCode (dveplCode)
-  const salesOrder = await prisma.salesOrder.findUnique({
+  let salesOrder = await prisma.salesOrder.findUnique({
     where: { dveplCode: referenceCode.trim() },
   });
 
+  // Fallback: If not found by dveplCode, try searching for the referenceCode inside the remarks field
+  if (!salesOrder) {
+    salesOrder = await prisma.salesOrder.findFirst({
+      where: {
+        remarks: {
+          contains: referenceCode.trim(),
+        },
+      },
+    });
+  }
+
   if (!salesOrder) return;
 
-  // 2. Determine target WorkflowStage
-  // poStatus can be "Ready", "Placed", "APPROVED", "SENT"
+  // poStatus can be "Ready", "Placed", "Needs Revision", "Pending", "Ordered", "Partially Received", "Received", "Cancelled", "APPROVED", "SENT", "PARTIAL_RECEIVED", "COMPLETED", "CANCELLED", "DRAFT"
   let targetStage: WorkflowStage | null = null;
   if (poStatus === "Ready" || poStatus === "APPROVED") {
     targetStage = WorkflowStage.PO_READY;
-  } else if (poStatus === "Placed" || poStatus === "SENT") {
+  } else if (poStatus === "Placed" || poStatus === "Ordered" || poStatus === "SENT") {
     targetStage = WorkflowStage.PO_PLACED;
+  } else if (
+    poStatus === "Needs Revision" ||
+    poStatus === "NeedsRevision" ||
+    poStatus === "REVISION_REQUIRED"
+  ) {
+    targetStage = WorkflowStage.REVISION_REQUIRED;
+  } else if (poStatus === "Pending" || poStatus === "Cancelled" || poStatus === "CANCELLED" || poStatus === "DRAFT") {
+    targetStage = WorkflowStage.ORDER_CONFIRMED;
+  } else if (
+    poStatus === "Partially Received" ||
+    poStatus === "PARTIAL_RECEIVED" ||
+    poStatus === "Received" ||
+    poStatus === "COMPLETED"
+  ) {
+    targetStage = WorkflowStage.INVENTORY_FOLLOW_UP;
   }
 
   if (!targetStage || salesOrder.workflowStage === targetStage) return;

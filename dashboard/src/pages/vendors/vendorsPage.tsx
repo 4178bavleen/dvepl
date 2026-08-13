@@ -1486,7 +1486,13 @@ export function VendorsPage() {
       setPoDate(
         po.orderDate ? new Date(po.orderDate).toISOString().split("T")[0] : "",
       );
-      setPoStatus(po.status || "SENT");
+      let mappedFriendly = po.status || "SENT";
+      if (mappedFriendly === "APPROVED") mappedFriendly = "Ready";
+      else if (mappedFriendly === "SENT") mappedFriendly = "Placed";
+      else if (mappedFriendly === "PARTIAL_RECEIVED") mappedFriendly = "Partially Received";
+      else if (mappedFriendly === "COMPLETED") mappedFriendly = "Received";
+      else if (mappedFriendly === "CANCELLED") mappedFriendly = "Cancelled";
+      setPoStatus(mappedFriendly);
       setPaymentTerms(po.paymentTerms || "");
       setMaterialStatus(po.shippingTerms || "");
       setAdvance(0);
@@ -2296,8 +2302,106 @@ export function VendorsPage() {
     setRemoveColConfirmOpen(true);
   };
 
+  // Update PO status directly without creating a revision
+  const handleUpdatePoStatus = async (newStatus: string) => {
+    if (!activePoVendor) return;
+
+    if (!poNumber.trim()) {
+      toast.error("PO Number is required");
+      return;
+    }
+
+    let mappedStatus: "DRAFT" | "APPROVED" | "SENT" | "PARTIAL_RECEIVED" | "COMPLETED" | "CANCELLED" = "DRAFT";
+    if (newStatus === "Placed" || newStatus === "Ordered" || newStatus === "SENT") {
+      mappedStatus = "SENT";
+    } else if (newStatus === "Ready" || newStatus === "APPROVED") {
+      mappedStatus = "APPROVED";
+    } else if (newStatus === "Partially Received" || newStatus === "PARTIAL_RECEIVED") {
+      mappedStatus = "PARTIAL_RECEIVED";
+    } else if (newStatus === "Received" || newStatus === "COMPLETED") {
+      mappedStatus = "COMPLETED";
+    } else if (newStatus === "Cancelled" || newStatus === "CANCELLED") {
+      mappedStatus = "CANCELLED";
+    }
+
+    try {
+      const resolvedItems = poItems.map((item) => {
+        let resolvedMaterialId = item.materialId || item.inventoryId;
+        if (
+          !resolvedMaterialId &&
+          item.description &&
+          inventoryFields.length > 0
+        ) {
+          const primaryFieldName = inventoryFields[0]?.fieldName;
+          const descLower = item.description.trim().toLowerCase();
+          const matchedRecord = inventoryRecords.find((rec) => {
+            const recName = String(rec.values?.[primaryFieldName] || "")
+              .trim()
+              .toLowerCase();
+            return recName === descLower;
+          });
+          if (matchedRecord) {
+            resolvedMaterialId = matchedRecord.id;
+          }
+        }
+        if (!resolvedMaterialId && item.description) {
+          const descLower = item.description.trim().toLowerCase();
+          const matched = inventoryItems.find(
+            (inv) => inv.material?.name?.trim().toLowerCase() === descLower,
+          );
+          if (matched?.materialId) resolvedMaterialId = matched.materialId;
+        }
+        if (!resolvedMaterialId && inventoryItems.length > 0) {
+          resolvedMaterialId = inventoryItems[0].materialId;
+        }
+        return {
+          materialId: resolvedMaterialId || "",
+          quantity: (Number(item.qty) || 0) > 0 ? Number(item.qty) : 1,
+          unitPrice: item.rate > 0 ? item.rate : 0.01,
+          remarks: item.description || "",
+        };
+      });
+
+      const existingPOsRes = await apiClient.get("/purchase-order/read");
+      const existingPOs = existingPOsRes.data?.data ?? [];
+      const matchedPO = existingPOs.find((p: any) => p.poNo === poNumber);
+
+      if (matchedPO) {
+        await apiClient.patch(`/purchase-order/update/${matchedPO.id}`, {
+          vendorId: activePoVendor.id,
+          expectedDelivery: null,
+          paymentTerms,
+          shippingTerms: "",
+          remarks,
+          referenceCode,
+          status: mappedStatus,
+          poStatus: newStatus,
+          items: resolvedItems,
+        });
+      } else {
+        await apiClient.post("/purchase-order/create", {
+          poNo: poNumber,
+          vendorId: activePoVendor.id,
+          orderDate: poDate,
+          expectedDelivery: null,
+          paymentTerms,
+          shippingTerms: "",
+          remarks,
+          referenceCode,
+          status: mappedStatus,
+          poStatus: newStatus,
+          items: resolvedItems,
+        });
+      }
+      toast.success(`Purchase Order status updated to "${newStatus}"`);
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Failed to update Purchase Order status");
+    }
+  };
+
   // Save revision
-  const handleSavePoRevision = async (overrideStatus?: string) => {
+  const handleSavePoRevision = async () => {
     if (!activePoVendor) return;
 
     // PO header validations
@@ -2379,7 +2483,7 @@ export function VendorsPage() {
         ? 0
         : Math.max(...existingRevisions.map((r) => r.revisionNo)) + 1;
 
-    const statusToSave = (typeof overrideStatus === "string" ? overrideStatus : "") || poStatus;
+    const statusToSave = poStatus;
 
     const newRevision: PORevision = {
       id: `rev-${Date.now()}`,
@@ -2411,11 +2515,17 @@ export function VendorsPage() {
 
     try {
       // 1. Resolve Status
-      let mappedStatus: "DRAFT" | "APPROVED" | "SENT" = "DRAFT";
-      if (statusToSave === "Placed") {
+      let mappedStatus: "DRAFT" | "APPROVED" | "SENT" | "PARTIAL_RECEIVED" | "COMPLETED" | "CANCELLED" = "DRAFT";
+      if (statusToSave === "Placed" || statusToSave === "Ordered" || statusToSave === "SENT") {
         mappedStatus = "SENT";
-      } else if (statusToSave === "Ready") {
+      } else if (statusToSave === "Ready" || statusToSave === "APPROVED") {
         mappedStatus = "APPROVED";
+      } else if (statusToSave === "Partially Received" || statusToSave === "PARTIAL_RECEIVED") {
+        mappedStatus = "PARTIAL_RECEIVED";
+      } else if (statusToSave === "Received" || statusToSave === "COMPLETED") {
+        mappedStatus = "COMPLETED";
+      } else if (statusToSave === "Cancelled" || statusToSave === "CANCELLED") {
+        mappedStatus = "CANCELLED";
       }
 
       // 2. Prepare items with description-to-materialId resolution
@@ -2471,6 +2581,7 @@ export function VendorsPage() {
           remarks,
           referenceCode,
           status: mappedStatus,
+          poStatus: statusToSave,
           items: resolvedItems,
         });
       } else {
@@ -2485,6 +2596,7 @@ export function VendorsPage() {
           remarks,
           referenceCode,
           status: mappedStatus,
+          poStatus: statusToSave,
           items: resolvedItems,
         });
       }
@@ -2511,7 +2623,13 @@ export function VendorsPage() {
   const loadRevision = (rev: PORevision) => {
     setPoNumber(rev.poNumber);
     setPoDate(rev.poDate);
-    setPoStatus(rev.poStatus);
+    let mappedFriendly = rev.poStatus || "Pending";
+    if (mappedFriendly === "APPROVED") mappedFriendly = "Ready";
+    else if (mappedFriendly === "SENT") mappedFriendly = "Placed";
+    else if (mappedFriendly === "PARTIAL_RECEIVED") mappedFriendly = "Partially Received";
+    else if (mappedFriendly === "COMPLETED") mappedFriendly = "Received";
+    else if (mappedFriendly === "CANCELLED") mappedFriendly = "Cancelled";
+    setPoStatus(mappedFriendly);
     setPaymentTerms(rev.paymentTerms);
     setMaterialStatus(rev.materialStatus);
     setAdvance(rev.advance);
@@ -3271,7 +3389,7 @@ export function VendorsPage() {
     }
 
     setPoStatus("Placed");
-    await handleSavePoRevision("Placed");
+    await handleUpdatePoStatus("Placed");
     toast.success(
       "PO marked as Placed - PDF generated and sent via " +
         sentChannels.join(" & "),
@@ -4941,6 +5059,7 @@ export function VendorsPage() {
                       Partially Received
                     </option>
                     <option value="Received">Received</option>
+                    <option value="Cancelled">Cancelled</option>
                   </select>
                 </div>
                 <div className="de-po-field">
@@ -5294,32 +5413,10 @@ export function VendorsPage() {
                     <span className="de-exp-name">PDF</span>
                     <span className="de-exp-ext">.pdf</span>
                   </button>
-                  <button
-                    className="de-exp-btn"
-                    onClick={() => triggerExport("png")}
-                  >
-                    <span className="de-exp-icon">🖼️</span>
-                    <span className="de-exp-name">PNG</span>
-                    <span className="de-exp-ext">.png</span>
-                  </button>
-                  <button
-                    className="de-exp-btn"
-                    onClick={() => triggerExport("jpeg")}
-                  >
-                    <span className="de-exp-icon">📷</span>
-                    <span className="de-exp-name">JPEG</span>
-                    <span className="de-exp-ext">.jpeg</span>
-                  </button>
+
                 </div>
               </div>
               <div className="de-footer-actions">
-                <button
-                  className="de-tbtn"
-                  style={{ padding: "10px 18px", fontSize: "13.5px" }}
-                  onClick={() => toast.success("Skipped")}
-                >
-                  ⏭️ Skip
-                </button>
                 <button
                   className="de-tbtn"
                   style={{ padding: "10px 18px", fontSize: "13.5px" }}
@@ -5339,9 +5436,18 @@ export function VendorsPage() {
                 </button>
                 <button
                   className="btn-save-rev"
+                  style={{ background: "#4f46e5", color: "#fff" }}
+                  onClick={() => {
+                    handleSavePoRevision();
+                  }}
+                >
+                  💾 Save Revision
+                </button>
+                <button
+                  className="btn-save-rev"
                   onClick={() => {
                     setPoStatus("Ready");
-                    handleSavePoRevision("Ready");
+                    handleUpdatePoStatus("Ready");
                   }}
                 >
                   ✅ PO Ready

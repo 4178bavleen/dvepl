@@ -15,6 +15,7 @@ interface UpdatePurchaseOrderBody {
   remarks?: string;
   referenceCode?: string | null;
   status?: PurchaseOrderStatus;
+  poStatus?: string;
   items?: {
     materialId: string;
     quantity: number;
@@ -56,6 +57,7 @@ async function adminPurchaseOrderUpdateRoutes(
           referenceCode,
           status,
           items,
+          poStatus,
         } = request.body;
 
         const existing = await fastify.prisma.purchaseOrder.findFirst({
@@ -232,7 +234,7 @@ async function adminPurchaseOrderUpdateRoutes(
         await syncSalesOrderWorkflowFromPo(
           fastify.prisma,
           referenceCode || existing.referenceCode,
-          status,
+          poStatus || status,
           request.user.id
         );
 

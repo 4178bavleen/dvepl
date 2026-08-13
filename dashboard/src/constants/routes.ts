@@ -79,4 +79,5 @@ export const ROUTES = {
   SETTINGS_APPROVAL_RULES: '/settings/approval-rules',
 
   EXPORT_ORDERS: '/export-orders',
+  WORKFLOW_TRACKER: '/workflow',
 };

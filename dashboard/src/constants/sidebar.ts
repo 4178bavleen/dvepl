@@ -30,6 +30,7 @@ import {
   Package,
   Trash2,
   PenTool,
+  Workflow,
 } from "lucide-react";
 import { ROUTES } from "./routes";
 
@@ -186,13 +187,19 @@ export const sidebarItems: SidebarItem[] = [
     path: ROUTES.EXPORT_ORDERS,
     section: "CRM",
   },
-
+  
   // Finance
   {
     name: "Finance",
     icon: DollarSign,
     path: ROUTES.FINANCE,
     section: "Finance",
+  },
+  {
+    name: "Workflow Tracker",
+    icon: Workflow,
+    path: ROUTES.WORKFLOW_TRACKER,
+    section: "Sales",
   },
 
   // Lead Management & Tenders
