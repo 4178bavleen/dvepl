@@ -72,10 +72,10 @@ async function updateRoleRoute(
           });
         }
 
-        if (role.isSystem) {
+        if (role.isSystem && name !== undefined && name !== role.name) {
           return reply.status(400).send({
             success: false,
-            message: "System roles cannot be updated.",
+            message: "System roles name cannot be updated.",
           });
         }
 

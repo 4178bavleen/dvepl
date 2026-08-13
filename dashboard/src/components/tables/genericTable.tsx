@@ -273,7 +273,13 @@ export function GenericTable<TData extends { id: string }>({
   const isFieldVisible = React.useCallback((columnId: string) => {
     if (!store.currentUserId) return true;
     const currentUser = store.users.find(u => u.id === store.currentUserId) as any;
-    if (!currentUser || !currentUser.fieldPermissions) return true;
+    if (!currentUser) return true;
+
+    const isAdmin = currentUser.role?.toLowerCase().includes('admin') || 
+                    currentUser.name?.toLowerCase().includes('admin');
+    if (isAdmin) return true;
+
+    if (!currentUser.fieldPermissions) return true;
 
     // Normalize input column ID to lowercase alphanumeric only (e.g., "basicSalary" -> "basicsalary", "po_number" -> "ponumber")
     const cleanColId = columnId.toLowerCase().replace(/[^a-z0-9]/g, '');

@@ -81,6 +81,24 @@ export function DocumentsPage() {
   const [fileUrl, setFileUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const selectedEmployeeLabel = useMemo(() => {
+    if (!employeeId) return undefined;
+    const selected = employees.find(emp => emp.id === employeeId);
+    return selected ? `${selected.firstName} ${selected.lastName} (${selected.employeeCode})` : undefined;
+  }, [employeeId, employees]);
+
+  const selectedDocumentTypeLabel = useMemo(() => {
+    if (!documentType) return undefined;
+    const labels: Record<string, string> = {
+      AADHAR: 'Aadhar Card',
+      PAN: 'PAN Card',
+      RESUME: 'Resume / CV',
+      OFFER_LETTER: 'Offer Letter',
+      OTHER: 'Other Official Document'
+    };
+    return labels[documentType] || documentType;
+  }, [documentType]);
+
   const fetchData = async () => {
     setIsLoading(true);
     try {
@@ -388,7 +406,9 @@ export function DocumentsPage() {
               </Label>
               <Select value={employeeId} onValueChange={(val) => setEmployeeId(val || '')}>
                 <SelectTrigger id="employee" className="w-full text-xs">
-                  <SelectValue placeholder="Select Employee" />
+                  <SelectValue placeholder="Select Employee">
+                    {selectedEmployeeLabel}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {employees.map(emp => (
@@ -406,7 +426,9 @@ export function DocumentsPage() {
               </Label>
               <Select value={documentType} onValueChange={(val) => setDocumentType(val || 'AADHAR')}>
                 <SelectTrigger id="docType" className="w-full text-xs">
-                  <SelectValue placeholder="Select Type" />
+                  <SelectValue placeholder="Select Type">
+                    {selectedDocumentTypeLabel}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="AADHAR" className="text-xs">Aadhar Card</SelectItem>

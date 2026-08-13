@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { UploadCloud, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +34,22 @@ export default function DrawingUploader({ selectedOrderIds, selectedOrders, avai
   const [drawingNo, setDrawingNo] = useState("");
   const [title, setTitle] = useState("");
   const [drawingType, setDrawingType] = useState("SLD");
+
+  const combinedOrders = useMemo(() => {
+    const list = [...selectedOrders];
+    availableOrders.forEach((ao) => {
+      if (!list.some((so) => so.id === ao.id)) {
+        list.push(ao);
+      }
+    });
+    return list;
+  }, [selectedOrders, availableOrders]);
+
+  const selectedOrderLabel = useMemo(() => {
+    if (!salesOrderId) return undefined;
+    const selected = combinedOrders.find((o) => o.id === salesOrderId);
+    return selected ? `${selected.dveplCode} — ${selected.partyName}` : undefined;
+  }, [salesOrderId, combinedOrders]);
 
   const openDialog = async (file: File) => {
     setPendingFile(file);
@@ -148,10 +164,12 @@ export default function DrawingUploader({ selectedOrderIds, selectedOrders, avai
               <Label>Sales Order *</Label>
               <Select value={salesOrderId} onValueChange={(val) => setSalesOrderId(val ?? "")}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select order" />
+                  <SelectValue placeholder="Select order">
+                    {selectedOrderLabel}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                    {availableOrders.map((o) => (
+                  {combinedOrders.map((o) => (
                     <SelectItem key={o.id} value={o.id}>
                       {o.dveplCode} — {o.partyName}
                     </SelectItem>

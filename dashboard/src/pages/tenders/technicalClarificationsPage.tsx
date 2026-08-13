@@ -113,6 +113,57 @@ export function TechnicalClarificationsPage() {
 
   const [showTimeline, setShowTimeline] = useState(false);
 
+  const selectedTenderLabel = useMemo(() => {
+    if (!tenderId) return undefined;
+    const selected = tenders.find(t => t.id === tenderId);
+    return selected ? `${selected.title} (${selected.id.slice(0, 8)}...)` : undefined;
+  }, [tenderId, tenders]);
+
+  const selectedAssigneeLabel = useMemo(() => {
+    if (!assignedToId) return undefined;
+    const selected = users.find(u => u.id === assignedToId);
+    return selected ? selected.name : undefined;
+  }, [assignedToId, users]);
+
+  const selectedPriorityLabel = useMemo(() => {
+    if (!priority) return undefined;
+    const labels: Record<string, string> = {
+      LOW: 'Low',
+      MEDIUM: 'Medium',
+      HIGH: 'High',
+      CRITICAL: 'Critical'
+    };
+    return labels[priority] || priority;
+  }, [priority]);
+
+  const selectedEditAssigneeLabel = useMemo(() => {
+    if (!editAssignedToId) return undefined;
+    const selected = users.find(u => u.id === editAssignedToId);
+    return selected ? selected.name : undefined;
+  }, [editAssignedToId, users]);
+
+  const selectedEditStatusLabel = useMemo(() => {
+    if (!editStatus) return undefined;
+    const labels: Record<string, string> = {
+      OPEN: 'Open',
+      ANSWERED: 'Answered',
+      REVISED: 'Revised',
+      CLOSED: 'Closed'
+    };
+    return labels[editStatus] || editStatus;
+  }, [editStatus]);
+
+  const selectedEditPriorityLabel = useMemo(() => {
+    if (!editPriority) return undefined;
+    const labels: Record<string, string> = {
+      LOW: 'Low',
+      MEDIUM: 'Medium',
+      HIGH: 'High',
+      CRITICAL: 'Critical'
+    };
+    return labels[editPriority] || editPriority;
+  }, [editPriority]);
+
   const fetchThreads = async () => {
     setIsLoading(true);
     try {
@@ -654,7 +705,9 @@ export function TechnicalClarificationsPage() {
               </Label>
               <Select value={tenderId} onValueChange={(val) => setTenderId(val || '')}>
                 <SelectTrigger id="tender" className="w-full text-xs">
-                  <SelectValue placeholder="Select Tender" />
+                  <SelectValue placeholder="Select Tender">
+                    {selectedTenderLabel}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {tenders.map(t => (
@@ -686,7 +739,9 @@ export function TechnicalClarificationsPage() {
               </Label>
               <Select value={assignedToId} onValueChange={(val) => setAssignedToId(val || '')}>
                 <SelectTrigger id="assignee" className="w-full text-xs">
-                  <SelectValue placeholder="Select Assignee" />
+                  <SelectValue placeholder="Select Assignee">
+                    {selectedAssigneeLabel}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {users.map(u => (
@@ -717,7 +772,9 @@ export function TechnicalClarificationsPage() {
                 </Label>
                 <Select value={priority} onValueChange={(val) => setPriority(val || 'MEDIUM')}>
                   <SelectTrigger id="priority" className="w-full text-xs">
-                    <SelectValue placeholder="Priority" />
+                    <SelectValue placeholder="Priority">
+                      {selectedPriorityLabel}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="LOW" className="text-xs">Low</SelectItem>
@@ -762,15 +819,15 @@ export function TechnicalClarificationsPage() {
                 className="w-full min-h-[70px] p-2.5 text-xs bg-card border border-border rounded-xl focus:outline-none focus:ring-1 focus:ring-primary"
                 required
               />
-            </div>
-
-            <div className="space-y-2">
+            </div>             <div className="space-y-2">
               <Label htmlFor="editAssignee" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Reassign to User
               </Label>
               <Select value={editAssignedToId} onValueChange={(val) => setEditAssignedToId(val || '')}>
                 <SelectTrigger id="editAssignee" className="w-full text-xs">
-                  <SelectValue placeholder="Select Assignee" />
+                  <SelectValue placeholder="Select Assignee">
+                    {selectedEditAssigneeLabel}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {users.map(u => (
@@ -788,7 +845,9 @@ export function TechnicalClarificationsPage() {
               </Label>
               <Select value={editStatus} onValueChange={(val) => setEditStatus(val || 'OPEN')}>
                 <SelectTrigger id="editStatus" className="w-full text-xs">
-                  <SelectValue placeholder="Select Status" />
+                  <SelectValue placeholder="Select Status">
+                    {selectedEditStatusLabel}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="OPEN" className="text-xs">Open</SelectItem>
@@ -818,7 +877,9 @@ export function TechnicalClarificationsPage() {
                 </Label>
                 <Select value={editPriority} onValueChange={(val) => setEditPriority(val || 'MEDIUM')}>
                   <SelectTrigger id="editPriority" className="w-full text-xs">
-                    <SelectValue placeholder="Priority" />
+                    <SelectValue placeholder="Priority">
+                      {selectedEditPriorityLabel}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="LOW" className="text-xs">Low</SelectItem>

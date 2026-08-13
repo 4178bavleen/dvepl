@@ -86,6 +86,21 @@ export function QuotationsPage() {
     approvalRequired: true,
   });
 
+  const selectedCustomerLabel = useMemo(() => {
+    const custId = formValues.customerId;
+    if (!custId) return undefined;
+    const customer = customers.find(c => c.id === custId);
+    return customer ? customer.name : undefined;
+  }, [formValues.customerId, customers]);
+
+  const selectedTenderProjectLabel = useMemo(() => {
+    const tId = formValues.tenderId;
+    if (!tId) return undefined;
+    if (tId === "none") return "None";
+    const tender = tenders.find(t => t.id === tId);
+    return tender ? tender.title : undefined;
+  }, [formValues.tenderId, tenders]);
+
   const [formItems, setFormItems] = useState<QuotationItemInput[]>([]);
 
   // Approval form state
@@ -473,10 +488,7 @@ export function QuotationsPage() {
                 <Select value={formValues.customerId} onValueChange={(val) => setFormValues(prev => ({ ...prev, customerId: val || '' }))}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select Client">
-                      {(value) => {
-                        const customer = customers.find(c => c.id === value);
-                        return customer ? customer.name : value;
-                      }}
+                      {selectedCustomerLabel}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
@@ -490,11 +502,7 @@ export function QuotationsPage() {
                 <Select value={formValues.tenderId} onValueChange={(val) => setFormValues(prev => ({ ...prev, tenderId: val || '' }))}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select Tender (Optional)">
-                      {(value) => {
-                        if (value === "none") return "None";
-                        const tender = tenders.find(t => t.id === value);
-                        return tender ? tender.title : value;
-                      }}
+                      {selectedTenderProjectLabel}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
