@@ -62,7 +62,6 @@ interface UserItem {
   designation?: string | null;
   phone?: string | null;
   role: string;
-  hasOverride?: boolean;
   pageAccess?: string[];
   fieldPermissions?: Record<string, { view: boolean; edit: boolean }>;
   actionPermissions?: StoredActionPermissions;
@@ -157,6 +156,7 @@ export function SettingsPage() {
   const [permissionMode, setPermissionMode] = useState<"role" | "user">("role");
   const [selectedPermissionRole, setSelectedPermissionRole] = useState("");
   const [selectedPermissionUserId, setSelectedPermissionUserId] = useState("");
+  const [selectedResourceKey, setSelectedResourceKey] = useState("");
   const [permissionRoleSearch, setPermissionRoleSearch] = useState("");
   const [permissionUserSearch, setPermissionUserSearch] = useState("");
 
@@ -307,7 +307,6 @@ export function SettingsPage() {
               ? u.designation.title || "Team Member"
               : u.designation || "Team Member",
           role: u.role || "user",
-          hasOverride: u.hasOverride ?? false,
           pageAccess: u.pageAccess || ["dashboard", "vendors", "orders"],
           fieldPermissions: u.fieldPermissions || {},
           actionPermissions: u.actionPermissions || {
@@ -673,6 +672,12 @@ export function SettingsPage() {
     { key: "settings", label: "⚙️ Settings" },
   ];
 
+  useEffect(() => {
+    if (!selectedResourceKey && modulesList.length > 0) {
+      setSelectedResourceKey(modulesList[0].key);
+    }
+  }, [selectedResourceKey]);
+
 
   // Fields Access List
   const fieldsAccessList = [
@@ -781,7 +786,7 @@ export function SettingsPage() {
   ];
 
   const selectedResourceFields = fieldsAccessList.filter(
-    (field) => field.tag === selectedActionModule
+    (field) => field.tag === selectedResourceKey
   );
 
   // Standard PRBAC permission helpers
@@ -845,25 +850,10 @@ export function SettingsPage() {
     setPermissionMode("role");
     setSelectedPermissionRole(role);
 
-    const store = useERPStore.getState();
-    const roleObj = store.roles?.find((r: any) => r.name === role);
-    if (roleObj) {
-      const simulatedUser: any = {
-        id: "",
-        name: "",
-        email: "",
-        role: role,
-        pageAccess: roleObj.pageAccess || [],
-        fieldPermissions: roleObj.fieldPermissions || {},
-        actionPermissions: roleObj.actionPermissions || {},
-      };
-      initializePermissionState(simulatedUser);
-    } else {
-      const roleUser = users.find((user) => user.role === role);
-      if (roleUser) {
-        setSelectedPermissionUserId(roleUser.id);
-        initializePermissionState(roleUser);
-      }
+    const roleUser = users.find((user) => user.role === role);
+    if (roleUser) {
+      setSelectedPermissionUserId(roleUser.id);
+      initializePermissionState(roleUser);
     }
   };
 
@@ -924,6 +914,19 @@ export function SettingsPage() {
         }
       });
 
+      // Role mode is the standard PRBAC path: the role owns the permission set.
+      // Until a dedicated role-permission endpoint exists, the existing user update
+      // endpoint is used to keep every user in that role synchronized.
+      const targetUsers =
+        permissionMode === "role"
+          ? users.filter((user) => user.role === selectedPermissionRole)
+          : [permUser];
+
+      if (targetUsers.length === 0) {
+        toast.error("No users found for the selected role");
+        return;
+      }
+
       const permissionPayload = {
         pageAccess,
         fieldPermissions: finalFieldPerms,
@@ -932,88 +935,53 @@ export function SettingsPage() {
 
       if (permissionMode === "role") {
         const storeRoles = store.roles || [];
-        const roleObj = storeRoles.find((r: any) => r.name === selectedPermissionRole);
+        const roleObj = storeRoles.find(
+          (role: any) => role.name === selectedPermissionRole,
+        );
+
         if (!roleObj) {
           toast.error("Role not found");
           return;
         }
-        if (securityApi.roles.update) {
-          await securityApi.roles.update(roleObj.id, permissionPayload);
-        }
 
-        // Update local roles store
-        const updatedRoles = storeRoles.map((r: any) =>
-          r.id === roleObj.id
-            ? {
-                ...r,
-                pageAccess,
-                fieldPermissions: finalFieldPerms,
-                actionPermissions: actionPermsState,
-              }
-            : r
-        );
-        useERPStore.setState({ roles: updatedRoles });
-      } else {
-        if (!permUser) return;
-        if (securityApi.users.update) {
-          await securityApi.users.update(permUser.id, {
+        if (securityApi.roles.update) {
+          await securityApi.roles.update(roleObj.id, {
+            name: roleObj.name,
             ...permissionPayload,
-            hasOverride: true,
           });
         }
+      } else if (securityApi.users.update) {
+        await securityApi.users.update(permUser.id, {
+          ...permissionPayload,
+          hasOverride: true,
+        });
       }
 
-      // Sync users local state
-      const updatedUsers = users.map((user) => {
-        if (permissionMode === "role") {
-          if (user.role === selectedPermissionRole && !user.hasOverride) {
-            return {
+      const targetIds = new Set(targetUsers.map((user) => user.id));
+      const updatedUsers = users.map((user) =>
+        targetIds.has(user.id)
+          ? {
               ...user,
               pageAccess,
               fieldPermissions: finalFieldPerms,
               actionPermissions: actionPermsState,
-            };
-          }
-        } else {
-          if (permUser && user.id === permUser.id) {
-            return {
-              ...user,
-              pageAccess,
-              fieldPermissions: finalFieldPerms,
-              actionPermissions: actionPermsState,
-              hasOverride: true,
-            };
-          }
-        }
-        return user;
-      });
+            }
+          : user,
+      );
 
       setUsers(updatedUsers);
 
-      // Sync Zustand users store
-      const updatedStoreUsers = store.users.map((user: any) => {
-        if (permissionMode === "role") {
-          if (user.role === selectedPermissionRole && !user.hasOverride) {
-            return {
+      // Sync Zustand so permission-dependent UI changes immediately.
+      const updatedStoreUsers = store.users.map((user: any) =>
+        targetIds.has(user.id)
+          ? {
               ...user,
               pageAccess,
               fieldPermissions: finalFieldPerms,
               actionPermissions: actionPermsState,
-            };
-          }
-        } else {
-          if (permUser && user.id === permUser.id) {
-            return {
-              ...user,
-              pageAccess,
-              fieldPermissions: finalFieldPerms,
-              actionPermissions: actionPermsState,
-              hasOverride: true,
-            };
-          }
-        }
-        return user;
-      });
+            }
+          : user,
+      );
       useERPStore.setState({ users: updatedStoreUsers });
 
       toast.success(
@@ -4540,7 +4508,7 @@ export function SettingsPage() {
                           );
                         })}
 
-                      {selectedResourceFields.length === 0 && (
+                      {fieldsAccessList.filter((field) => field.tag === selectedActionModule).length === 0 && (
                         <div className="px-5 py-12 text-center">
                           <div className="text-2xl">🔒</div>
                           <div className="mt-2 text-sm font-semibold text-foreground">

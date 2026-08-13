@@ -255,7 +255,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       'custom_fields': 'custom_fields',
       'recycle_bin': 'recycle_bin',
       'settings': 'settings',
-      'export_orders': 'export_orders'
+      'export_orders': 'export_orders',
+      'engineering_drawing': 'export_orders'
     };
 
     return sidebarItems.filter(item => {

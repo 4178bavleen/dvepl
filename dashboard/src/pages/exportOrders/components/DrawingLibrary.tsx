@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   PauseCircle,
   XCircle,
+  PenLine,
   LayoutGrid,
   List,
   ChevronDown,
@@ -22,6 +23,7 @@ import { exportOrdersApi } from "@/services/modules";
 import toast from "react-hot-toast";
 import React, { useState } from "react";
 import type { EngineeringDrawing } from "@/types/exportOrders";
+import { useSalesOrderAccess } from "@/utils/salesOrderAccess";
 
 interface Props {
   drawings: EngineeringDrawing[];
@@ -66,16 +68,45 @@ function parseContactDetails(details?: string) {
 }
 
 const STATUS_CONFIG = {
-  PENDING:     { label: "Pending",     icon: Clock,        dot: "bg-amber-400",   pill: "bg-amber-50 text-amber-700 border border-amber-200",     row: "" },
-  IN_PROGRESS: { label: "In Progress", icon: PlayCircle,   dot: "bg-blue-500",    pill: "bg-blue-50 text-blue-700 border border-blue-200",         row: "bg-blue-50/20" },
-  COMPLETED:   { label: "Completed",   icon: CheckCircle2, dot: "bg-emerald-500", pill: "bg-emerald-50 text-emerald-700 border border-emerald-200", row: "bg-emerald-50/20" },
-  ON_HOLD:     { label: "On Hold",     icon: PauseCircle,  dot: "bg-gray-400",    pill: "bg-gray-100 text-gray-600 border border-gray-200",         row: "bg-gray-50/40" },
-  REJECTED:    { label: "Rejected",    icon: XCircle,      dot: "bg-red-500",     pill: "bg-red-50 text-red-600 border border-red-200",             row: "bg-red-50/20" },
+  DRAFT:       { label: "Draft",      icon: PenLine,      dot: "bg-gray-400",    pill: "bg-gray-50 text-gray-600 border border-gray-200",               row: "" },
+  SUBMITTED:   { label: "Submitted",  icon: Send,         dot: "bg-blue-500",    pill: "bg-blue-50 text-blue-700 border border-blue-200",               row: "bg-blue-50/20" },
+  APPROVED:    { label: "Approved",   icon: CheckCircle2, dot: "bg-emerald-500", pill: "bg-emerald-50 text-emerald-700 border border-emerald-200",     row: "bg-emerald-50/20" },
+  PENDING:     { label: "Pending",    icon: Clock,        dot: "bg-amber-400",   pill: "bg-amber-50 text-amber-700 border border-amber-200",           row: "" },
+  IN_PROGRESS: { label: "In Progress", icon: PlayCircle,  dot: "bg-blue-500",    pill: "bg-blue-50 text-blue-700 border border-blue-200",               row: "bg-blue-50/20" },
+  COMPLETED:   { label: "Completed",  icon: CheckCircle2, dot: "bg-emerald-500", pill: "bg-emerald-50 text-emerald-700 border border-emerald-200",     row: "bg-emerald-50/20" },
+  ON_HOLD:     { label: "On Hold",    icon: PauseCircle,  dot: "bg-gray-400",    pill: "bg-gray-100 text-gray-600 border border-gray-200",             row: "bg-gray-50/40" },
+  REJECTED:    { label: "Rejected",   icon: XCircle,      dot: "bg-red-500",     pill: "bg-red-50 text-red-600 border border-red-200",                 row: "bg-red-50/20" },
 } as const;
 
 type DrawingStatus = keyof typeof STATUS_CONFIG;
 
-const STATUS_ACTIONS: { status: DrawingStatus; label: string; hoverBg: string; textColor: string }[] = [
+interface WorkflowAction {
+  status: DrawingStatus;
+  label: string;
+  hoverBg: string;
+  textColor: string;
+  icon?: any;
+  requiresReason?: boolean;
+}
+
+const WORKFLOW_ACTIONS: Record<string, WorkflowAction[]> = {
+  DRAFT: [
+    { status: "SUBMITTED", label: "Submit for Review", hoverBg: "hover:bg-blue-50",    textColor: "text-blue-700",    icon: Send },
+  ],
+  REJECTED: [
+    { status: "DRAFT",     label: "Revise (back to Draft)", hoverBg: "hover:bg-gray-50",  textColor: "text-gray-600",   icon: PenLine },
+    { status: "SUBMITTED", label: "Resubmit for Review",     hoverBg: "hover:bg-blue-50",  textColor: "text-blue-700",   icon: Send },
+  ],
+  SUBMITTED: [
+    { status: "APPROVED",  label: "Approve",     hoverBg: "hover:bg-emerald-50", textColor: "text-emerald-700", icon: CheckCircle2 },
+    { status: "REJECTED",  label: "Reject…",     hoverBg: "hover:bg-red-50",     textColor: "text-red-600",     icon: XCircle, requiresReason: true },
+  ],
+  APPROVED: [],
+};
+
+const LEGACY_ACTIONS: WorkflowAction[] = [
+  { status: "SUBMITTED", label: "Submit for Review", hoverBg: "hover:bg-blue-50", textColor: "text-blue-700", icon: Send },
+  { status: "APPROVED", label: "Approve", hoverBg: "hover:bg-emerald-50", textColor: "text-emerald-700", icon: CheckCircle2 },
   { status: "PENDING",     label: "Pending",     hoverBg: "hover:bg-amber-50",   textColor: "text-amber-700" },
   { status: "IN_PROGRESS", label: "In Progress", hoverBg: "hover:bg-blue-50",    textColor: "text-blue-700" },
   { status: "COMPLETED",   label: "Completed",   hoverBg: "hover:bg-emerald-50", textColor: "text-emerald-700" },
@@ -83,9 +114,18 @@ const STATUS_ACTIONS: { status: DrawingStatus; label: string; hoverBg: string; t
   { status: "REJECTED",    label: "Rejected",    hoverBg: "hover:bg-red-50",     textColor: "text-red-600" },
 ];
 
+const WORKFLOW_STATUSES = ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED"];
+
+function getStatusActions(currentStatus: string): WorkflowAction[] {
+  if (WORKFLOW_STATUSES.includes(currentStatus)) {
+    return WORKFLOW_ACTIONS[currentStatus] ?? [];
+  }
+  return LEGACY_ACTIONS;
+}
+
 const TYPE_LABELS: Record<string, string> = {
   SLD: "SLD", GA_DRAWING: "G.A.", WIRING_DIAGRAM: "Wiring",
-  LAYOUT: "Layout", CAD: "CAD", PDF: "PDF", OTHER: "Other",
+  LAYOUT: "Layout", CAD: "CAD", PDF: "PDF",
 };
 
 function StatusPill({ status }: { status: string }) {
@@ -147,6 +187,18 @@ export default function DrawingLibrary({
   const [customMessage, setCustomMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
 
+  // Reject drawing states
+  const [rejectDrawing, setRejectDrawing] = useState<EngineeringDrawing | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [isRejecting, setIsRejecting] = useState(false);
+
+  const { canWorkOnOrder } = useSalesOrderAccess();
+
+  const orderForDrawing = (drawing: EngineeringDrawing) => {
+    const salesOrderId = drawing.project?.salesOrderId;
+    return salesOrderId ? orders.find((o: any) => o.id === salesOrderId) : undefined;
+  };
+
   const toggle = (id: string) =>
     setSelectedDrawingIds(
       selectedDrawingIds.includes(id)
@@ -170,12 +222,16 @@ export default function DrawingLibrary({
     window.open(fileUrl, "_blank", "noopener,noreferrer");
   };
 
-  const changeStatus = async (e: React.MouseEvent, drawing: EngineeringDrawing, newStatus: string) => {
+  const changeStatus = async (e: React.MouseEvent, drawing: EngineeringDrawing, newStatus: string, rejectionReasonArg?: string) => {
     e.stopPropagation();
+    if (!canWorkOnOrder(orderForDrawing(drawing))) {
+      toast.error("View-only: you cannot change the status of this drawing.");
+      return;
+    }
     setOpenDropdown(null);
     setUpdatingId(drawing.id);
     try {
-      await exportOrdersApi.updateDrawingStatus(drawing.id, newStatus);
+      await exportOrdersApi.updateDrawingStatus(drawing.id, newStatus, rejectionReasonArg);
       toast.success(`Marked as ${STATUS_CONFIG[newStatus as DrawingStatus]?.label ?? newStatus}.`);
       onStatusChanged?.();
     } catch (err: any) {
@@ -185,8 +241,44 @@ export default function DrawingLibrary({
     }
   };
 
+  const handleStatusAction = (e: React.MouseEvent, drawing: EngineeringDrawing, action: WorkflowAction) => {
+    e.stopPropagation();
+    if (action.requiresReason) {
+      setRejectReason("");
+      setRejectDrawing(drawing);
+      setOpenActionsMenu(null);
+      setOpenDropdown(null);
+      return;
+    }
+    void changeStatus(e, drawing, action.status);
+  };
+
+  const handleRejectSubmit = async () => {
+    if (!rejectDrawing) return;
+    if (!rejectReason.trim()) {
+      toast.error("Please enter a rejection reason.");
+      return;
+    }
+    setIsRejecting(true);
+    try {
+      await exportOrdersApi.updateDrawingStatus(rejectDrawing.id, "REJECTED", rejectReason.trim());
+      toast.success("Drawing rejected.");
+      setRejectDrawing(null);
+      setRejectReason("");
+      onStatusChanged?.();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message ?? "Rejection failed.");
+    } finally {
+      setIsRejecting(false);
+    }
+  };
+
   const handleOpenSendModal = (e: React.MouseEvent, drawing: EngineeringDrawing) => {
     e.stopPropagation();
+    if (!canWorkOnOrder(orderForDrawing(drawing))) {
+      toast.error("View-only: you cannot send drawings for orders you are not assigned to.");
+      return;
+    }
     setOpenActionsMenu(null);
 
     // Find matching order contact details
@@ -297,7 +389,7 @@ export default function DrawingLibrary({
       {/* ── Stat bar ───────────────────────────────────────────── */}
       {drawings.length > 0 && (
         <div className="grid grid-cols-5 divide-x border-b bg-muted/20 text-xs">
-          {(["PENDING", "IN_PROGRESS", "COMPLETED", "ON_HOLD", "REJECTED"] as DrawingStatus[]).map((s) => {
+          {(["DRAFT", "SUBMITTED", "APPROVED", "REJECTED", "PENDING"] as DrawingStatus[]).map((s) => {
             const cfg = STATUS_CONFIG[s];
             return (
               <div key={s} className="flex items-center gap-2 px-4 py-2.5">
@@ -331,6 +423,7 @@ export default function DrawingLibrary({
             const fileUrl = buildFileUrl(d.fileUrl);
             const isUpdating = updatingId === d.id;
             const statusCfg = STATUS_CONFIG[d.status as DrawingStatus] ?? STATUS_CONFIG.PENDING;
+            const canWork = canWorkOnOrder(orderForDrawing(d));
 
             return (
               <div
@@ -407,13 +500,20 @@ export default function DrawingLibrary({
                             <ExternalLink className="w-3.5 h-3.5 text-muted-foreground" />
                             Open File
                           </button>
-                          <button
-                            onClick={(e) => handleOpenSendModal(e, d)}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-muted text-foreground transition-colors font-semibold text-left"
-                          >
-                            <Send className="w-3.5 h-3.5 text-primary" />
-                            Send to Customer
-                          </button>
+                          {canWork && (
+                            <button
+                              onClick={(e) => handleOpenSendModal(e, d)}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-muted text-foreground transition-colors font-semibold text-left"
+                            >
+                              <Send className="w-3.5 h-3.5 text-primary" />
+                              Send to Customer
+                            </button>
+                          )}
+                          {!canWork && (
+                            <p className="px-3 py-2 text-[11px] text-muted-foreground">
+                              View only — no work actions available
+                            </p>
+                          )}
                         </div>
                       )}
                     </div>
@@ -423,10 +523,20 @@ export default function DrawingLibrary({
                     <p className="text-[10px] text-muted-foreground/50 truncate -mt-0.5">{d.project.name}</p>
                   )}
 
+                  {d.status === "REJECTED" && d.rejectionReason && (
+                    <p
+                      className="text-[10px] text-red-600 bg-red-50 border border-red-200 rounded-md px-2 py-1 truncate"
+                      title={d.rejectionReason}
+                    >
+                      Reason: {d.rejectionReason}
+                    </p>
+                  )}
+
                   {/* Status dropdown */}
                   <div className="relative mt-0.5" onClick={(e) => e.stopPropagation()}>
                     <button
-                      disabled={isUpdating}
+                      disabled={isUpdating || !canWork}
+                      title={!canWork ? "View only — you cannot change the status of this drawing" : undefined}
                       onClick={(e) => {
                         e.stopPropagation();
                         setOpenDropdown(openDropdown === d.id ? null : d.id);
@@ -444,14 +554,14 @@ export default function DrawingLibrary({
 
                     {openDropdown === d.id && (
                       <div className="absolute bottom-full mb-1 left-0 right-0 z-40 rounded-xl border bg-background shadow-2xl py-1 overflow-hidden">
-                        {STATUS_ACTIONS.map((action) => {
-                          const Icon = STATUS_CONFIG[action.status].icon;
+                        {getStatusActions(d.status).map((action) => {
+                          const Icon = action.icon ?? STATUS_CONFIG[action.status].icon;
                           const isCurrent = d.status === action.status;
                           return (
                             <button
                               key={action.status}
                               disabled={isCurrent}
-                              onClick={(e) => changeStatus(e, d, action.status)}
+                              onClick={(e) => handleStatusAction(e, d, action)}
                               className={`w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors disabled:cursor-default ${action.hoverBg} ${action.textColor} ${isCurrent ? "opacity-50" : ""}`}
                             >
                               <Icon className="w-3.5 h-3.5 flex-shrink-0" />
@@ -497,6 +607,7 @@ export default function DrawingLibrary({
                 const isSelected = selectedDrawingIds.includes(d.id);
                 const isUpdating = updatingId === d.id;
                 const rowBg = STATUS_CONFIG[d.status as DrawingStatus]?.row ?? "";
+                const canWork = canWorkOnOrder(orderForDrawing(d));
 
                 return (
                   <tr
@@ -521,7 +632,19 @@ export default function DrawingLibrary({
                       </span>
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">{d.project?.name ?? "—"}</td>
-                    <td className="px-4 py-3"><StatusPill status={d.status} /></td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col items-start gap-1">
+                        <StatusPill status={d.status} />
+                        {d.status === "REJECTED" && d.rejectionReason && (
+                          <span
+                            className="text-[10px] text-red-600 max-w-[200px] truncate"
+                            title={d.rejectionReason}
+                          >
+                            {d.rejectionReason}
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
                         <button
@@ -531,16 +654,19 @@ export default function DrawingLibrary({
                         >
                           <ExternalLink className="w-3.5 h-3.5" />
                         </button>
-                        <button
-                          onClick={(e) => handleOpenSendModal(e, d)}
-                          title="Send to Customer"
-                          className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          <Send className="w-3.5 h-3.5" />
-                        </button>
+                        {canWork && (
+                          <button
+                            onClick={(e) => handleOpenSendModal(e, d)}
+                            title="Send to Customer"
+                            className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            <Send className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         <div className="relative">
                           <button
-                            disabled={isUpdating}
+                            disabled={isUpdating || !canWork}
+                            title={!canWork ? "View only — you cannot change the status of this drawing" : undefined}
                             onClick={(e) => { e.stopPropagation(); setOpenDropdown(openDropdown === d.id ? null : d.id); setOpenActionsMenu(null); }}
                             className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg border hover:bg-muted transition-colors disabled:opacity-50"
                           >
@@ -548,14 +674,14 @@ export default function DrawingLibrary({
                             {isUpdating ? "Saving…" : "Status"}
                           </button>
                           {openDropdown === d.id && (
-                            <div className="absolute right-0 top-full mt-1 z-50 w-44 rounded-xl border bg-background shadow-xl py-1 overflow-hidden">
-                              {STATUS_ACTIONS.map((action) => {
-                                const Icon = STATUS_CONFIG[action.status].icon;
+                            <div className="absolute right-0 top-full mt-1 z-50 w-48 rounded-xl border bg-background shadow-xl py-1 overflow-hidden">
+                              {getStatusActions(d.status).map((action) => {
+                                const Icon = action.icon ?? STATUS_CONFIG[action.status].icon;
                                 return (
                                   <button
                                     key={action.status}
                                     disabled={d.status === action.status}
-                                    onClick={(e) => changeStatus(e, d, action.status)}
+                                    onClick={(e) => handleStatusAction(e, d, action)}
                                     className={`w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${action.hoverBg} ${action.textColor}`}
                                   >
                                     <Icon className="w-3.5 h-3.5" />
@@ -730,6 +856,69 @@ export default function DrawingLibrary({
                     Send Drawing
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Reject Modal ─────────────────────────────────────── */}
+      {rejectDrawing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-background rounded-2xl border max-w-md w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="border-b px-6 py-4 flex items-center justify-between bg-muted/20">
+              <div>
+                <h3 className="font-bold text-lg text-foreground">Reject Drawing</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {rejectDrawing.drawingNo} ({rejectDrawing.title})
+                </p>
+              </div>
+              <button
+                onClick={() => { setRejectDrawing(null); setRejectReason(""); }}
+                className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Rejection Reason *
+                </label>
+                <textarea
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="Explain why this drawing needs to be revised..."
+                  rows={4}
+                  className="w-full p-3.5 text-sm rounded-xl border border-input bg-background focus:ring-2 focus:ring-primary/20 outline-none font-medium resize-none"
+                />
+                <p className="text-[10px] text-muted-foreground font-semibold">
+                  The assigned engineer will see this reason and can revise/resubmit the drawing.
+                </p>
+              </div>
+            </div>
+
+            <div className="border-t px-6 py-4 flex items-center justify-end gap-3 bg-muted/10">
+              <button
+                type="button"
+                onClick={() => { setRejectDrawing(null); setRejectReason(""); }}
+                className="px-4.5 py-2.5 rounded-xl border text-sm font-bold hover:bg-muted transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isRejecting}
+                onClick={handleRejectSubmit}
+                className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold shadow-sm hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50"
+              >
+                {isRejecting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <XCircle className="w-4 h-4" />
+                )}
+                {isRejecting ? "Rejecting..." : "Reject Drawing"}
               </button>
             </div>
           </div>

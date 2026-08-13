@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyPluginOptions, FastifyRequest, FastifyReply } from "fastify";
 import { adminLogs } from "../../../services/logger/contextLogger";
-import { DrawingStatus, DrawingType } from "@prisma/client";
+import { DrawingStatus, DrawingType, WorkflowStage } from "@prisma/client";
 import { z } from "zod";
 import { existsSync } from "fs";
 import path from "path";
@@ -14,6 +14,30 @@ interface Query {
 }
 
 const uploadsDirectory = path.join(__dirname, "../../../../uploads");
+
+// Workflow transition map. Legacy statuses (PENDING, IN_PROGRESS, COMPLETED,
+// ON_HOLD) remain free-form for backward compatibility (null = any target allowed).
+const DRAWING_STATUS_TRANSITIONS: Record<string, string[] | null> = {
+  DRAFT: ["SUBMITTED"],
+  SUBMITTED: ["APPROVED", "REJECTED"],
+  APPROVED: [],
+  REJECTED: ["DRAFT", "SUBMITTED"],
+  PENDING: null,
+  IN_PROGRESS: null,
+  COMPLETED: null,
+  ON_HOLD: null,
+};
+
+const VALID_DRAWING_STATUSES = [
+  "DRAFT",
+  "SUBMITTED",
+  "APPROVED",
+  "PENDING",
+  "IN_PROGRESS",
+  "COMPLETED",
+  "ON_HOLD",
+  "REJECTED",
+];
 
 const hasStoredDrawingFile = (fileUrl: string): boolean => {
   // A remote URL cannot be verified on the application filesystem, so leave it
@@ -31,6 +55,103 @@ async function adminExportOrdersRouteGroup(
 ) {
   // Pre-handler hook for verification
   const preHandlers = [fastify.verifyToken];
+
+  // ============================================================
+  // Assignment-aware access helpers
+  // ============================================================
+  const isAdminUser = (admin: any): boolean =>
+    Boolean(
+      Array.isArray(admin?.roles) &&
+        admin.roles.some((roleName: string) =>
+          String(roleName).toLowerCase().includes("admin")
+        )
+    );
+
+  const isAssignedToSalesOrder = async (
+    salesOrderId: string,
+    userId: string
+  ): Promise<boolean> => {
+    const assignment = await fastify.prisma.salesOrderAssignment.findUnique({
+      where: { salesOrderId_userId: { salesOrderId, userId } },
+    });
+    return !!assignment;
+  };
+
+  const canManageDrawingOrder = async (
+    salesOrderId: string,
+    request: FastifyRequest
+  ): Promise<boolean> => {
+    const userId = (request.admin as any)?.id;
+    if (!userId) return false;
+    if (isAdminUser(request.admin)) return true;
+    return isAssignedToSalesOrder(salesOrderId, userId);
+  };
+
+  // ============================================================
+  // Workflow tracker sync
+  // ============================================================
+  const WORKFLOW_STAGE_ORDER: Record<WorkflowStage, number> = {
+    ORDER_CONFIRMED: 0,
+    PO_READY: 1,
+    DRAWING_ASSIGNED: 2,
+    DRAWING_SENT: 3,
+    REVISION_REQUIRED: 4,
+    DRAWING_APPROVED: 5,
+    PO_PLACED: 6,
+    INVENTORY_FOLLOW_UP: 7,
+    PRODUCTION_FOLLOW_UP: 8,
+  };
+
+  const WORKFLOW_STAGE_TITLES: Record<string, string> = {
+    DRAWING_ASSIGNED: "Drawing Assigned",
+    DRAWING_SENT: "Drawing Sent",
+    REVISION_REQUIRED: "Revision Required",
+    DRAWING_APPROVED: "Drawing Approved",
+  };
+
+  // Advance the sales order's workflow stage + log an event. The stage only
+  // ever moves forward (never regresses) so drawing activity reflects the
+  // furthest point reached in the workflow tracker. Best-effort so a failure
+  // here never breaks the drawing operation itself.
+  const syncSalesOrderWorkflow = async (
+    salesOrderId: string,
+    stage: WorkflowStage,
+    performedById: string | null | undefined,
+    description?: string
+  ): Promise<void> => {
+    try {
+      const order = await fastify.prisma.salesOrder.findUnique({
+        where: { id: salesOrderId },
+        select: { workflowStage: true },
+      });
+      if (!order) return;
+
+      const currentIndex = WORKFLOW_STAGE_ORDER[order.workflowStage] ?? -1;
+      const newIndex = WORKFLOW_STAGE_ORDER[stage];
+      if (newIndex <= currentIndex) return;
+
+      await fastify.prisma.$transaction([
+        fastify.prisma.salesOrder.update({
+          where: { id: salesOrderId },
+          data: {
+            workflowStage: stage,
+            workflowUpdatedAt: new Date(),
+          },
+        }),
+        fastify.prisma.workflowEvent.create({
+          data: {
+            salesOrderId,
+            stage,
+            title: WORKFLOW_STAGE_TITLES[stage] ?? stage,
+            description: description ?? null,
+            performedById,
+          },
+        }),
+      ]);
+    } catch (error: any) {
+      adminLogs.error("Failed to sync sales order workflow from drawing action", { error, salesOrderId, stage });
+    }
+  };
 
   // 1. Get Matching Sales Orders with filters
   fastify.get(
@@ -276,6 +397,13 @@ async function adminExportOrdersRouteGroup(
           });
         }
 
+        if (!(await canManageDrawingOrder(data.salesOrderId, request))) {
+          return reply.status(403).send({
+            success: false,
+            message: "View only: you can only create drawings for sales orders assigned to you.",
+          });
+        }
+
         // Find or create EngineeringProject linked to this Sales Order
         let project = await fastify.prisma.engineeringProject.findFirst({
           where: { salesOrderId: data.salesOrderId, companyId, deletedAt: null },
@@ -316,11 +444,18 @@ async function adminExportOrdersRouteGroup(
             fileSize: data.fileSize,
             mimeType: data.mimeType,
             createdById: userId,
-            status: DrawingStatus.PENDING,
+            status: DrawingStatus.DRAFT,
           },
         });
 
         adminLogs.info("Created drawing for sales order export context", { drawingId: drawing.id });
+
+        await syncSalesOrderWorkflow(
+          data.salesOrderId,
+          WorkflowStage.DRAWING_ASSIGNED,
+          userId,
+          `Drawing ${drawing.drawingNo} added for order ${salesOrder.dveplCode}`
+        );
 
         return reply.status(201).send({
           success: true,
@@ -338,7 +473,7 @@ async function adminExportOrdersRouteGroup(
     }
   );
 
-  // 5. Update drawing status (APPROVED / REJECTED / PENDING)
+  // 5. Update drawing status / review workflow (DRAFT -> SUBMITTED -> APPROVED / REJECTED)
   fastify.put(
     "/drawing/update/:id",
     {
@@ -351,25 +486,134 @@ async function adminExportOrdersRouteGroup(
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         const { id } = request.params as { id: string };
-        const { status } = request.body as { status: string };
+        const bodySchema = z.object({
+          status: z.string().trim().min(1),
+          rejectionReason: z.string().trim().optional().nullable(),
+        });
 
-        const validStatuses = ["PENDING", "IN_PROGRESS", "COMPLETED", "ON_HOLD", "REJECTED"];
-        if (!status || !validStatuses.includes(status.toUpperCase())) {
+        const validation = bodySchema.safeParse(request.body);
+        if (!validation.success) {
           return reply.status(400).send({
             success: false,
-            message: `Invalid status. Must be one of: ${validStatuses.join(", ")}`,
+            message: "Invalid request data.",
+            error: validation.error.issues,
           });
         }
 
-        const drawing = await fastify.prisma.engineeringDrawing.update({
-          where: { id },
-          data: { status: status.toUpperCase() as any },
+        const { status: rawStatus, rejectionReason } = validation.data;
+        const status = rawStatus.toUpperCase();
+
+        if (!VALID_DRAWING_STATUSES.includes(status)) {
+          return reply.status(400).send({
+            success: false,
+            message: `Invalid status. Must be one of: ${VALID_DRAWING_STATUSES.join(", ")}`,
+          });
+        }
+
+        const companyId = (request.admin as any)?.companyId;
+        const userId = (request.admin as any)?.id;
+        if (!companyId || !userId) {
+          return reply.status(401).send({
+            success: false,
+            message: "Unauthorized. Missing token info.",
+          });
+        }
+
+        const drawing = await fastify.prisma.engineeringDrawing.findFirst({
+          where: { id, project: { companyId, deletedAt: null } },
+          include: { project: { select: { salesOrderId: true } } },
         });
+
+        if (!drawing) {
+          return reply.status(404).send({
+            success: false,
+            message: "Drawing not found.",
+          });
+        }
+
+        const salesOrderId = drawing.project?.salesOrderId;
+        if (!salesOrderId) {
+          return reply.status(400).send({
+            success: false,
+            message: "Drawing is not linked to a sales order.",
+          });
+        }
+
+        if (!(await canManageDrawingOrder(salesOrderId, request))) {
+          return reply.status(403).send({
+            success: false,
+            message: "View only: you can only manage drawings for sales orders assigned to you.",
+          });
+        }
+
+        const currentStatus = drawing.status;
+
+        if (status === currentStatus) {
+          return reply.send({
+            success: true,
+            message: "Drawing status is already set.",
+            data: drawing,
+          });
+        }
+
+        // Enforce the review workflow for workflow statuses.
+        const allowedTargets = DRAWING_STATUS_TRANSITIONS[currentStatus];
+        if (allowedTargets && !allowedTargets.includes(status)) {
+          return reply.status(400).send({
+            success: false,
+            message: `Invalid transition from ${currentStatus} to ${status}.`,
+          });
+        }
+
+        // Rejection within the review workflow requires a reason.
+        if (status === "REJECTED" && currentStatus === "SUBMITTED" && !rejectionReason?.trim()) {
+          return reply.status(400).send({
+            success: false,
+            message: "Rejection reason is required.",
+          });
+        }
+
+        const updateData: any = { status };
+
+        if (status === "APPROVED") {
+          updateData.approvedById = userId;
+          updateData.approvedAt = new Date();
+          updateData.rejectionReason = null;
+        } else if (status === "REJECTED") {
+          updateData.rejectionReason = rejectionReason?.trim() || null;
+        } else if (status === "SUBMITTED") {
+          updateData.rejectionReason = null;
+        } else if (status === "DRAFT") {
+          updateData.rejectionReason = null;
+          updateData.approvedById = null;
+          updateData.approvedAt = null;
+        }
+
+        const updated = await fastify.prisma.engineeringDrawing.update({
+          where: { id },
+          data: updateData,
+        });
+
+        if (status === "APPROVED") {
+          await syncSalesOrderWorkflow(
+            salesOrderId,
+            WorkflowStage.DRAWING_APPROVED,
+            userId,
+            `Drawing ${updated.drawingNo} approved`
+          );
+        } else if (status === "REJECTED") {
+          await syncSalesOrderWorkflow(
+            salesOrderId,
+            WorkflowStage.REVISION_REQUIRED,
+            userId,
+            `Drawing ${updated.drawingNo} rejected: ${rejectionReason?.trim() || "revision required"}`
+          );
+        }
 
         return reply.send({
           success: true,
           message: "Drawing status updated.",
-          data: drawing,
+          data: updated,
         });
       } catch (error: any) {
         adminLogs.error("Failed to update drawing status", { error });
@@ -414,6 +658,7 @@ async function adminExportOrdersRouteGroup(
 
         const { drawingId, method, email, phone, subject, message } = validation.data;
         const companyId = request.admin?.companyId;
+        const userId = request.admin?.id;
 
         if (!companyId) {
           return reply.status(401).send({
@@ -446,6 +691,14 @@ async function adminExportOrdersRouteGroup(
           return reply.status(404).send({
             success: false,
             message: "Drawing not found.",
+          });
+        }
+
+        const salesOrderId = drawing.project?.salesOrderId;
+        if (!salesOrderId || !(await canManageDrawingOrder(salesOrderId, request))) {
+          return reply.status(403).send({
+            success: false,
+            message: "View only: you can only send drawings for sales orders assigned to you.",
           });
         }
 
@@ -544,6 +797,15 @@ async function adminExportOrdersRouteGroup(
             }`
           );
           whatsappLink = `https://wa.me/${rawPhone ? rawPhone : ""}?text=${text}`;
+        }
+
+        if (emailSent || whatsappLink) {
+          await syncSalesOrderWorkflow(
+            salesOrderId,
+            WorkflowStage.DRAWING_SENT,
+            userId,
+            `Drawing ${drawing.drawingNo} sent to customer via ${method}`
+          );
         }
 
         return reply.send({

@@ -3,6 +3,17 @@ import { z } from "zod";
 const stringValue = z.string().nullish().transform((value) => value ?? "");
 const numberValue = z.coerce.number().catch(0);
 
+export const salesOrderAssignmentSchema = z.object({
+  id: z.string().optional(),
+  salesOrderId: z.string().optional(),
+  userId: z.string(),
+  user: z.object({
+    id: z.string(),
+    name: z.string(),
+    email: z.string().optional(),
+  }).optional(),
+}).passthrough();
+
 export const exportOrderSchema = z.object({
   id: z.string(),
   dveplCode: stringValue,
@@ -12,6 +23,7 @@ export const exportOrderSchema = z.object({
   deliveryMonthTarget: stringValue,
   orderConfirmDate: stringValue,
   items: z.array(z.object({ quantity: numberValue }).passthrough()).catch([]),
+  assignments: z.array(salesOrderAssignmentSchema).catch([]),
 }).passthrough();
 
 export const engineeringDrawingSchema = z.object({
@@ -24,6 +36,9 @@ export const engineeringDrawingSchema = z.object({
   fileSize: z.coerce.number().nullable().catch(null),
   mimeType: z.string().nullable().catch(null),
   status: stringValue,
+  rejectionReason: z.string().nullable().optional(),
+  approvedById: z.string().nullable().optional(),
+  approvedAt: z.string().nullable().optional(),
   project: z.object({
     id: z.string(),
     name: stringValue,
@@ -67,6 +82,7 @@ export const uploadedFileResponseSchema = z.object({
 
 export type ExportOrder = z.infer<typeof exportOrderSchema>;
 export type EngineeringDrawing = z.infer<typeof engineeringDrawingSchema>;
+export type SalesOrderAssignment = z.infer<typeof salesOrderAssignmentSchema>;
 
 export interface ExportOrderFilters {
   search?: string;

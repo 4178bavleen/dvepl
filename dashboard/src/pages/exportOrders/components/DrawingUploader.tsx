@@ -12,6 +12,7 @@ import {
 import { exportOrdersApi } from "@/services/modules";
 import toast from "react-hot-toast";
 import type { ExportOrder } from "@/types/exportOrders";
+import { useSalesOrderAccess } from "@/utils/salesOrderAccess";
 
 interface Props {
   selectedOrderIds: string[];
@@ -21,7 +22,7 @@ interface Props {
 }
 
 const DRAWING_TYPES = [
-  "SLD", "GA_DRAWING", "WIRING_DIAGRAM", "LAYOUT", "CAD", "PDF", "OTHER",
+  "SLD", "GA_DRAWING", "WIRING_DIAGRAM", "LAYOUT", "CAD", "PDF",
 ];
 
 export default function DrawingUploader({ selectedOrderIds, selectedOrders, availableOrders, onSuccess }: Props) {
@@ -35,7 +36,18 @@ export default function DrawingUploader({ selectedOrderIds, selectedOrders, avai
   const [title, setTitle] = useState("");
   const [drawingType, setDrawingType] = useState("SLD");
 
+  const { canWorkOnOrder } = useSalesOrderAccess();
+  const workableOrders = availableOrders.filter((o) => canWorkOnOrder(o));
+  const canAttach =
+    selectedOrderIds.length > 0 &&
+    selectedOrders.length > 0 &&
+    selectedOrders.every((o) => canWorkOnOrder(o));
+
   const openDialog = async (file: File) => {
+    if (selectedOrderIds.length > 0 && !canAttach) {
+      toast.error("View-only: you can only upload drawings to orders assigned to you.");
+      return;
+    }
     setPendingFile(file);
     // Pre-select first selected order, or first available order
     setSalesOrderId(selectedOrderIds[0] ?? "");
@@ -65,6 +77,12 @@ export default function DrawingUploader({ selectedOrderIds, selectedOrders, avai
   const handleSubmit = async () => {
     if (!pendingFile || !salesOrderId || !drawingNo || !title) {
       toast.error("Please fill in all required fields.");
+      return;
+    }
+
+    const targetOrder = availableOrders.find((o) => o.id === salesOrderId);
+    if (!canWorkOnOrder(targetOrder)) {
+      toast.error("View-only: you can only upload drawings to orders assigned to you.");
       return;
     }
 
@@ -118,6 +136,11 @@ export default function DrawingUploader({ selectedOrderIds, selectedOrders, avai
                 Select at least one order first to attach drawings.
               </p>
             )}
+            {selectedOrderIds.length > 0 && !canAttach && (
+              <p className="text-xs text-yellow-600 mt-2">
+                View-only: you can only upload drawings to orders assigned to you.
+              </p>
+            )}
             <Button
               className="mt-5"
               type="button"
@@ -151,7 +174,12 @@ export default function DrawingUploader({ selectedOrderIds, selectedOrders, avai
                   <SelectValue placeholder="Select order" />
                 </SelectTrigger>
                 <SelectContent>
-                    {availableOrders.map((o) => (
+                  {workableOrders.length === 0 && (
+                    <div className="px-3 py-2 text-xs text-muted-foreground">
+                      No orders assigned to you.
+                    </div>
+                  )}
+                  {workableOrders.map((o) => (
                     <SelectItem key={o.id} value={o.id}>
                       {o.dveplCode} — {o.partyName}
                     </SelectItem>

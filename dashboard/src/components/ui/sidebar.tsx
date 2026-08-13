@@ -148,6 +148,7 @@ export default function Sidebar({
       recycle_bin: 'recycle_bin',
       settings: 'settings',
       export_orders: 'export_orders',
+      engineering_drawing: 'export_orders',
     };
 
     return sidebarItems.filter((item) => {

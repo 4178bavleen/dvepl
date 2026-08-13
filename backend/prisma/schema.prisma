@@ -445,46 +445,46 @@ model UserAccessProfile {
 }
 
 model Employee {
-  id                     String                     @id @default(uuid())
-  userId                 String?                    @unique
+  id                     String                  @id @default(uuid())
+  userId                 String?                 @unique
   companyId              String
   branchId               String?
   departmentId           String?
   teamId                 String?
   designationId          String?
   reportsToId            String?
-  employeeCode           String                     @unique
+  employeeCode           String                  @unique
   firstName              String
   lastName               String
   dateOfBirth            DateTime?
   gender                 String?
   dateOfJoining          DateTime?
   dateOfExit             DateTime?
-  status                 EmployeeStatus             @default(ACTIVE)
-  createdAt              DateTime                   @default(now())
-  updatedAt              DateTime                   @updatedAt
+  status                 EmployeeStatus          @default(ACTIVE)
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
   deletedAt              DateTime?
   notificationRecipients NotificationRecipient[]
-  salesOrderAssignments  SalesOrderAssignment[]
-  attendances            Attendance[]
-  contacts               EmployeeContact[]
-  documents              EmployeeDocument[]
-  education              EmployeeEducation[]
-  emergencyContacts      EmployeeEmergencyContact[]
-  experience             EmployeeExperience[]
-  shiftAssignments       EmployeeShift[]
-  branch                 Branch?                    @relation(fields: [branchId], references: [id])
-  company                Company                    @relation(fields: [companyId], references: [id])
-  department             Department?                @relation(fields: [departmentId], references: [id])
-  designation            Designation?               @relation(fields: [designationId], references: [id])
-  reportsTo              Employee?                  @relation("EmployeeHierarchy", fields: [reportsToId], references: [id])
-  subordinates           Employee[]                 @relation("EmployeeHierarchy")
-  team                   Team?                      @relation(fields: [teamId], references: [id])
-  user                   User?                      @relation(fields: [userId], references: [id])
-  leaves                 Leave[]
-  salaries               Salary[]
-  taskAssignments        TaskAssignment[]
-  tenderRequestsCreated  TenderRequest[]            @relation("TenderRequestCreatedBy")
+
+  attendances           Attendance[]
+  contacts              EmployeeContact[]
+  documents             EmployeeDocument[]
+  education             EmployeeEducation[]
+  emergencyContacts     EmployeeEmergencyContact[]
+  experience            EmployeeExperience[]
+  shiftAssignments      EmployeeShift[]
+  branch                Branch?                    @relation(fields: [branchId], references: [id])
+  company               Company                    @relation(fields: [companyId], references: [id])
+  department            Department?                @relation(fields: [departmentId], references: [id])
+  designation           Designation?               @relation(fields: [designationId], references: [id])
+  reportsTo             Employee?                  @relation("EmployeeHierarchy", fields: [reportsToId], references: [id])
+  subordinates          Employee[]                 @relation("EmployeeHierarchy")
+  team                  Team?                      @relation(fields: [teamId], references: [id])
+  user                  User?                      @relation(fields: [userId], references: [id])
+  leaves                Leave[]
+  salaries              Salary[]
+  taskAssignments       TaskAssignment[]
+  tenderRequestsCreated TenderRequest[]            @relation("TenderRequestCreatedBy")
 
   @@index([companyId])
   @@map("employees")
@@ -1286,16 +1286,16 @@ model ApprovalHistory {
 }
 
 model SalesOrder {
-  id                     String                 @id @default(uuid())
+  id                     String           @id @default(uuid())
   companyId              String
   customerId             String?
   tenderId               String?
   quotationId            String?
-  status                 SalesOrderStatus       @default(PENDING)
+  status                 SalesOrderStatus @default(PENDING)
   remarks                String?
   createdById            String
-  createdAt              DateTime               @default(now())
-  updatedAt              DateTime               @updatedAt
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
   deletedAt              DateTime?
   caNo                   String?
   contactDetails         String?
@@ -1304,36 +1304,36 @@ model SalesOrder {
   drawingConcernedPerson String?
   drawingRemarks         String?
   drawingStatus          DrawingStatus?
-  dveplCode              String                 @unique
-  grandTotal             Decimal                @default(0) @db.Decimal(15, 2)
-  gstTotal               Decimal                @default(0) @db.Decimal(15, 2)
+  dveplCode              String           @unique
+  grandTotal             Decimal          @default(0) @db.Decimal(15, 2)
+  gstTotal               Decimal          @default(0) @db.Decimal(15, 2)
   inspectionField        String?
   orderConfirmDate       DateTime?
   orderTakenById         String?
   partyName              String
   poDate                 DateTime?
-  sendNotification       Boolean                @default(true)
-  subtotal               Decimal                @default(0) @db.Decimal(15, 2)
-  assignedToIds          String[]               @default([])
-  assignments            SalesOrderAssignment[]
-  dispatches             Dispatch[]
-  engineeringProjects    EngineeringProject[]
-  invoices               Invoice[]
-  payments               Payment[]
-  salesOrderAttachments  SalesOrderAttachment[]
-  items                  SalesOrderItem[]
-  company                Company                @relation(fields: [companyId], references: [id])
-  createdBy              User                   @relation("OrderCreatedBy", fields: [createdById], references: [id])
-  customer               Customer?              @relation(fields: [customerId], references: [id])
-  orderTakenBy           User?                  @relation("OrderTakenBy", fields: [orderTakenById], references: [id])
-  quotation              Quotation?             @relation(fields: [quotationId], references: [id])
-  tender                 Tender?                @relation(fields: [tenderId], references: [id])
-  workOrders             WorkOrder[]
-  workflowStage          WorkflowStage          @default(ORDER_CONFIRMED)
-  nextAction             String?
-  dueDate                DateTime?
-  workflowUpdatedAt      DateTime               @default(now())
-  workflowEvents         WorkflowEvent[]
+  sendNotification       Boolean          @default(true)
+  subtotal               Decimal          @default(0) @db.Decimal(15, 2)
+
+  assignments           SalesOrderAssignment[]
+  dispatches            Dispatch[]
+  engineeringProjects   EngineeringProject[]
+  invoices              Invoice[]
+  payments              Payment[]
+  salesOrderAttachments SalesOrderAttachment[]
+  items                 SalesOrderItem[]
+  company               Company                @relation(fields: [companyId], references: [id])
+  createdBy             User                   @relation("OrderCreatedBy", fields: [createdById], references: [id])
+  customer              Customer?              @relation(fields: [customerId], references: [id])
+  orderTakenBy          User?                  @relation("OrderTakenBy", fields: [orderTakenById], references: [id])
+  quotation             Quotation?             @relation(fields: [quotationId], references: [id])
+  tender                Tender?                @relation(fields: [tenderId], references: [id])
+  workOrders            WorkOrder[]
+  workflowStage         WorkflowStage          @default(ORDER_CONFIRMED)
+  nextAction            String?
+  dueDate               DateTime?
+  workflowUpdatedAt     DateTime               @default(now())
+  workflowEvents        WorkflowEvent[]
 
   @@index([companyId])
   @@index([status])
@@ -1357,13 +1357,20 @@ model WorkflowEvent {
 }
 
 model SalesOrderAssignment {
-  id           String     @id @default(uuid())
+  id           String @id @default(uuid())
   salesOrderId String
-  employeeId   String?
-  userId       String?
-  employee     Employee?  @relation(fields: [employeeId], references: [id])
-  salesOrder   SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
-  user         User?      @relation(fields: [userId], references: [id])
+  userId       String
+
+  salesOrder SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([salesOrderId, userId])
+  @@index([salesOrderId])
+  @@index([userId])
 }
 
 model Task {
@@ -1469,6 +1476,7 @@ model EngineeringDrawing {
   fileSize        Int?
   mimeType        String?
   status          DrawingStatus           @default(PENDING)
+  rejectionReason String?
   approvedById    String?
   approvedAt      DateTime?
   createdById     String
@@ -2938,6 +2946,9 @@ enum DrawingType {
 }
 
 enum DrawingStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
   PENDING
   IN_PROGRESS
   COMPLETED
@@ -3187,4 +3198,3 @@ model CustomerDrawingReview {
   @@index([status])
   @@map("customer_drawing_reviews")
 }
-

@@ -312,7 +312,11 @@ export async function seedSalesOrders() {
           `Reference Code: ${order.referenceCode}`,
         ].join("\n"),
 
-        assignedToIds: [user.id],
+        assignments: {
+          create: {
+            userId: user.id,
+          },
+        },
 
         createdAt: new Date(order.date),
 
