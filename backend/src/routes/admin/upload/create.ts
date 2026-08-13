@@ -23,7 +23,6 @@ async function createUploadRoute(
       },
       preHandler: [
         fastify.verifyToken,
-        fastify.authorizePermissions(["company.create"]),
       ],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {

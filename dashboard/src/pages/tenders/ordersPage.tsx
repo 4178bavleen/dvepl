@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   XCircle,
   Users,
+  UserPlus,
   ExternalLink,
   Eye,
 } from "lucide-react";
@@ -48,6 +49,11 @@ import {
 
 import { apiClient } from "@/services/axios";
 import { toast } from "react-hot-toast";
+import { useERPStore } from "@/store/erpStore";
+import {
+  SalesOrderAssignModal,
+  SalesOrderAssignment,
+} from "./components/SalesOrderAssignModal";
 
 // ============================================================
 // API RESPONSE SHAPE
@@ -80,6 +86,7 @@ interface RawQuoteTenderOrder {
 
 interface QuoteTenderOrder extends RawQuoteTenderOrder {
   id: string;
+  dveplCode?: string;
   drawingAttached: boolean;
   drawings?: Array<{
     id: string;
@@ -90,6 +97,7 @@ interface QuoteTenderOrder extends RawQuoteTenderOrder {
   }>;
   poStatus?: string;
   poNumber?: string;
+  assignments?: SalesOrderAssignment[];
 }
 
 // ============================================================
@@ -100,6 +108,7 @@ const ALL_COLUMN_KEYS = [
   { id: "tenderNo", label: "TENDER NO" },
   { id: "nameOfWork", label: "NAME OF WORK" },
   { id: "firmName", label: "FIRM NAME" },
+  { id: "assignedUsers", label: "ASSIGNED TO" },
   { id: "contactPerson", label: "Name" },
   { id: "mobile", label: "MOBILE" },
   { id: "email", label: "EMAIL" },
@@ -251,6 +260,29 @@ function parseContactDetails(contactDetails: string) {
 // ============================================================
 
 export function OrdersPage() {
+  const store = useERPStore();
+
+  const currentUser = useMemo(() => {
+    return store.users.find((user) => user.id === store.currentUserId) as any;
+  }, [store.users, store.currentUserId]);
+
+  const currentUserId = store.currentUserId || currentUser?.id || null;
+
+  const isAdmin = Boolean(
+    currentUser?.role?.toLowerCase?.().includes("admin") ||
+    currentUser?.name?.toLowerCase?.().includes("admin")
+  );
+
+  const isOrderAssignedToCurrentUser = useCallback(
+    (order: QuoteTenderOrder | null | undefined) => {
+      if (!order || !currentUserId) return false;
+      return (order.assignments || []).some(
+        (assignment) => assignment.userId === currentUserId
+      );
+    },
+    [currentUserId]
+  );
+
   const navigate = useNavigate();
   const [quoteTenders, setQuoteTenders] =
     useState<QuoteTenderOrder[]>(EMPTY_ARRAY);
@@ -265,6 +297,10 @@ export function OrdersPage() {
 
   // Selected tender for centered overview dialog
   const [viewingTender, setViewingTender] =
+    useState<QuoteTenderOrder | null>(null);
+
+  // Selected tender for user assignment modal
+  const [assigningTender, setAssigningTender] =
     useState<QuoteTenderOrder | null>(null);
 
   const [isSyncing, setIsSyncing] = useState(false);
@@ -379,6 +415,7 @@ export function OrdersPage() {
 
           return {
             id: order.id,
+            dveplCode: order.dveplCode || "",
             t_id: order.dveplCode ? parseInt(order.dveplCode.replace(/\D/g, ""), 10) || 0 : 0,
             tender_no: order.caNo || "",
             name_of_work: remarksFields.workName || "",
@@ -401,10 +438,21 @@ export function OrdersPage() {
             drawingAttached: order.engineeringProjects?.some((proj: any) => proj.drawings?.length > 0) || false,
             drawings: order.engineeringProjects?.flatMap((proj: any) => proj.drawings || []) || [],
             file_name: remarksFields.fileName || null,
+            assignments: order.assignments || [],
           };
         });
 
         setQuoteTenders(rows);
+        setViewingTender((prev) => {
+          if (!prev) return null;
+          const updated = rows.find((r) => r.id === prev.id);
+          return updated || prev;
+        });
+        setAssigningTender((prev) => {
+          if (!prev) return null;
+          const updated = rows.find((r) => r.id === prev.id);
+          return updated || prev;
+        });
       } else {
         toast.error(
           response.data?.message ??
@@ -633,6 +681,59 @@ export function OrdersPage() {
           header: sortableHeader("FIRM NAME"),
           cell: ({ getValue }) =>
             (getValue() as string) || "—",
+        },
+
+        assignedUsers: {
+          id: "assignedUsers",
+          header: "ASSIGNED TO",
+          cell: ({ row }) => {
+            const item = row.original;
+            const assignments = item.assignments || [];
+
+            return (
+              <div className="flex items-center gap-1.5 min-w-[140px]">
+                {assignments.length > 0 ? (
+                  <div
+                    className="flex items-center -space-x-1.5 overflow-hidden max-w-[120px]"
+                    title={assignments.map((a) => a.user?.name || a.userId).join(", ")}
+                  >
+                    {assignments.slice(0, 2).map((a, idx) => (
+                      <span
+                        key={a.id || a.userId || idx}
+                        className="inline-flex items-center justify-center size-6 rounded-full bg-primary/10 border-2 border-background text-[10px] font-bold text-primary shrink-0 uppercase"
+                      >
+                        {(a.user?.name || "U").charAt(0)}
+                      </span>
+                    ))}
+                    {assignments.length > 2 && (
+                      <span className="inline-flex items-center justify-center size-6 rounded-full bg-muted border-2 border-background text-[9px] font-bold text-muted-foreground shrink-0">
+                        +{assignments.length - 2}
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-[11px] font-medium text-muted-foreground italic">
+                    Unassigned
+                  </span>
+                )}
+
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  disabled={!isAdmin}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!isAdmin) return;
+                    setAssigningTender(item);
+                  }}
+                  className="size-7 rounded-md hover:bg-primary/10 hover:text-primary transition-colors ml-auto shrink-0"
+                  title={isAdmin ? "Assign Users" : "Only administrators can manage assignments"}
+                >
+                  <Users className="size-3.5" />
+                </Button>
+              </div>
+            );
+          },
         },
 
         contactPerson: {
@@ -911,7 +1012,7 @@ export function OrdersPage() {
       return (Object.keys(allDefs) as ColumnKey[])
         .filter((key) => visibleColumns[key])
         .map((key) => allDefs[key]);
-    }, [visibleColumns]);
+    }, [visibleColumns, isAdmin]);
 
   // ============================================================
   // RENDER
@@ -1331,6 +1432,111 @@ export function OrdersPage() {
                   </section>
 
                   {/* ==================================================
+                      ASSIGNED USERS
+                      ================================================== */}
+
+                  <section className="border-t pt-7">
+                    <div className="flex items-center justify-between mb-4">
+                      <DetailSectionTitle
+                        title="Assigned Users"
+                        color="bg-purple-500"
+                      />
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!isAdmin}
+                        onClick={() => {
+                          if (!isAdmin) return;
+                          setAssigningTender(viewingTender);
+                        }}
+                        title={isAdmin ? "Manage Assignments" : "Only administrators can manage assignments"}
+                        className="gap-1.5 h-8 text-xs font-semibold border-purple-500/30 text-purple-600 dark:text-purple-400 hover:bg-purple-500/10"
+                      >
+                        <Users className="size-3.5" />
+                        Manage Assignments
+                      </Button>
+                    </div>
+
+                    <div className="rounded-xl border bg-card p-4">
+                      {viewingTender.assignments && viewingTender.assignments.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {viewingTender.assignments.map((assignment, idx) => (
+                            <div
+                              key={assignment.id || assignment.userId || idx}
+                              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-muted/20 text-xs font-semibold"
+                            >
+                              <div className="size-6 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[10px] uppercase">
+                                {(assignment.user?.name || "U").charAt(0)}
+                              </div>
+                              <div>
+                                <p className="font-semibold text-foreground">
+                                  {assignment.user?.name || "User ID: " + assignment.userId}
+                                </p>
+                                {assignment.user?.email && (
+                                  <p className="text-[10px] text-muted-foreground">
+                                    {assignment.user.email}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between text-xs text-muted-foreground p-2">
+                          <span>No users are currently assigned to this order.</span>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            disabled={!isAdmin}
+                            onClick={() => {
+                              if (!isAdmin) return;
+                              setAssigningTender(viewingTender);
+                            }}
+                            title={isAdmin ? "Assign Users" : "Only administrators can manage assignments"}
+                            className="h-7 text-xs font-semibold"
+                          >
+                            + Assign Now
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </section>
+
+                  {/* ==================================================
+                      WORK ACCESS
+                      ================================================== */}
+                  <section className="border-t pt-7">
+                    <DetailSectionTitle
+                      title="Work Access"
+                      color={
+                        isOrderAssignedToCurrentUser(viewingTender)
+                          ? "bg-emerald-500"
+                          : "bg-amber-500"
+                      }
+                    />
+
+                    <div
+                      className={`rounded-xl border p-4 ${
+                        isOrderAssignedToCurrentUser(viewingTender)
+                          ? "border-emerald-500/20 bg-emerald-500/5"
+                          : "border-amber-500/20 bg-amber-500/5"
+                      }`}
+                    >
+                      <p className="text-sm font-semibold">
+                        {isOrderAssignedToCurrentUser(viewingTender)
+                          ? "This order is assigned to you."
+                          : "This is a view-only order for you."}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {isOrderAssignedToCurrentUser(viewingTender)
+                          ? "You can perform order-specific work actions for this order."
+                          : "Order-specific work actions should only be available on orders assigned to you."}
+                      </p>
+                    </div>
+                  </section>
+
+                  {/* ==================================================
                       CONTACT
                       ================================================== */}
 
@@ -1578,6 +1784,20 @@ export function OrdersPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* ========================================================
+          ASSIGN USERS MODAL
+          ======================================================== */}
+      <SalesOrderAssignModal
+        open={Boolean(assigningTender)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setAssigningTender(null);
+          }
+        }}
+        order={assigningTender}
+        onSuccess={() => void loadQuoteTenders()}
+      />
     </div>
   );
 }

@@ -117,7 +117,11 @@ export const quotationApi = {
 };
 
 export const salesOrderApi = {
-  salesOrders: crud(API_ENDPOINTS.salesOrder.salesOrders),
+  salesOrders: {
+    ...crud(API_ENDPOINTS.salesOrder.salesOrders),
+    assign: (id: string, userIds: string[]) =>
+      apiClient.put(API_ENDPOINTS.salesOrder.salesOrders.assign(id), { userIds }).then(res => res.data),
+  },
 };
 
 export const approvalRuleApi = {
@@ -268,8 +272,8 @@ export const exportOrdersApi = {
     }).then((res) => uploadedFileResponseSchema.parse(res.data));
   },
 
-  updateDrawingStatus: (id: string, status: string) =>
-    apiClient.put(API_ENDPOINTS.exportOrders.updateDrawing(id), { status })
+  updateDrawingStatus: (id: string, status: string, rejectionReason?: string | null) =>
+    apiClient.put(API_ENDPOINTS.exportOrders.updateDrawing(id), { status, rejectionReason })
       .then((res) => drawingResponseSchema.parse(res.data)),
 
   // Send a drawing to a customer via Email/WhatsApp

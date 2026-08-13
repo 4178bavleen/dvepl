@@ -250,32 +250,35 @@ async function adminSalesOrderBulkUploadRoutes(
               if (orderData.assignedTo) {
                 const assignees = String(orderData.assignedTo).split(",").map(s => s.trim()).filter(Boolean);
                 if (assignees.length > 0) {
-                  const employees = await tx.employee.findMany({
+                  const users = await tx.user.findMany({
                     where: {
+                      companyId,
+                      deletedAt: null,
+                      isActive: true,
                       OR: [
-                        { user: { name: { in: assignees, mode: "insensitive" } } },
-                        { user: { email: { in: assignees, mode: "insensitive" } } },
-                        { firstName: { in: assignees, mode: "insensitive" } },
-                        { lastName: { in: assignees, mode: "insensitive" } },
+                        { name: { in: assignees, mode: "insensitive" } },
+                        { email: { in: assignees, mode: "insensitive" } },
+                        { employee: { firstName: { in: assignees, mode: "insensitive" } } },
+                        { employee: { lastName: { in: assignees, mode: "insensitive" } } },
                         {
-                          contacts: {
-                            some: {
-                              value: { in: assignees, mode: "insensitive" }
+                          employee: {
+                            contacts: {
+                              some: {
+                                value: { in: assignees, mode: "insensitive" }
+                              }
                             }
                           }
                         }
-                      ],
-                      deletedAt: null
+                      ]
                     },
-                    select: { id: true, userId: true }
+                    select: { id: true }
                   });
 
-                  if (employees.length > 0) {
+                  if (users.length > 0) {
                     await tx.salesOrderAssignment.createMany({
-                      data: employees.map(emp => ({
+                      data: users.map(u => ({
                         salesOrderId: salesOrder.id,
-                        employeeId: emp.id,
-                        userId: emp.userId
+                        userId: u.id
                       })),
                       skipDuplicates: true
                     });

@@ -16,7 +16,7 @@ interface ExportOrdersStore {
   fetchOrders: (filters?: ExportOrderFilters) => Promise<void>;
   fetchAvailableOrders: () => Promise<void>;
   fetchDrawings: (orderIds: string[]) => Promise<void>;
-  updateDrawingStatus: (id: string, status: string) => Promise<void>;
+  updateDrawingStatus: (id: string, status: string, rejectionReason?: string | null) => Promise<void>;
 }
 
 export const useExportOrdersStore = create<ExportOrdersStore>((set) => ({
@@ -68,8 +68,8 @@ export const useExportOrdersStore = create<ExportOrdersStore>((set) => ({
     }
   },
 
-  updateDrawingStatus: async (id, status) => {
-    const response = await exportOrdersApi.updateDrawingStatus(id, status);
+  updateDrawingStatus: async (id, status, rejectionReason) => {
+    const response = await exportOrdersApi.updateDrawingStatus(id, status, rejectionReason);
     set((state) => ({
       drawings: state.drawings.map((drawing) =>
         drawing.id === id ? { ...drawing, ...response.data } : drawing,

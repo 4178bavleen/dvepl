@@ -32,11 +32,7 @@ export const salesOrderSchema = z.object({
 
   orderTakenById: z.string().uuid().nullable().optional(),
 
-  // Allow nulls for now because frontend is sending [null]
-  assignedToIds: z
-    .array(z.string().uuid().nullable())
-    .optional()
-    .default([]),
+
 
   partyName: z.string().min(1, "Party name is required"),
 

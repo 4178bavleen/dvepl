@@ -116,9 +116,11 @@ async function quoteTenderOrderReadRoutes(
                 subtotal,
                 gstTotal,
                 grandTotal,
-                remarks,
-                assignedToIds: [userId],
-                createdAt: order.remarked_at ? new Date(order.remarked_at) : new Date(),
+                assignments: {
+                  create: {
+                    userId,
+                  },
+                },
                 sendNotification: false,
               },
             });

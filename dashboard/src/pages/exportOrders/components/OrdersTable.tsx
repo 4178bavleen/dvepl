@@ -1,5 +1,6 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import type { ExportOrder } from "@/types/exportOrders";
+import { useSalesOrderAccess } from "@/utils/salesOrderAccess";
 import { FileText } from "lucide-react";
 
 interface Props {
@@ -42,6 +43,7 @@ export default function OrdersTable({
   onSelectOrder,
   onSelectAll,
 }: Props) {
+  const { canWorkOnOrder, isAdmin } = useSalesOrderAccess();
   const allSelected = orders.length > 0 && selectedOrderIds.length === orders.length;
   const someSelected = selectedOrderIds.length > 0 && !allSelected;
 
@@ -72,6 +74,7 @@ export default function OrdersTable({
               <th className="px-4 py-3 text-left">Status</th>
               <th className="px-4 py-3 text-left">Amount</th>
               <th className="px-4 py-3 text-left">Delivery Target</th>
+              <th className="px-4 py-3 text-left">Access</th>
             </tr>
           </thead>
 
@@ -79,7 +82,7 @@ export default function OrdersTable({
             {isLoading &&
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i} className="border-t">
-                  {Array.from({ length: 7 }).map((__, j) => (
+                  {Array.from({ length: 8 }).map((__, j) => (
                     <td key={j} className="px-4 py-3">
                       <div className="h-4 w-full rounded bg-muted animate-pulse" />
                     </td>
@@ -89,7 +92,7 @@ export default function OrdersTable({
 
             {!isLoading && orders.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
                   No orders found. Use the filter above to search.
                 </td>
               </tr>
@@ -104,6 +107,8 @@ export default function OrdersTable({
                 const hasDrawing = row.engineeringProjects?.some(
                   (p: any) => p.drawings?.length > 0
                 );
+
+                const canWork = canWorkOnOrder(row);
 
                 return (
                   <tr
@@ -146,6 +151,23 @@ export default function OrdersTable({
                     <td className="px-4 py-3">{fmt(row.grandTotal)}</td>
                     <td className="px-4 py-3 text-muted-foreground text-xs">
                       {row.deliveryMonthTarget || fmtDate(row.orderConfirmDate)}
+                    </td>
+                    <td className="px-4 py-3">
+                      {canWork ? (
+                        isAdmin ? (
+                          <span className="inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                            Admin access
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            Assigned to you
+                          </span>
+                        )
+                      ) : (
+                        <span className="inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground border">
+                          View only
+                        </span>
+                      )}
                     </td>
                   </tr>
                 );

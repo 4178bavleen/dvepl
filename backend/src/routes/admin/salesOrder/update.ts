@@ -8,7 +8,6 @@ import {
 import { Prisma } from "@prisma/client";
 
 import { adminLogs } from "../../../services/logger/contextLogger";
-
 import { salesOrderSchema } from "../../../schemas/admin/salesOrder/salesOrder.schema";
 
 interface Params {
@@ -33,14 +32,15 @@ async function adminSalesOrderUpdateRoutes(
       request: FastifyRequest<{ Params: Params }>,
       reply: FastifyReply,
     ) => {
+      const { id } = request.params;
+
       try {
-        const { id } = request.params;
-
         // ==========================
-        // Validate Body
+        // Validate Request
         // ==========================
 
-        const validationResult = salesOrderSchema.partial().safeParse(request.body);
+        const validationResult =
+          salesOrderSchema.partial().safeParse(request.body);
 
         if (!validationResult.success) {
           adminLogs.error("Invalid Sales Order update data", {
@@ -61,27 +61,20 @@ async function adminSalesOrderUpdateRoutes(
           companyId,
           dveplCode,
           status,
-
           orderTakenById,
-          assignedToIds,
-
           partyName,
           caNo,
           contactDetails,
-
           orderConfirmDate,
           deliveryMonthTarget,
           poDate,
-
           drawingConcernedPerson,
           drawingApprovedDate,
           drawingStatus,
           drawingRemarks,
-
           inspectionField,
           sendNotification,
           remarks,
-
           items,
         } = validationResult.data;
 
@@ -89,12 +82,13 @@ async function adminSalesOrderUpdateRoutes(
         // Check Existing Order
         // ==========================
 
-        const existingOrder = await fastify.prisma.salesOrder.findFirst({
-          where: {
-            id,
-            deletedAt: null,
-          },
-        });
+        const existingOrder =
+          await fastify.prisma.salesOrder.findFirst({
+            where: {
+              id,
+              deletedAt: null,
+            },
+          });
 
         if (!existingOrder) {
           return reply.status(404).send({
@@ -104,15 +98,16 @@ async function adminSalesOrderUpdateRoutes(
         }
 
         // ==========================
-        // Company Validation (If provided)
+        // Company Validation
         // ==========================
 
         if (companyId) {
-          const company = await fastify.prisma.company.findUnique({
-            where: {
-              id: companyId,
-            },
-          });
+          const company =
+            await fastify.prisma.company.findUnique({
+              where: {
+                id: companyId,
+              },
+            });
 
           if (!company) {
             return reply.status(404).send({
@@ -125,59 +120,67 @@ async function adminSalesOrderUpdateRoutes(
         // ==========================
         // Order Taken By Validation
         // ==========================
-        if (orderTakenById) {
-          const user = await fastify.prisma.user.findUnique({
-            where: {
-              id: orderTakenById,
-            },
-          });
 
-          if (!user) {
+        if (orderTakenById) {
+          const user =
+            await fastify.prisma.user.findUnique({
+              where: {
+                id: orderTakenById,
+              },
+              select: {
+                id: true,
+                companyId: true,
+                isActive: true,
+                deletedAt: true,
+              },
+            });
+
+          if (
+            !user ||
+            !user.isActive ||
+            user.deletedAt
+          ) {
             return reply.status(404).send({
               success: false,
-              message: "Order Taken By user not found.",
+              message:
+                "Order Taken By user not found or inactive.",
             });
           }
-        } 
 
-        // ==========================
-        // Assigned Users Validation
-        // ==========================
+          const targetCompanyId =
+            companyId ?? existingOrder.companyId;
 
-        const assignedToId = (assignedToIds || []).filter((id): id is string => id !== null);
-
-        if (assignedToId.length > 0) {
-          const users = await fastify.prisma.user.findMany({
-            where: {
-              id: {
-                in: assignedToId,
-              },
-            },
-          });
-
-          if (users.length !== assignedToId.length) {
-            return reply.status(404).send({
+          if (user.companyId !== targetCompanyId) {
+            return reply.status(400).send({
               success: false,
-              message: "One or more assigned users not found.",
+              message:
+                "Order Taken By user does not belong to this company.",
             });
           }
         }
 
         // ==========================
-        // Calculate Totals (If items provided)
+        // Calculate Totals
         // ==========================
 
         let subtotal: number | undefined;
         let gstTotal: number | undefined;
         let grandTotal: number | undefined;
 
-        if (items && items.length > 0) {
+        if (items !== undefined) {
           subtotal = 0;
           gstTotal = 0;
 
           for (const item of items) {
-            const itemAmount = Number(item.quantity) * Number(item.rate);
-            const itemGST = (itemAmount * Number(item.gstPercentage)) / 100;
+            const itemAmount =
+              Number(item.quantity) *
+              Number(item.rate);
+
+            const itemGST =
+              (itemAmount *
+                Number(item.gstPercentage)) /
+              100;
+
             subtotal += itemAmount;
             gstTotal += itemGST;
           }
@@ -189,196 +192,319 @@ async function adminSalesOrderUpdateRoutes(
         // Update Transaction
         // ==========================
 
-        const updatedOrderId = await fastify.prisma.$transaction(async (tx) => {
-          // ==========================
-          // Update Sales Order
-          // ==========================
+        const updatedOrderId =
+          await fastify.prisma.$transaction(
+            async (tx) => {
+              // ==========================
+              // Build Update Data
+              // ==========================
 
-          const updateData: any = {};
-          if (companyId !== undefined) updateData.companyId = companyId;
-          if (dveplCode !== undefined) updateData.dveplCode = dveplCode;
-          if (status !== undefined) updateData.status = status;
-          if (orderTakenById !== undefined) updateData.orderTakenById = orderTakenById;
-          if (assignedToIds !== undefined) updateData.assignedToIds = assignedToId;
-          if (partyName !== undefined) updateData.partyName = partyName;
-          if (caNo !== undefined) updateData.caNo = caNo;
-          if (contactDetails !== undefined) updateData.contactDetails = contactDetails;
-          if (orderConfirmDate !== undefined) updateData.orderConfirmDate = orderConfirmDate ? new Date(orderConfirmDate) : null;
-          if (deliveryMonthTarget !== undefined) updateData.deliveryMonthTarget = deliveryMonthTarget;
-          if (poDate !== undefined) updateData.poDate = poDate ? new Date(poDate) : null;
-          if (drawingConcernedPerson !== undefined) updateData.drawingConcernedPerson = drawingConcernedPerson;
-          if (drawingApprovedDate !== undefined) updateData.drawingApprovedDate = drawingApprovedDate ? new Date(drawingApprovedDate) : null;
-          if (drawingStatus !== undefined) {
-            updateData.drawingStatus = drawingStatus === "APPROVED"
-              ? "COMPLETED"
-              : drawingStatus === "REJECTED"
-              ? "ON_HOLD"
-              : drawingStatus;
-          }
-          if (drawingRemarks !== undefined) updateData.drawingRemarks = drawingRemarks;
-          if (subtotal !== undefined) updateData.subtotal = new Prisma.Decimal(subtotal);
-          if (gstTotal !== undefined) updateData.gstTotal = new Prisma.Decimal(gstTotal);
-          if (grandTotal !== undefined) updateData.grandTotal = new Prisma.Decimal(grandTotal);
-          if (inspectionField !== undefined) updateData.inspectionField = inspectionField;
-          if (sendNotification !== undefined) updateData.sendNotification = sendNotification;
-          if (remarks !== undefined) updateData.remarks = remarks;
+              const updateData: Prisma.SalesOrderUpdateInput =
+                {};
 
-          const updatedOrder = await tx.salesOrder.update({
-            where: {
-              id,
+              if (companyId !== undefined) {
+                updateData.company = {
+                  connect: {
+                    id: companyId,
+                  },
+                };
+              }
+
+              if (dveplCode !== undefined) {
+                updateData.dveplCode = dveplCode;
+              }
+
+              if (status !== undefined) {
+                updateData.status = status;
+              }
+
+              if (orderTakenById !== undefined) {
+                updateData.orderTakenBy = orderTakenById
+                  ? {
+                      connect: {
+                        id: orderTakenById,
+                      },
+                    }
+                  : {
+                      disconnect: true,
+                    };
+              }
+
+              if (partyName !== undefined) {
+                updateData.partyName = partyName;
+              }
+
+              if (caNo !== undefined) {
+                updateData.caNo = caNo;
+              }
+
+              if (contactDetails !== undefined) {
+                updateData.contactDetails =
+                  contactDetails;
+              }
+
+              if (orderConfirmDate !== undefined) {
+                updateData.orderConfirmDate =
+                  orderConfirmDate
+                    ? new Date(orderConfirmDate)
+                    : null;
+              }
+
+              if (
+                deliveryMonthTarget !== undefined
+              ) {
+                updateData.deliveryMonthTarget =
+                  deliveryMonthTarget;
+              }
+
+              if (poDate !== undefined) {
+                updateData.poDate = poDate
+                  ? new Date(poDate)
+                  : null;
+              }
+
+              if (
+                drawingConcernedPerson !== undefined
+              ) {
+                updateData.drawingConcernedPerson =
+                  drawingConcernedPerson;
+              }
+
+              if (
+                drawingApprovedDate !== undefined
+              ) {
+                updateData.drawingApprovedDate =
+                  drawingApprovedDate
+                    ? new Date(drawingApprovedDate)
+                    : null;
+              }
+
+              if (drawingStatus !== undefined) {
+                updateData.drawingStatus =
+                  drawingStatus === "APPROVED"
+                    ? "COMPLETED"
+                    : drawingStatus === "REJECTED"
+                      ? "ON_HOLD"
+                      : drawingStatus;
+              }
+
+              if (drawingRemarks !== undefined) {
+                updateData.drawingRemarks =
+                  drawingRemarks;
+              }
+
+              if (subtotal !== undefined) {
+                updateData.subtotal =
+                  new Prisma.Decimal(subtotal);
+              }
+
+              if (gstTotal !== undefined) {
+                updateData.gstTotal =
+                  new Prisma.Decimal(gstTotal);
+              }
+
+              if (grandTotal !== undefined) {
+                updateData.grandTotal =
+                  new Prisma.Decimal(grandTotal);
+              }
+
+              if (inspectionField !== undefined) {
+                updateData.inspectionField =
+                  inspectionField;
+              }
+
+              if (
+                sendNotification !== undefined
+              ) {
+                updateData.sendNotification =
+                  sendNotification;
+              }
+
+              if (remarks !== undefined) {
+                updateData.remarks = remarks;
+              }
+
+              // ==========================
+              // Update Sales Order
+              // ==========================
+
+              const updatedOrder =
+                await tx.salesOrder.update({
+                  where: {
+                    id,
+                  },
+                  data: updateData,
+                });
+
+              // ==========================
+              // Replace Items
+              // ==========================
+
+              if (items !== undefined) {
+                await tx.salesOrderItem.deleteMany({
+                  where: {
+                    salesOrderId: id,
+                  },
+                });
+
+                if (items.length > 0) {
+                  await tx.salesOrderItem.createMany({
+                    data: items.map((item) => {
+                      const itemAmount =
+                        Number(item.quantity) *
+                        Number(item.rate);
+
+                      return {
+                        salesOrderId:
+                          updatedOrder.id,
+
+                        itemCode:
+                          item.itemCode,
+
+                        description:
+                          item.description,
+
+                        unit:
+                          item.unit,
+
+                        quantity:
+                          new Prisma.Decimal(
+                            item.quantity,
+                          ),
+
+                        unitPrice:
+                          new Prisma.Decimal(
+                            item.rate,
+                          ),
+
+                        gstPercentage:
+                          new Prisma.Decimal(
+                            item.gstPercentage,
+                          ),
+
+                        totalPrice:
+                          new Prisma.Decimal(
+                            itemAmount,
+                          ),
+
+                        remarks:
+                          item.remarks ?? null,
+                      };
+                    }),
+                  });
+                }
+              }
+
+              // ==========================
+              // Save EAV Custom Fields
+              // ==========================
+
+              if (
+                (request.body as any)
+                  ?.customFields
+              ) {
+                const {
+                  CustomFieldService,
+                } = await import(
+                  "../../../services/customFieldService"
+                );
+
+                const cfService =
+                  new CustomFieldService(tx as any);
+
+                await cfService.saveValues(
+                  "order",
+                  id,
+                  (request.body as any)
+                    .customFields,
+                );
+              }
+
+              return updatedOrder.id;
             },
-            data: updateData,
-          });
+          );
 
-          // ==========================
-          // Replace Items (Only if items provided)
-          // ==========================
+        // ==========================
+        // Fetch Updated Order
+        // ==========================
 
-          if (items !== undefined) {
-            await tx.salesOrderItem.deleteMany({
-              where: {
-                salesOrderId: id,
-              },
-            });
-
-            if (items.length > 0) {
-              await tx.salesOrderItem.createMany({
-                data: items.map((item) => ({
-                  salesOrderId: updatedOrder.id,
-
-                  itemCode: item.itemCode,
-
-                  description: item.description,
-
-                unit: "Nos",
-
-                quantity: new Prisma.Decimal(item.quantity),
-
-                unitPrice: new Prisma.Decimal(item.rate),
-
-                gstPercentage: new Prisma.Decimal(item.gstPercentage),
-
-                totalPrice: new Prisma.Decimal(
-                  Number(item.quantity) * Number(item.rate),
-                ),
-
-                remarks: item.remarks ?? null,
-              })),
-            });
-          }
-        }
-
-          // ==========================
-          // Replace Assignments
-          // ==========================
-
-          await tx.salesOrderAssignment.deleteMany({
+        const updatedOrder =
+          await fastify.prisma.salesOrder.findUnique({
             where: {
-              salesOrderId: id,
+              id: updatedOrderId,
             },
-          });
 
-          if (assignedToId.length > 0) {
-            const employees = await tx.employee.findMany({
-              where: {
-                userId: {
-                  in: assignedToId,
+            include: {
+              company: true,
+
+              orderTakenBy: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
                 },
               },
-              select: {
-                id: true,
-                userId: true,
+
+              createdBy: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                },
               },
-            });
 
-            const employeeMap = new Map(employees.map((e) => [e.userId, e.id]));
+              items: true,
 
-            const assignments = assignedToId.map((userId) => ({
-              salesOrderId: id,
-              userId,
-              employeeId: employeeMap.get(userId) ?? null,
-            }));
-
-            await tx.salesOrderAssignment.createMany({
-              data: assignments,
-            });
-          }
-
-          // Save EAV Custom Field Values if provided
-          if ((request.body as any)?.customFields) {
-            const { CustomFieldService } = await import("../../../services/customFieldService");
-            const cfService = new CustomFieldService(tx as any);
-            await cfService.saveValues("order", id, (request.body as any).customFields);
-          }
-
-          return updatedOrder.id;
-        });
-
-        const updatedOrder = await fastify.prisma.salesOrder.findUnique({
-          where: {
-            id: updatedOrderId,
-          },
-
-          include: {
-            company: true,
-
-            orderTakenBy: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              },
-            },
-
-            createdBy: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              },
-            },
-
-            items: true,
-
-            assignments: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    name: true,
-                    email: true,
+              // Assignment data is READ ONLY here.
+              // Assignment mutations happen through
+              // the dedicated assignment endpoint.
+              assignments: {
+                include: {
+                  user: {
+                    select: {
+                      id: true,
+                      name: true,
+                      email: true,
+                    },
                   },
                 },
               },
             },
-          },
-        });
+          });
 
-        adminLogs.info("Sales Order updated successfully", {
-          salesOrderId: id,
-        });
+        adminLogs.info(
+          "Sales Order updated successfully",
+          {
+            salesOrderId: updatedOrderId,
+            updatedBy: request.user.id,
+          },
+        );
 
         return reply.status(200).send({
           success: true,
-
-          message: "Sales Order updated successfully.",
-
+          message:
+            "Sales Order updated successfully.",
           data: updatedOrder,
         });
       } catch (error: any) {
         console.error(error);
 
-        adminLogs.error("Sales Order update failed", {
-          error,
-        });
+        adminLogs.error(
+          "Sales Order update failed",
+          {
+            salesOrderId: id,
+            error,
+          },
+        );
 
         return reply.status(500).send({
           success: false,
-
-          message: "Server error while updating Sales Order.",
-
+          message:
+            "Server error while updating Sales Order.",
           error:
-            process.env.NODE_ENV === "development" ? error.message : undefined,
+            process.env.NODE_ENV === "development"
+              ? error.message
+              : undefined,
         });
       }
     },

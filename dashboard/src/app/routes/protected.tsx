@@ -15,6 +15,7 @@ const getRequiredPermission = (pathname: string): string | null => {
   if (pathname.startsWith('/settings/recycle-bin')) return 'recycle_bin';
   if (pathname.startsWith('/settings/notifications')) return 'notifications';
   if (pathname.startsWith('/settings')) return 'settings';
+  if (pathname.startsWith('/export-orders')) return 'export_orders';
 
   const routePermissionMap: Record<string, string> = {
     '/organization/companies': 'companies',
