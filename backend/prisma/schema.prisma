@@ -3187,3 +3187,4 @@ model CustomerDrawingReview {
   @@index([status])
   @@map("customer_drawing_reviews")
 }
+
