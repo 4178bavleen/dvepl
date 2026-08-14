@@ -1041,7 +1041,7 @@ export function OrdersPage() {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-5">
         <div>
           <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-            Tender Orders
+            Orders
           </h1>
           <p className="text-xs text-muted-foreground mt-0.5">
             Manage your client tenders, purchase order status, and drawing synchronizations in real-time.

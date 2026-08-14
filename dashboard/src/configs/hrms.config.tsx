@@ -211,7 +211,7 @@ export const attendanceConfig = {
     remarks: z.string().optional().nullable(),
   }),
   defaultFormValues: {
-    employeeId: "emp-1",
+    employeeId: "",
     date: new Date().toISOString().split("T")[0],
     status: "PRESENT",
     remarks: "On time",
@@ -289,11 +289,6 @@ export const attendanceConfig = {
       name: "employeeId",
       label: "Select Employee",
       type: "select",
-      options: [
-        { label: "Gabriel Dhillon (EMP-001)", value: "emp-1" },
-        { label: "Rajesh Kumar (EMP-002)", value: "emp-2" },
-        { label: "Priya Sharma (EMP-003)", value: "emp-3" },
-      ],
       required: true,
     },
     {
@@ -359,7 +354,7 @@ export const leaveConfig = {
     status: z.string().default("PENDING"),
   }),
   defaultFormValues: {
-    employeeId: "emp-3",
+    employeeId: "",
     leaveType: "CASUAL",
     fromDate: "",
     toDate: "",
@@ -424,11 +419,6 @@ export const leaveConfig = {
       name: "employeeId",
       label: "Select Employee",
       type: "select",
-      options: [
-        { label: "Gabriel Dhillon", value: "emp-1" },
-        { label: "Rajesh Kumar", value: "emp-2" },
-        { label: "Priya Sharma", value: "emp-3" },
-      ],
       required: true,
     },
     {
@@ -496,7 +486,7 @@ export const payrollConfig = {
     deductions: z.coerce.number(),
   }),
   defaultFormValues: {
-    employeeId: "emp-1",
+    employeeId: "",
     effectiveFrom: new Date().toISOString().split("T")[0],
     basic: "0",
     hra: "0",
@@ -560,11 +550,6 @@ export const payrollConfig = {
       name: "employeeId",
       label: "Select Employee",
       type: "select",
-      options: [
-        { label: "Gabriel Dhillon", value: "emp-1" },
-        { label: "Rajesh Kumar", value: "emp-2" },
-        { label: "Priya Sharma", value: "emp-3" },
-      ],
       required: true,
     },
     {
