@@ -82,6 +82,63 @@ import {
 import { ConfirmDialog } from "@/components/shared/confirmDialog";
 import "@/styles/vendors.css";
 
+/**
+ * Resolve a value from a dynamic record's `values` object using the field's
+ * fieldName, label, or a normalized comparison. Imported records store values
+ * under their original Excel header (label) keys, while manually created
+ * records store them under fieldName keys, so we have to handle both.
+ */
+function getRecordValue(
+  recordValues: Record<string, any> | string | null | undefined,
+  field: { fieldName: string; label: string } | undefined,
+): any {
+  if (!field) return undefined;
+
+  let saved: Record<string, any> = {};
+  if (typeof recordValues === "string") {
+    try {
+      saved = JSON.parse(recordValues);
+    } catch {
+      saved = {};
+    }
+  } else if (recordValues && typeof recordValues === "object") {
+    saved = recordValues;
+  }
+
+  if (
+    field.fieldName &&
+    Object.prototype.hasOwnProperty.call(saved, field.fieldName)
+  ) {
+    return saved[field.fieldName];
+  }
+
+  if (
+    field.label &&
+    Object.prototype.hasOwnProperty.call(saved, field.label)
+  ) {
+    return saved[field.label];
+  }
+
+  const normalizeKey = (value: string) =>
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "");
+
+  const normalizedFieldName = normalizeKey(field.fieldName);
+  const normalizedLabel = normalizeKey(field.label);
+
+  const matchingEntry = Object.entries(saved).find(([key]) => {
+    const normalizedKey = normalizeKey(key);
+    return (
+      normalizedKey === normalizedFieldName ||
+      normalizedKey === normalizedLabel
+    );
+  });
+
+  return matchingEntry?.[1];
+}
+
 function SortableHeaderCell({
   id,
   children,
@@ -778,7 +835,10 @@ export function VendorsPage() {
               if (typedVal.trim()) {
                 const matches = getInventoryMatches(typedVal);
                 const exactMatch = matches.find((inv) => {
-                  const fieldVal = inv.values?.[id];
+                  const fieldVal = getRecordValue(
+                    inv.values,
+                    inventoryFieldsMap.get(id),
+                  );
                   return (
                     String(fieldVal || "")
                       .trim()
@@ -796,7 +856,10 @@ export function VendorsPage() {
               if (String(currentVal).trim()) {
                 const matches = getInventoryMatches(String(currentVal));
                 const exactMatch = matches.find((inv) => {
-                  const fieldVal = inv.values?.[id];
+                  const fieldVal = getRecordValue(
+                    inv.values,
+                    inventoryFieldsMap.get(id),
+                  );
                   return (
                     String(fieldVal || "")
                       .trim()
@@ -837,7 +900,7 @@ export function VendorsPage() {
                 )}
                 {getInventoryMatches(String(val)).map((inv) => {
                   const primaryField = inventoryFields[0];
-                  const nameVal = inv.values?.[primaryField?.fieldName];
+                  const nameVal = getRecordValue(inv.values, primaryField);
                   const displayName =
                     nameVal ||
                     Object.values(inv.values || {})[0] ||
@@ -846,7 +909,7 @@ export function VendorsPage() {
                   const subtitleParts = inventoryFields
                     .filter((f) => f.fieldName !== primaryField?.fieldName)
                     .map((f) => {
-                      const val = inv.values?.[f.fieldName];
+                      const val = getRecordValue(inv.values, f);
                       if (val === undefined || val === null || val === "")
                         return null;
                       return `${f.label}: ${val}`;
@@ -859,7 +922,7 @@ export function VendorsPage() {
                       f.label.toLowerCase().includes("rate"),
                   );
                   const priceVal = priceField
-                    ? Number(inv.values?.[priceField.fieldName]) || 0
+                    ? Number(getRecordValue(inv.values, priceField)) || 0
                     : 0;
 
                   return (
@@ -1304,7 +1367,7 @@ export function VendorsPage() {
 
     return pool.filter((rec) => {
       const nameVal = String(
-        rec.values?.[primaryField?.fieldName] || "",
+        getRecordValue(rec.values, primaryField) || "",
       ).toLowerCase();
       const codeVal = String(rec.materialCode || "").toLowerCase();
       const catVal = String(rec.category || "").toLowerCase();
@@ -1536,7 +1599,11 @@ export function VendorsPage() {
 
         if (invRecord && invRecord.values) {
           inventoryFields.forEach((f) => {
-            mappedItem[f.fieldName] = invRecord.values?.[f.fieldName] ?? "";
+            const loadedValue = getRecordValue(invRecord.values, f);
+            mappedItem[f.fieldName] =
+              loadedValue !== undefined && loadedValue !== null
+                ? loadedValue
+                : "";
           });
         } else {
           inventoryFields.forEach((f) => {
@@ -1944,8 +2011,11 @@ export function VendorsPage() {
         };
 
         inventoryFields.forEach((f) => {
+          const loadedValue = getRecordValue(invRecord.values, f);
           updatedItem[f.fieldName] =
-            invRecord.values?.[f.fieldName] ?? item[f.fieldName] ?? "";
+            loadedValue !== undefined && loadedValue !== null
+              ? loadedValue
+              : item[f.fieldName] ?? "";
         });
 
         const primaryField = inventoryFields[0];
@@ -1993,7 +2063,7 @@ export function VendorsPage() {
 
     const primaryField = inventoryFields[0];
     const nameVal = primaryField
-      ? invRecord.values?.[primaryField.fieldName]
+      ? getRecordValue(invRecord.values, primaryField)
       : "";
     toast.success(`Loaded "${nameVal || "Item"}" details from inventory`);
     setInventoryDropdownRowId(null);
@@ -2090,13 +2160,12 @@ export function VendorsPage() {
             if (cellVal !== "") {
               newItem[f.fieldName] =
                 f.type === "NUMBER" ? Number(cellVal) || 0 : cellVal;
-            } else if (
-              invMatch &&
-              invMatch.values?.[f.fieldName] !== undefined
-            ) {
-              const invVal = invMatch.values[f.fieldName];
-              newItem[f.fieldName] =
-                f.type === "NUMBER" ? Number(invVal) || 0 : String(invVal);
+            } else if (invMatch) {
+              const invVal = getRecordValue(invMatch.values, f);
+              if (invVal !== undefined) {
+                newItem[f.fieldName] =
+                  f.type === "NUMBER" ? Number(invVal) || 0 : String(invVal);
+              }
             } else {
               newItem[f.fieldName] = f.type === "NUMBER" ? 0 : "";
             }
@@ -2332,10 +2401,10 @@ export function VendorsPage() {
           item.description &&
           inventoryFields.length > 0
         ) {
-          const primaryFieldName = inventoryFields[0]?.fieldName;
+          const primaryField = inventoryFields[0];
           const descLower = item.description.trim().toLowerCase();
           const matchedRecord = inventoryRecords.find((rec) => {
-            const recName = String(rec.values?.[primaryFieldName] || "")
+            const recName = String(getRecordValue(rec.values, primaryField) || "")
               .trim()
               .toLowerCase();
             return recName === descLower;
@@ -2429,30 +2498,30 @@ export function VendorsPage() {
         item.description &&
         inventoryFields.length > 0
       ) {
-        const primaryFieldName = inventoryFields[0]?.fieldName;
-        const descLower = item.description.trim().toLowerCase();
-        const matchedRecord = inventoryRecords.find((rec) => {
-          const recName = String(rec.values?.[primaryFieldName] || "")
-            .trim()
-            .toLowerCase();
-          return recName === descLower;
-        });
-        if (matchedRecord) {
-          resolvedMaterialId = matchedRecord.id;
+          const primaryField = inventoryFields[0];
+          const descLower = item.description.trim().toLowerCase();
+          const matchedRecord = inventoryRecords.find((rec) => {
+            const recName = String(getRecordValue(rec.values, primaryField) || "")
+              .trim()
+              .toLowerCase();
+            return recName === descLower;
+          });
+          if (matchedRecord) {
+            resolvedMaterialId = matchedRecord.id;
+          }
         }
-      }
-      if (!resolvedMaterialId && item.description) {
-        const descLower = item.description.trim().toLowerCase();
-        const matched = inventoryItems.find(
-          (inv) => inv.material?.name?.trim().toLowerCase() === descLower,
-        );
-        if (matched?.materialId) resolvedMaterialId = matched.materialId;
-      }
-      if (!resolvedMaterialId && inventoryItems.length > 0) {
-        resolvedMaterialId = inventoryItems[0].materialId;
-      }
+        if (!resolvedMaterialId && item.description) {
+          const descLower = item.description.trim().toLowerCase();
+          const matched = inventoryItems.find(
+            (inv) => inv.material?.name?.trim().toLowerCase() === descLower,
+          );
+          if (matched?.materialId) resolvedMaterialId = matched.materialId;
+        }
+        if (!resolvedMaterialId && inventoryItems.length > 0) {
+          resolvedMaterialId = inventoryItems[0].materialId;
+        }
 
-      const uuidRegex =
+        const uuidRegex =
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (!resolvedMaterialId || !uuidRegex.test(resolvedMaterialId)) {
         toast.error(
@@ -2536,10 +2605,10 @@ export function VendorsPage() {
           item.description &&
           inventoryFields.length > 0
         ) {
-          const primaryFieldName = inventoryFields[0]?.fieldName;
+          const primaryField = inventoryFields[0];
           const descLower = item.description.trim().toLowerCase();
           const matchedRecord = inventoryRecords.find((rec) => {
-            const recName = String(rec.values?.[primaryFieldName] || "")
+            const recName = String(getRecordValue(rec.values, primaryField) || "")
               .trim()
               .toLowerCase();
             return recName === descLower;
@@ -2647,7 +2716,11 @@ export function VendorsPage() {
 
       if (invRecord && invRecord.values) {
         inventoryFields.forEach((f) => {
-          mappedItem[f.fieldName] = invRecord.values?.[f.fieldName] ?? mappedItem[f.fieldName] ?? "";
+          const loadedValue = getRecordValue(invRecord.values, f);
+          mappedItem[f.fieldName] =
+            loadedValue !== undefined && loadedValue !== null
+              ? loadedValue
+              : mappedItem[f.fieldName] ?? "";
         });
       } else {
         inventoryFields.forEach((f) => {
@@ -3815,8 +3888,10 @@ export function VendorsPage() {
                       );
 
                       const primaryField = inventoryFields[0];
-                      const dynamicName =
-                        dynamicItem?.values?.[primaryField?.fieldName];
+                      const dynamicName = getRecordValue(
+                        dynamicItem?.values,
+                        primaryField,
+                      );
                       const name =
                         dynamicName ||
                         staticItem?.material?.name ||
@@ -3867,7 +3942,7 @@ export function VendorsPage() {
                         : false;
 
                       const primaryField = inventoryFields[0];
-                      const nameVal = item.values?.[primaryField?.fieldName];
+                      const nameVal = getRecordValue(item.values, primaryField);
                       const displayName =
                         nameVal ||
                         Object.values(item.values || {})[0] ||
@@ -3876,7 +3951,7 @@ export function VendorsPage() {
                       const subtitleParts = inventoryFields
                         .filter((f) => f.fieldName !== primaryField?.fieldName)
                         .map((f) => {
-                          const val = item.values?.[f.fieldName];
+                          const val = getRecordValue(item.values, f);
                           if (val === undefined || val === null || val === "")
                             return null;
                           return `${f.label}: ${val}`;
@@ -3889,7 +3964,7 @@ export function VendorsPage() {
                           f.label.toLowerCase().includes("rate"),
                       );
                       const priceVal = priceField
-                        ? Number(item.values?.[priceField.fieldName]) || 0
+                        ? Number(getRecordValue(item.values, priceField)) || 0
                         : 0;
 
                       return (
