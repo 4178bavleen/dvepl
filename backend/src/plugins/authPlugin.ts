@@ -31,6 +31,12 @@ const getModuleActions = (value: unknown, moduleKey: string): ModuleActions => {
     };
   }
 
+  // An empty object is "unset" (matches the login/verifyToken fallback logic),
+  // not "no actions" — never lock a user out because of an empty profile.
+  if (isRecord(value) && Object.keys(value).length === 0) {
+    return legacyActionDefaults;
+  }
+
   const moduleActions = isRecord(value) ? value[moduleKey] : undefined;
   if (!isRecord(moduleActions)) return { create: false, edit: false, delete: false, export: false };
 
@@ -55,7 +61,7 @@ const getModuleForRequest = (url: string): string | null => {
     ["/technical-clarification/", "technical_clarifications"], ["/government-department/", "government_departments"],
     ["/section/", "sections"], ["/division/", "divisions"], ["/sub-division/", "sub_divisions"],
     ["/reference-code/", "reference_codes"], ["/user/", "users"], ["/role/", "roles"],
-    ["/settings/", "settings"],
+    ["/settings/", "settings"], ["/recycle-bin/", "recycle_bin"], ["/custom-fields/", "custom_fields"],
   ];
   return routeModules.find(([path]) => url.includes(path))?.[1] ?? null;
 };
@@ -90,6 +96,182 @@ const getRequiredAction = (url: string, permissions: string[]): ActionName | nul
   if (permissions.some((permission) => permission.includes(".update") || permission.includes(".edit"))) return "edit";
   if (permissions.some((permission) => permission.includes(".delete") || permission.includes(".remove"))) return "delete";
   return null;
+};
+
+// Maps PRBAC field-permission keys to the exact response field names exposed by
+// the corresponding module API.  These are used to strip fields the requesting
+// user is explicitly denied from seeing (view === false).
+const FIELD_PERMISSION_RESPONSE_MAP: Record<string, Record<string, string[]>> = {
+  companies: {
+    company_name: ["name"],
+    company_tax_id: ["gst", "pan"],
+  },
+  branches: {
+    branch_name: ["name"],
+    branch_code: ["code"],
+  },
+  departments: {
+    department_name: ["name"],
+    department_code: ["code"],
+  },
+  teams: {
+    team_name: ["name"],
+  },
+  designations: {
+    designation_title: ["title"],
+  },
+  cost_centers: {
+    budget_limit: ["budget"],
+  },
+  employees: {
+    employee_code: ["employeeCode"],
+    employee_first_name: ["firstName"],
+    employee_last_name: ["lastName"],
+    date_of_birth: ["dateOfBirth"],
+  },
+  attendance: {
+    attendance_date: ["date"],
+    check_in: ["checkIn"],
+    check_out: ["checkOut"],
+  },
+  leaves: {
+    leave_type: ["leaveType"],
+    leave_reason: ["reason"],
+  },
+  holidays: {
+    holiday_name: ["name"],
+  },
+  shift_management: {
+    shift_name: ["name"],
+  },
+  payroll: {
+    basic_salary: ["basic"],
+    hra_allowance: ["hra"],
+    allowances: ["allowances"],
+    deductions: ["deductions"],
+    total_ctc: ["ctc"],
+  },
+  documents: {
+    document_name: ["fileName"],
+  },
+  tasks: {
+    task_title: ["title"],
+    task_priority: ["priority"],
+    task_due_date: ["dueDate"],
+  },
+  customers: {
+    customer_name: ["name"],
+    customer_company: ["firmName"],
+    customer_pan: ["pan"],
+    customer_gstin: ["gst"],
+    payment_terms: ["paymentTerms"],
+  },
+  contacts: {
+    contact_name: ["name"],
+  },
+  communication: {
+    communication_date: ["createdAt"],
+  },
+  vendors: {
+    vendor_name: ["name"],
+    vendor_category: ["category"],
+    vendor_contact_person: ["contactPerson"],
+    vendor_phone: ["phone"],
+    vendor_email: ["email"],
+    vendor_gstin: ["gstNumber"],
+    vendor_address: ["address"],
+  },
+  inventory: {
+    inventory_qty: ["quantity"],
+  },
+  users: {
+    password_hash: ["passwordHash"],
+  },
+  roles: {
+    is_system_role: ["isSystem"],
+  },
+  orders: {
+    po_value: ["grandTotal"],
+    delivery_month_target: ["deliveryMonthTarget"],
+    concerned_person: ["drawingConcernedPerson"],
+    drawing_status: ["drawingStatus"],
+    order_client_name: ["partyName"],
+    po_date: ["poDate"],
+  },
+  delivery: {
+    dispatch_date: ["dispatchDate"],
+    delivery_status: ["status"],
+  },
+  tenders: {
+    tender_no: ["tenderNo"],
+    tender_name: ["title"],
+    tender_value: ["estimatedCost"],
+  },
+  technical_clarifications: {
+    clarification_query: ["question"],
+  },
+  government_departments: {
+    gov_dept_name: ["name"],
+  },
+  sections: {
+    section_name: ["name"],
+  },
+  divisions: {
+    division_name: ["name"],
+  },
+  sub_divisions: {
+    sub_division_name: ["name"],
+  },
+};
+
+const snakeToCamel = (key: string): string =>
+  key.replace(/_([a-z0-9])/g, (_match, char: string) => char.toUpperCase());
+
+// Collect the exact response field names that must be hidden for the current
+// module based on the user's fieldPermissions (view === false).
+const collectHiddenResponseFields = (
+  moduleKey: string,
+  fieldPermissions: unknown,
+): Set<string> => {
+  const hidden = new Set<string>();
+  if (!isRecord(fieldPermissions)) return hidden;
+
+  const moduleMap = FIELD_PERMISSION_RESPONSE_MAP[moduleKey];
+  for (const [permissionKey, config] of Object.entries(fieldPermissions)) {
+    const isHidden = isRecord(config) ? config.view === false : config === false;
+    if (!isHidden) continue;
+
+    const responseFields = moduleMap?.[permissionKey];
+    if (responseFields && responseFields.length > 0) {
+      responseFields.forEach((field) => hidden.add(field));
+    } else {
+      hidden.add(snakeToCamel(permissionKey));
+    }
+  }
+  return hidden;
+};
+
+// Strip hidden fields from the payload at the record level (mirrors the
+// client-side column hiding behaviour in the dashboard tables).
+const stripHiddenFields = (value: unknown, hidden: Set<string>): void => {
+  if (!value || typeof value !== "object") return;
+  if (Array.isArray(value)) {
+    value.forEach((item) => stripHiddenFields(item, hidden));
+    return;
+  }
+  const record = value as Record<string, unknown>;
+  if (
+    Object.prototype.hasOwnProperty.call(record, "data") &&
+    record.data !== undefined &&
+    record.data !== null &&
+    typeof record.data === "object"
+  ) {
+    stripHiddenFields(record.data, hidden);
+    return;
+  }
+  for (const key of Object.keys(record)) {
+    if (hidden.has(key)) delete record[key];
+  }
 };
 
 async function authPlugin(fastify: FastifyInstance) {
@@ -159,6 +341,12 @@ async function authPlugin(fastify: FastifyInstance) {
               ? mainRole.actionPermissions
               : (up?.actionPermissions || { create: true, edit: true, delete: false, export: true }));
 
+        const resolvedFieldPermissions = hasOverride
+          ? (up?.fieldPermissions || {})
+          : (mainRole?.fieldPermissions && Object.keys((mainRole.fieldPermissions as any) || {}).length > 0
+              ? mainRole.fieldPermissions
+              : (up?.fieldPermissions || {}));
+
         const tokenUser = {
           id: decoded.userId,
           companyId: activeCompanyId,
@@ -166,6 +354,7 @@ async function authPlugin(fastify: FastifyInstance) {
           uiAccessProfile: {
             pageAccess: resolvedPageAccess,
             actionPermissions: resolvedActionPermissions,
+            fieldPermissions: resolvedFieldPermissions,
           },
         };
         (request as any).user = tokenUser;
@@ -240,6 +429,31 @@ async function authPlugin(fastify: FastifyInstance) {
     };
   }
 );
+
+  // ==========================
+  // Server-side field permission enforcement
+  // ==========================
+  fastify.addHook("onSend", async (request: FastifyRequest, reply: FastifyReply, payload: any) => {
+    try {
+      if (reply.statusCode >= 400 || typeof payload !== "string") return payload;
+      if (swaggerSafePaths.some((p) => request.url.startsWith(p))) return payload;
+
+      const fieldPermissions = (request.admin as any)?.uiAccessProfile?.fieldPermissions;
+      if (!fieldPermissions || Object.keys(fieldPermissions).length === 0) return payload;
+
+      const moduleKey = getModuleForRequest(request.url);
+      if (!moduleKey) return payload;
+
+      const hidden = collectHiddenResponseFields(moduleKey, fieldPermissions);
+      if (hidden.size === 0) return payload;
+
+      const parsed = JSON.parse(payload);
+      stripHiddenFields(parsed, hidden);
+      return JSON.stringify(parsed);
+    } catch {
+      return payload;
+    }
+  });
 }
 
 export default fp(authPlugin, {

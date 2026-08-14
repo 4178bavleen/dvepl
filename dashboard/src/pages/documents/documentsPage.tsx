@@ -16,9 +16,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'react-hot-toast';
 import { hrmsApi } from '@/services/modules';
+import { useERPStore } from '@/store/erpStore';
+import { canPerformPageAction } from '@/utils/pagePermissions';
 import { ConfirmDialog } from '@/components/shared/confirmDialog';
 
 export function DocumentsPage() {
+  const store = useERPStore();
+  const currentUser = store.users?.find((u: any) => u.id === store.currentUserId) as any;
+  const canCreate = canPerformPageAction(currentUser?.actionPermissions, "documents", "create");
+  const canDelete = canPerformPageAction(currentUser?.actionPermissions, "documents", "delete");
+
   const [documents, setDocuments] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -232,10 +239,12 @@ export function DocumentsPage() {
             className="pl-9 h-9 border-border text-xs rounded-lg"
           />
         </div>
-        <Button variant="default" size="sm" onClick={() => setIsUploadOpen(true)} className="h-9 gap-1.5 text-xs font-semibold bg-primary text-white">
-          <Plus className="h-4 w-4" />
-          <span>Upload File</span>
-        </Button>
+        {canCreate && (
+          <Button variant="default" size="sm" onClick={() => setIsUploadOpen(true)} className="h-9 gap-1.5 text-xs font-semibold bg-primary text-white">
+            <Plus className="h-4 w-4" />
+            <span>Upload File</span>
+          </Button>
+        )}
       </div>
 
       {/* Pagination Controls */}
@@ -376,9 +385,11 @@ export function DocumentsPage() {
                   <Button variant="ghost" size="sm" onClick={() => handleDownload(doc)} className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground">
                     <Download className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => handleDelete(doc.id)} className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10">
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {canDelete && (
+                    <Button variant="ghost" size="sm" onClick={() => handleDelete(doc.id)} className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
             ))

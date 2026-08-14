@@ -12,9 +12,11 @@ import {
   ChevronRight,
   ChevronDown,
   X,
+  Workflow,
 } from 'lucide-react';
 
 import { useERPStore } from '@/store/erpStore';
+import { isAdminUser } from '@/utils/pagePermissions';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useUiConfig } from '@/contexts/ui/uiConfigContext';
@@ -36,9 +38,32 @@ export default function Sidebar({
   const { config } = useUiConfig();
 
   // ---------------------------------------------------------
+  // Workflow Tracker fallback item
+  // ---------------------------------------------------------
+  const workflowTrackerItem = {
+    name: 'Workflow Tracker',
+    path: '/workflow',
+    icon: Workflow,
+    section: 'Sales',
+  };
+
+  // ---------------------------------------------------------
   // Sidebar items
   // ---------------------------------------------------------
-  const sidebarItems = config.sidebarItems;
+  const sidebarItems = React.useMemo(() => {
+    const exists = config.sidebarItems.some(
+      (item) => item.path === '/workflow',
+    );
+
+    if (exists) {
+      return config.sidebarItems;
+    }
+
+    return [
+      ...config.sidebarItems,
+      workflowTrackerItem,
+    ];
+  }, [config.sidebarItems]);
 
   const location = useLocation();
 
@@ -48,22 +73,7 @@ export default function Sidebar({
 
   const [expandedSections, setExpandedSections] = useState<
     Record<string, boolean>
-  >(() => {
-    // Expand core sections by default for a smoother first-time UX
-    return {
-      'Organization': true,
-      'HRMS': true,
-      'CRM': true,
-      'Tenders': true,
-      'Tender Management': true,
-      'Finance': true,
-      'Procurement': true,
-      'Inventory': true,
-      'Production': true,
-      'Security': true,
-      'Settings': true,
-    };
-  });
+  >({});
 
   const toggleSection = (secName: string) => {
     setExpandedSections((prev) => ({
@@ -85,9 +95,7 @@ export default function Sidebar({
     }
 
     // Always grant full access to Admins/Super Admins
-    const isAdmin =
-      currentUser.role?.toLowerCase().includes('admin') ||
-      currentUser.name?.toLowerCase().includes('admin');
+    const isAdmin = isAdminUser(currentUser);
 
     if (isAdmin) {
       return sidebarItems;
@@ -232,14 +240,14 @@ export default function Sidebar({
                   <Link
                     key={item.name}
                     to={item.path}
-                    className={`flex items-center rounded-lg text-xs font-medium transition-all duration-150 relative group ${
+                    className={`flex items-center rounded-lg text-xs font-medium transition-all duration-200 relative group ${
                       isCollapsed
                         ? 'justify-center p-2'
                         : 'gap-3 px-3 py-2'
                     } ${
                       active
-                        ? 'bg-primary/5 text-primary border-l-2 border-primary font-semibold shadow-2xs'
-                        : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground hover:translate-x-0.5'
+                        ? 'bg-primary/10 text-primary border-l-2 border-primary font-semibold shadow-xs'
+                        : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground hover:translate-x-0.5'
                     }`}
                     title={item.name}
                   >
@@ -266,7 +274,7 @@ export default function Sidebar({
                 {!isCollapsed && (
                   <button
                     onClick={() => toggleSection(secName)}
-                    className="w-full flex items-center justify-between text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest px-3 py-2 hover:text-foreground hover:bg-muted/30 rounded-lg transition-colors group cursor-pointer"
+                    className="w-full flex items-center justify-between text-sm font-bold text-foreground uppercase tracking-wider px-3 py-1.5 hover:text-foreground hover:bg-muted/30 rounded-lg transition-colors group cursor-pointer"
                   >
                     <span>{t(secName)}</span>
 
@@ -321,14 +329,14 @@ export default function Sidebar({
                             <Link
                               key={item.name}
                               to={item.path || '#'}
-                              className={`flex items-center rounded-lg text-xs font-medium transition-all duration-150 relative group ${
+                              className={`flex items-center rounded-lg text-xs font-medium transition-all duration-200 relative group ${
                                 isCollapsed
                                   ? 'justify-center p-2'
                                   : 'gap-3 px-3 py-2'
                               } ${
                                 active
-                                  ? 'bg-primary/5 text-primary border-l-2 border-primary font-semibold shadow-2xs'
-                                  : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground hover:translate-x-0.5'
+                                  ? 'bg-primary/10 text-primary border-l-2 border-primary font-semibold shadow-xs'
+                                  : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground hover:translate-x-0.5'
                               }`}
                               title={item.name}
                             >
@@ -440,10 +448,10 @@ export default function Sidebar({
                           onClick={() =>
                             onMobileOpenChange(false)
                           }
-                          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150 ${
+                          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
                             location.pathname === item.path
-                              ? 'bg-primary/5 text-primary border-l-2 border-primary font-semibold shadow-2xs'
-                              : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground hover:translate-x-0.5'
+                              ? 'bg-primary/10 text-primary border-l-2 border-primary font-semibold'
+                              : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground hover:translate-x-0.5'
                           }`}
                         >
                           <item.icon className="h-4.5 w-4.5" />
@@ -467,7 +475,7 @@ export default function Sidebar({
                           onClick={() =>
                             toggleSection(secName)
                           }
-                          className="w-full flex items-center justify-between text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest px-3 py-2 hover:text-foreground hover:bg-muted/30 rounded-lg transition-colors group cursor-pointer"
+                          className="w-full flex items-center justify-between text-sm font-bold text-foreground uppercase tracking-wider px-3 py-1.5 hover:text-foreground hover:bg-muted/30 rounded-lg transition-colors group cursor-pointer"
                         >
                           <span>{t(secName)}</span>
 
@@ -515,11 +523,11 @@ export default function Sidebar({
                                         false,
                                       )
                                     }
-                                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-150 ${
+                                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 ${
                                       location.pathname ===
                                       item.path
-                                        ? 'bg-primary/5 text-primary border-l-2 border-primary font-semibold shadow-2xs'
-                                        : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground hover:translate-x-0.5'
+                                        ? 'bg-primary/10 text-primary border-l-2 border-primary font-semibold'
+                                        : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground hover:translate-x-0.5'
                                     }`}
                                   >
                                     <item.icon className="h-4.5 w-4.5" />

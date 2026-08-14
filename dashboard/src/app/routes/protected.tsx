@@ -3,6 +3,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/authContext';
 import { DashboardLayout } from '@/layouts/DashboardLayout';
 import { useERPStore } from '@/store/erpStore';
+import { isAdminUser } from '@/utils/pagePermissions';
 import { toast } from 'react-hot-toast';
 
 const getRequiredPermission = (pathname: string): string | null => {
@@ -16,6 +17,7 @@ const getRequiredPermission = (pathname: string): string | null => {
   if (pathname.startsWith('/settings/notifications')) return 'notifications';
   if (pathname.startsWith('/settings')) return 'settings';
   if (pathname.startsWith('/export-orders')) return 'export_orders';
+  if (pathname.startsWith('/workflow')) return 'workflow_tracker';
 
   const routePermissionMap: Record<string, string> = {
     '/organization/companies': 'companies',
@@ -80,8 +82,7 @@ export function ProtectedRoute() {
   const currentUser = store.users.find((u) => u.id === store.currentUserId) as any;
 
   if (currentUser) {
-    const isAdmin = currentUser.role?.toLowerCase().includes('admin') || 
-                    currentUser.name?.toLowerCase().includes('admin');
+    const isAdmin = isAdminUser(currentUser);
     if (!isAdmin) {
       const requiredPermission = getRequiredPermission(location.pathname);
       if (requiredPermission && (!Array.isArray(currentUser.pageAccess) || !currentUser.pageAccess.includes(requiredPermission))) {

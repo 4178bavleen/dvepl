@@ -29,6 +29,8 @@ import {
 } from 'lucide-react';
 import { ColumnDef } from '@tanstack/react-table';
 import { ConfirmDialog } from '@/components/shared/confirmDialog';
+import { useERPStore } from '@/store/erpStore';
+import { canPerformPageAction } from '@/utils/pagePermissions';
 
 interface QuotationItemInput {
   slNo: number;
@@ -43,6 +45,11 @@ interface QuotationItemInput {
 
 export function QuotationsPage() {
   const { user } = useAuth();
+  const store = useERPStore();
+  const currentUser = store.users?.find((u: any) => u.id === store.currentUserId) as any;
+  const canCreate = canPerformPageAction(currentUser?.actionPermissions, "quotations", "create");
+  const canEdit = canPerformPageAction(currentUser?.actionPermissions, "quotations", "edit");
+  const canDelete = canPerformPageAction(currentUser?.actionPermissions, "quotations", "delete");
   const [quotations, setQuotations] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [tenders, setTenders] = useState<any[]>([]);
@@ -438,9 +445,11 @@ export function QuotationsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Quotations Pipeline</h1>
           <p className="mt-1 text-sm text-muted-foreground">Manage and revise bidding quotations with sequential approvals.</p>
         </div>
-        <Button onClick={openCreateMode} className="gap-2">
-          <Plus className="size-4" /> Add Quotation
-        </Button>
+        {canCreate && (
+          <Button onClick={openCreateMode} className="gap-2">
+            <Plus className="size-4" /> Add Quotation
+          </Button>
+        )}
       </div>
 
       {/* Main Table */}
@@ -459,17 +468,17 @@ export function QuotationsPage() {
             setIsLoading(false);
           }
         }}
-        onEdit={(row) => {
+        onEdit={canEdit ? (row) => {
           if (row.frozenAt) {
             toast.error('This quotation is approved and frozen. Cannot edit.');
             return;
           }
           openEditMode(row);
-        }}
-        onDelete={(row) => {
+        } : undefined}
+        onDelete={canDelete ? (row) => {
           setQuotationToDelete(row);
           setDeleteConfirmOpen(true);
-        }}
+        } : undefined}
         isLoading={isLoading}
         storageKey="quotations"
       />

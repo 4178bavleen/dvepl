@@ -16,8 +16,7 @@ export function getCurrentUser(): any {
 export function isAdminUser(user?: any): boolean {
   const target = user ?? getCurrentUser();
   return Boolean(
-    target?.role?.toLowerCase?.().includes("admin") ||
-    target?.name?.toLowerCase?.().includes("admin")
+    target?.role?.toLowerCase?.().includes("admin")
   );
 }
 

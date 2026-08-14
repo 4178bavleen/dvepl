@@ -268,25 +268,29 @@ export default function DynamicTable({
                           <span>Suppliers</span>
                         </Button>
 
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 rounded-lg hover:bg-amber-500/10 hover:text-amber-600 transition-colors duration-150"
-                          title="Edit"
-                          onClick={() => onEdit(record)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
+                        {onEdit && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-lg hover:bg-amber-500/10 hover:text-amber-600 transition-colors duration-150"
+                            title="Edit"
+                            onClick={() => onEdit(record)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
 
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 rounded-lg text-destructive hover:bg-destructive/15 transition-colors duration-150"
-                          title="Delete"
-                          onClick={() => onDelete(record)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {onDelete && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-lg text-destructive hover:bg-destructive/15 transition-colors duration-150"
+                            title="Delete"
+                            onClick={() => onDelete(record)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>

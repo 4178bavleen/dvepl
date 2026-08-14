@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useERPStore } from "@/store/erpStore";
+import { isAdminUser } from "@/utils/pagePermissions";
 import { cn } from "@/utils/helpers";
 import {
   DndContext,
@@ -275,8 +276,7 @@ export function GenericTable<TData extends { id: string }>({
     const currentUser = store.users.find(u => u.id === store.currentUserId) as any;
     if (!currentUser) return true;
 
-    const isAdmin = currentUser.role?.toLowerCase().includes('admin') || 
-                    currentUser.name?.toLowerCase().includes('admin');
+    const isAdmin = isAdminUser(currentUser);
     if (isAdmin) return true;
 
     if (!currentUser.fieldPermissions) return true;

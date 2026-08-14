@@ -24,6 +24,8 @@ import { financePaymentApi } from "@/services/modules";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { ConfirmDialog } from "@/components/shared/confirmDialog";
+import { useERPStore } from "@/store/erpStore";
+import { canPerformPageAction } from "@/utils/pagePermissions";
 
 interface PaymentEntry {
   id: string;
@@ -50,6 +52,11 @@ interface OrderInfo {
 export default function PaymentHistoryPage() {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
+  const store = useERPStore();
+  const currentUser = store.users?.find((u: any) => u.id === store.currentUserId) as any;
+  const canCreate = canPerformPageAction(currentUser?.actionPermissions, "finance", "create");
+  const canEdit = canPerformPageAction(currentUser?.actionPermissions, "finance", "edit");
+  const canDelete = canPerformPageAction(currentUser?.actionPermissions, "finance", "delete");
 
   const [orderInfo, setOrderInfo] = useState<OrderInfo | null>(null);
   const [payments, setPayments] = useState<PaymentEntry[]>([]);
@@ -494,7 +501,7 @@ export default function PaymentHistoryPage() {
           </div>
 
           {/* Add Installment Form Card */}
-          {orderInfo.balance > 0 ? (
+          {orderInfo.balance > 0 && canCreate ? (
             <div className="rounded-xl border bg-card p-5 space-y-4">
               <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
                 <Plus className="size-4 text-primary" /> Record Installment Receipt
@@ -730,24 +737,28 @@ export default function PaymentHistoryPage() {
                         </td>
                         <td className="py-3 px-3.5 text-center">
                           <div className="flex justify-center items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              disabled={isSaving}
-                              onClick={() => openEditModal(pay)}
-                              className="h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/5"
-                            >
-                              <Edit3 className="size-3.5" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              disabled={isSaving}
-                              onClick={() => handleDeletePayment(pay.id)}
-                              className="h-7 w-7 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/5"
-                            >
-                              <Trash2 className="size-3.5" />
-                            </Button>
+                            {canEdit && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                disabled={isSaving}
+                                onClick={() => openEditModal(pay)}
+                                className="h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/5"
+                              >
+                                <Edit3 className="size-3.5" />
+                              </Button>
+                            )}
+                            {canDelete && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                disabled={isSaving}
+                                onClick={() => handleDeletePayment(pay.id)}
+                                className="h-7 w-7 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/5"
+                              >
+                                <Trash2 className="size-3.5" />
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>

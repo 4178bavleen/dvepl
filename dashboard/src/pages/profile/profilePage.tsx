@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { isAdminUser } from '@/utils/pagePermissions';
 import { useAuth } from '@/contexts/authContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -87,8 +88,7 @@ export function ProfilePage() {
   }
 
   const initials = profile?.name ? profile.name.slice(0, 2).toUpperCase() : 'DU';
-  const isAdmin = profile?.roles.some(role => role.toLowerCase().includes('admin')) || 
-                  profile?.name?.toLowerCase().includes('admin');
+  const isAdmin = isAdminUser(profile);
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-12">

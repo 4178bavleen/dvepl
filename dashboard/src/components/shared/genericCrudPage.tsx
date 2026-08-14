@@ -19,6 +19,55 @@ import {
 import { GenericTable } from "@/components/tables/genericTable";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { canPerformPageAction } from "@/utils/pagePermissions";
+
+// Maps the generic table's storage key (tableName) to the PRBAC module key so
+// Create/Edit/Delete buttons can be hidden when the action permission is off.
+// Tables without a PRBAC module remain un-gated (buttons stay visible).
+const TABLE_NAME_TO_MODULE: Record<string, string> = {
+  companies: "companies",
+  branches: "branches",
+  departments: "departments",
+  teams: "teams",
+  designations: "designations",
+  costCenters: "cost_centers",
+  employees: "employees",
+  attendances: "attendance",
+  leaves: "leaves",
+  holidays: "holidays",
+  shifts: "shift_management",
+  salaries: "payroll",
+  employeeDocuments: "documents",
+  customers: "customers",
+  contactPersons: "contacts",
+  communicationHistories: "communication",
+  salesOrders: "orders",
+  vendors: "vendors",
+  warehouses: "inventory",
+  inventories: "inventory",
+  stockTransfers: "inventory",
+  tenderRequests: "tender_requests",
+  tenders: "tenders",
+  governmentDepartments: "government_departments",
+  sections: "sections",
+  divisions: "divisions",
+  subDivisions: "sub_divisions",
+  referenceCodes: "reference_codes",
+  technicalClarifications: "technical_clarifications",
+  boqs: "boqs",
+  quotations: "quotations",
+  users: "users",
+  roles: "roles",
+  approvalRequests: "approval_requests",
+  inspections: "inspections",
+  materials: "materials",
+  materialCategories: "material_categories",
+  productionPlans: "production_plans",
+  workOrders: "work_orders",
+  purchaseRequests: "purchase_requests",
+  purchaseOrders: "orders",
+  dispatches: "inventory",
+};
 
 
 import {
@@ -550,6 +599,18 @@ export function GenericCrudPage<TRecord extends { id: string }>({
   const [removeMemberId, setRemoveMemberId] = useState<string | null>(null);
 
   const records = api ? remoteRecords : localRecords;
+
+  // Action-permission gating. Tables without a PRBAC module are not gated.
+  const moduleKey = TABLE_NAME_TO_MODULE[tableName];
+  const currentUser = globalStore.users?.find(
+    (u: any) => u.id === globalStore.currentUserId,
+  ) as any;
+  const canCreate =
+    !moduleKey || canPerformPageAction(currentUser?.actionPermissions, moduleKey, "create");
+  const canEdit =
+    !moduleKey || canPerformPageAction(currentUser?.actionPermissions, moduleKey, "edit");
+  const canDelete =
+    !moduleKey || canPerformPageAction(currentUser?.actionPermissions, moduleKey, "delete");
 
   const loadRecords = useCallback(async () => {
     if (!api) return;
@@ -1356,7 +1417,7 @@ export function GenericCrudPage<TRecord extends { id: string }>({
             Manage {pluralName.toLowerCase()}.
           </p>
         </div>
-        {!readOnly && !hideAdd && (
+        {!readOnly && !hideAdd && canCreate && (
           <Button onClick={openCreate} className="gap-2">
             <Plus className="size-4" /> Add {moduleName}
           </Button>
@@ -1398,9 +1459,9 @@ export function GenericCrudPage<TRecord extends { id: string }>({
         columns={processedColumns as any}
         data={filteredRecords}
         onView={setViewingRecord}
-        onEdit={!readOnly && (!api || api.update) ? openEdit : undefined}
+        onEdit={!readOnly && canEdit && (!api || api.update) ? openEdit : undefined}
         onDelete={
-          api && !api.remove
+          (api && !api.remove) || !canDelete
             ? undefined
             : (record) => {
               setRecordToDelete(record);

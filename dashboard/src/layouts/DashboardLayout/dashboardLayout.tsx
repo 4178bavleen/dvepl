@@ -17,6 +17,7 @@ import { useAuth } from '@/contexts/authContext';
 import { authService, type ProfileResponse } from '@/services/auth';
 import { organizationApi } from '@/services/organization';
 import { securityApi } from '@/services/modules';
+import { isAdminUser } from '@/utils/pagePermissions';
 import { Button } from '@/components/ui/button';
 import Sidebar from '@/components/ui/sidebar';
 
@@ -117,8 +118,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
         if (!isMounted) return;
 
-        const isAdmin = userProfile.roles?.some((r: string) => r.toLowerCase().includes('admin')) || 
-                        userProfile.name?.toLowerCase().includes('admin');
+        const isAdmin = isAdminUser(userProfile);
         const pageAccess = userProfile.pageAccess || [];
         const hasUsersAccess = isAdmin || pageAccess.includes('users');
         const hasRolesAccess = isAdmin || pageAccess.includes('roles');
@@ -211,8 +211,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     if (!userObj || !userObj.pageAccess) return sidebarItems;
     
     // Always grant full access to Admins/Super Admins
-    const isAdmin = userObj.role?.toLowerCase().includes('admin') || 
-                    userObj.name?.toLowerCase().includes('admin');
+    const isAdmin = isAdminUser(userObj);
     if (isAdmin) return sidebarItems;
 
     const mapping: Record<string, string> = {

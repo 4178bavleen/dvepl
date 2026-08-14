@@ -19,6 +19,8 @@ import workflowApi, {
   WorkflowOrder,
   WorkflowStage,
 } from "@/services/workflowApi";
+import { useERPStore } from "@/store/erpStore";
+import { canPerformPageAction } from "@/utils/pagePermissions";
 
 const stages: { value: WorkflowStage | "ALL"; label: string }[] = [
   { value: "ALL", label: "All Orders" },
@@ -85,6 +87,9 @@ function overdue(value?: string | Date | null) {
 }
 
 export default function WorkflowTrackerPage() {
+  const store = useERPStore();
+  const currentUser = store.users?.find((u: any) => u.id === store.currentUserId) as any;
+  const canEdit = canPerformPageAction(currentUser?.actionPermissions, "workflow_tracker", "edit");
   const [orders, setOrders] = useState<WorkflowOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeStage, setActiveStage] = useState<WorkflowStage | "ALL">("ALL");
@@ -531,7 +536,7 @@ export default function WorkflowTrackerPage() {
                         <td className="px-3.5 py-2.5">
                           <select
                             value={order.workflowStage}
-                            disabled={updatingOrderId === order.id}
+                            disabled={updatingOrderId === order.id || !canEdit}
                             onClick={(event) => event.stopPropagation()}
                             onChange={(event) =>
                               void handleStageChange(

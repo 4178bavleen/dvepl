@@ -11,8 +11,15 @@ import {
 } from 'lucide-react';
 import { CustomField, SUPPORTED_FIELD_TYPES } from '@/components/customFields/dynamicFormRenderer';
 import { ConfirmDialog } from '@/components/shared/confirmDialog';
+import { useERPStore } from '@/store/erpStore';
+import { canPerformPageAction } from '@/utils/pagePermissions';
 
 export default function CustomFieldsPage() {
+  const store = useERPStore();
+  const currentUser = store.users?.find((u: any) => u.id === store.currentUserId) as any;
+  const canCreate = canPerformPageAction(currentUser?.actionPermissions, "custom_fields", "create");
+  const canEdit = canPerformPageAction(currentUser?.actionPermissions, "custom_fields", "edit");
+  const canDelete = canPerformPageAction(currentUser?.actionPermissions, "custom_fields", "delete");
   const [activeModule, setActiveModule] = useState<'order' | 'task' | 'vendor' | 'inventory'>('order');
   const [fields, setFields] = useState<CustomField[]>([]);
   const [loading, setLoading] = useState(false);
@@ -228,6 +235,7 @@ export default function CustomFieldsPage() {
       </div>
 
       {/* Form Card */}
+      {(canCreate || canEdit) && (
       <div className="rounded-2xl border bg-card p-6 shadow-sm space-y-4">
         <div className="border-b pb-3 flex items-center justify-between">
           <div>
@@ -563,6 +571,7 @@ export default function CustomFieldsPage() {
           </div>
         </form>
       </div>
+      )}
 
       {/* List Card */}
       <div className="rounded-2xl border bg-card p-6 shadow-sm space-y-4">
@@ -605,22 +614,28 @@ export default function CustomFieldsPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleToggleActive(cf.id, cf.isActive)}
-                    className={`px-2.5 py-1 rounded-md text-[11px] font-semibold border cursor-pointer ${
-                      cf.isActive
-                        ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
-                        : 'bg-muted text-muted-foreground border-border'
-                    }`}
-                  >
-                    {cf.isActive ? 'Active' : 'Disabled'}
-                  </button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditField(cf)}>
-                    <Edit className="size-3.5" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(cf.id, cf.name)}>
-                    <Trash2 className="size-3.5" />
-                  </Button>
+                  {canEdit && (
+                    <button
+                      onClick={() => handleToggleActive(cf.id, cf.isActive)}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-semibold border cursor-pointer ${
+                        cf.isActive
+                          ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                          : 'bg-muted text-muted-foreground border-border'
+                      }`}
+                    >
+                      {cf.isActive ? 'Active' : 'Disabled'}
+                    </button>
+                  )}
+                  {canEdit && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditField(cf)}>
+                      <Edit className="size-3.5" />
+                    </Button>
+                  )}
+                  {canDelete && (
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(cf.id, cf.name)}>
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}

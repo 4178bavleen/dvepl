@@ -29,6 +29,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useERPStore } from '@/store/erpStore';
 import { apiClient } from '@/services/axios';
+import { canPerformPageAction } from '@/utils/pagePermissions';
 import { DeliveryOrder, DeliveryStatus } from '@/types/erp';
 
 export type { DeliveryOrder };
@@ -51,6 +52,8 @@ export const deliveryApiService = {
 
 export function DeliveryPage() {
   const store = useERPStore();
+  const currentUser = store.users?.find((u: any) => u.id === store.currentUserId) as any;
+  const canEdit = canPerformPageAction(currentUser?.actionPermissions, "delivery", "edit");
   const setDeliveryOrdersInStore = useERPStore((s) => s.setDeliveryOrders);
   const updateDeliveryOrderInStore = useERPStore((s) => s.updateDeliveryOrder);
   const [activeView, setActiveView] = useState<'table' | 'calendar' | 'timeline'>('table');
@@ -756,15 +759,17 @@ export function DeliveryPage() {
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-emerald-600 hover:text-emerald-500 hover:bg-emerald-500/10 rounded-lg"
-                              onClick={() => handleOpenUpdateModal(order)}
-                              title="Update Delivery"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
+                            {canEdit && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-emerald-600 hover:text-emerald-500 hover:bg-emerald-500/10 rounded-lg"
+                                onClick={() => handleOpenUpdateModal(order)}
+                                title="Update Delivery"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -958,15 +963,17 @@ export function DeliveryPage() {
                           >
                             <Eye className="h-3.5 w-3.5" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-emerald-600 hover:text-emerald-500 hover:bg-emerald-500/10 rounded-lg"
-                            onClick={() => handleOpenUpdateModal(order)}
-                            title="Update Delivery"
-                          >
-                            <Edit className="h-3.5 w-3.5" />
-                          </Button>
+                          {canEdit && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-emerald-600 hover:text-emerald-500 hover:bg-emerald-500/10 rounded-lg"
+                              onClick={() => handleOpenUpdateModal(order)}
+                              title="Update Delivery"
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>

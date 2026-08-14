@@ -44,6 +44,8 @@ import useDynamicModule from "@/hooks/useDynamicModule";
 import VendorTracking from "./vendorTracking";
 import { DynamicRecord } from "@/types/dynamic";
 import { ConfirmDialog } from "@/components/shared/confirmDialog";
+import { useERPStore } from "@/store/erpStore";
+import { canPerformPageAction } from "@/utils/pagePermissions";
 
 type StockStatus = "all" | "in-stock" | "low-stock" | "out-of-stock";
 
@@ -56,6 +58,11 @@ type SupplierMailRecipient = {
 export default function InventoryPage() {
   const navigate = useNavigate();
   const importInputRef = useRef<HTMLInputElement>(null);
+  const store = useERPStore();
+  const currentUser = store.users?.find((u: any) => u.id === store.currentUserId) as any;
+  const canCreate = canPerformPageAction(currentUser?.actionPermissions, "inventory", "create");
+  const canEdit = canPerformPageAction(currentUser?.actionPermissions, "inventory", "edit");
+  const canDelete = canPerformPageAction(currentUser?.actionPermissions, "inventory", "delete");
 
   const {
     module,
@@ -884,10 +891,12 @@ export default function InventoryPage() {
             Manage Fields
           </Button>
 
-          <Button onClick={openCreate}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Item
-          </Button>
+          {canCreate && (
+            <Button onClick={openCreate}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Item
+            </Button>
+          )}
         </div>
       </div>
 
@@ -1082,8 +1091,8 @@ export default function InventoryPage() {
             records={paginatedRecords}
             loading={loading}
             onStock={handleRestockAction}
-            onEdit={openEdit}
-            onDelete={confirmDeleteRecord}
+            onEdit={canEdit ? openEdit : undefined}
+            onDelete={canDelete ? confirmDeleteRecord : undefined}
             onVendors={handleViewItemVendors}
           />
         </>

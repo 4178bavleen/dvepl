@@ -35,6 +35,7 @@ interface Props {
   selectedDrawingIds: string[];
   setSelectedDrawingIds: (ids: string[]) => void;
   onStatusChanged?: () => void;
+  canEdit?: boolean;
   orders?: any[];
 }
 
@@ -176,6 +177,7 @@ export default function DrawingLibrary({
   selectedDrawingIds,
   setSelectedDrawingIds,
   onStatusChanged,
+  canEdit = true,
   orders = [],
 }: Props) {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -514,7 +516,7 @@ export default function DrawingLibrary({
                             <ExternalLink className="w-3.5 h-3.5 text-muted-foreground" />
                             Open File
                           </button>
-                          {canWork && (
+                          {canWork && canEdit && (
                             <button
                               onClick={(e) => handleOpenSendModal(e, d)}
                               className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-muted text-foreground transition-colors font-semibold text-left"
@@ -523,7 +525,7 @@ export default function DrawingLibrary({
                               Send to Customer
                             </button>
                           )}
-                          {!canWork && (
+                          {(!canWork || !canEdit) && (
                             <p className="px-3 py-2 text-[11px] text-muted-foreground">
                               View only — no work actions available
                             </p>
@@ -562,8 +564,8 @@ export default function DrawingLibrary({
                       <PopoverTrigger
                         render={
                           <button
-                            disabled={isUpdating || !canWork}
-                            title={!canWork ? "View only — you cannot change the status of this drawing" : undefined}
+                            disabled={isUpdating || !canWork || !canEdit}
+                            title={!canWork || !canEdit ? "View only — you cannot change the status of this drawing" : undefined}
                             onClick={(e) => e.stopPropagation()}
                             className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-semibold shadow-2xs transition-all duration-200 disabled:opacity-50 hover:brightness-95 hover:shadow-xs cursor-pointer ${statusCfg.pill}`}
                           >
@@ -686,15 +688,15 @@ export default function DrawingLibrary({
                           <PopoverTrigger
                             render={
                               <button
-                                disabled={isUpdating || !canWork}
-                                title={!canWork ? "View only — you cannot change the status of this drawing" : undefined}
-                                className={`group inline-flex items-center gap-2 px-3 py-1.5 min-w-[130px] justify-between rounded-full border text-[11px] font-semibold transition-all duration-200 ${statusCfg.pill} ${canWork ? "hover:brightness-95 hover:shadow-xs cursor-pointer" : "cursor-default"}`}
+                                disabled={isUpdating || !canWork || !canEdit}
+                                title={!canWork || !canEdit ? "View only — you cannot change the status of this drawing" : undefined}
+                                className={`group inline-flex items-center gap-2 px-3 py-1.5 min-w-[130px] justify-between rounded-full border text-[11px] font-semibold transition-all duration-200 ${statusCfg.pill} ${canWork && canEdit ? "hover:brightness-95 hover:shadow-xs cursor-pointer" : "cursor-default"}`}
                               >
                                 <div className="flex items-center gap-1.5 truncate">
                                   <span className={`w-1.5 h-1.5 rounded-full ${statusCfg.dot} ${d.status === "PENDING" || d.status === "SUBMITTED" ? "animate-pulse" : ""}`} />
                                   <span className="truncate">{statusCfg.label}</span>
                                 </div>
-                                {canWork && (
+                                {canWork && canEdit && (
                                   isUpdating ? (
                                     <Loader2 className="w-3 h-3 animate-spin opacity-60 flex-shrink-0" />
                                   ) : (

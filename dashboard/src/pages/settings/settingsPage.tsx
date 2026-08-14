@@ -66,6 +66,7 @@ interface UserItem {
   pageAccess?: string[];
   fieldPermissions?: Record<string, { view: boolean; edit: boolean }>;
   actionPermissions?: StoredActionPermissions;
+  hasOverride?: boolean;
   password?: string;
   teamId?: string | null;
   teamName?: string | null;
@@ -310,7 +311,7 @@ export function SettingsPage() {
               ? u.designation.title || "Team Member"
               : u.designation || "Team Member",
           role: u.role || "user",
-          pageAccess: u.pageAccess || ["dashboard", "vendors", "orders"],
+          pageAccess: u.pageAccess ?? ["dashboard", "vendors", "orders"],
           fieldPermissions: u.fieldPermissions || {},
           actionPermissions: u.actionPermissions || {
             create: true,
@@ -662,11 +663,24 @@ export function SettingsPage() {
     { key: "tender_requests", label: "📂 Tender Requests" },
     { key: "tenders", label: "🗂️ Tenders" },
     { key: "technical_clarifications", label: "❓ Technical Clarifications" },
+    { key: "quotations", label: "📄 Quotations" },
+    { key: "boqs", label: "📋 BOQs" },
     { key: "government_departments", label: "🏢 Government Departments" },
     { key: "sections", label: "🌿 Sections" },
     { key: "divisions", label: "🌿 Divisions" },
     { key: "sub_divisions", label: "👥 Sub Divisions" },
     { key: "reference_codes", label: "📄 Reference Codes" },
+
+    // Engineering, Materials & Production
+    { key: "engineering_projects", label: "🛠️ Engineering Projects" },
+    { key: "engineering_drawings", label: "📐 Engineering Drawings" },
+    { key: "boms", label: "📦 BOMs" },
+    { key: "materials", label: "🧱 Materials" },
+    { key: "material_categories", label: "🏷️ Material Categories" },
+    { key: "purchase_requests", label: "🛒 Purchase Requests" },
+    { key: "production_plans", label: "🏭 Production Plans" },
+    { key: "work_orders", label: "⚙️ Work Orders" },
+    { key: "inspections", label: "🔍 Inspections / QC" },
 
     // Security (PRBAC)
     { key: "users", label: "👤 Users" },
@@ -676,6 +690,8 @@ export function SettingsPage() {
     // Other / Reports / Settings
     { key: "reports", label: "📊 Reports" },
     { key: "audit_logs", label: "📜 Audit Logs" },
+    { key: "workflow_tracker", label: "🔄 Workflow Tracker" },
+    { key: "notifications", label: "🔔 Notifications" },
     { key: "custom_fields", label: "⚙️ Custom Fields" },
     { key: "recycle_bin", label: "🗑️ Recycle Bin" },
     { key: "settings", label: "⚙️ Settings" },
@@ -816,18 +832,20 @@ export function SettingsPage() {
       .replace(/[_-]+/g, " ")
       .replace(/\b\w/g, (char) => char.toUpperCase());
 
-  const initializePermissionState = (user: UserItem) => {
-    setPermUser(user);
-
+  const initializePermissionState = (source: {
+    pageAccess?: string[];
+    fieldPermissions?: Record<string, any>;
+    actionPermissions?: StoredActionPermissions;
+  }) => {
     const pageObj: Record<string, boolean> = {};
     modulesList.forEach((module) => {
-      pageObj[module.key] = user.pageAccess?.includes(module.key) ?? false;
+      pageObj[module.key] = source.pageAccess?.includes(module.key) ?? false;
     });
     setPageAccessState(pageObj);
 
     const fieldObj: Record<string, { view: boolean; edit: boolean }> = {};
     fieldsAccessList.forEach((field) => {
-      fieldObj[field.key] = user.fieldPermissions?.[field.key] ?? {
+      fieldObj[field.key] = source.fieldPermissions?.[field.key] ?? {
         view: true,
         edit: true,
       };
@@ -836,13 +854,13 @@ export function SettingsPage() {
 
     setActionPermsState(
       normalizePageActionPermissions(
-        user.actionPermissions ?? LEGACY_ACTION_DEFAULTS,
+        source.actionPermissions ?? LEGACY_ACTION_DEFAULTS,
         modulesList.map((module) => module.key),
       ),
     );
 
     setSelectedActionModule(
-      user.pageAccess?.find((key) => modulesList.some((module) => module.key === key)) ||
+      source.pageAccess?.find((key) => modulesList.some((module) => module.key === key)) ||
         "dashboard",
     );
   };
@@ -864,7 +882,15 @@ export function SettingsPage() {
     setSelectedPermissionUserId(user.id);
     setPermissionRoleSearch("");
     setPermissionUserSearch("");
-    initializePermissionState(user);
+    setPermUser(user);
+    // Role mode must initialize from the ROLE record, never from a member's
+    // (possibly overridden) permissions — otherwise one user's override could
+    // be silently propagated onto the whole role.
+    initializePermissionState(
+      hasRoleInDb
+        ? (storeObj.roles?.find((r: any) => r.name === user.role) ?? user)
+        : user,
+    );
     setIsPermModalOpen(true);
   };
 
@@ -872,10 +898,16 @@ export function SettingsPage() {
     setPermissionMode("role");
     setSelectedPermissionRole(role);
 
-    const roleUser = users.find((user) => user.role === role);
-    if (roleUser) {
-      setSelectedPermissionUserId(roleUser.id);
-      initializePermissionState(roleUser);
+    const storeObj = useERPStore.getState();
+    const roleObj = storeObj.roles?.find((r: any) => r.name === role);
+    if (roleObj) {
+      initializePermissionState(roleObj);
+    } else {
+      const roleUser = users.find((user) => user.role === role);
+      if (roleUser) {
+        setSelectedPermissionUserId(roleUser.id);
+        initializePermissionState(roleUser);
+      }
     }
   };
 
@@ -883,6 +915,7 @@ export function SettingsPage() {
     setPermissionMode("user");
     setSelectedPermissionUserId(user.id);
     setSelectedPermissionRole(user.role || "user");
+    setPermUser(user);
     initializePermissionState(user);
   };
 
@@ -944,11 +977,6 @@ export function SettingsPage() {
           ? users.filter((user) => user.role === selectedPermissionRole)
           : [permUser];
 
-      if (targetUsers.length === 0) {
-        toast.error("No users found for the selected role");
-        return;
-      }
-
       const permissionPayload = {
         pageAccess,
         fieldPermissions: finalFieldPerms,
@@ -972,12 +1000,38 @@ export function SettingsPage() {
             ...permissionPayload,
           });
         }
+
+        // Role permissions are the source of truth for every member of the role.
+        // Clear per-user overrides so the newly saved policy actually applies to
+        // all of them (previously an override was permanent and the role edit
+        // silently stopped affecting overridden users).
+        await Promise.all(
+          targetUsers.map((user) =>
+            securityApi.users.update
+              ? securityApi.users
+                  .update(user.id, { hasOverride: false })
+                  .catch(() => {
+                    // A user's override reset is best-effort; the role itself is saved.
+                  })
+              : Promise.resolve(),
+          ),
+        );
       } else if (securityApi.users.update) {
         await securityApi.users.update(permUser.id, {
           ...permissionPayload,
           hasOverride: true,
         });
       }
+
+      // Sync the role record so the UI reflects the saved role permissions even
+      // when the role currently has no members (bug: role edit was blocked).
+      useERPStore.setState({
+        roles: (store.roles || []).map((role: any) =>
+          permissionMode === "role" && role.name === selectedPermissionRole
+            ? { ...role, ...permissionPayload }
+            : role,
+        ),
+      });
 
       const targetIds = new Set(targetUsers.map((user) => user.id));
       const updatedUsers = users.map((user) =>
@@ -987,6 +1041,8 @@ export function SettingsPage() {
               pageAccess,
               fieldPermissions: finalFieldPerms,
               actionPermissions: actionPermsState,
+              hasOverride:
+                permissionMode === "role" ? false : user.hasOverride,
             }
           : user,
       );
@@ -1001,6 +1057,8 @@ export function SettingsPage() {
               pageAccess,
               fieldPermissions: finalFieldPerms,
               actionPermissions: actionPermsState,
+              hasOverride:
+                permissionMode === "role" ? false : user.hasOverride,
             }
           : user,
       );
@@ -1015,6 +1073,40 @@ export function SettingsPage() {
     } catch (err) {
       console.error(err);
       toast.error("Failed to save permissions");
+    }
+  };
+
+  // Clear a per-user override so the user goes back to inheriting the role's
+  // permission policy (previously there was no way to un-override a user).
+  const handleResetUserOverride = async () => {
+    if (!permUser || !selectedPermissionRole) return;
+    try {
+      if (securityApi.users.update) {
+        await securityApi.users.update(permUser.id, { hasOverride: false });
+      }
+
+      const storeObj = useERPStore.getState();
+      const roleObj = storeObj.roles?.find(
+        (r: any) => r.name === selectedPermissionRole,
+      );
+
+      // Re-initialize the modal from the role so it shows inherited permissions.
+      setPermissionMode("role");
+      initializePermissionState(roleObj ?? permUser);
+
+      const reset = (u: any) =>
+        u.id === permUser.id ? { ...u, hasOverride: false } : u;
+      setUsers((prev) => prev.map(reset));
+      useERPStore.setState({
+        users: useERPStore.getState().users.map(reset),
+      });
+
+      toast.success(
+        "Override cleared — user now inherits role permissions",
+      );
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to reset override");
     }
   };
 
@@ -4598,6 +4690,15 @@ export function SettingsPage() {
                 >
                   Cancel
                 </button>
+                {permissionMode === "user" && (
+                  <button
+                    onClick={handleResetUserOverride}
+                    className="px-4 py-2.5 border border-destructive/30 rounded-lg bg-background text-xs font-bold text-destructive hover:bg-destructive/5 transition"
+                    title="Stop overriding the role policy — this user will inherit role permissions again"
+                  >
+                    Reset to Role
+                  </button>
+                )}
                 <button
                   onClick={savePermissions}
                   className="px-5 py-2.5 bg-primary text-white font-bold rounded-lg text-xs hover:bg-primary/95 transition shadow-sm"

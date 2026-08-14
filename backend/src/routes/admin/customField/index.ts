@@ -6,7 +6,7 @@ export default async function customFieldRoutes(fastify: FastifyInstance, option
   const service = new CustomFieldService(fastify.prisma);
 
   // GET /api/admin/custom-fields - List custom fields by module (or all if query module missing)
-  fastify.get("/", async (req: FastifyRequest<{ Querystring: { module?: string; activeOnly?: string } }>, reply: FastifyReply) => {
+  fastify.get<{ Querystring: { module?: string; activeOnly?: string } }>("/", { preHandler: [fastify.verifyToken] }, async (req: FastifyRequest<{ Querystring: { module?: string; activeOnly?: string } }>, reply: FastifyReply) => {
     try {
       const module = req.query.module || "order";
       const activeOnly = req.query.activeOnly === "true";
@@ -27,7 +27,7 @@ export default async function customFieldRoutes(fastify: FastifyInstance, option
   });
 
   // GET /api/admin/custom-fields/:id - Get single custom field
-  fastify.get("/:id", async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+  fastify.get<{ Params: { id: string } }>("/:id", { preHandler: [fastify.verifyToken] }, async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     try {
       const field = await service.getFieldById(req.params.id);
       if (!field) return reply.status(404).send({ error: "Custom field not found" });
@@ -38,7 +38,7 @@ export default async function customFieldRoutes(fastify: FastifyInstance, option
   });
 
   // POST /api/admin/custom-fields - Create custom field
-  fastify.post("/", async (req: FastifyRequest<{ Body: any }>, reply: FastifyReply) => {
+  fastify.post<{ Body: any }>("/", { preHandler: [fastify.verifyToken, fastify.authorizePermissions(["custom_fields.create"])] }, async (req: FastifyRequest<{ Body: any }>, reply: FastifyReply) => {
     try {
       const body = req.body as any;
       const name = body.name || body.label;
@@ -80,7 +80,7 @@ export default async function customFieldRoutes(fastify: FastifyInstance, option
   });
 
   // PUT /api/admin/custom-fields/:id - Update custom field
-  fastify.put("/:id", async (req: FastifyRequest<{ Params: { id: string }; Body: any }>, reply: FastifyReply) => {
+  fastify.put<{ Params: { id: string }; Body: any }>("/:id", { preHandler: [fastify.verifyToken, fastify.authorizePermissions(["custom_fields.update"])] }, async (req: FastifyRequest<{ Params: { id: string }; Body: any }>, reply: FastifyReply) => {
     try {
       const body = req.body as any;
       let optionsList = body.options;
@@ -112,7 +112,7 @@ export default async function customFieldRoutes(fastify: FastifyInstance, option
   });
 
   // PATCH /api/admin/custom-fields/:id/toggle - Toggle active status
-  fastify.patch("/:id/toggle", async (req: FastifyRequest<{ Params: { id: string }; Body: { isActive: boolean } }>, reply: FastifyReply) => {
+  fastify.patch<{ Params: { id: string }; Body: { isActive: boolean } }>("/:id/toggle", { preHandler: [fastify.verifyToken, fastify.authorizePermissions(["custom_fields.update"])] }, async (req: FastifyRequest<{ Params: { id: string }; Body: { isActive: boolean } }>, reply: FastifyReply) => {
     try {
       const updated = await service.toggleActive(req.params.id, req.body.isActive);
       return reply.send(updated);
@@ -122,7 +122,7 @@ export default async function customFieldRoutes(fastify: FastifyInstance, option
   });
 
   // DELETE /api/admin/custom-fields/:id - Delete field
-  fastify.delete("/:id", async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+  fastify.delete<{ Params: { id: string } }>("/:id", { preHandler: [fastify.verifyToken, fastify.authorizePermissions(["custom_fields.delete"])] }, async (req: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     try {
       await service.deleteField(req.params.id);
       return reply.send({ success: true, message: "Custom field deleted successfully" });
@@ -132,7 +132,7 @@ export default async function customFieldRoutes(fastify: FastifyInstance, option
   });
 
   // GET /api/admin/custom-fields/values/:module/:entityId - Retrieve values for entity
-  fastify.get("/values/:module/:entityId", async (req: FastifyRequest<{ Params: { module: string; entityId: string } }>, reply: FastifyReply) => {
+  fastify.get<{ Params: { module: string; entityId: string } }>("/values/:module/:entityId", { preHandler: [fastify.verifyToken] }, async (req: FastifyRequest<{ Params: { module: string; entityId: string } }>, reply: FastifyReply) => {
     try {
       const values = await service.getValuesForEntity(req.params.module, req.params.entityId);
       return reply.send({ success: true, data: values });
@@ -142,7 +142,7 @@ export default async function customFieldRoutes(fastify: FastifyInstance, option
   });
 
   // POST /api/admin/custom-fields/values/:module/:entityId - Save values for entity
-  fastify.post("/values/:module/:entityId", async (req: FastifyRequest<{ Params: { module: string; entityId: string }; Body: { values: Record<string, any> } }>, reply: FastifyReply) => {
+  fastify.post<{ Params: { module: string; entityId: string }; Body: { values: Record<string, any> } }>("/values/:module/:entityId", { preHandler: [fastify.verifyToken] }, async (req: FastifyRequest<{ Params: { module: string; entityId: string }; Body: { values: Record<string, any> } }>, reply: FastifyReply) => {
     try {
       await service.saveValues(req.params.module, req.params.entityId, req.body.values || {});
       return reply.send({ success: true, message: "Custom field values saved successfully" });

@@ -24,10 +24,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'react-hot-toast';
 import { tenderApi, securityApi } from '@/services/modules';
+import { useERPStore } from '@/store/erpStore';
+import { canPerformPageAction } from '@/utils/pagePermissions';
 
 const ITEMS_PER_PAGE = 5;
 
 export function TechnicalClarificationsPage() {
+  const store = useERPStore();
+  const currentUser = store.users?.find((u: any) => u.id === store.currentUserId) as any;
+  const canCreate = canPerformPageAction(currentUser?.actionPermissions, "technical_clarifications", "create");
+  const canEdit = canPerformPageAction(currentUser?.actionPermissions, "technical_clarifications", "edit");
   const [threads, setThreads] = useState<any[]>([]);
   const [tenders, setTenders] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -363,10 +369,12 @@ export function TechnicalClarificationsPage() {
           <span className="text-xs font-semibold text-muted-foreground/80">Tenders & Bid Management</span>
           <h1 className="text-2xl font-bold tracking-tight text-foreground mt-0.5">Technical Clarifications</h1>
         </div>
-        <Button variant="default" size="sm" onClick={() => setIsCreateOpen(true)} className="h-9 gap-1.5 text-xs font-semibold bg-primary text-white">
-          <Plus className="h-4 w-4" />
-          <span>New Clarification</span>
-        </Button>
+        {canCreate && (
+          <Button variant="default" size="sm" onClick={() => setIsCreateOpen(true)} className="h-9 gap-1.5 text-xs font-semibold bg-primary text-white">
+            <Plus className="h-4 w-4" />
+            <span>New Clarification</span>
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -553,9 +561,11 @@ export function TechnicalClarificationsPage() {
                     </span>
                     <h2 className="text-sm font-bold text-foreground pt-1">{selectedThread.question}</h2>
                   </div>
-                  <Button variant="outline" size="sm" onClick={openEditDialog} className="h-8 text-xs font-semibold">
-                    Edit Status
-                  </Button>
+                  {canEdit && (
+                    <Button variant="outline" size="sm" onClick={openEditDialog} className="h-8 text-xs font-semibold">
+                      Edit Status
+                    </Button>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 text-[10px] text-muted-foreground font-medium">

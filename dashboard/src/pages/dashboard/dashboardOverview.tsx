@@ -50,6 +50,7 @@ import {
 } from "@/services/modules";
 
 import { organizationApi } from "@/services/organization";
+import { isAdminUser } from "@/utils/pagePermissions";
 
 // ============================================================
 // TYPES
@@ -393,13 +394,7 @@ export function DashboardOverview() {
       const pageAccess =
         currentUserObj?.pageAccess || [];
 
-      const isAdmin =
-        currentUserObj?.role
-          ?.toLowerCase()
-          .includes("admin") ||
-        currentUserObj?.name
-          ?.toLowerCase()
-          .includes("admin");
+      const isAdmin = isAdminUser(currentUserObj);
 
       const hasAccess = (page: string) =>
         isAdmin || pageAccess.includes(page);

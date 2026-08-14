@@ -513,9 +513,10 @@ export async function recycleBinRoutes(
   options: FastifyPluginOptions
 ) {
   // 1. Get all soft-deleted records across modules
-  fastify.get(
+  fastify.get<{ Querystring: Query }>(
     "/list",
     {
+      preHandler: [fastify.verifyToken, fastify.authorizePermissions(["recycle_bin.view"])],
       schema: {
         tags: ["Recycle Bin"],
         summary: "Get soft-deleted items",
@@ -573,9 +574,10 @@ export async function recycleBinRoutes(
   );
 
   // 2. Restore a soft-deleted record (set deletedAt = null)
-  fastify.post(
+  fastify.post<{ Params: ItemParams }>(
     "/restore/:module/:id",
     {
+      preHandler: [fastify.verifyToken, fastify.authorizePermissions(["recycle_bin.update"])],
       schema: {
         tags: ["Recycle Bin"],
         summary: "Restore soft-deleted item",
@@ -612,9 +614,10 @@ export async function recycleBinRoutes(
   );
 
   // 3. Permanent delete a record from database
-  fastify.delete(
+  fastify.delete<{ Params: ItemParams }>(
     "/permanent-delete/:module/:id",
     {
+      preHandler: [fastify.verifyToken, fastify.authorizePermissions(["recycle_bin.delete"])],
       schema: {
         tags: ["Recycle Bin"],
         summary: "Permanently delete item",
@@ -656,6 +659,7 @@ export async function recycleBinRoutes(
   fastify.delete(
     "/empty",
     {
+      preHandler: [fastify.verifyToken, fastify.authorizePermissions(["recycle_bin.delete"])],
       schema: {
         tags: ["Recycle Bin"],
         summary: "Empty entire recycle bin",

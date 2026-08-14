@@ -102,9 +102,9 @@ export interface DynamicTableProps {
   loading?: boolean;
     
 
-  onEdit: (record: DynamicRecord) => void;
+  onEdit?: (record: DynamicRecord) => void;
 
-  onDelete: (record: DynamicRecord) => void;
+  onDelete?: (record: DynamicRecord) => void;
   onStock: (record: DynamicRecord) => void;
   onVendors: (record: DynamicRecord) => void;
 

@@ -50,6 +50,7 @@ import {
 import { apiClient } from "@/services/axios";
 import { toast } from "react-hot-toast";
 import { useERPStore } from "@/store/erpStore";
+import { isAdminUser } from "@/utils/pagePermissions";
 import {
   SalesOrderAssignModal,
   SalesOrderAssignment,
@@ -268,10 +269,7 @@ export function OrdersPage() {
 
   const currentUserId = store.currentUserId || currentUser?.id || null;
 
-  const isAdmin = Boolean(
-    currentUser?.role?.toLowerCase?.().includes("admin") ||
-    currentUser?.name?.toLowerCase?.().includes("admin")
-  );
+  const isAdmin = isAdminUser(currentUser);
 
   const isOrderAssignedToCurrentUser = useCallback(
     (order: QuoteTenderOrder | null | undefined) => {

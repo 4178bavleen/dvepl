@@ -51,6 +51,12 @@ export function getModuleActions(
     };
   }
 
+  // An empty object is "unset" (matches the backend resolution logic): treat
+  // it as the default action set so a no-op modal save can never lock a user out.
+  if (isRecord(actionPermissions) && Object.keys(actionPermissions).length === 0) {
+    return LEGACY_ACTION_DEFAULTS;
+  }
+
   const moduleActions = isRecord(actionPermissions) ? actionPermissions[moduleKey] : undefined;
   if (!isRecord(moduleActions)) return NO_ACTIONS;
 
@@ -71,6 +77,15 @@ export function normalizePageActionPermissions(
   );
 }
 
+export function isAdminUser(user: any): boolean {
+  if (!user) return false;
+  const roleValues = Array.isArray(user.roles) ? user.roles : user.role ? [user.role] : [];
+  return roleValues.some((r: any) => {
+    const roleName = typeof r === "string" ? r : (r?.name ?? r?.label ?? "");
+    return roleName.toLowerCase().includes("admin");
+  });
+}
+
 export function canPerformPageAction(
   actionPermissions: unknown,
   moduleKey: string,
@@ -79,11 +94,7 @@ export function canPerformPageAction(
   try {
     const store = useERPStore.getState();
     const currentUser = store.users.find((u) => u.id === store.currentUserId) as any;
-    if (currentUser) {
-      const isAdmin = currentUser.role?.toLowerCase().includes('admin') || 
-                      currentUser.name?.toLowerCase().includes('admin');
-      if (isAdmin) return true;
-    }
+    if (isAdminUser(currentUser)) return true;
   } catch (e) {
     // Fallback if store is not initialized
   }

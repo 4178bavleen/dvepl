@@ -1,5 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useExportOrdersStore } from "@/store/exportOrders.store";
+import { useERPStore } from "@/store/erpStore";
+import { canPerformPageAction } from "@/utils/pagePermissions";
 
 import { Card, CardContent } from "@/components/ui/card";
 import FilterPanel from "./components/FilterPanel";
@@ -48,6 +50,10 @@ const DEFAULT_PDF_OPTS: PdfOpts = {
 };
 
 export default function ExportOrdersPage() {
+  const store = useERPStore();
+  const currentUser = store.users?.find((u: any) => u.id === store.currentUserId) as any;
+  const canCreate = canPerformPageAction(currentUser?.actionPermissions, "export_orders", "create");
+  const canEdit = canPerformPageAction(currentUser?.actionPermissions, "export_orders", "edit");
   const orders = useExportOrdersStore((state) => state.orders);
   const availableOrders = useExportOrdersStore((state) => state.availableOrders);
   const allDrawings = useExportOrdersStore((state) => state.drawings);
@@ -186,16 +192,18 @@ export default function ExportOrdersPage() {
       />
 
       {/* Drawing uploader */}
-      <Card>
-        <CardContent className="p-5">
-          <DrawingUploader
-            selectedOrderIds={selectedOrderIds}
-            selectedOrders={selectedOrders}
-            availableOrders={availableOrders}
-            onSuccess={handleDrawingCreated}
-          />
-        </CardContent>
-      </Card>
+      {canCreate && (
+        <Card>
+          <CardContent className="p-5">
+            <DrawingUploader
+              selectedOrderIds={selectedOrderIds}
+              selectedOrders={selectedOrders}
+              availableOrders={availableOrders}
+              onSuccess={handleDrawingCreated}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Drawing library */}
       <Card>
@@ -205,6 +213,7 @@ export default function ExportOrdersPage() {
             selectedDrawingIds={selectedDrawingIds}
             setSelectedDrawingIds={setSelectedDrawingIds}
             onStatusChanged={handleDrawingCreated}
+            canEdit={canEdit}
             orders={orders}
           />
         </CardContent>

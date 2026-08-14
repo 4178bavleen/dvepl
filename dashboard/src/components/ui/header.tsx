@@ -15,6 +15,7 @@ import {
 import { toast } from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { isAdminUser } from '@/utils/pagePermissions';
 
 type Company = { id: string; name: string };
 
@@ -64,8 +65,7 @@ const Header: React.FC<HeaderProps> = ({
     const user = currentUser as any;
     
     // Always grant full access to Admins/Super Admins
-    const isAdmin = user.role?.toLowerCase().includes('admin') || 
-                    user.name?.toLowerCase().includes('admin');
+    const isAdmin = isAdminUser(user);
     if (isAdmin) return true;
 
     return Array.isArray(user.pageAccess) && user.pageAccess.includes('settings');
