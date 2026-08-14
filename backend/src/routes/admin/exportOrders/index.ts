@@ -770,8 +770,8 @@ async function adminExportOrdersRouteGroup(
           }
 
           const { default: EmailService } = await import("../../../services/notification/email.service");
-          const config = await EmailService.getConfiguration();
-          const transporter = await EmailService.createTransporter();
+          const config = await EmailService.getConfiguration(companyId);
+          const transporter = await EmailService.createTransporter(companyId);
 
           await transporter.sendMail({
             from: `"${config.smtpFromName || "DVEPL"}" <${config.smtpFromEmail}>`,

@@ -178,7 +178,7 @@ const emailResults = await Promise.allSettled(
       to: user.email,
       userName: user.name || "User",
       dveplCode: salesOrder.dveplCode,
-    });
+    }, salesOrder.companyId);
   }),
 );
 

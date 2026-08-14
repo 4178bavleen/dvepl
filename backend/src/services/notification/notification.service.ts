@@ -12,6 +12,7 @@ export class NotificationService {
    */
   static async sendSalesOrderAssignmentNotification(
     options: SalesOrderAssignmentNotificationOptions,
+    companyId?: string,
   ) {
     const { to, userName, dveplCode } = options;
 
@@ -78,7 +79,7 @@ export class NotificationService {
       to,
       subject,
       html,
-    });
+    }, companyId);
   }
 }
 

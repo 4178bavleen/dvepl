@@ -10,8 +10,10 @@ export interface SendEmailOptions {
 }
 
 export class EmailService {
-  static async getConfiguration() {
-    const config = await prisma.notificationConfiguration.findFirst();
+  static async getConfiguration(companyId?: string) {
+    const config = await prisma.notificationConfiguration.findFirst({
+      where: companyId ? { companyId } : {},
+    });
 
     if (!config) {
       throw new Error("Notification configuration not found.");
@@ -34,8 +36,8 @@ export class EmailService {
     return config;
   }
 
-  static async createTransporter() {
-    const config = await this.getConfiguration();
+  static async createTransporter(companyId?: string) {
+    const config = await this.getConfiguration(companyId);
 
     return nodemailer.createTransport({
       host: config.smtpHost,
@@ -48,10 +50,10 @@ export class EmailService {
     });
   }
 
-  static async send(options: SendEmailOptions) {
-    const config = await this.getConfiguration();
+  static async send(options: SendEmailOptions, companyId?: string) {
+    const config = await this.getConfiguration(companyId);
 
-    const transporter = await this.createTransporter();
+    const transporter = await this.createTransporter(companyId);
 
     const info = await transporter.sendMail({
       from: `"${config.smtpFromName || "DVEPL"}" <${config.smtpFromEmail}>`,
@@ -63,8 +65,8 @@ export class EmailService {
     return info;
   }
 
-  static async verify() {
-    const transporter = await this.createTransporter();
+  static async verify(companyId?: string) {
+    const transporter = await this.createTransporter(companyId);
 
     await transporter.verify();
 
