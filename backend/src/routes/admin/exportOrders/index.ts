@@ -4,6 +4,7 @@ import { DrawingStatus, DrawingType, WorkflowStage } from "@prisma/client";
 import { z } from "zod";
 import { existsSync } from "fs";
 import path from "path";
+import nodemailer from "nodemailer";
 
 interface Query {
   search?: string;
@@ -769,12 +770,39 @@ async function adminExportOrdersRouteGroup(
             }
           }
 
-          const { default: EmailService } = await import("../../../services/notification/email.service");
-          const config = await EmailService.getConfiguration(companyId);
-          const transporter = await EmailService.createTransporter(companyId);
+          const dbConfig = await fastify.prisma.notificationConfiguration.findUnique({
+            where: { companyId },
+          });
+          const savedSettings = (await fastify.prisma.companySettings.findUnique({ where: { companyId } }))?.data as any || {};
+          const savedSmtp = savedSettings.smtpSettings || {};
+
+          const smtpHost = dbConfig?.smtpHost || savedSmtp.host;
+          const smtpPort = dbConfig?.smtpPort || savedSmtp.port;
+          const smtpUsername = dbConfig?.smtpUsername || savedSmtp.username || savedSmtp.email;
+          const smtpPassword = dbConfig?.smtpPassword || savedSmtp.password;
+          const smtpFromEmail = dbConfig?.smtpFromEmail || savedSettings.emailSettings?.address || smtpUsername;
+          const smtpFromName = dbConfig?.smtpFromName || savedSmtp.title || savedSettings.emailSettings?.name;
+
+          if (!smtpHost || !smtpPort) {
+            return reply.status(400).send({
+              success: false,
+              message: "SMTP host and port must be configured before sending a drawing email.",
+            });
+          }
+
+          const parsedPort = parseInt(String(smtpPort), 10);
+          const transporter = nodemailer.createTransport({
+            host: smtpHost,
+            port: parsedPort,
+            secure: parsedPort === 465,
+            auth: smtpUsername && smtpPassword
+              ? { user: smtpUsername, pass: smtpPassword }
+              : undefined,
+            connectionTimeout: 10000,
+          });
 
           await transporter.sendMail({
-            from: `"${config.smtpFromName || "DVEPL"}" <${config.smtpFromEmail}>`,
+            from: `"${smtpFromName || "DVEPL"}" <${smtpFromEmail || "no-reply@dvepl.com"}>`,
             to: targetEmail,
             subject: defaultSubject,
             html: defaultMessage.replace(/\n/g, "<br>"),
