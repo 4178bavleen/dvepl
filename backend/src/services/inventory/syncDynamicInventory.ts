@@ -361,9 +361,20 @@ export async function syncDynamicInventory({
   // MATERIAL
   // --------------------------------------------------
 
+  // `materialCode` is globally unique. Import rows always get a fresh
+  // record id, so resolve any material that already owns this code first,
+  // otherwise re-importing a code would violate the unique constraint.
+  const existingMaterial = await prisma.material.findFirst({
+    where: {
+      OR: [{ id: recordId }, { materialCode }],
+    },
+  });
+
+  const materialId = existingMaterial?.id ?? recordId;
+
   await prisma.material.upsert({
     where: {
-      id: recordId,
+      id: materialId,
     },
 
     create: {
@@ -398,12 +409,13 @@ export async function syncDynamicInventory({
     create: {
       id: recordId,
       companyId,
-      materialId: recordId,
+      materialId,
       quantity: new Prisma.Decimal(quantity),
       unitPrice: new Prisma.Decimal(unitPrice),
     },
 
     update: {
+      materialId,
       quantity: new Prisma.Decimal(quantity),
       unitPrice: new Prisma.Decimal(unitPrice),
     },
