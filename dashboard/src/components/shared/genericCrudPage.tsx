@@ -92,6 +92,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useERPStore } from "@/store/erpStore";
 import { toast } from "react-hot-toast";
 import type { ResourceApi } from "@/services/organization";
+import { hrmsApi } from "@/services/modules";
 import { ConfirmDialog } from "@/components/shared/confirmDialog";
 
 type FieldType =
@@ -609,6 +610,14 @@ export function GenericCrudPage<TRecord extends { id: string }>({
   const [isTeamMemberSubmitting, setIsTeamMemberSubmitting] = useState(false);
   const [removeMemberId, setRemoveMemberId] = useState<string | null>(null);
 
+  // Attendance records for the employee currently being viewed in the profile.
+  // Fetched from the API (the Zustand store's `attendances` is only used by
+  // locally-created records, so API-created attendance would otherwise never
+  // show up in the employee overview's Attendance tab).
+  const [profileAttendances, setProfileAttendances] = useState<any[]>([]);
+  const [isProfileAttendanceLoading, setIsProfileAttendanceLoading] =
+    useState(false);
+
   const records = api ? remoteRecords : localRecords;
 
   // Action-permission gating. Tables without a PRBAC module are not gated.
@@ -1037,10 +1046,54 @@ export function GenericCrudPage<TRecord extends { id: string }>({
     setSelectedEmployeeIds([]);
   }, [viewingRecord, tableName, relationManager]);
 
+  useEffect(() => {
+    if (!viewingRecord || tableName !== "employees") {
+      setProfileAttendances([]);
+      setIsProfileAttendanceLoading(false);
+      return;
+    }
+
+    let active = true;
+    setIsProfileAttendanceLoading(true);
+    hrmsApi.attendance
+      .list({ employeeId: viewingRecord.id })
+      .then((records) => {
+        if (active) {
+          setProfileAttendances(Array.isArray(records) ? records : []);
+        }
+      })
+      .catch((err) => {
+        console.warn("Unable to load employee attendance:", err);
+        if (active) setProfileAttendances([]);
+      })
+      .finally(() => {
+        if (active) setIsProfileAttendanceLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [viewingRecord, tableName]);
+
   const renderEmployeeProfile = (record: any) => {
-    const employeeAttendances = globalStore.attendances.filter((a) => a.employeeId === record.id);
+    const employeeAttendances = profileAttendances;
     const employeeLeaves = globalStore.leaves.filter((l) => l.employeeId === record.id);
     const employeeSalary = globalStore.salaries.find((s) => s.employeeId === record.id);
+
+    const formatProfileTime = (value?: string | null) => {
+      if (!value) return "—";
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return "—";
+      return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    };
+
+    const formatProfileHours = (checkIn?: string | null, checkOut?: string | null) => {
+      if (!checkIn || !checkOut) return "—";
+      const ms = new Date(checkOut).getTime() - new Date(checkIn).getTime();
+      if (ms <= 0) return "—";
+      const totalMinutes = Math.floor(ms / 60000);
+      return `${Math.floor(totalMinutes / 60)}h ${String(totalMinutes % 60).padStart(2, "0")}m`;
+    };
 
     return (
       <div className="flex flex-col h-full bg-card">
@@ -1126,7 +1179,11 @@ export function GenericCrudPage<TRecord extends { id: string }>({
 
           {profileTab === "attendance" && (
             <div className="space-y-4">
-              {employeeAttendances.length === 0 ? (
+              {isProfileAttendanceLoading ? (
+                <div className="p-8 text-center text-xs text-muted-foreground border border-dashed rounded-xl">
+                  Loading attendance records...
+                </div>
+              ) : employeeAttendances.length === 0 ? (
                 <div className="p-8 text-center text-xs text-muted-foreground border border-dashed rounded-xl">
                   No attendance records logged for this employee.
                 </div>
@@ -1139,6 +1196,7 @@ export function GenericCrudPage<TRecord extends { id: string }>({
                         <th className="p-3">Status</th>
                         <th className="p-3">Check-In</th>
                         <th className="p-3">Check-Out</th>
+                        <th className="p-3">Hours</th>
                         <th className="p-3">Remarks</th>
                       </tr>
                     </thead>
@@ -1147,8 +1205,9 @@ export function GenericCrudPage<TRecord extends { id: string }>({
                         <tr key={att.id} className="hover:bg-muted/10">
                           <td className="p-3 font-semibold">{new Date(att.date).toLocaleDateString()}</td>
                           <td className="p-3">{getStatusBadge(att.status)}</td>
-                          <td className="p-3 font-medium text-muted-foreground">{att.checkIn ? att.checkIn : "—"}</td>
-                          <td className="p-3 font-medium text-muted-foreground">{att.checkOut ? att.checkOut : "—"}</td>
+                          <td className="p-3 font-medium text-muted-foreground">{formatProfileTime(att.checkIn)}</td>
+                          <td className="p-3 font-medium text-muted-foreground">{formatProfileTime(att.checkOut)}</td>
+                          <td className="p-3 font-semibold text-foreground">{formatProfileHours(att.checkIn, att.checkOut)}</td>
                           <td className="p-3 text-muted-foreground italic">{att.remarks || "—"}</td>
                         </tr>
                       ))}
