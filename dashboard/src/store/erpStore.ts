@@ -116,7 +116,7 @@ export const useERPStore = create<ERPStore>((set) => ({
   currentUserId: '',
   currentUserName: '',
   currentWorkspace: 'Default Workspace',
-  theme: 'dark',
+  theme: 'light',
   language: 'English',
 
   setCompanyId: (id) => set({ currentCompanyId: id }),
