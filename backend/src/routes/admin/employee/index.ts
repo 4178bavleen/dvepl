@@ -4,6 +4,7 @@ import createEmployeeRoute from "./create";
 import readEmployeeRoutes from "./read";
 import updateEmployeeRoutes from "./update";
 import deleteEmployeeRoute from "./delete";
+import syncEmployeeRoutes from "./sync";
 
 async function adminEmployeeRouteGroup(
   fastify: FastifyInstance,
@@ -13,6 +14,7 @@ async function adminEmployeeRouteGroup(
   fastify.register(readEmployeeRoutes, { prefix: "/read" });
   fastify.register(updateEmployeeRoutes, { prefix: "/update" });
   fastify.register(deleteEmployeeRoute, { prefix: "/delete" });
+  fastify.register(syncEmployeeRoutes, { prefix: "/sync" });
 }
 
 export default adminEmployeeRouteGroup;

@@ -55,12 +55,20 @@ export const employeesConfig = {
   },
   breadcrumbs: [{ label: "Dashboard", href: "/" }, { label: "Employees" }],
   hideAdd: true,
+  syncAction: {
+    label: "Sync Users",
+    run: async () => {
+      const res = await hrmsApi.employees.sync();
+      return res as any;
+    },
+  },
   columns: [
     { accessorKey: "employeeCode", header: sortableHeader("Emp Code") },
     {
       id: "fullName",
       header: sortableHeader("Full Name"),
-      cell: ({ row }) => `${row.original.firstName} ${row.original.lastName}`,
+      cell: ({ row }) =>
+        [row.original.firstName, row.original.lastName].filter(Boolean).join(" "),
     },
     { accessorKey: "gender", header: "Gender" },
 

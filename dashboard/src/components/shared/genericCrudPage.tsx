@@ -15,6 +15,7 @@ import {
   Loader2,
   UserPlus,
   UserMinus,
+  RefreshCw,
 } from "lucide-react";
 import { GenericTable } from "@/components/tables/genericTable";
 import { Button } from "@/components/ui/button";
@@ -161,6 +162,14 @@ interface GenericCrudPageProps<
     getAvailableRecords: (record: TRecord) => Promise<any[]>;
     add: (record: TRecord, relatedRecordId: string) => Promise<void>;
     remove: (record: TRecord, relatedRecordId: string) => Promise<void>;
+  };
+  /**
+   * Optional action that pulls records in from another source (e.g. syncing
+   * users into employees). Renders a "Sync" button in the page header.
+   */
+  syncAction?: {
+    label: string;
+    run: () => Promise<{ syncedCount?: number; message?: string }>;
   };
 }
 
@@ -555,6 +564,7 @@ export function GenericCrudPage<TRecord extends { id: string }>({
   freezeActions = true,
   overviewHiddenFields = [],
   relationManager,
+  syncAction,
 }: GenericCrudPageProps<TRecord>) {
   const [searchParams] = useSearchParams();
   const globalStore = useERPStore();
@@ -589,6 +599,7 @@ export function GenericCrudPage<TRecord extends { id: string }>({
   >({});
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<TRecord | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Optional Team -> Employee membership management.
   const [teamEmployees, setTeamEmployees] = useState<any[]>([]);
@@ -630,6 +641,28 @@ export function GenericCrudPage<TRecord extends { id: string }>({
   useEffect(() => {
     void loadRecords();
   }, [loadRecords]);
+
+  const handleSync = async () => {
+    if (!syncAction) return;
+    setIsSyncing(true);
+    const syncToast = toast.loading("Syncing...");
+    try {
+      const res = await syncAction.run();
+      const syncedCount = res?.syncedCount ?? 0;
+      toast.success(
+        res?.message ?? `Successfully synced ${syncedCount} records!`,
+        { id: syncToast },
+      );
+      await loadRecords();
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.message ?? "Sync failed.",
+        { id: syncToast },
+      );
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Stabilise the selectOptions reference — the prop is an object literal that
   // gets a new identity on every render, which would cause an infinite loop.
@@ -1021,7 +1054,7 @@ export function GenericCrudPage<TRecord extends { id: string }>({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-bold text-foreground">
-                {record.firstName} {record.lastName}
+                {[record.firstName, record.lastName].filter(Boolean).join(" ")}
               </h2>
               {getStatusBadge(record.status)}
             </div>
@@ -1417,11 +1450,25 @@ export function GenericCrudPage<TRecord extends { id: string }>({
             Manage {pluralName.toLowerCase()}.
           </p>
         </div>
-        {!readOnly && !hideAdd && canCreate && (
-          <Button onClick={openCreate} className="gap-2">
-            <Plus className="size-4" /> Add {moduleName}
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {syncAction && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void handleSync()}
+              disabled={isSyncing}
+              className="gap-2"
+            >
+              <RefreshCw className={`size-4 ${isSyncing ? "animate-spin" : ""}`} />
+              {isSyncing ? "Syncing..." : syncAction.label}
+            </Button>
+          )}
+          {!readOnly && !hideAdd && canCreate && (
+            <Button onClick={openCreate} className="gap-2">
+              <Plus className="size-4" /> Add {moduleName}
+            </Button>
+          )}
+        </div>
       </div>
 
       {tableName === "salaries" && renderPayrollWizard()}
