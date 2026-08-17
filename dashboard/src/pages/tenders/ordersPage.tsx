@@ -713,13 +713,13 @@ export function OrdersPage() {
                     {assignments.slice(0, 3).map((a, idx) => (
                       <span
                         key={a.id || a.userId || idx}
-                        className="inline-flex items-center justify-center size-6.5 rounded-full bg-primary/10 border-2 border-background text-[9px] font-bold text-primary shrink-0 uppercase shadow-3xs"
+                        className="inline-flex items-center justify-center h-7 w-7 rounded-full bg-primary/10 border-2 border-background text-[10px] font-bold text-primary shrink-0 uppercase shadow-3xs"
                       >
                         {(a.user?.name || "U").charAt(0)}
                       </span>
                     ))}
                     {assignments.length > 3 && (
-                      <span className="inline-flex items-center justify-center size-6.5 rounded-full bg-muted border-2 border-background text-[9px] font-bold text-muted-foreground shrink-0 shadow-3xs">
+                      <span className="inline-flex items-center justify-center h-7 w-7 rounded-full bg-muted border-2 border-background text-[10px] font-bold text-muted-foreground shrink-0 shadow-3xs">
                         +{assignments.length - 3}
                       </span>
                     )}
@@ -1041,7 +1041,7 @@ export function OrdersPage() {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-5">
         <div>
           <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-            Tender Orders
+            Orders
           </h1>
           <p className="text-xs text-muted-foreground mt-0.5">
             Manage your client tenders, purchase order status, and drawing synchronizations in real-time.

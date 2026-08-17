@@ -44,7 +44,11 @@ const crud = (paths: CrudEndpoints, options: { updateMethod?: 'put' | 'patch'; u
 });
 
 export const hrmsApi = {
-  employees: crud(API_ENDPOINTS.hrms.employees), attendance: crud(API_ENDPOINTS.hrms.attendance), leave: crud(API_ENDPOINTS.hrms.leave),
+  employees: {
+    ...crud(API_ENDPOINTS.hrms.employees),
+    sync: () => apiClient.post("/employee/sync").then(res => res.data),
+  },
+  attendance: crud(API_ENDPOINTS.hrms.attendance), leave: crud(API_ENDPOINTS.hrms.leave),
   salary: crud(API_ENDPOINTS.hrms.salary), holidays: crud(API_ENDPOINTS.hrms.holidays), shifts: crud(API_ENDPOINTS.hrms.shifts),
   documents: crud(API_ENDPOINTS.hrms.documents),
   tasks: {

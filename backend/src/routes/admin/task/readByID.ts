@@ -57,6 +57,35 @@ async function adminTaskReadByIdRoutes(
           });
         }
 
+        const userId = (request.admin as any)?.id;
+        const roles = (request.admin as any)?.roles || [];
+        const pageAccess = (request.admin as any)?.uiAccessProfile?.pageAccess || [];
+        const isManager = roles.some((r: string) => r.toLowerCase().includes("admin")) || pageAccess.includes("tasks") || pageAccess.includes("employees");
+
+        if (!isManager) {
+          const employee = await fastify.prisma.employee.findFirst({
+            where: {
+              userId: userId,
+              deletedAt: null,
+            },
+          });
+
+          if (!employee) {
+            return reply.status(403).send({
+              success: false,
+              message: "Access denied: employee record not found.",
+            });
+          }
+
+          const isAssigned = task.assignments.some(a => a.employeeId === employee.id);
+          if (!isAssigned) {
+            return reply.status(403).send({
+              success: false,
+              message: "Access denied: you are not assigned to this task.",
+            });
+          }
+        }
+
         const formattedTask = {
           ...task,
           dueDate: task.dueDate.toISOString().split("T")[0],

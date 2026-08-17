@@ -55,12 +55,20 @@ export const employeesConfig = {
   },
   breadcrumbs: [{ label: "Dashboard", href: "/" }, { label: "Employees" }],
   hideAdd: true,
+  syncAction: {
+    label: "Sync Users",
+    run: async () => {
+      const res = await hrmsApi.employees.sync();
+      return res as any;
+    },
+  },
   columns: [
     { accessorKey: "employeeCode", header: sortableHeader("Emp Code") },
     {
       id: "fullName",
       header: sortableHeader("Full Name"),
-      cell: ({ row }) => `${row.original.firstName} ${row.original.lastName}`,
+      cell: ({ row }) =>
+        [row.original.firstName, row.original.lastName].filter(Boolean).join(" "),
     },
     { accessorKey: "gender", header: "Gender" },
 
@@ -203,7 +211,7 @@ export const attendanceConfig = {
     remarks: z.string().optional().nullable(),
   }),
   defaultFormValues: {
-    employeeId: "emp-1",
+    employeeId: "",
     date: new Date().toISOString().split("T")[0],
     status: "PRESENT",
     remarks: "On time",
@@ -281,11 +289,6 @@ export const attendanceConfig = {
       name: "employeeId",
       label: "Select Employee",
       type: "select",
-      options: [
-        { label: "Gabriel Dhillon (EMP-001)", value: "emp-1" },
-        { label: "Rajesh Kumar (EMP-002)", value: "emp-2" },
-        { label: "Priya Sharma (EMP-003)", value: "emp-3" },
-      ],
       required: true,
     },
     {
@@ -351,7 +354,7 @@ export const leaveConfig = {
     status: z.string().default("PENDING"),
   }),
   defaultFormValues: {
-    employeeId: "emp-3",
+    employeeId: "",
     leaveType: "CASUAL",
     fromDate: "",
     toDate: "",
@@ -416,11 +419,6 @@ export const leaveConfig = {
       name: "employeeId",
       label: "Select Employee",
       type: "select",
-      options: [
-        { label: "Gabriel Dhillon", value: "emp-1" },
-        { label: "Rajesh Kumar", value: "emp-2" },
-        { label: "Priya Sharma", value: "emp-3" },
-      ],
       required: true,
     },
     {
@@ -488,7 +486,7 @@ export const payrollConfig = {
     deductions: z.coerce.number(),
   }),
   defaultFormValues: {
-    employeeId: "emp-1",
+    employeeId: "",
     effectiveFrom: new Date().toISOString().split("T")[0],
     basic: "0",
     hra: "0",
@@ -552,11 +550,6 @@ export const payrollConfig = {
       name: "employeeId",
       label: "Select Employee",
       type: "select",
-      options: [
-        { label: "Gabriel Dhillon", value: "emp-1" },
-        { label: "Rajesh Kumar", value: "emp-2" },
-        { label: "Priya Sharma", value: "emp-3" },
-      ],
       required: true,
     },
     {

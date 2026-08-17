@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNotificationStore } from '@/store/notification.store';
 import {
   Settings2,
   Menu,
@@ -11,6 +12,7 @@ import {
   ChevronDown,
   LogOut,
   User,
+  X,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { Button } from '@/components/ui/button';
@@ -60,6 +62,24 @@ const Header: React.FC<HeaderProps> = ({
   logout,
   navigate,
 }) => {
+  const { notifications, fetchNotifications, markAllAsRead, markAsRead, clearAll, clearNotification } = useNotificationStore();
+
+  React.useEffect(() => {
+    if (currentUser?.email) {
+      fetchNotifications(currentUser.email as string);
+    } else {
+      fetchNotifications();
+    }
+    const interval = setInterval(() => {
+      if (currentUser?.email) {
+        fetchNotifications(currentUser.email as string);
+      } else {
+        fetchNotifications();
+      }
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [currentUser]);
+
   const hasSettingsAccess = React.useMemo(() => {
     if (!currentUser) return false;
     const user = currentUser as any;
@@ -126,7 +146,11 @@ const Header: React.FC<HeaderProps> = ({
         </Button>
 
         {/* Notification Center */}
-        <div className="relative">
+        <div 
+          className="relative py-1"
+          onMouseEnter={() => setIsNotificationOpen(true)}
+          onMouseLeave={() => setIsNotificationOpen(false)}
+        >
           <Button
             variant="ghost"
             size="sm"
@@ -134,48 +158,96 @@ const Header: React.FC<HeaderProps> = ({
             className="h-8 w-8 p-0 hover:bg-muted relative text-muted-foreground hover:text-foreground"
           >
             <Bell className="h-4 w-4" />
-            <span className="absolute top-1 right-1.5 h-1.5 w-1.5 bg-destructive rounded-full" />
+            {notifications.some(n => !n.read) && (
+              <span className="absolute top-1 right-1.5 h-1.5 w-1.5 bg-destructive rounded-full animate-pulse" />
+            )}
           </Button>
 
           <AnimatePresence>
             {isNotificationOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setIsNotificationOpen(false)} />
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  className="absolute right-0 mt-2.5 w-80 bg-card/95 backdrop-blur-md border border-border/80 rounded-2xl shadow-xl z-50 overflow-hidden"
-                >
-                  <div className="p-3.5 border-b border-border/80 bg-muted/30 font-semibold text-xs flex justify-between items-center">
-                    <span>Notifications</span>
-                    <span className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded font-bold">3 New</span>
+              <motion.div
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 5 }}
+                className="absolute right-0 mt-1 w-80 bg-card/95 backdrop-blur-md border border-border/80 rounded-2xl shadow-xl z-50 overflow-hidden text-xs"
+              >
+                <div className="p-3.5 border-b border-border/80 bg-muted/30 font-semibold flex justify-between items-center">
+                  <span>Notifications</span>
+                  <div className="flex items-center gap-1.5">
+                    {notifications.filter(n => !n.read).length > 0 && (
+                      <button 
+                        onClick={markAllAsRead} 
+                        className="text-[10px] text-primary hover:underline font-bold"
+                      >
+                        Mark all read
+                      </button>
+                    )}
+                    {notifications.length > 0 && (
+                      <>
+                        {notifications.filter(n => !n.read).length > 0 && <span className="text-[10px] text-muted-foreground/60">•</span>}
+                        <button 
+                          onClick={clearAll} 
+                          className="text-[10px] text-destructive hover:underline font-bold"
+                        >
+                          Clear all
+                        </button>
+                      </>
+                    )}
                   </div>
-                  <div className="max-h-60 overflow-y-auto divide-y divide-border/60">
-                    <div className="p-3.5 hover:bg-muted/40 cursor-pointer transition-colors">
-                      <p className="text-xs font-bold">New Tender Request Assigned</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">Central Railway Valve Supply needs review</p>
-                      <span className="text-[9px] text-muted-foreground/80 mt-1.5 block">5m ago</span>
+                </div>
+                <div className="max-h-60 overflow-y-auto divide-y divide-border/60">
+                  {notifications.length === 0 ? (
+                    <div className="p-4 text-center text-muted-foreground italic text-[11px]">
+                      No notifications found.
                     </div>
-                    <div className="p-3.5 hover:bg-muted/40 cursor-pointer transition-colors">
-                      <p className="text-xs font-bold">Leave Approved</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">Priya Sharma leave approved by Rajesh</p>
-                      <span className="text-[9px] text-muted-foreground/80 mt-1.5 block">2h ago</span>
-                    </div>
-                    <div className="p-3.5 hover:bg-muted/40 cursor-pointer transition-colors">
-                      <p className="text-xs font-bold">Audit Alert</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">Role permissions modified for HR Manager</p>
-                      <span className="text-[9px] text-muted-foreground/80 mt-1.5 block">1d ago</span>
-                    </div>
-                  </div>
-                </motion.div>
-              </>
+                  ) : (
+                    notifications.map(notif => (
+                      <div 
+                        key={notif.id} 
+                        className={`p-3 hover:bg-muted/40 cursor-pointer transition-colors relative group ${
+                          !notif.read ? "bg-primary/5 font-semibold" : ""
+                        }`}
+                      >
+                        {!notif.read && (
+                          <span className="absolute left-1.5 top-4 h-1.5 w-1.5 bg-primary rounded-full" />
+                        )}
+                        <div 
+                          onClick={() => {
+                            markAsRead(notif.id);
+                            navigate(notif.targetUrl || '/');
+                            setIsNotificationOpen(false);
+                          }}
+                          className="pl-1.5 pr-6"
+                        >
+                          <p className="text-xs font-bold text-foreground line-clamp-1">{notif.title}</p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">{notif.desc}</p>
+                          <span className="text-[9px] text-muted-foreground/80 mt-1 block font-medium">{notif.date}</span>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            clearNotification(notif.id);
+                          }}
+                          className="absolute right-2.5 top-3.5 opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-destructive hover:bg-muted/60 rounded-md transition-all duration-150"
+                          title="Dismiss notification"
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </motion.div>
             )}
           </AnimatePresence>
         </div>
 
         {/* Profile Dropdown */}
-        <div className="relative">
+        <div 
+          className="relative py-1"
+          onMouseEnter={() => setIsProfileOpen(true)}
+          onMouseLeave={() => setIsProfileOpen(false)}
+        >
           <Avatar
             className="h-7 w-7 cursor-pointer hover:ring-2 hover:ring-primary/40 transition-all duration-200"
             onClick={() => setIsProfileOpen(!isProfileOpen)}
@@ -187,14 +259,12 @@ const Header: React.FC<HeaderProps> = ({
  
           <AnimatePresence>
             {isProfileOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setIsProfileOpen(false)} />
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  className="absolute right-0 mt-2.5 w-48 bg-card/95 backdrop-blur-md border border-border/80 rounded-2xl shadow-xl z-50 p-1.5 divide-y divide-border/60"
-                >
+              <motion.div
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 5 }}
+                className="absolute right-0 mt-1.5 w-48 bg-card/95 backdrop-blur-md border border-border/80 rounded-2xl shadow-xl z-50 p-1.5 divide-y divide-border/60"
+              >
                   <div className="px-3 py-2.5">
                     <p className="text-xs font-bold text-foreground">{currentUser?.name as string}</p>
                     <p className="text-[9px] text-muted-foreground truncate mt-0.5">{currentUser?.email as string}</p>
@@ -235,7 +305,6 @@ const Header: React.FC<HeaderProps> = ({
                     </button>
                   </div>
                 </motion.div>
-              </>
             )}
           </AnimatePresence>
         </div>

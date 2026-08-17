@@ -48,8 +48,17 @@ async function createCustomerRoute(
         //--------------------------------
         // Check Company
         //--------------------------------
+        const companyId = (request.admin as any)?.companyId;
+
+        if (!companyId) {
+          return reply.status(401).send({
+            success: false,
+            message: "Company information missing from token.",
+          });
+        }
+
         const company = await fastify.prisma.company.findUnique({
-          where: { id: data.companyId },
+          where: { id: companyId },
         });
 
         if (!company || company.deletedAt) {
@@ -63,7 +72,10 @@ async function createCustomerRoute(
         // Create Customer
         //--------------------------------
         const customer = await fastify.prisma.customer.create({
-          data,
+          data: {
+            ...data,
+            companyId,
+          },
         });
 
         adminLogs.info("Customer created successfully", {

@@ -1,74 +1,70 @@
-// export const notificationConfigUpdateSchema = z.object({
-//   emailEnabled: z.boolean(),
+import { z } from "zod";
+import { NotificationProvider, NotificationChannel, NotificationStatus } from "@prisma/client";
 
-//   smtpHost: z.string().trim().optional().nullable(),
-//   smtpPort: z.coerce.number().optional().nullable(),
-//   smtpUsername: z.string().trim().optional().nullable(),
-//   smtpPassword: z.string().trim().optional().nullable(),
-//   smtpFromEmail: z.string().email().optional().nullable(),
-//   smtpFromName: z.string().trim().optional().nullable(),
+export const notificationConfigUpdateSchema = z.object({
+  emailEnabled: z.boolean(),
 
-//   whatsappEnabled: z.boolean(),
+  smtpHost: z.string().trim().optional().nullable(),
+  smtpPort: z.coerce.number().optional().nullable(),
+  smtpUsername: z.string().trim().optional().nullable(),
+  smtpPassword: z.string().trim().optional().nullable(),
+  smtpFromEmail: z.string().email().optional().nullable(),
+  smtpFromName: z.string().trim().optional().nullable(),
 
-//   whatsappProvider: z.nativeEnum(NotificationProvider).optional().nullable(),
+  whatsappEnabled: z.boolean(),
 
-//   whatsappApiKey: z.string().optional().nullable(),
-//   whatsappEndpoint: z.string().optional().nullable(),
-// });
+  whatsappProvider: z.nativeEnum(NotificationProvider).optional().nullable(),
 
-// export const notificationEventUpdateSchema = z.object({
-//   emailEnabled: z.boolean(),
+  whatsappApiKey: z.string().optional().nullable(),
+  whatsappEndpoint: z.string().optional().nullable(),
+});
 
-//   whatsappEnabled: z.boolean(),
+export const notificationEventUpdateSchema = z.object({
+  emailEnabled: z.boolean(),
 
-//   isActive: z.boolean(),
-// });
+  whatsappEnabled: z.boolean(),
 
-// export const notificationRecipientCreateSchema = z.object({
-//   eventId: z.string().uuid(),
+  isActive: z.boolean(),
+});
 
-//   employeeId: z.string().uuid().optional().nullable(),
+export const notificationRecipientCreateSchema = z.object({
+  eventId: z.string().uuid(),
 
-//   email: z.string().email().optional().nullable(),
+  employeeId: z.string().uuid().optional().nullable(),
 
-//   phone: z.string().optional().nullable(),
-// });
+  email: z.string().email().optional().nullable(),
 
-// export const notificationRecipientUpdateSchema =
-//   notificationRecipientCreateSchema.extend({
-//     isActive: z.boolean(),
-//   });
+  phone: z.string().optional().nullable(),
+});
 
-//   export const notificationTemplateCreateSchema = z.object({
-//   eventId: z.string().uuid(),
+export const notificationRecipientUpdateSchema =
+  notificationRecipientCreateSchema.extend({
+    isActive: z.boolean(),
+  });
 
-//   channel: z.nativeEnum(NotificationChannel),
+export const notificationTemplateCreateSchema = z.object({
+  eventId: z.string().uuid(),
 
-//   subject: z.string().optional().nullable(),
+  channel: z.nativeEnum(NotificationChannel),
 
-//   body: z.string().min(1),
-// });
+  subject: z.string().optional().nullable(),
 
-// export const notificationTemplateUpdateSchema =
-//   notificationTemplateCreateSchema.extend({
-//     isActive: z.boolean(),
-//   });
+  body: z.string().min(1),
+});
 
-//   export const notificationLogQuerySchema = z.object({
-//   page: z.coerce.number().default(1),
+export const notificationTemplateUpdateSchema =
+  notificationTemplateCreateSchema.extend({
+    isActive: z.boolean(),
+  });
 
-//   limit: z.coerce.number().default(10),
+export const notificationLogQuerySchema = z.object({
+  page: z.coerce.number().default(1),
 
-//   search: z.string().optional(),
+  limit: z.coerce.number().default(10),
 
-//   channel: z.nativeEnum(NotificationChannel).optional(),
+  search: z.string().optional(),
 
-//   status: z.nativeEnum(NotificationStatus).optional(),
-// });
-// export const notificationEventUpdateSchema = z.object({
-//   emailEnabled: z.boolean(),
+  channel: z.nativeEnum(NotificationChannel).optional(),
 
-//   whatsappEnabled: z.boolean(),
-
-//   isActive: z.boolean(),
-// });
+  status: z.nativeEnum(NotificationStatus).optional(),
+});

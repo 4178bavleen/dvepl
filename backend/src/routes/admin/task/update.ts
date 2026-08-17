@@ -7,6 +7,8 @@ import {
 import { adminLogs } from "../../../services/logger/contextLogger";
 import { taskSchema } from "../../../schemas/admin/task/task.schema";
 
+import NotificationService from "../../../services/notification/notification.service";
+
 async function adminTaskUpdateRoutes(
   fastify: FastifyInstance,
   options: FastifyPluginOptions,
@@ -106,6 +108,35 @@ async function adminTaskUpdateRoutes(
             await cfService.saveValues("task", id, (request.body as any).customFields);
           }
         });
+
+        // Trigger task update notifications
+        try {
+          const finalTitle = title !== undefined ? title : existingTask.title;
+          const finalPriority = priority !== undefined ? priority : existingTask.priority;
+          const finalDueDate = dueDate !== undefined ? new Date(dueDate) : existingTask.dueDate;
+          const finalStatus = status !== undefined ? status : existingTask.status;
+
+          // Fetch currently assigned users
+          const assignments = await fastify.prisma.taskAssignment.findMany({
+            where: { taskId: id },
+            include: { employee: { include: { user: true } } }
+          });
+
+          const assignedUsers = assignments
+            .map((a: any) => a.employee?.user)
+            .filter((u: any) => u && u.email);
+
+          for (const user of assignedUsers) {
+            await NotificationService.sendCustomNotification({
+              to: user.email,
+              subject: `Task Updated: ${finalTitle}`,
+              message: `Hello ${user.name || "User"},\n\nThe task "${finalTitle}" assigned to you has been updated.\nPriority: ${finalPriority}.\nDue Date: ${new Date(finalDueDate).toLocaleDateString()}.\nStatus: ${finalStatus}.`,
+              eventCode: "TASK_UPDATED"
+            });
+          }
+        } catch (notifErr) {
+          console.error("Failed to send task update notifications:", notifErr);
+        }
 
         adminLogs.info("Task updated successfully", { taskId: id });
 

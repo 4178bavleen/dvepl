@@ -12,6 +12,7 @@ export class NotificationService {
    */
   static async sendSalesOrderAssignmentNotification(
     options: SalesOrderAssignmentNotificationOptions,
+    companyId?: string,
   ) {
     const { to, userName, dveplCode } = options;
 
@@ -78,7 +79,55 @@ export class NotificationService {
       to,
       subject,
       html,
-    });
+    }, companyId);
+  }
+
+  /**
+   * Send a generic custom notification (for POs, Drawings, Tasks, etc.).
+   */
+  static async sendCustomNotification(
+    options: {
+      to: string;
+      subject: string;
+      message: string;
+      eventCode?: string;
+    },
+    companyId?: string,
+  ) {
+    const { to, subject, message, eventCode } = options;
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8" />
+          <title>${subject}</title>
+        </head>
+        <body style="margin: 0; padding: 0; background-color: #f5f5f5; font-family: Arial, Helvetica, sans-serif;">
+          <div style="max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #e5e7eb;">
+            <div style="padding: 24px; background: #1f2937; color: #ffffff;">
+              <h2 style="margin: 0; font-size: 20px;">${subject}</h2>
+            </div>
+            <div style="padding: 32px 24px;">
+              <p style="margin: 0 0 20px; font-size: 14px; line-height: 1.6; color: #4b5563;">
+                ${message}
+              </p>
+            </div>
+            <div style="padding: 20px 24px; border-top: 1px solid #e5e7eb; background: #f9fafb;">
+              <p style="margin: 0; font-size: 12px; color: #6b7280;">
+                This is an automated notification from DVEPL ERP.
+              </p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    return EmailService.send({
+      to,
+      subject,
+      html,
+    }, companyId, eventCode);
   }
 }
 
