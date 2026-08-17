@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useERPStore } from "@/store/erpStore";
 import { securityApi } from "@/services/modules";
 import { organizationApi } from "@/services/organization";
@@ -127,10 +128,18 @@ const sanitizeObject = (obj: any, defaults: any) => {
 
 export function SettingsPage() {
   const store = useERPStore();
+  const [searchParams] = useSearchParams();
 
   // Active section state
   // 'hub' represents the grid overview, clicking a card loads a section.
-  const [activeSection, setActiveSection] = useState<string>("hub");
+  const [activeSection, setActiveSection] = useState<string>(() => searchParams.get("section") || "hub");
+
+  useEffect(() => {
+    const sec = searchParams.get("section");
+    if (sec) {
+      setActiveSection(sec);
+    }
+  }, [searchParams]);
 
   // Users List and Search state
   const [users, setUsers] = useState<UserItem[]>([]);
@@ -1375,10 +1384,7 @@ export function SettingsPage() {
   };
 
   const testEmailConnection = async () => {
-    if (!emailSettings.address) {
-      toast.error("Please enter a valid Email Address");
-      return;
-    }
+    const targetEmail = emailSettings.address || smtpSettings.email || "admin@dvepl.com";
     try {
       let customFields = {};
       if (selectedTestTemplateId) {
@@ -1423,7 +1429,7 @@ export function SettingsPage() {
           username: smtpSettings.email,
           secure: smtpSettings.port === 465,
         },
-        toEmail: emailSettings.address,
+        toEmail: targetEmail,
         fromEmail: smtpSettings.email,
         fromName: smtpSettings.title || "DVEPL ERP",
         ...customFields,

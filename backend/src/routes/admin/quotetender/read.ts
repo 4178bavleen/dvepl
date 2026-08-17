@@ -117,11 +117,6 @@ async function quoteTenderOrderReadRoutes(
                 subtotal,
                 gstTotal,
                 grandTotal,
-                assignments: {
-                  create: {
-                    userId,
-                  },
-                },
                 sendNotification: false,
               },
             });

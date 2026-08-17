@@ -7,6 +7,8 @@ import {
 import { adminLogs } from "../../../services/logger/contextLogger";
 import { taskSchema } from "../../../schemas/admin/task/task.schema";
 
+import NotificationService from "../../../services/notification/notification.service";
+
 async function adminTaskCreateRoutes(
   fastify: FastifyInstance,
   options: FastifyPluginOptions,
@@ -94,6 +96,34 @@ async function adminTaskCreateRoutes(
 
           return createdTask;
         });
+
+        // Trigger task assignment notifications
+        if (assignedUserIds && assignedUserIds.length > 0) {
+          try {
+            const assignedUsers = await fastify.prisma.user.findMany({
+              where: {
+                OR: [
+                  { id: { in: assignedUserIds } },
+                  { employee: { id: { in: assignedUserIds } } }
+                ]
+              },
+              select: { email: true, name: true }
+            });
+
+            for (const user of assignedUsers) {
+              if (user.email) {
+                await NotificationService.sendCustomNotification({
+                  to: user.email,
+                  subject: `New Task Assigned: ${title}`,
+                  message: `Hello ${user.name || "User"},\n\nYou have been assigned to a new task: "${title}".\nPriority: ${priority || "medium"}.\nDue Date: ${new Date(dueDate).toLocaleDateString()}.\n\nDescription:\n${description || "No description provided."}`,
+                  eventCode: "TASK_ASSIGNED"
+                });
+              }
+            }
+          } catch (notifErr) {
+            console.error("Failed to send task notifications:", notifErr);
+          }
+        }
 
         adminLogs.info("Task created successfully", {
           taskId: task.id,

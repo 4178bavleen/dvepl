@@ -86,7 +86,12 @@ export function SalesOrderAssignModal({
         ? response
         : (response as any)?.data || [];
 
-      const activeUsers = userList.filter((u) => u.isActive !== false);
+      const activeUsers = userList.filter(
+        (u) =>
+          u.isActive !== false &&
+          u.name?.toLowerCase() !== "admin" &&
+          u.email?.toLowerCase() !== "admin@dvepl.com"
+      );
       setUsers(activeUsers);
     } catch (err: any) {
       const msg = err.response?.data?.message || "Failed to load eligible users.";

@@ -1,12 +1,15 @@
 import { FastifyInstance } from "fastify";
 
-import get from "./read";
+import create from "./create";
+import read from "./read";
 import update from "./update";
+import del from "./delete";
 
 export default async function (
   fastify: FastifyInstance,
 ) {
-  fastify.register(get);
-
+  fastify.register(create);
+  fastify.register(read);
   fastify.register(update);
+  fastify.register(del);
 }

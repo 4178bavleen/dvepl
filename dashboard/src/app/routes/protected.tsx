@@ -6,18 +6,28 @@ import { useERPStore } from '@/store/erpStore';
 import { isAdminUser } from '@/utils/pagePermissions';
 import { toast } from 'react-hot-toast';
 
+import { useNavigate } from 'react-router-dom';
+
 const getRequiredPermission = (pathname: string): string | null => {
   // exact matches
   if (pathname === '/profile') return null;
   if (pathname === '/') return 'dashboard';
+  
+  // Assignment/Task pages where the backend manages row-level access:
+  // Allow all logged-in users to load the page structure.
+  if (pathname.startsWith('/export-orders')) return null;
+  if (pathname.startsWith('/hrms/tasks')) return null;
+  if (pathname.startsWith('/hrms/leaves')) return null;
+  if (pathname.startsWith('/workflow')) return null;
+  if (pathname.startsWith('/purchase/orders')) return null;
+  if (pathname.startsWith('/logistics/delivery')) return null;
+  if (pathname.startsWith('/tender/orders')) return null;
   
   if (pathname.startsWith('/finance')) return 'finance';
   if (pathname.startsWith('/settings/custom-fields')) return 'custom_fields';
   if (pathname.startsWith('/settings/recycle-bin')) return 'recycle_bin';
   if (pathname.startsWith('/settings/notifications')) return 'notifications';
   if (pathname.startsWith('/settings')) return 'settings';
-  if (pathname.startsWith('/export-orders')) return 'export_orders';
-  if (pathname.startsWith('/workflow')) return 'workflow_tracker';
 
   const routePermissionMap: Record<string, string> = {
     '/organization/companies': 'companies',
@@ -28,12 +38,10 @@ const getRequiredPermission = (pathname: string): string | null => {
     '/organization/cost-centers': 'cost_centers',
     '/hrms/employees': 'employees',
     '/hrms/attendance': 'attendance',
-    '/hrms/leaves': 'leaves',
     '/hrms/holidays': 'holidays',
     '/hrms/shifts': 'shift_management',
     '/hrms/payroll': 'payroll',
     '/hrms/documents': 'documents',
-    '/hrms/tasks': 'tasks',
     '/crm/customers': 'customers',
     '/crm/contacts': 'contacts',
     '/crm/communication': 'communication',
@@ -57,12 +65,10 @@ const getRequiredPermission = (pathname: string): string | null => {
     '/material/materials': 'materials',
     '/material/categories': 'material_categories',
     '/purchase/requests': 'purchase_requests',
-    '/purchase/orders': 'orders',
     '/inventory/warehouses': 'inventory',
     '/inventory/stocks': 'inventory',
     '/inventory/transfers': 'inventory',
     '/logistics/dispatches': 'inventory',
-    '/logistics/delivery': 'delivery',
     '/audit-logs': 'audit_logs',
     '/reports': 'reports'
   };
@@ -74,22 +80,32 @@ export function ProtectedRoute() {
   const { isAuthenticated } = useAuth();
   const location = useLocation();
   const store = useERPStore();
+  const navigate = useNavigate();
+
+  const currentUser = store.users.find((u) => u.id === store.currentUserId) as any;
+  const isAdmin = currentUser ? isAdminUser(currentUser) : false;
+  const requiredPermission = getRequiredPermission(location.pathname);
+  
+  const hasPermission = !requiredPermission || (
+    currentUser && (
+      isAdmin || 
+      (Array.isArray(currentUser.pageAccess) && currentUser.pageAccess.includes(requiredPermission))
+    )
+  );
+
+  React.useEffect(() => {
+    if (isAuthenticated && currentUser && !hasPermission) {
+      toast.error("You do not have enough permissions to perform this operation.");
+      navigate("/profile", { replace: true });
+    }
+  }, [isAuthenticated, currentUser, hasPermission, navigate]);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
-  const currentUser = store.users.find((u) => u.id === store.currentUserId) as any;
-
-  if (currentUser) {
-    const isAdmin = isAdminUser(currentUser);
-    if (!isAdmin) {
-      const requiredPermission = getRequiredPermission(location.pathname);
-      if (requiredPermission && (!Array.isArray(currentUser.pageAccess) || !currentUser.pageAccess.includes(requiredPermission))) {
-        toast.error("You do not have enough permissions to perform this operation.");
-        return <Navigate to="/profile" replace />;
-      }
-    }
+  if (currentUser && !hasPermission) {
+    return null;
   }
 
   return (
