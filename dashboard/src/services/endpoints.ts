@@ -434,5 +434,11 @@ export const API_ENDPOINTS = {
     createDrawing: '/export-orders/create-drawing',
     updateDrawing: (id: string) => `/export-orders/drawing/update/${id}`,
     sendDrawing: '/export-orders/drawing/send',
+    createDrawingRevision: (drawingId: string) =>
+      `/export-orders/drawing/${drawingId}/revision`,
+    listDrawingRevisions: (drawingId: string) =>
+      `/export-orders/drawing/${drawingId}/revisions`,
+    updateDrawingRevisionStatus: (revisionId: string) =>
+      `/export-orders/drawing/revision/${revisionId}/status`,
   },
 } as const;

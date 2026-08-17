@@ -41,6 +41,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useERPStore } from "@/store/erpStore";
+import { canPerformPageAction } from "@/utils/pagePermissions";
 
 // ---------------------------------------------------------------------------
 // Endpoints
@@ -188,6 +189,21 @@ export default function VendorTracking() {
   };
 
   const currentUserName = useERPStore((state) => state.currentUserName);
+
+  const store = useERPStore();
+  const currentUser = store.users?.find(
+    (u: any) => u.id === store.currentUserId,
+  ) as any;
+  const canCreate = canPerformPageAction(
+    currentUser?.actionPermissions,
+    "inventory",
+    "create",
+  );
+  const canExport = canPerformPageAction(
+    currentUser?.actionPermissions,
+    "inventory",
+    "export",
+  );
 
   const [data, setData] = useState<TrackingRow[]>([]);
   const [search, setSearch] = useState("");
@@ -1138,24 +1154,28 @@ if (!followUpPhone.trim()) {
             <Printer className="size-4" />
             Print
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => exportToExcel("full")}
-            className="gap-2"
-          >
-            <FileSpreadsheet className="size-4" />
-            Export Excel
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleImportClick}
-            className="gap-2"
-          >
-            <Upload className="size-4" />
-            Import Excel
-          </Button>
+          {canExport && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportToExcel("full")}
+              className="gap-2"
+            >
+              <FileSpreadsheet className="size-4" />
+              Export Excel
+            </Button>
+          )}
+          {canCreate && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleImportClick}
+              className="gap-2"
+            >
+              <Upload className="size-4" />
+              Import Excel
+            </Button>
+          )}
           <input
             ref={fileInputRef}
             type="file"

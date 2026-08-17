@@ -214,6 +214,11 @@ export function AttendancePage() {
     "attendance",
     "create",
   );
+  const canExport = canPerformPageAction(
+    currentUser?.actionPermissions,
+    "attendance",
+    "export",
+  );
 
   const shiftById = useMemo(() => {
     const map = new Map<string, any>();
@@ -270,6 +275,7 @@ export function AttendancePage() {
     setMarkDate(date);
     prefillMarkings(date);
   };
+
 
   const setMarkField = (
     employeeId: string,
@@ -753,14 +759,16 @@ export function AttendancePage() {
                 className="h-9 w-64 bg-card pl-9"
               />
             </div>
-            <Button
-              variant="outline"
-              onClick={exportCSV}
-              className="h-9 gap-2 bg-card"
-            >
-              <Download className="size-4" />
-              Export
-            </Button>
+            {canExport && (
+              <Button
+                variant="outline"
+                onClick={exportCSV}
+                className="h-9 gap-2 bg-card"
+              >
+                <Download className="size-4" />
+                Export
+              </Button>
+            )}
           </div>
         </div>
       </div>

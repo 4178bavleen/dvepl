@@ -63,6 +63,7 @@ export default function InventoryPage() {
   const canCreate = canPerformPageAction(currentUser?.actionPermissions, "inventory", "create");
   const canEdit = canPerformPageAction(currentUser?.actionPermissions, "inventory", "edit");
   const canDelete = canPerformPageAction(currentUser?.actionPermissions, "inventory", "delete");
+  const canExport = canPerformPageAction(currentUser?.actionPermissions, "inventory", "export");
 
   const {
     module,
@@ -859,19 +860,23 @@ export default function InventoryPage() {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={handleExportExcel}>
-            <Download className="mr-2 h-4 w-4" />
-            Export Excel
-          </Button>
+          {canExport && (
+            <Button variant="outline" onClick={handleExportExcel}>
+              <Download className="mr-2 h-4 w-4" />
+              Export Excel
+            </Button>
+          )}
 
-          <Button
-            variant="outline"
-            onClick={() => importInputRef.current?.click()}
-            disabled={importing}
-          >
-            <Upload className="mr-2 h-4 w-4" />
-            {importing ? "Importing..." : "Import Excel"}
-          </Button>
+          {canCreate && (
+            <Button
+              variant="outline"
+              onClick={() => importInputRef.current?.click()}
+              disabled={importing}
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              {importing ? "Importing..." : "Import Excel"}
+            </Button>
+          )}
 
           <input
             ref={importInputRef}
@@ -886,10 +891,12 @@ export default function InventoryPage() {
             Vendor Tracking
           </Button>
 
-          <Button variant="outline" onClick={() => setFieldManagerOpen(true)}>
-            <Settings className="mr-2 h-4 w-4" />
-            Manage Fields
-          </Button>
+          {canEdit && (
+            <Button variant="outline" onClick={() => setFieldManagerOpen(true)}>
+              <Settings className="mr-2 h-4 w-4" />
+              Manage Fields
+            </Button>
+          )}
 
           {canCreate && (
             <Button onClick={openCreate}>

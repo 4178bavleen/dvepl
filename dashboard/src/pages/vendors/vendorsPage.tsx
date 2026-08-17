@@ -5477,20 +5477,22 @@ export function VendorsPage() {
 
             {/* de-footer */}
             <div className="de-footer">
-              <div className="de-export-section">
-                <div className="de-export-label">EXPORT AS:</div>
-                <div className="de-export-btns">
-                  <button
-                    className="de-exp-btn"
-                    onClick={() => triggerExport("pdf")}
-                  >
-                    <span className="de-exp-icon">📕</span>
-                    <span className="de-exp-name">PDF</span>
-                    <span className="de-exp-ext">.pdf</span>
-                  </button>
+              {canExport && (
+                <div className="de-export-section">
+                  <div className="de-export-label">EXPORT AS:</div>
+                  <div className="de-export-btns">
+                    <button
+                      className="de-exp-btn"
+                      onClick={() => triggerExport("pdf")}
+                    >
+                      <span className="de-exp-icon">📕</span>
+                      <span className="de-exp-name">PDF</span>
+                      <span className="de-exp-ext">.pdf</span>
+                    </button>
 
+                  </div>
                 </div>
-              </div>
+              )}
               <div className="de-footer-actions">
                 <button
                   className="de-tbtn"
@@ -5534,12 +5536,14 @@ export function VendorsPage() {
                 >
                   📨 PO Placed
                 </button>
-                <button
-                  className="btn-export-pdf"
-                  onClick={() => triggerExport("pdf")}
-                >
-                  📘 Export PDF
-                </button>
+                {canExport && (
+                  <button
+                    className="btn-export-pdf"
+                    onClick={() => triggerExport("pdf")}
+                  >
+                    📘 Export PDF
+                  </button>
+                )}
               </div>
             </div>
           </div>
