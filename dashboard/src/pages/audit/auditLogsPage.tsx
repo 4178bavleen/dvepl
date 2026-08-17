@@ -3,12 +3,39 @@ import { useERPStore } from '@/store/erpStore';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
+import { securityApi } from '@/services/modules';
+
+const getInitials = (name: string) => {
+  if (!name) return 'SYS';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 0) return 'SYS';
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
 
 export function AuditLogsPage() {
   const store = useERPStore();
   const [search, setSearch] = React.useState('');
   const [action, setAction] = React.useState('ALL');
   const [moduleSelect, setModuleSelect] = React.useState('ALL');
+
+  React.useEffect(() => {
+    let active = true;
+    const fetchLogs = async () => {
+      try {
+        const logs = await securityApi.auditLogs.list();
+        if (active) {
+          useERPStore.setState({ auditLogs: logs || [] });
+        }
+      } catch (err) {
+        console.error("Failed to load audit logs:", err);
+      }
+    };
+    fetchLogs();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Filter logs
   const filteredLogs = React.useMemo(() => {
@@ -113,7 +140,7 @@ export function AuditLogsPage() {
       {/* Title */}
       <div>
         <span className="text-xs font-semibold text-muted-foreground/80">Security Audit Trail</span>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground mt-0.5">Enterprise Ledger History</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground mt-0.5">Audit Logs</h1>
       </div>
 
       {/* KPI Cards Panel */}
@@ -225,10 +252,10 @@ export function AuditLogsPage() {
                 {/* Operator and Network Metadata */}
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground font-medium">
                   <div className="flex items-center gap-1.5">
-                    <span className="h-4.5 w-4.5 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[9px]">
-                      GD
+                    <span className="h-4.5 w-4.5 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[9px] w-6 h-6">
+                      {getInitials(log.user?.name || log.userId || 'System')}
                     </span>
-                    <span>Operator: <span className="text-foreground font-semibold">Gabriel Dhillon</span></span>
+                    <span>Operator: <span className="text-foreground font-semibold">{log.user?.name || log.userId || 'System'}</span></span>
                   </div>
                   <div>&bull;</div>
                   <div>IP Address: <span className="font-mono text-foreground font-semibold">{log.ipAddress || '127.0.0.1'}</span></div>

@@ -4,6 +4,7 @@ import {
   FastifyRequest,
 } from "fastify";
 import { WorkflowStage } from "@prisma/client";
+import NotificationService from "../../../../services/notification/notification.service";
 
 interface Params {
   orderId: string;
@@ -49,6 +50,8 @@ export default async function updateOrderWorkflowStageRoute(
           workflowStage: true,
           nextAction: true,
           dueDate: true,
+          dveplCode: true,
+          companyId: true,
         },
       });
 
@@ -110,6 +113,63 @@ export default async function updateOrderWorkflowStageRoute(
           workflowEvent,
         };
       });
+
+      // -----------------------------------------
+      // 4.5. Send reminder to assigned users if nextAction or dueDate is updated
+      // -----------------------------------------
+      if (nextAction || dueDate) {
+        try {
+          const assignments = await fastify.prisma.salesOrderAssignment.findMany({
+            where: {
+              salesOrderId: orderId,
+            },
+            include: {
+              user: true,
+            },
+          });
+
+          const formattedDueDate = dueDate
+            ? new Date(dueDate).toLocaleDateString("en-IN", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              })
+            : "—";
+
+          const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+
+          for (const assignment of assignments) {
+            const user = assignment.user;
+            if (user && user.email) {
+              const subject = `Workflow Reminder: Sales Order ${order.dveplCode}`;
+              const htmlMessage = `
+                Hello ${user.name || "User"},<br/><br/>
+                This is a follow-up reminder for Sales Order <strong>${order.dveplCode}</strong> assigned to you.<br/><br/>
+                <strong>Next Action:</strong> ${nextAction || "—"}<br/>
+                <strong>Due Date:</strong> ${formattedDueDate}<br/>
+                ${description ? `<strong>Notes:</strong> ${description}<br/>` : ""}
+                <br/>
+                Please <a href="${frontendUrl}/workflow" style="color: #33cc33; font-weight: bold; text-decoration: underline;">click here to log in and view the Workflow Tracker</a> to complete this action.
+              `;
+
+              await NotificationService.sendCustomNotification(
+                {
+                  to: user.email,
+                  subject: subject,
+                  message: htmlMessage,
+                  eventCode: "WORKFLOW_REMINDER",
+                  relatedModule: "salesOrder",
+                  relatedRecordId: orderId,
+                },
+                order.companyId,
+              );
+            }
+          }
+        } catch (notifErr) {
+          // Log notification error but don't fail the workflow update
+          fastify.log.error(notifErr, "Failed to send workflow reminder notifications");
+        }
+      }
 
       // -----------------------------------------
       // 5. Response

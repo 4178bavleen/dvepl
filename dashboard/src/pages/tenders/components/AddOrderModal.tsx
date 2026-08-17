@@ -184,10 +184,68 @@ export function AddOrderModal({
 
   // Prefill the form when editing an existing order
   useEffect(() => {
+    const fetchOrderDetails = async () => {
+      if (!editingOrder?.id) return;
+      try {
+        const res = await apiClient.get(`/order/read/${editingOrder.id}`);
+        if (res.data?.success && res.data?.data) {
+          const order = res.data.data;
+
+          setDveplCode(order.dveplCode || "");
+          setPartyName(order.partyName || "");
+          setCaNo(order.caNo || "");
+
+          const parts = (order.contactDetails || "").split(" | ");
+          setContactPerson(parts[0] || "");
+          setMobile(parts[1] || "");
+          setEmail(parts[2] || "");
+
+          setOrderConfirmDate(
+            order.orderConfirmDate
+              ? new Date(order.orderConfirmDate).toISOString().slice(0, 10)
+              : ""
+          );
+          setDeliveryMonthTarget(order.deliveryMonthTarget || "");
+          setPoDate(
+            order.poDate ? new Date(order.poDate).toISOString().slice(0, 10) : ""
+          );
+          setDrawingConcernedPerson(order.drawingConcernedPerson || "");
+          setDrawingApprovedDate(
+            order.drawingApprovedDate
+              ? new Date(order.drawingApprovedDate).toISOString().slice(0, 10)
+              : ""
+          );
+          setDrawingStatus(order.drawingStatus || "");
+          setDrawingRemarks(order.drawingRemarks || "");
+          setInspectionField(order.inspectionField || "");
+          setRemarks(order.remarks || "");
+          setSendNotification(order.sendNotification ?? true);
+
+          if (order.items && order.items.length > 0) {
+            setItems(
+              order.items.map((item: any) => ({
+                itemCode: item.itemCode || "",
+                description: item.description || "",
+                unit: item.unit || "Nos",
+                quantity: String(item.quantity ?? "1"),
+                rate: String(item.unitPrice ?? item.rate ?? "0"),
+                gstPercentage: String(item.gstPercentage ?? "18"),
+              }))
+            );
+          } else {
+            setItems([{ ...EMPTY_ITEM }]);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch order details:", err);
+        toast.error("Failed to load full order details.");
+      }
+    };
+
     if (open && editingOrder) {
       setDveplCode(editingOrder.dveplCode || "");
-      setPartyName(editingOrder.partyName || "");
-      setCaNo(editingOrder.caNo || "");
+      setPartyName(editingOrder.partyName || (editingOrder as any).firm_name || "");
+      setCaNo(editingOrder.caNo || (editingOrder as any).tender_no || "");
       setContactPerson(editingOrder.name || "");
       setMobile(editingOrder.mobile || "");
       setEmail(editingOrder.email_id || "");
@@ -199,7 +257,11 @@ export function AddOrderModal({
       setLocation(editingOrder.state_name || "");
       setTenderId(editingOrder.tenderID || "");
       setReferenceCode(editingOrder.reference_code || "");
-      setStatus(editingOrder.status || "PENDING");
+      setStatus(editingOrder.status || (editingOrder as any).remark || "PENDING");
+
+      void fetchOrderDetails();
+    } else {
+      resetForm();
     }
   }, [open, editingOrder]);
 

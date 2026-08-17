@@ -155,6 +155,9 @@ export const securityApi = {
     testWhatsapp: (data: any) => apiClient.post((API_ENDPOINTS.security.settings as any).testWhatsapp, data).then(res => res.data),
     exportBackup: () => apiClient.get((API_ENDPOINTS.security.settings as any).exportBackup).then(res => res.data.data),
     importBackup: (data: any) => apiClient.post((API_ENDPOINTS.security.settings as any).importBackup, data).then(res => res.data),
+  },
+  auditLogs: {
+    list: () => apiClient.get((API_ENDPOINTS.security as any).auditLogs.list).then(res => res.data.data),
   }
 };
 

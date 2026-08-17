@@ -269,6 +269,9 @@ export const API_ENDPOINTS = {
       exportBackup: '/settings/backup/export',
       importBackup: '/settings/backup/import',
     },
+    auditLogs: {
+      list: '/audit-log/read/',
+    },
   },
   workflow: {
     approvalRequests: {

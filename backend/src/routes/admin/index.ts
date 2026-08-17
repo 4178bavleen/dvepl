@@ -62,6 +62,8 @@ import purchaseOrderRoutes from './purchaseOrder'
 import workflowRoutes from "./workflow"
 
 import quoteTenderOrderRoutes from "./quotetender";
+import adminAuditLogRouteGroup from "./auditLog/index";
+import { requestContextStorage } from "../../utils/context";
 
 
 async function adminRoutes(
@@ -77,6 +79,12 @@ async function adminRoutes(
     //runs automatically before every req
     instance.addHook("preHandler", async (req, reply) => {
       await instance.verifyToken(req, reply); // 1️⃣ Verify token
+
+      // Set request context for audit logging
+      const userId = (req as any).admin?.id || undefined;
+      const ipAddress = req.ip || undefined;
+      const userAgent = req.headers["user-agent"] || undefined;
+      requestContextStorage.enterWith({ userId, ipAddress, userAgent });
 
       // Determine required permissions dynamically based on the request URL and method
       const url = req.url;
@@ -129,6 +137,8 @@ async function adminRoutes(
         } else {
           requiredPermissions = ["company.view", "tender.view"];
         }
+      } else if (url.includes("/audit-log/")) {
+        requiredPermissions = ["company.view"];
       }
 
       // If we identified specific required permissions, authorize them
@@ -269,6 +279,9 @@ async function adminRoutes(
     });
     instance.register(notificationRoutes, {
       prefix: "/notification",
+    });
+    instance.register(adminAuditLogRouteGroup, {
+      prefix: "/audit-log",
     });
   });
 

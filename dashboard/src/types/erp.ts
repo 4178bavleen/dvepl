@@ -646,6 +646,11 @@ export interface ReferenceCodeCounter {
 export interface AuditLog {
   id: string;
   userId?: string | null;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+  } | null;
   module: string;
   recordId: string;
   action: string;
