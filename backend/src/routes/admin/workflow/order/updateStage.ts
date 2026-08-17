@@ -11,13 +11,16 @@ interface Params {
 
 interface Body {
   stage: WorkflowStage;
+  nextAction?: string | null;
+  dueDate?: string | null;
+  description?: string | null;
 }
 
 export default async function updateOrderWorkflowStageRoute(
   fastify: FastifyInstance,
 ) {
   fastify.patch(
-    "/workflow/order/:orderId/stage",
+    "/order/:orderId/stage",
     {
       schema: {
         tags: ["Workflow Tracker"],
@@ -31,7 +34,7 @@ export default async function updateOrderWorkflowStageRoute(
       reply: FastifyReply,
     ) => {
       const { orderId } = request.params;
-      const { stage } = request.body;
+      const { stage, nextAction, dueDate, description } = request.body;
 
       // -----------------------------------------
       // 1. Find order
@@ -44,6 +47,8 @@ export default async function updateOrderWorkflowStageRoute(
         select: {
           id: true,
           workflowStage: true,
+          nextAction: true,
+          dueDate: true,
         },
       });
 
@@ -58,7 +63,7 @@ export default async function updateOrderWorkflowStageRoute(
       // 2. Prevent unnecessary update
       // -----------------------------------------
 
-      if (order.workflowStage === stage) {
+      if (order.workflowStage === stage && nextAction === undefined && dueDate === undefined) {
         return reply.code(400).send({
           success: false,
           message: `Order is already in ${stage}`,
@@ -83,6 +88,10 @@ export default async function updateOrderWorkflowStageRoute(
           data: {
             workflowStage: stage,
             workflowUpdatedAt: new Date(),
+            ...(nextAction !== undefined ? { nextAction } : {}),
+            ...(dueDate !== undefined
+              ? { dueDate: dueDate ? new Date(dueDate) : null }
+              : {}),
           },
         });
 
@@ -91,6 +100,7 @@ export default async function updateOrderWorkflowStageRoute(
             salesOrderId: orderId,
             stage,
             title: getWorkflowStageTitle(stage),
+            description: description ?? null,
             performedById: userId,
           },
         });
