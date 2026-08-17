@@ -12,6 +12,7 @@ import {
   UserPlus,
   ExternalLink,
   Eye,
+  Plus,
 } from "lucide-react";
 
 import {
@@ -50,11 +51,17 @@ import {
 import { apiClient } from "@/services/axios";
 import { toast } from "react-hot-toast";
 import { useERPStore } from "@/store/erpStore";
-import { isAdminUser } from "@/utils/pagePermissions";
+import {
+  isAdminUser,
+  canPerformPageAction,
+} from "@/utils/pagePermissions";
+import { ConfirmDialog } from "@/components/shared/confirmDialog";
 import {
   SalesOrderAssignModal,
   SalesOrderAssignment,
 } from "./components/SalesOrderAssignModal";
+
+import { AddOrderModal } from "./components/AddOrderModal";
 
 // ============================================================
 // API RESPONSE SHAPE
@@ -99,6 +106,9 @@ interface QuoteTenderOrder extends RawQuoteTenderOrder {
   poStatus?: string;
   poNumber?: string;
   assignments?: SalesOrderAssignment[];
+  workflowStage?: string;
+  nextAction?: string | null;
+  dueDate?: string | null;
 }
 
 // ============================================================
@@ -121,6 +131,7 @@ const ALL_COLUMN_KEYS = [
   { id: "tenderID", label: "TENDER ID" },
   { id: "referenceCode", label: "REFERENCE CODE" },
   { id: "poStatus", label: "PO STATUS" },
+  { id: "workflowProgress", label: "WORKFLOW PROGRESS" },
   { id: "remark", label: "REMARK" },
   { id: "remarkedAt", label: "REMARKED AT" },
   { id: "drawingAttached", label: "DRAWING" },
@@ -130,6 +141,58 @@ const ALL_COLUMN_KEYS = [
 type ColumnKey = (typeof ALL_COLUMN_KEYS)[number]["id"];
 
 const EMPTY_ARRAY: QuoteTenderOrder[] = [];
+
+// ============================================================
+// WORKFLOW STAGES (shared with the workflow tracker page)
+// ============================================================
+
+const WORKFLOW_STAGE_ORDER = [
+  "ORDER_CONFIRMED",
+  "PO_READY",
+  "DRAWING_ASSIGNED",
+  "DRAWING_SENT",
+  "REVISION_REQUIRED",
+  "DRAWING_APPROVED",
+  "PO_PLACED",
+  "INVENTORY_FOLLOW_UP",
+  "PRODUCTION_FOLLOW_UP",
+] as const;
+
+const WORKFLOW_STAGE_LABELS: Record<string, string> = {
+  ORDER_CONFIRMED: "Order Confirmed",
+  PO_READY: "PO Ready",
+  DRAWING_ASSIGNED: "Drawing Assigned",
+  DRAWING_SENT: "Drawing Sent",
+  REVISION_REQUIRED: "Revision Required",
+  DRAWING_APPROVED: "Drawing Approved",
+  PO_PLACED: "PO Placed",
+  INVENTORY_FOLLOW_UP: "Inventory Follow-up",
+  PRODUCTION_FOLLOW_UP: "Production Follow-up",
+};
+
+const WORKFLOW_STAGE_COLORS: Record<string, string> = {
+  ORDER_CONFIRMED: "#3b82f6",
+  PO_READY: "#8b5cf6",
+  DRAWING_ASSIGNED: "#a855f7",
+  DRAWING_SENT: "#6366f1",
+  REVISION_REQUIRED: "#f97316",
+  DRAWING_APPROVED: "#22c55e",
+  PO_PLACED: "#10b981",
+  INVENTORY_FOLLOW_UP: "#f59e0b",
+  PRODUCTION_FOLLOW_UP: "#06b6d4",
+};
+
+function workflowStageLabel(stage?: string | null) {
+  if (!stage) return "—";
+  return WORKFLOW_STAGE_LABELS[stage] || stage.replace(/_/g, " ");
+}
+
+function workflowStagePercent(stage?: string | null) {
+  if (!stage) return 0;
+  const index = WORKFLOW_STAGE_ORDER.indexOf(stage as any);
+  if (index === -1) return 0;
+  return Math.round((index / (WORKFLOW_STAGE_ORDER.length - 1)) * 100);
+}
 
 // ============================================================
 // GENERIC TABLE TYPE WORKAROUND
@@ -271,6 +334,17 @@ export function OrdersPage() {
 
   const isAdmin = isAdminUser(currentUser);
 
+  const canEdit = canPerformPageAction(
+    currentUser?.actionPermissions,
+    "orders",
+    "edit",
+  );
+  const canDelete = canPerformPageAction(
+    currentUser?.actionPermissions,
+    "orders",
+    "delete",
+  );
+
   const isOrderAssignedToCurrentUser = useCallback(
     (order: QuoteTenderOrder | null | undefined) => {
       if (!order || !currentUserId) return false;
@@ -302,6 +376,17 @@ export function OrdersPage() {
     useState<QuoteTenderOrder | null>(null);
 
   const [isSyncing, setIsSyncing] = useState(false);
+
+  const [isAddOrderOpen, setIsAddOrderOpen] = useState(false);
+
+  const [editingOrder, setEditingOrder] = useState<QuoteTenderOrder | null>(
+    null,
+  );
+
+  const [orderToDelete, setOrderToDelete] =
+    useState<QuoteTenderOrder | null>(null);
+
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // ============================================================
   // COLUMN VISIBILITY
@@ -437,6 +522,9 @@ export function OrdersPage() {
             drawings: order.engineeringProjects?.flatMap((proj: any) => proj.drawings || []) || [],
             file_name: remarksFields.fileName || null,
             assignments: order.assignments || [],
+            workflowStage: order.workflowStage || undefined,
+            nextAction: order.nextAction ?? null,
+            dueDate: order.dueDate ? new Date(order.dueDate).toISOString() : null,
           };
         });
 
@@ -470,6 +558,33 @@ export function OrdersPage() {
   useEffect(() => {
     void loadQuoteTenders();
   }, [loadQuoteTenders]);
+
+  const handleDeleteOrder = useCallback(async () => {
+    if (!orderToDelete) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await apiClient.delete(
+        `/order/delete/${orderToDelete.id}`
+      );
+      if (response.data?.success) {
+        toast.success("Order deleted successfully.");
+        setOrderToDelete(null);
+        await loadQuoteTenders();
+      } else {
+        toast.error(
+          response.data?.message ?? "Unable to delete order."
+        );
+      }
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.message ??
+          "Failed to delete order. Please try again."
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [orderToDelete, loadQuoteTenders]);
 
   const handleSync = useCallback(async () => {
     setIsSyncing(true);
@@ -879,6 +994,64 @@ export function OrdersPage() {
           },
         },
 
+        workflowProgress: {
+          id: "workflowProgress",
+          header: "WORKFLOW PROGRESS",
+          cell: ({ row }) => {
+            const stage = row.original.workflowStage;
+            if (!stage) {
+              return (
+                <span className="text-[10px] font-semibold text-muted-foreground/60 italic">
+                  Not started
+                </span>
+              );
+            }
+
+            const percent = workflowStagePercent(stage);
+            const currentIndex = WORKFLOW_STAGE_ORDER.indexOf(stage as any);
+            const isDone = currentIndex === WORKFLOW_STAGE_ORDER.length - 1;
+
+            return (
+              <div className="min-w-[180px] py-1">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <span className="text-[10px] font-bold text-foreground truncate">
+                    {workflowStageLabel(stage)}
+                  </span>
+                  <span
+                    className={`text-[10px] font-bold shrink-0 ${
+                      isDone
+                        ? "text-emerald-600"
+                        : percent >= 100
+                          ? "text-emerald-600"
+                          : "text-blue-600"
+                    }`}
+                  >
+                    {isDone ? "100% Done" : `${percent}%`}
+                  </span>
+                </div>
+                <div className="flex items-center gap-0.5">
+                  {WORKFLOW_STAGE_ORDER.map((s, i) => {
+                    const color = WORKFLOW_STAGE_COLORS[s];
+                    const active = i <= currentIndex;
+                    return (
+                      <span
+                        key={s}
+                        className="h-1.5 flex-1 rounded-full transition-colors"
+                        style={
+                          active
+                            ? { backgroundColor: color }
+                            : { backgroundColor: "hsl(var(--border))" }
+                        }
+                        title={WORKFLOW_STAGE_LABELS[s]}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          },
+        },
+
         remark: {
           accessorKey: "remark",
           header: "REMARK",
@@ -1168,6 +1341,19 @@ export function OrdersPage() {
 
         <div className="flex items-center gap-3 flex-wrap">
 
+          {/* Add Order Manually */}
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!isAdmin}
+            onClick={() => setIsAddOrderOpen(true)}
+            title={isAdmin ? "Add a sales order manually" : "Only administrators can add orders"}
+            className="gap-1.5 h-9 rounded-xl border-emerald-500/20 hover:border-emerald-500/40 text-emerald-600 bg-emerald-500/5 hover:bg-emerald-500/10 transition-all duration-200 text-xs font-semibold"
+          >
+            <Plus className="size-3.5" />
+            Add Order
+          </Button>
+
           {/* Sync Portal Orders */}
           <Button
             variant="outline"
@@ -1180,7 +1366,7 @@ export function OrdersPage() {
             {isSyncing ? "Syncing..." : "Sync Portal Orders"}
           </Button>
 
-          {/* Fields */}
+          {/* Customize Columns */}
           <Popover>
             <PopoverTrigger
               render={
@@ -1190,7 +1376,7 @@ export function OrdersPage() {
                   className="gap-1.5 h-9 rounded-xl border-muted-foreground/15 text-xs font-semibold shadow-3xs"
                 >
                   <SlidersHorizontal className="size-3.5" />
-                  <span>Fields</span>
+                  <span>Customize Columns</span>
                 </Button>
               }
             />
@@ -1201,28 +1387,38 @@ export function OrdersPage() {
             >
               <div className="flex items-center justify-between border-b pb-2">
                 <span className="font-bold text-xs">
-                  Show / Hide Columns
+                  Toggle Columns
                 </span>
 
-                <div className="flex gap-2 text-[11px]">
+                <div className="flex items-center gap-1">
                   <button
                     type="button"
-                    className="text-primary hover:underline font-semibold"
+                    className="flex items-center gap-1.5 h-6 px-1.5 text-[11px] font-medium text-primary hover:text-primary hover:bg-primary/10 rounded"
                     onClick={() =>
-                      setAllColumns(true)
+                      setAllColumns(
+                        !ALL_COLUMN_KEYS.every(
+                          (c) => visibleColumns[c.id] ?? true
+                        )
+                      )
                     }
                   >
-                    All
+                    <Checkbox
+                      checked={ALL_COLUMN_KEYS.every(
+                        (c) => visibleColumns[c.id] ?? true
+                      )}
+                      className="pointer-events-none size-3.5"
+                    />
+                    Select All
                   </button>
 
                   <button
                     type="button"
-                    className="text-muted-foreground hover:underline font-semibold"
+                    className="h-6 px-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground rounded"
                     onClick={() =>
                       setAllColumns(false)
                     }
                   >
-                    None
+                    Clear
                   </button>
                 </div>
               </div>
@@ -1231,7 +1427,7 @@ export function OrdersPage() {
                 {ALL_COLUMN_KEYS.map((col) => (
                   <label
                     key={col.id}
-                    className="flex items-center gap-2 text-xs font-medium cursor-pointer hover:bg-muted/50 p-1 rounded"
+                    className="flex items-center gap-2.5 px-1 py-1 text-xs font-medium cursor-pointer hover:bg-muted/50 rounded transition-colors"
                   >
                     <Checkbox
                       checked={
@@ -1328,6 +1524,21 @@ export function OrdersPage() {
         columns={tableColumns}
         data={processedTenders}
         onView={setViewingTender}
+        onEdit={
+          canEdit || isAdmin
+            ? (row) => {
+                setEditingOrder(row);
+                setIsAddOrderOpen(true);
+              }
+            : undefined
+        }
+        onDelete={
+          canDelete || isAdmin
+            ? (row) => {
+                setOrderToDelete(row);
+              }
+            : undefined
+        }
         isLoading={isLoading}
         showColumnVisibility={false}
         storageKey="quote-tender-orders"
@@ -1462,6 +1673,125 @@ export function OrdersPage() {
                         className="md:col-span-2"
                       />
                     </div>
+                  </section>
+
+                  {/* ==================================================
+                      WORKFLOW PROGRESS
+                      ================================================== */}
+
+                  <section className="border-t pt-7">
+                    <DetailSectionTitle
+                      title="Workflow Progress"
+                      color="bg-emerald-500"
+                    />
+
+                    {viewingTender.workflowStage ? (
+                      (() => {
+                        const stage = viewingTender.workflowStage;
+                        const percent = workflowStagePercent(stage);
+                        const currentIndex = WORKFLOW_STAGE_ORDER.indexOf(stage as any);
+                        const isDone = currentIndex === WORKFLOW_STAGE_ORDER.length - 1;
+
+                        return (
+                          <div className="rounded-2xl border border-border/80 bg-muted/10 p-5 shadow-3xs">
+                            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="size-2.5 rounded-full"
+                                  style={{
+                                    backgroundColor:
+                                      WORKFLOW_STAGE_COLORS[stage] || "#3b82f6",
+                                  }}
+                                />
+                                <span className="text-sm font-bold text-foreground">
+                                  {workflowStageLabel(stage)}
+                                </span>
+                              </div>
+                              <span
+                                className={`text-xs font-bold px-3 py-1 rounded-full border ${
+                                  isDone
+                                    ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                                    : "bg-blue-500/10 text-blue-600 border-blue-500/20"
+                                }`}
+                              >
+                                {isDone ? "100% Done" : `${percent}% Complete`}
+                              </span>
+                            </div>
+
+                            {/* Pipeline bar */}
+                            <div className="flex items-center gap-1 mb-2">
+                              {WORKFLOW_STAGE_ORDER.map((s, i) => {
+                                const color = WORKFLOW_STAGE_COLORS[s];
+                                const active = i <= currentIndex;
+                                return (
+                                  <div key={s} className="flex-1" title={WORKFLOW_STAGE_LABELS[s]}>
+                                    <div
+                                      className={`h-2 rounded-full transition-all ${
+                                        i === currentIndex && !isDone ? "ring-2 ring-blue-500/30" : ""
+                                      }`}
+                                      style={
+                                        active
+                                          ? { backgroundColor: color }
+                                          : { backgroundColor: "hsl(var(--border))" }
+                                      }
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            {/* Stage labels */}
+                            <div className="flex items-center gap-1">
+                              {WORKFLOW_STAGE_ORDER.map((s, i) => (
+                                <div
+                                  key={s}
+                                  className={`flex-1 text-center text-[9px] font-medium leading-tight truncate ${
+                                    i === currentIndex
+                                      ? "text-blue-600 dark:text-blue-400"
+                                      : i < currentIndex
+                                        ? "text-emerald-600 dark:text-emerald-400"
+                                        : "text-muted-foreground"
+                                  }`}
+                                >
+                                  {WORKFLOW_STAGE_LABELS[s]}
+                                </div>
+                              ))}
+                            </div>
+
+                            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div className="rounded-xl border border-border/70 bg-background px-4 py-3 shadow-3xs">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
+                                  Next Action
+                                </p>
+                                <p className="mt-1 text-xs font-semibold text-foreground">
+                                  {viewingTender.nextAction || "No action assigned"}
+                                </p>
+                              </div>
+                              <div className="rounded-xl border border-border/70 bg-background px-4 py-3 shadow-3xs">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
+                                  Due Date
+                                </p>
+                                <p className="mt-1 text-xs font-semibold text-foreground">
+                                  {viewingTender.dueDate
+                                    ? new Date(viewingTender.dueDate).toLocaleDateString("en-IN", {
+                                        day: "2-digit",
+                                        month: "short",
+                                        year: "numeric",
+                                      })
+                                    : "—"}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-border bg-muted/10 p-6 text-center shadow-3xs">
+                        <p className="text-xs font-medium text-muted-foreground">
+                          No workflow has been started for this order yet.
+                        </p>
+                      </div>
+                    )}
                   </section>
 
                   {/* ==================================================
@@ -1832,6 +2162,42 @@ export function OrdersPage() {
         }}
         order={assigningTender}
         onSuccess={() => void loadQuoteTenders()}
+      />
+
+      {/* ========================================================
+          ADD / EDIT ORDER MANUALLY MODAL
+          ======================================================== */}
+      <AddOrderModal
+        open={isAddOrderOpen}
+        onOpenChange={(open) => {
+          setIsAddOrderOpen(open);
+          if (!open) setEditingOrder(null);
+        }}
+        editingOrder={editingOrder}
+        companyId={(currentUser as any)?.companyId || null}
+        orderTakenById={currentUserId}
+        onSuccess={() => void loadQuoteTenders()}
+      />
+
+      {/* ========================================================
+          DELETE ORDER CONFIRMATION
+          ======================================================== */}
+      <ConfirmDialog
+        open={Boolean(orderToDelete)}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) setOrderToDelete(null);
+        }}
+        title={`Delete Order?`}
+        description={
+          orderToDelete
+            ? `This will move order ${orderToDelete.dveplCode || orderToDelete.tender_no || ""} to the Recycle Bin. You can restore it later if needed.`
+            : ""
+        }
+        confirmText="Delete Order"
+        cancelText="Cancel"
+        variant="danger"
+        loading={isDeleting}
+        onConfirm={() => void handleDeleteOrder()}
       />
     </div>
   );

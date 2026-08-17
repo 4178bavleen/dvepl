@@ -15,6 +15,10 @@ export interface WorkflowOrder {
   id: string;
   dveplCode: string;
 
+  caNo: string | null;
+  partyName: string | null;
+  grandTotal: number;
+
   status: string;
   workflowStage: WorkflowStage;
 
@@ -37,6 +41,28 @@ export interface WorkflowOrdersResponse {
   count: number;
 }
 
+export interface WorkflowEvent {
+  id: string;
+  salesOrderId: string;
+  stage: WorkflowStage;
+  title: string;
+  description: string | null;
+  performedById: string | null;
+  createdAt: string;
+}
+
+export interface OrderTrackerResponse {
+  success: boolean;
+  data: {
+    orderId: string;
+    workflowStage: WorkflowStage;
+    nextAction: string | null;
+    dueDate: string | null;
+    workflowUpdatedAt: string;
+    timeline: WorkflowEvent[];
+  };
+}
+
 class WorkflowApi {
   getOrders(params?: {
     stage?: WorkflowStage;
@@ -48,10 +74,23 @@ class WorkflowApi {
   }
 
   getOrderTracker(orderId: string) {
-    return api.get(`/workflow/order/${orderId}/tracker`);
+    return api.get<OrderTrackerResponse>(
+      `/workflow/order/${orderId}/tracker`,
+    );
   }
-  updateOrderWorkflowStage(orderId: string, stage: string) {
-    return api.patch(`/workflow/order/${orderId}/stage`, { stage });
+  updateOrderWorkflowStage(
+    orderId: string,
+    stage: string,
+    data?: {
+      nextAction?: string | null;
+      dueDate?: string | null;
+      description?: string | null;
+    },
+  ) {
+    return api.patch(`/workflow/order/${orderId}/stage`, {
+      stage,
+      ...data,
+    });
   }
 
   updateStage(

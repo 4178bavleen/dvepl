@@ -46,6 +46,18 @@ export default async function listWorkflowOrdersRoute(
                       mode: "insensitive",
                     },
                   },
+                  {
+                    partyName: {
+                      contains: search,
+                      mode: "insensitive",
+                    },
+                  },
+                  {
+                    caNo: {
+                      contains: search,
+                      mode: "insensitive",
+                    },
+                  },
                 ],
               }
             : {}),
@@ -70,6 +82,12 @@ export default async function listWorkflowOrdersRoute(
         data: orders.map((order) => ({
           id: order.id,
           dveplCode: order.dveplCode,
+          caNo: order.caNo,
+
+          partyName: order.partyName,
+          grandTotal: order.grandTotal
+            ? Number(order.grandTotal)
+            : 0,
 
           status: order.status,
 
