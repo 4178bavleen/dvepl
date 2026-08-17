@@ -21,10 +21,41 @@ async function adminTaskReadRoutes(
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
+        const userId = (request.admin as any)?.id;
+        const roles = (request.admin as any)?.roles || [];
+        const pageAccess = (request.admin as any)?.uiAccessProfile?.pageAccess || [];
+        const isManager = roles.some((r: string) => r.toLowerCase().includes("admin")) || pageAccess.includes("tasks") || pageAccess.includes("employees");
+
+        let whereClause: any = {
+          deletedAt: null,
+        };
+
+        if (!isManager) {
+          const employee = await fastify.prisma.employee.findFirst({
+            where: {
+              userId: userId,
+              deletedAt: null,
+            },
+          });
+
+          if (!employee) {
+            return reply.status(200).send({
+              success: true,
+              message: "No tasks found (no employee record associated with user).",
+              count: 0,
+              data: [],
+            });
+          }
+
+          whereClause.assignments = {
+            some: {
+              employeeId: employee.id,
+            },
+          };
+        }
+
         const tasks = await fastify.prisma.task.findMany({
-          where: {
-            deletedAt: null,
-          },
+          where: whereClause,
           include: {
             assignments: {
               include: {

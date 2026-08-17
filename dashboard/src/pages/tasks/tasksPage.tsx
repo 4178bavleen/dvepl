@@ -370,18 +370,24 @@ export default function TasksPage() {
 
     // Sorting
     result.sort((a, b) => {
+      const dateA = a.dueDate || "";
+      const dateB = b.dueDate || "";
       if (sortBy === "due-soonest") {
-        return a.dueDate.localeCompare(b.dueDate);
+        return dateA.localeCompare(dateB);
       }
       if (sortBy === "due-latest") {
-        return b.dueDate.localeCompare(a.dueDate);
+        return dateB.localeCompare(dateA);
       }
+      const createdA = a.createdAt || "";
+      const createdB = b.createdAt || "";
       if (sortBy === "created-newest") {
-        return b.createdAt.localeCompare(a.createdAt);
+        return createdB.localeCompare(createdA);
       }
       if (sortBy === "priority-high") {
         const priorityWeight = { high: 3, medium: 2, low: 1 };
-        return priorityWeight[b.priority] - priorityWeight[a.priority];
+        const weightA = priorityWeight[a.priority as keyof typeof priorityWeight] || 0;
+        const weightB = priorityWeight[b.priority as keyof typeof priorityWeight] || 0;
+        return weightB - weightA;
       }
       return 0;
     });

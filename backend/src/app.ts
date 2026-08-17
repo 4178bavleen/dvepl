@@ -10,6 +10,7 @@ import fastifyStatic from "@fastify/static";
 
 //Logger
 import { adminLogs as AdminLogger } from "./services/logger/contextLogger";
+import { checkAndSendTaskReminders } from "./utils/taskScheduler";
 
 //Route Groups
 import adminRouteGroup from "./routes/admin/index";
@@ -96,6 +97,16 @@ async function buildApp() {
 
   // ✅ Wait until Fastify is fully ready (plugins loaded)
   await fastify.ready();
+
+  // Start background task reminder scheduler
+  try {
+    void checkAndSendTaskReminders(fastify.prisma);
+    setInterval(() => {
+      void checkAndSendTaskReminders(fastify.prisma);
+    }, 60 * 60 * 1000);
+  } catch (error: any) {
+    fastify.log.error(error, "Failed to start task reminder scheduler:");
+  }
 
   return fastify;
 }

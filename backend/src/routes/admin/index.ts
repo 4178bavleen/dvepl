@@ -52,7 +52,7 @@ import adminUploadRouteGroup from "./upload/index";
 import adminExportOrdersRouteGroup from "./exportOrders/index";
 import dynamicRoutes from "./dynamic";
 
-// import notificationRoutes from "./notification";
+import notificationRoutes from "./notification";
 
 import { FastifyInstance, FastifyPluginOptions } from "fastify";
 
@@ -105,7 +105,6 @@ async function adminRoutes(
         if (url.includes("/create")) requiredPermissions = ["employee.create"];
         else if (url.includes("/update")) requiredPermissions = ["employee.update"];
         else if (url.includes("/delete")) requiredPermissions = ["employee.delete"];
-        else if (url.includes("/read")) requiredPermissions = ["employee.view"];
       } else if (url.includes("/settings/")) {
         // Settings are administrative, allow company.update, company.create, or role.update
         requiredPermissions = ["company.update", "company.create", "role.update"];
@@ -267,6 +266,9 @@ async function adminRoutes(
     });
     fastify.register(adminExportOrdersRouteGroup, {
       prefix: "/export-orders",
+    });
+    instance.register(notificationRoutes, {
+      prefix: "/notification",
     });
   });
 

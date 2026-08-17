@@ -46,13 +46,40 @@ async function sendTestEmailRoute(
           connectionTimeout: 10000,
         });
 
-        await transporter.sendMail({
-          from: `"${fromName || "DVEPL Test"}" <${fromEmail || smtpSettings.username || "test@dvepl.com"}>`,
-          to: toEmail,
-          subject: subject || "DVEPL SMTP Connection Test",
-          text: text || "Hello,\n\nThis is a test email sent from the DVEPL ERP Settings page. If you are reading this, your SMTP configuration is successfully working!\n\nRegards,\nDVEPL Team",
-          html: html || "<p>Hello,</p><p>This is a test email sent from the DVEPL ERP Settings page. If you are reading this, your SMTP configuration is successfully working!</p><p>Regards,<br>DVEPL Team</p>",
-        });
+        let status: "SENT" | "FAILED" = "SENT";
+        let errorMsg: string | null = null;
+        const mailSubject = subject || "DVEPL SMTP Connection Test";
+        const mailHtml = html || "<p>Hello,</p><p>This is a test email sent from the DVEPL ERP Settings page. If you are reading this, your SMTP configuration is successfully working!</p><p>Regards,<br>DVEPL Team</p>";
+
+        try {
+          await transporter.sendMail({
+            from: `"${fromName || "DVEPL Test"}" <${fromEmail || smtpSettings.username || "test@dvepl.com"}>`,
+            to: toEmail,
+            subject: mailSubject,
+            text: text || "Hello,\n\nThis is a test email sent from the DVEPL ERP Settings page. If you are reading this, your SMTP configuration is successfully working!\n\nRegards,\nDVEPL Team",
+            html: mailHtml,
+          });
+        } catch (e: any) {
+          status = "FAILED";
+          errorMsg = e.message || String(e);
+          throw e;
+        } finally {
+          try {
+            await fastify.prisma.notificationLog.create({
+              data: {
+                eventCode: "TEST_EMAIL",
+                channel: "EMAIL",
+                recipient: toEmail,
+                subject: mailSubject,
+                message: mailHtml.replace(/<[^>]*>/g, '').trim(),
+                status: status,
+                error: errorMsg,
+              }
+            });
+          } catch (dbError) {
+            adminLogs.error("Failed to write test email to notificationLog", { error: dbError });
+          }
+        }
 
         return reply.status(200).send({
           success: true,

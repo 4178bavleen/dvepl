@@ -50,17 +50,51 @@ export class EmailService {
     });
   }
 
-  static async send(options: SendEmailOptions, companyId?: string) {
+  static async send(
+    options: SendEmailOptions,
+    companyId?: string,
+    eventCode?: string,
+    relatedModule?: string,
+    relatedRecordId?: string
+  ) {
     const config = await this.getConfiguration(companyId);
 
     const transporter = await this.createTransporter(companyId);
 
-    const info = await transporter.sendMail({
-      from: `"${config.smtpFromName || "DVEPL"}" <${config.smtpFromEmail}>`,
-      to: options.to,
-      subject: options.subject,
-      html: options.html,
-    });
+    let info: any = null;
+    let status: 'SENT' | 'FAILED' = 'SENT';
+    let errorMsg: string | null = null;
+
+    try {
+      info = await transporter.sendMail({
+        from: `"${config.smtpFromName || "DVEPL"}" <${config.smtpFromEmail}>`,
+        to: options.to,
+        subject: options.subject,
+        html: options.html,
+      });
+    } catch (e: any) {
+      status = 'FAILED';
+      errorMsg = e.message || String(e);
+      throw e;
+    } finally {
+      try {
+        await prisma.notificationLog.create({
+          data: {
+            eventCode: eventCode || "TEST_EMAIL",
+            channel: "EMAIL",
+            recipient: options.to,
+            subject: options.subject,
+            message: options.html.replace(/<[^>]*>/g, '').trim(),
+            status: status,
+            error: errorMsg,
+            relatedModule: relatedModule || null,
+            relatedRecordId: relatedRecordId || null,
+          }
+        });
+      } catch (dbError) {
+        console.error("Failed to write to notificationLog:", dbError);
+      }
+    }
 
     return info;
   }

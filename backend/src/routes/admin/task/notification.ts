@@ -6,6 +6,7 @@ import {
 } from "fastify";
 import { adminLogs } from "../../../services/logger/contextLogger";
 import { taskNotificationSchema } from "../../../schemas/admin/task/task.schema";
+import NotificationService from "../../../services/notification/notification.service";
 
 async function adminTaskNotificationRoutes(
   fastify: FastifyInstance,
@@ -103,15 +104,45 @@ async function adminTaskNotificationRoutes(
             dueDate: { lt: today },
             notifEnabled: true,
           },
+          include: {
+            assignments: {
+              include: {
+                employee: {
+                  include: {
+                    user: true
+                  }
+                }
+              }
+            }
+          }
         });
+
+        let sentCount = 0;
+
+        for (const task of overdueTasks) {
+          const assignedUsers = task.assignments
+            .map((a: any) => a.employee?.user)
+            .filter((u: any) => u && u.email);
+
+          for (const user of assignedUsers) {
+            await NotificationService.sendCustomNotification({
+              to: user.email,
+              subject: `Overdue Task Reminder: ${task.title}`,
+              message: `Hello ${user.name || "User"},\n\nThis is a reminder that the task "${task.title}" is overdue.\nDue Date was: ${new Date(task.dueDate).toLocaleDateString()}.\nPriority: ${task.priority}.\nStatus: ${task.status}.`,
+              eventCode: "TASK_REMINDER"
+            });
+            sentCount++;
+          }
+        }
 
         adminLogs.info("Overdue reminders run triggered manually", {
           overdueCount: overdueTasks.length,
+          notificationsSent: sentCount,
         });
 
         return reply.status(200).send({
           success: true,
-          message: `Reminders run completed. Dispatched alerts for ${overdueTasks.length} task(s).`,
+          message: `Reminders run completed. Dispatched ${sentCount} alert(s) for ${overdueTasks.length} task(s).`,
         });
       } catch (error: any) {
         console.error(error);
