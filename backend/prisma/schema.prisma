@@ -191,6 +191,7 @@ model User {
   deliveryProofs                    DeliveryProof[]
   dispatches                        Dispatch[]
   approvedRevisions                 DrawingRevision[]                  @relation("RevisionApprovedBy")
+  rejectedRevisions                 DrawingRevision[]                  @relation("RevisionRejectedBy")
   createdRevisions                  DrawingRevision[]                  @relation("RevisionCreatedBy")
   employee                          Employee?
   approvedDrawings                  EngineeringDrawing[]               @relation("DrawingApprovedBy")
@@ -1496,23 +1497,44 @@ model EngineeringDrawing {
 }
 
 model DrawingRevision {
-  id                     String                  @id @default(uuid())
-  drawingId              String
-  revisionNo             Int
-  fileUrl                String
-  fileName               String
-  changes                String?
-  approvedById           String?
-  approvedAt             DateTime?
-  createdById            String
-  createdAt              DateTime                @default(now())
-  approvedBy             User?                   @relation("RevisionApprovedBy", fields: [approvedById], references: [id])
-  createdBy              User                    @relation("RevisionCreatedBy", fields: [createdById], references: [id])
-  drawing                EngineeringDrawing      @relation(fields: [drawingId], references: [id])
+  id         String @id @default(uuid())
+  drawingId  String
+  revisionNo Int
+
+  fileUrl  String
+  fileName String
+  fileSize Int?
+  mimeType String?
+
+  changes String?
+
+  status          DrawingStatus @default(DRAFT)
+  rejectionReason String?
+
+  createdById String
+
+  approvedById String?
+  approvedAt   DateTime?
+
+  rejectedById String?
+  rejectedAt   DateTime?
+
+  submittedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  approvedBy User? @relation("RevisionApprovedBy", fields: [approvedById], references: [id])
+  rejectedBy User? @relation("RevisionRejectedBy", fields: [rejectedById], references: [id])
+  createdBy  User  @relation("RevisionCreatedBy", fields: [createdById], references: [id])
+
+  drawing EngineeringDrawing @relation(fields: [drawingId], references: [id])
+
   customerDrawingReviews CustomerDrawingReview[]
 
   @@unique([drawingId, revisionNo])
   @@index([drawingId])
+  @@index([status])
   @@map("drawing_revisions")
 }
 
@@ -1745,39 +1767,39 @@ model PurchaseRequestItem {
 }
 
 model PurchaseOrder {
-  id               String              @id @default(uuid())
+  id               String                  @id @default(uuid())
   companyId        String
-  poNo             String              @unique
+  poNo             String                  @unique
   requestId        String?
   vendorId         String
-  orderDate        DateTime            @default(now())
+  orderDate        DateTime                @default(now())
   expectedDelivery DateTime?
-  status           PurchaseOrderStatus @default(DRAFT)
+  status           PurchaseOrderStatus     @default(DRAFT)
   paymentTerms     String?
   shippingTerms    String?
-  currency         String              @default("INR")
-  subtotal         Decimal             @db.Decimal(15, 2)
-  tax              Decimal             @db.Decimal(15, 2)
-  total            Decimal             @db.Decimal(15, 2)
+  currency         String                  @default("INR")
+  subtotal         Decimal                 @db.Decimal(15, 2)
+  tax              Decimal                 @db.Decimal(15, 2)
+  total            Decimal                 @db.Decimal(15, 2)
   createdById      String
   approvedById     String?
   approvedAt       DateTime?
   sentAt           DateTime?
   remarks          String?
   referenceCode    String?
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
   deletedAt        DateTime?
   customerId       String?
   goodsReceipts    GoodsReceipt[]
   invoices         Invoice[]
   items            PurchaseOrderItem[]
-  approvedBy       User?               @relation("PurchaseOrderApprovedBy", fields: [approvedById], references: [id])
-  company          Company             @relation(fields: [companyId], references: [id])
-  createdBy        User                @relation("PurchaseOrderCreatedBy", fields: [createdById], references: [id])
-  customer         Customer?           @relation(fields: [customerId], references: [id])
-  request          PurchaseRequest?    @relation(fields: [requestId], references: [id])
-  vendor           Vendor              @relation(fields: [vendorId], references: [id])
+  approvedBy       User?                   @relation("PurchaseOrderApprovedBy", fields: [approvedById], references: [id])
+  company          Company                 @relation(fields: [companyId], references: [id])
+  createdBy        User                    @relation("PurchaseOrderCreatedBy", fields: [createdById], references: [id])
+  customer         Customer?               @relation(fields: [customerId], references: [id])
+  request          PurchaseRequest?        @relation(fields: [requestId], references: [id])
+  vendor           Vendor                  @relation(fields: [vendorId], references: [id])
   revisions        PurchaseOrderRevision[]
 
   @@index([companyId])
@@ -1787,7 +1809,7 @@ model PurchaseOrder {
 }
 
 model PurchaseOrderRevision {
-  id                 String         @id @default(uuid())
+  id                 String   @id @default(uuid())
   purchaseOrderId    String?
   vendorId           String
   poNumber           String
@@ -1795,27 +1817,27 @@ model PurchaseOrderRevision {
   poStatus           String
   paymentTerms       String?
   materialStatus     String?
-  advance            Float          @default(0)
+  advance            Float    @default(0)
   remarks            String?
-  cgstPercent        Float          @default(0)
-  sgstPercent        Float          @default(0)
-  igstPercent        Float          @default(0)
-  subtotal           Float          @default(0)
-  cgstAmount         Float          @default(0)
-  sgstAmount         Float          @default(0)
-  igstAmount         Float          @default(0)
-  grandTotal         Float          @default(0)
+  cgstPercent        Float    @default(0)
+  sgstPercent        Float    @default(0)
+  igstPercent        Float    @default(0)
+  subtotal           Float    @default(0)
+  cgstAmount         Float    @default(0)
+  sgstAmount         Float    @default(0)
+  igstAmount         Float    @default(0)
+  grandTotal         Float    @default(0)
   termsAndConditions String?
   lineItems          Json
   companyDetails     Json
-  createdAt          DateTime       @default(now())
+  createdAt          DateTime @default(now())
   createdBy          String
   revisionNo         Int
   customColumns      Json?
   referenceCode      String?
 
-  purchaseOrder      PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
-  vendor             Vendor         @relation("VendorPurchaseOrderRevisions", fields: [vendorId], references: [id])
+  purchaseOrder PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  vendor        Vendor         @relation("VendorPurchaseOrderRevisions", fields: [vendorId], references: [id])
 
   @@map("purchase_order_revisions")
 }
@@ -2573,7 +2595,7 @@ model DashboardWidget {
 }
 
 model Vendor {
-  id                    String           @id @default(uuid())
+  id                    String                  @id @default(uuid())
   companyId             String
   name                  String
   category              String?
@@ -2583,19 +2605,19 @@ model Vendor {
   gstNumber             String?
   address               String?
   notes                 String?
-  revisionCount         Int              @default(0)
+  revisionCount         Int                     @default(0)
   createdById           String
-  createdAt             DateTime         @default(now())
-  updatedAt             DateTime         @updatedAt
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
   deletedAt             DateTime?
-  preferredForMaterials Material[]       @relation("MaterialPreferredVendor")
+  preferredForMaterials Material[]              @relation("MaterialPreferredVendor")
   materials             Material[]
   purchaseOrders        PurchaseOrder[]
   vendorProducts        VendorProduct[]
   revisions             VendorRevision[]
   poRevisions           PurchaseOrderRevision[] @relation("VendorPurchaseOrderRevisions")
-  company               Company          @relation(fields: [companyId], references: [id])
-  createdBy             User             @relation("VendorCreatedBy", fields: [createdById], references: [id])
+  company               Company                 @relation(fields: [companyId], references: [id])
+  createdBy             User                    @relation("VendorCreatedBy", fields: [createdById], references: [id])
 
   @@index([companyId])
   @@index([name])

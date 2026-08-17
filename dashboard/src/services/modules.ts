@@ -5,6 +5,8 @@ import { API_ENDPOINTS } from './endpoints';
 import {
   drawingResponseSchema,
   drawingsResponseSchema,
+  drawingRevisionResponseSchema,
+  drawingRevisionsResponseSchema,
   exportOrdersResponseSchema,
   nextDrawingNumberResponseSchema,
   uploadedFileResponseSchema,
@@ -267,6 +269,53 @@ export const exportOrdersApi = {
   }) => apiClient.post(API_ENDPOINTS.exportOrders.createDrawing, data)
     .then((res) => drawingResponseSchema.parse(res.data)),
 
+  // Create a new revision for an existing drawing (R1, R2, R3, ...)
+  createDrawingRevision: (data: {
+    drawingId: string;
+    revisionNo?: number;
+    fileUrl: string;
+    fileName: string;
+    fileSize?: number | null;
+    mimeType?: string | null;
+    changes?: string | null;
+  }) =>
+    apiClient
+      .post(
+        API_ENDPOINTS.exportOrders.createDrawingRevision(data.drawingId),
+        {
+          fileUrl: data.fileUrl,
+          fileName: data.fileName,
+          fileSize: data.fileSize,
+          mimeType: data.mimeType,
+          changes: data.changes,
+        },
+      )
+      .then((res) => drawingResponseSchema.parse(res.data)),
+
+  // Get complete revision history for a drawing
+  listDrawingRevisions: (drawingId: string) =>
+    apiClient
+      .get(
+        API_ENDPOINTS.exportOrders.listDrawingRevisions(drawingId),
+      )
+      .then((res) => drawingRevisionsResponseSchema.parse(res.data)),
+
+  // Update the status of a specific revision
+  updateDrawingRevisionStatus: (
+    revisionId: string,
+    status: "SUBMITTED" | "APPROVED" | "REJECTED",
+    rejectionReason?: string | null,
+  ) =>
+    apiClient
+      .put(
+        API_ENDPOINTS.exportOrders.updateDrawingRevisionStatus(revisionId),
+        {
+          status,
+          rejectionReason,
+        },
+      )
+      .then((res) => drawingRevisionResponseSchema.parse(res.data)),
+
   // Upload the drawing binary before creating its engineering-drawing record.
   uploadDrawingFile: (file: File) => {
     const formData = new FormData();
@@ -291,3 +340,5 @@ export const exportOrdersApi = {
   }) => apiClient.post(API_ENDPOINTS.exportOrders.sendDrawing, data)
     .then((res) => res.data),
 };
+
+

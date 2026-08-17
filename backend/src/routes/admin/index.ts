@@ -86,7 +86,6 @@ async function adminRoutes(
         if (url.includes("/create")) requiredPermissions = ["company.create"];
         else if (url.includes("/update")) requiredPermissions = ["company.update"];
         else if (url.includes("/delete")) requiredPermissions = ["company.delete"];
-        else if (url.includes("/read")) requiredPermissions = ["company.view"];
       } else if (url.includes("/branch/")) {
         if (url.includes("/create")) requiredPermissions = ["branch.create"];
         else if (url.includes("/update")) requiredPermissions = ["branch.update"];

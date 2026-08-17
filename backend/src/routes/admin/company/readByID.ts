@@ -21,7 +21,6 @@ async function readCompanyByIdRoute(
       },
       preHandler: [
         fastify.verifyToken,
-        fastify.authorizePermissions(["company.view"]),
       ],
     },
     async (

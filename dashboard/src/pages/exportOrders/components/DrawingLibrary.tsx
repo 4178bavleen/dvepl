@@ -18,6 +18,9 @@ import {
   MessageSquare,
   Send,
   MoreVertical,
+  History,
+  Eye,
+  Upload,
 } from "lucide-react";
 import { exportOrdersApi } from "@/services/modules";
 import toast from "react-hot-toast";
@@ -29,6 +32,31 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+
+interface DrawingRevisionView {
+  id: string;
+  revisionNo: number;
+  fileUrl: string;
+  fileName: string;
+  fileSize?: number | null;
+  mimeType?: string | null;
+  status?: string;
+  changes?: string | null;
+  rejectionReason?: string | null;
+  submittedAt?: string | null;
+  approvedAt?: string | null;
+  rejectedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  createdBy?: { id: string; name?: string | null };
+  approvedBy?: { id: string; name?: string | null } | null;
+  rejectedBy?: { id: string; name?: string | null } | null;
+}
+
+type RevisionAwareDrawing = EngineeringDrawing & {
+  revisions?: DrawingRevisionView[];
+  currentRevision?: DrawingRevisionView | null;
+};
 
 interface Props {
   drawings: EngineeringDrawing[];
@@ -184,6 +212,15 @@ export default function DrawingLibrary({
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [openActionsMenu, setOpenActionsMenu] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [revisionHistoryDrawing, setRevisionHistoryDrawing] =
+    useState<RevisionAwareDrawing | null>(null);
+
+  // Revision upload states
+  const [revisionUploadDrawing, setRevisionUploadDrawing] =
+    useState<EngineeringDrawing | null>(null);
+  const [revisionFile, setRevisionFile] = useState<File | null>(null);
+  const [revisionChanges, setRevisionChanges] = useState("");
+  const [isUploadingRevision, setIsUploadingRevision] = useState(false);
 
   // Send drawing states
   const [sendModalDrawing, setSendModalDrawing] = useState<EngineeringDrawing | null>(null);
@@ -200,6 +237,105 @@ export default function DrawingLibrary({
   const [isRejecting, setIsRejecting] = useState(false);
 
   const { canWorkOnOrder } = useSalesOrderAccess();
+
+  const getRevisionAwareDrawing = (
+    drawing: EngineeringDrawing,
+  ): RevisionAwareDrawing => drawing as RevisionAwareDrawing;
+
+  const getCurrentRevision = (drawing: EngineeringDrawing) => {
+    const revisionAware = getRevisionAwareDrawing(drawing);
+    return (
+      revisionAware.currentRevision ??
+      revisionAware.revisions?.[0] ??
+      null
+    );
+  };
+
+  const getRevisionFileUrl = (drawing: EngineeringDrawing): string => {
+    const revision = getCurrentRevision(drawing);
+    return revision?.fileUrl || drawing.fileUrl;
+  };
+
+  const handleOpenRevisionModal = (
+    e: React.MouseEvent,
+    drawing: EngineeringDrawing,
+  ) => {
+    e.stopPropagation();
+
+    if (drawing.status !== "REJECTED") {
+      toast.error("Only rejected drawings can receive a new revision.");
+      return;
+    }
+
+    if (!canWorkOnOrder(orderForDrawing(drawing))) {
+      toast.error(
+        "View-only: you can only upload revisions for orders assigned to you.",
+      );
+      return;
+    }
+
+    setOpenActionsMenu(null);
+    setRevisionUploadDrawing(drawing);
+    setRevisionFile(null);
+    setRevisionChanges("");
+  };
+
+  const handleRevisionSubmit = async () => {
+    if (!revisionUploadDrawing || !revisionFile) {
+      toast.error("Please select the revised drawing file.");
+      return;
+    }
+
+    if (!canWorkOnOrder(orderForDrawing(revisionUploadDrawing))) {
+      toast.error(
+        "View-only: you can only upload revisions for orders assigned to you.",
+      );
+      return;
+    }
+
+    setIsUploadingRevision(true);
+
+    try {
+      const uploadRes = await exportOrdersApi.uploadDrawingFile(revisionFile);
+      const fileUrl = uploadRes.data.fileUrl;
+
+      if (!fileUrl) {
+        throw new Error("Upload did not return a file URL.");
+      }
+
+      const result = await exportOrdersApi.createDrawingRevision({
+        drawingId: revisionUploadDrawing.id,
+        fileUrl,
+        fileName: revisionFile.name,
+        fileSize: revisionFile.size,
+        mimeType: revisionFile.type || null,
+        changes: revisionChanges.trim() || null,
+      });
+
+      const revisionNo =
+        result?.data?.revisionNo ??
+        result?.data?.currentRevision?.revisionNo;
+
+      toast.success(
+        revisionNo !== undefined
+          ? `Revision R${revisionNo} uploaded successfully.`
+          : "Drawing revision uploaded successfully.",
+      );
+
+      setRevisionUploadDrawing(null);
+      setRevisionFile(null);
+      setRevisionChanges("");
+      onStatusChanged?.();
+    } catch (err: any) {
+      toast.error(
+        err?.response?.data?.message ??
+          err?.message ??
+          "Failed to upload drawing revision.",
+      );
+    } finally {
+      setIsUploadingRevision(false);
+    }
+  };
 
   const orderForDrawing = (drawing: EngineeringDrawing) => {
     const salesOrderId = drawing.project?.salesOrderId;
@@ -427,7 +563,8 @@ export default function DrawingLibrary({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 p-6">
           {drawings.map((d) => {
             const isSelected = selectedDrawingIds.includes(d.id);
-            const fileUrl = buildFileUrl(d.fileUrl);
+            const currentRevision = getCurrentRevision(d);
+            const fileUrl = buildFileUrl(currentRevision?.fileUrl || d.fileUrl);
             const isUpdating = updatingId === d.id;
             const statusCfg = STATUS_CONFIG[d.status as DrawingStatus] ?? STATUS_CONFIG.PENDING;
             const canWork = canWorkOnOrder(orderForDrawing(d));
@@ -482,7 +619,14 @@ export default function DrawingLibrary({
                           {TYPE_LABELS[d.drawingType] ?? d.drawingType}
                         </span>
                       </div>
-                      <p className="text-xs text-muted-foreground truncate leading-snug mt-1">{d.title}</p>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <p className="text-xs text-muted-foreground truncate leading-snug">{d.title}</p>
+                        {currentRevision && (
+                          <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-primary/5 text-primary border border-primary/10 flex-shrink-0">
+                            R{currentRevision.revisionNo}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Actions Menu (Three dots) */}
@@ -510,12 +654,35 @@ export default function DrawingLibrary({
                         />
                         <PopoverContent align="end" className="w-44 p-1 overflow-hidden z-50 bg-background border rounded-xl shadow-xl">
                           <button
-                            onClick={(e) => openFile(e, d.fileUrl)}
+                            onClick={(e) => openFile(e, getRevisionFileUrl(d))}
                             className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-muted text-foreground transition-colors text-left"
                           >
                             <ExternalLink className="w-3.5 h-3.5 text-muted-foreground" />
                             Open File
                           </button>
+                          {getRevisionAwareDrawing(d).revisions &&
+                            getRevisionAwareDrawing(d).revisions!.length > 0 && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setRevisionHistoryDrawing(getRevisionAwareDrawing(d));
+                                setOpenActionsMenu(null);
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-muted text-foreground transition-colors text-left"
+                            >
+                              <History className="w-3.5 h-3.5 text-muted-foreground" />
+                              Revision History
+                            </button>
+                          )}
+                          {d.status === "REJECTED" && canWork && (
+                            <button
+                              onClick={(e) => handleOpenRevisionModal(e, d)}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-blue-50 text-blue-700 transition-colors font-semibold text-left"
+                            >
+                              <Upload className="w-3.5 h-3.5 text-blue-600" />
+                              Upload Revision
+                            </button>
+                          )}
                           {canWork && canEdit && (
                             <button
                               onClick={(e) => handleOpenSendModal(e, d)}
@@ -537,6 +704,13 @@ export default function DrawingLibrary({
 
                   {d.project?.name && (
                     <p className="text-[10px] text-muted-foreground/50 truncate -mt-0.5">{d.project.name}</p>
+                  )}
+
+                  {currentRevision && (
+                    <div className="flex items-center justify-between gap-2 text-[10px] text-muted-foreground bg-muted/30 rounded-md px-2 py-1.5">
+                      <span className="font-semibold">Revision R{currentRevision.revisionNo}</span>
+                      <span className="truncate">{currentRevision.fileName}</span>
+                    </div>
                   )}
 
                   {d.status === "REJECTED" && d.rejectionReason && (
@@ -636,6 +810,7 @@ export default function DrawingLibrary({
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Drawing</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Type</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Revision</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Order</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Status</th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">Actions</th>
@@ -647,6 +822,7 @@ export default function DrawingLibrary({
                 const isUpdating = updatingId === d.id;
                 const rowBg = STATUS_CONFIG[d.status as DrawingStatus]?.row ?? "";
                 const canWork = canWorkOnOrder(orderForDrawing(d));
+                const currentRevision = getCurrentRevision(d);
                 const statusCfg = STATUS_CONFIG[d.status as DrawingStatus] ?? STATUS_CONFIG.PENDING;
 
                 return (
@@ -670,6 +846,20 @@ export default function DrawingLibrary({
                       <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground font-medium">
                         {TYPE_LABELS[d.drawingType] ?? d.drawingType}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {currentRevision ? (
+                        <div className="flex flex-col items-start gap-0.5">
+                          <span className="text-[11px] font-semibold text-primary">
+                            R{currentRevision.revisionNo}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground max-w-[140px] truncate">
+                            {currentRevision.fileName}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">R0</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">{d.project?.name ?? "—"}</td>
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
@@ -754,12 +944,34 @@ export default function DrawingLibrary({
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
                         <button
-                          onClick={(e) => openFile(e, d.fileUrl)}
-                          title="Open file"
+                          onClick={(e) => openFile(e, getRevisionFileUrl(d))}
+                          title="Open current revision"
                           className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                         >
                           <ExternalLink className="w-3.5 h-3.5" />
                         </button>
+                        {getRevisionAwareDrawing(d).revisions &&
+                          getRevisionAwareDrawing(d).revisions!.length > 0 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRevisionHistoryDrawing(getRevisionAwareDrawing(d));
+                            }}
+                            title="Revision history"
+                            className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            <History className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {d.status === "REJECTED" && canWork && (
+                          <button
+                            onClick={(e) => handleOpenRevisionModal(e, d)}
+                            title="Upload Revision"
+                            className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 hover:text-blue-700 transition-colors"
+                          >
+                            <Upload className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         {canWork && (
                           <button
                             onClick={(e) => handleOpenSendModal(e, d)}
@@ -776,6 +988,122 @@ export default function DrawingLibrary({
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* ── Upload Revision Modal ─────────────────────────────── */}
+      {revisionUploadDrawing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-background rounded-2xl border max-w-lg w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="border-b px-6 py-4 flex items-center justify-between bg-muted/20">
+              <div>
+                <h3 className="font-bold text-lg text-foreground">
+                  Upload Drawing Revision
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {revisionUploadDrawing.drawingNo} ·{" "}
+                  {revisionUploadDrawing.title}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isUploadingRevision) {
+                    setRevisionUploadDrawing(null);
+                    setRevisionFile(null);
+                    setRevisionChanges("");
+                  }
+                }}
+                disabled={isUploadingRevision}
+                className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2">
+                <p className="text-[10px] font-bold text-red-600 uppercase tracking-wider">
+                  Previous Drawing Rejected
+                </p>
+                <p className="text-xs text-red-700 mt-1">
+                  {revisionUploadDrawing.rejectionReason ||
+                    "Revision required."}
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Revised Drawing File *
+                </label>
+                <input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  onChange={(e) => setRevisionFile(e.target.files?.[0] ?? null)}
+                  disabled={isUploadingRevision}
+                  className="block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-primary file:px-3 file:py-2 file:text-xs file:font-semibold file:text-primary-foreground hover:file:opacity-90 disabled:opacity-50"
+                />
+                {revisionFile && (
+                  <p className="text-[10px] text-muted-foreground">
+                    Selected: {revisionFile.name} (
+                    {(revisionFile.size / 1024).toFixed(1)} KB)
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Changes in This Revision
+                </label>
+                <textarea
+                  value={revisionChanges}
+                  onChange={(e) => setRevisionChanges(e.target.value)}
+                  placeholder="Describe what was changed in this revision..."
+                  rows={4}
+                  disabled={isUploadingRevision}
+                  className="w-full p-3.5 text-sm rounded-xl border border-input bg-background focus:ring-2 focus:ring-primary/20 outline-none font-medium resize-none disabled:opacity-50"
+                />
+              </div>
+
+              <p className="text-[10px] text-muted-foreground font-semibold">
+                This will create the next revision automatically (for example,
+                R0 → R1). The previous revision remains unchanged in history.
+              </p>
+            </div>
+
+            <div className="border-t px-6 py-4 flex items-center justify-end gap-3 bg-muted/10">
+              <button
+                type="button"
+                onClick={() => {
+                  setRevisionUploadDrawing(null);
+                  setRevisionFile(null);
+                  setRevisionChanges("");
+                }}
+                disabled={isUploadingRevision}
+                className="px-4.5 py-2.5 rounded-xl border text-sm font-bold hover:bg-muted transition disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!revisionFile || isUploadingRevision}
+                onClick={handleRevisionSubmit}
+                className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-bold shadow-sm hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50"
+              >
+                {isUploadingRevision ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    Upload Revision
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -926,6 +1254,170 @@ export default function DrawingLibrary({
                     Send Drawing
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Revision History Modal ─────────────────────────────── */}
+      {revisionHistoryDrawing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-background rounded-2xl border max-w-2xl w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="border-b px-6 py-4 flex items-center justify-between bg-muted/20">
+              <div>
+                <h3 className="font-bold text-lg text-foreground">Revision History</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {revisionHistoryDrawing.drawingNo} · {revisionHistoryDrawing.title}
+                </p>
+              </div>
+              <button
+                onClick={() => setRevisionHistoryDrawing(null)}
+                className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 max-h-[65vh] overflow-y-auto space-y-3">
+              {(() => {
+                const revisions = [...(revisionHistoryDrawing.revisions ?? [])].sort(
+                  (a, b) => b.revisionNo - a.revisionNo,
+                );
+
+                if (revisions.length === 0) {
+                  return (
+                    <div className="py-10 text-center text-sm text-muted-foreground">
+                      No revision history available.
+                    </div>
+                  );
+                }
+
+                return revisions.map((revision, index) => {
+                  const revisionStatus = revision.status ?? "DRAFT";
+                  const revisionCfg =
+                    STATUS_CONFIG[revisionStatus as DrawingStatus] ??
+                    STATUS_CONFIG.DRAFT;
+                  const isCurrent =
+                    revision.revisionNo ===
+                    (getCurrentRevision(revisionHistoryDrawing)?.revisionNo ??
+                      revisions[0]?.revisionNo);
+
+                  return (
+                    <div
+                      key={revision.id}
+                      className={`rounded-xl border p-4 ${
+                        isCurrent
+                          ? "border-primary/30 bg-primary/5"
+                          : "border-border bg-background"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-sm">
+                              R{revision.revisionNo}
+                            </span>
+                            {isCurrent && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                                CURRENT
+                              </span>
+                            )}
+                            <StatusPill status={revisionStatus} />
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1 truncate">
+                            {revision.fileName}
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const url = buildFileUrl(revision.fileUrl);
+                            if (url) {
+                              window.open(url, "_blank", "noopener,noreferrer");
+                            } else {
+                              toast.error("This revision does not have an attached file.");
+                            }
+                          }}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold hover:bg-muted transition-colors flex-shrink-0"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          View
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 text-[10px]">
+                        <div>
+                          <p className="text-muted-foreground">Created By</p>
+                          <p className="font-semibold mt-0.5">
+                            {revision.createdBy?.name ?? "—"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Created</p>
+                          <p className="font-semibold mt-0.5">
+                            {revision.createdAt
+                              ? new Date(revision.createdAt).toLocaleString()
+                              : "—"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Approved</p>
+                          <p className="font-semibold mt-0.5">
+                            {revision.approvedAt
+                              ? new Date(revision.approvedAt).toLocaleString()
+                              : "—"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Rejected</p>
+                          <p className="font-semibold mt-0.5">
+                            {revision.rejectedAt
+                              ? new Date(revision.rejectedAt).toLocaleString()
+                              : "—"}
+                          </p>
+                        </div>
+                      </div>
+
+                      {revision.changes && (
+                        <div className="mt-3 rounded-lg bg-muted/40 px-3 py-2">
+                          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                            Changes
+                          </p>
+                          <p className="text-xs mt-1 whitespace-pre-wrap">
+                            {revision.changes}
+                          </p>
+                        </div>
+                      )}
+
+                      {revision.rejectionReason && (
+                        <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                          <p className="text-[10px] font-bold text-red-600 uppercase tracking-wider">
+                            Rejection Reason
+                          </p>
+                          <p className="text-xs text-red-700 mt-1 whitespace-pre-wrap">
+                            {revision.rejectionReason}
+                          </p>
+                        </div>
+                      )}
+
+                      {index < revisions.length - 1 && (
+                        <div className="hidden" aria-hidden="true" />
+                      )}
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+
+            <div className="border-t px-6 py-4 flex items-center justify-end bg-muted/10">
+              <button
+                type="button"
+                onClick={() => setRevisionHistoryDrawing(null)}
+                className="px-4 py-2 rounded-xl border text-sm font-bold hover:bg-muted transition"
+              >
+                Close
               </button>
             </div>
           </div>

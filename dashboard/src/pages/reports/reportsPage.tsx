@@ -21,6 +21,8 @@ import { apiClient } from "@/services/axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useERPStore } from "@/store/erpStore";
+import { canPerformPageAction } from "@/utils/pagePermissions";
 
 // Types
 interface ReportTab {
@@ -40,6 +42,9 @@ const reportTabs: ReportTab[] = [
 ];
 
 export default function ReportsPage() {
+  const store = useERPStore();
+  const currentUser = store.users?.find((u: any) => u.id === store.currentUserId) as any;
+  const canExport = canPerformPageAction(currentUser?.actionPermissions, "reports", "export");
   const [userRole, setUserRole] = useState<string>("admin");
   const [currentReport, setCurrentReport] = useState<string>("customer");
   const [isLoading, setIsLoading] = useState(true);
@@ -327,16 +332,18 @@ export default function ReportsPage() {
               )}
               Run Report
             </Button>
-            <Button
-              onClick={handleExportPDF}
-              variant="outline"
-              disabled={!reportRan || reportData.length === 0}
-              size="sm"
-              className="h-9 text-xs font-semibold gap-1.5 border-teal-200 text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-950/20"
-            >
-              <FileText className="size-3.5" />
-              Export PDF
-            </Button>
+            {canExport && (
+              <Button
+                onClick={handleExportPDF}
+                variant="outline"
+                disabled={!reportRan || reportData.length === 0}
+                size="sm"
+                className="h-9 text-xs font-semibold gap-1.5 border-teal-200 text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-950/20"
+              >
+                <FileText className="size-3.5" />
+                Export PDF
+              </Button>
+            )}
           </div>
         </div>
       </div>
