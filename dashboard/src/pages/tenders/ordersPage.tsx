@@ -1692,7 +1692,7 @@ export function OrdersPage() {
                           viewingTender.tenderID
                         }
                       />
-
+                      
                       <DetailItem
                         label="Reference Code"
                         value={
