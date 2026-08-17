@@ -91,10 +91,12 @@ export class NotificationService {
       subject: string;
       message: string;
       eventCode?: string;
+      relatedModule?: string;
+      relatedRecordId?: string;
     },
     companyId?: string,
   ) {
-    const { to, subject, message, eventCode } = options;
+    const { to, subject, message, eventCode, relatedModule, relatedRecordId } = options;
 
     const html = `
       <!DOCTYPE html>
@@ -127,7 +129,7 @@ export class NotificationService {
       to,
       subject,
       html,
-    }, companyId, eventCode);
+    }, companyId, eventCode, relatedModule, relatedRecordId);
   }
 }
 

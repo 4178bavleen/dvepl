@@ -50,7 +50,13 @@ export class EmailService {
     });
   }
 
-  static async send(options: SendEmailOptions, companyId?: string, eventCode?: string) {
+  static async send(
+    options: SendEmailOptions,
+    companyId?: string,
+    eventCode?: string,
+    relatedModule?: string,
+    relatedRecordId?: string
+  ) {
     const config = await this.getConfiguration(companyId);
 
     const transporter = await this.createTransporter(companyId);
@@ -81,6 +87,8 @@ export class EmailService {
             message: options.html.replace(/<[^>]*>/g, '').trim(),
             status: status,
             error: errorMsg,
+            relatedModule: relatedModule || null,
+            relatedRecordId: relatedRecordId || null,
           }
         });
       } catch (dbError) {
