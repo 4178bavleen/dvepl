@@ -642,7 +642,6 @@ export function SettingsPage() {
     { key: "branches", label: "🌿 Branches" },
     { key: "departments", label: "🌿 Departments" },
     { key: "teams", label: "👥 Teams" },
-    { key: "designations", label: "🎖️ Designations" },
     { key: "cost_centers", label: "💼 Cost Centers" },
 
     // HRMS
@@ -650,57 +649,40 @@ export function SettingsPage() {
     { key: "attendance", label: "⏰ Attendance" },
     { key: "leaves", label: "📅 Leaves" },
     { key: "holidays", label: "📅 Holidays" },
-    { key: "shift_management", label: "⏰ Shift Management" },
-    { key: "payroll", label: "💸 Payroll" },
-    { key: "documents", label: "📄 Documents" },
     { key: "tasks", label: "✅ Tasks" },
+    { key: "roles", label: "🛡️ Roles" },
 
     // CRM
     { key: "customers", label: "🤝 Customers" },
     { key: "contacts", label: "📇 Contact Persons" },
-    { key: "communication", label: "💬 Communication History" },
     { key: "orders", label: "🛒 Orders" },
     { key: "delivery", label: "🚚 Delivery" },
     { key: "vendors", label: "🚚 Vendors" },
     { key: "inventory", label: "📦 Inventory" },
-    { key: "export_orders", label: "📤 Export Orders" },
+    { key: "export_orders", label: "📤 Engineering Drawing" },
 
     // Finance
     { key: "finance", label: "💵 Finance / Accounts" },
+
+    // Sales
+    { key: "workflow_tracker", label: "🔄 Workflow Tracker" },
 
     // Lead Management & Tenders
     { key: "tender_requests", label: "📂 Tender Requests" },
     { key: "tenders", label: "🗂️ Tenders" },
     { key: "technical_clarifications", label: "❓ Technical Clarifications" },
-    { key: "quotations", label: "📄 Quotations" },
-    { key: "boqs", label: "📋 BOQs" },
     { key: "government_departments", label: "🏢 Government Departments" },
     { key: "sections", label: "🌿 Sections" },
     { key: "divisions", label: "🌿 Divisions" },
     { key: "sub_divisions", label: "👥 Sub Divisions" },
     { key: "reference_codes", label: "📄 Reference Codes" },
 
-    // Engineering, Materials & Production
-    { key: "engineering_projects", label: "🛠️ Engineering Projects" },
-    { key: "engineering_drawings", label: "📐 Engineering Drawings" },
-    { key: "boms", label: "📦 BOMs" },
-    { key: "materials", label: "🧱 Materials" },
-    { key: "material_categories", label: "🏷️ Material Categories" },
-    { key: "purchase_requests", label: "🛒 Purchase Requests" },
-    { key: "production_plans", label: "🏭 Production Plans" },
-    { key: "work_orders", label: "⚙️ Work Orders" },
-    { key: "inspections", label: "🔍 Inspections / QC" },
-
-    // Security (PRBAC)
+    // Security
     { key: "users", label: "👤 Users" },
-    { key: "roles", label: "🛡️ Roles" },
-    { key: "approval_requests", label: "✅ Approval Requests" },
 
     // Other / Reports / Settings
     { key: "reports", label: "📊 Reports" },
     { key: "audit_logs", label: "📜 Audit Logs" },
-    { key: "workflow_tracker", label: "🔄 Workflow Tracker" },
-    { key: "notifications", label: "🔔 Notifications" },
     { key: "custom_fields", label: "⚙️ Custom Fields" },
     { key: "recycle_bin", label: "🗑️ Recycle Bin" },
     { key: "settings", label: "⚙️ Settings" },
@@ -717,17 +699,31 @@ export function SettingsPage() {
   const fieldsAccessList = [
     // Organization
     { key: "company_name", label: "Company Name", tag: "companies" },
-    { key: "company_code", label: "Company Code", tag: "companies" },
-    { key: "company_tax_id", label: "Company Tax ID (GST/PAN)", tag: "companies" },
-    { key: "registration_number", label: "Company Registration No", tag: "companies" },
+    { key: "company_gst", label: "GSTIN", tag: "companies" },
+    { key: "company_pan", label: "PAN", tag: "companies" },
+    { key: "company_email", label: "Email Address", tag: "companies" },
+    { key: "company_phone", label: "Phone Number", tag: "companies" },
+    { key: "company_address", label: "Registered Address", tag: "companies" },
+    { key: "company_is_active", label: "Active Status", tag: "companies" },
     { key: "branch_name", label: "Branch Name", tag: "branches" },
     { key: "branch_code", label: "Branch Code", tag: "branches" },
+    { key: "branch_company", label: "Company", tag: "branches" },
+    { key: "branch_address", label: "Branch Address", tag: "branches" },
+    { key: "branch_city", label: "City", tag: "branches" },
+    { key: "branch_state", label: "State", tag: "branches" },
+    { key: "branch_pincode", label: "Pincode", tag: "branches" },
+    { key: "branch_is_active", label: "Active Status", tag: "branches" },
     { key: "department_name", label: "Department Name", tag: "departments" },
     { key: "department_code", label: "Department Code", tag: "departments" },
+    { key: "department_branch", label: "Branch", tag: "departments" },
+    { key: "department_is_active", label: "Active Status", tag: "departments" },
     { key: "team_name", label: "Team Name", tag: "teams" },
-    { key: "designation_title", label: "Designation Title", tag: "designations" },
-    { key: "budget_limit", label: "Cost Center Budget Limit", tag: "cost_centers" },
-    { key: "allocated_amount", label: "Cost Center Allocated Amt", tag: "cost_centers" },
+    { key: "team_department", label: "Department", tag: "teams" },
+    { key: "team_is_active", label: "Active Status", tag: "teams" },
+    { key: "cost_center_code", label: "Cost Center Code", tag: "cost_centers" },
+    { key: "cost_center_name", label: "Cost Center Name", tag: "cost_centers" },
+    { key: "cost_center_budget", label: "Budget Allocation", tag: "cost_centers" },
+    { key: "cost_center_department", label: "Department", tag: "cost_centers" },
 
     // Finance / Banking
     { key: "payment_date", label: "Payment Date", tag: "finance" },
@@ -4068,7 +4064,7 @@ export function SettingsPage() {
                       </span>
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Manage role-based access, resource actions, scopes and field-level permissions.
+                      Manage role-based access, resource actions and field-level permissions.
                     </p>
                   </div>
                 </div>
@@ -4277,7 +4273,7 @@ export function SettingsPage() {
                           Permission model
                         </div>
                         <div className="mt-1 text-[11px] font-semibold text-foreground">
-                          Resource → Action → Scope → Field
+                          Resource → Action → Field
                         </div>
                       </div>
                     </div>
@@ -4528,40 +4524,6 @@ export function SettingsPage() {
                       })}
                     </div>
 
-                    {/* Scope */}
-                    <div className="mt-6 rounded-xl border border-border bg-muted/20 p-4">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-primary">
-                        Data scope
-                      </div>
-                      <div className="mt-1 text-xs font-bold text-foreground">
-                        Record visibility scope
-                      </div>
-                      <p className="mt-1 text-[10px] text-muted-foreground">
-                        Choose which records are visible to this role. Choose which records this role can access.
-                      </p>
-                      <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2">
-                        {[
-                          ["all", "All records"],
-                          ["own", "Own records"],
-                          ["team", "Team records"],
-                          ["department", "Department records"],
-                        ].map(([value, label], index) => (
-                          <label
-                            key={value}
-                            className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2.5 text-[10px] font-semibold text-foreground"
-                          >
-                            <input
-                              type="radio"
-                              name={`scope-${selectedActionModule}`}
-                              defaultChecked={index === 1}
-                              className="accent-primary"
-                              disabled
-                            />
-                            {label}
-                          </label>
-                        ))}
-                      </div>
-                    </div>
                   </section>
 
                   {/* Field-level permissions */}

@@ -61,8 +61,9 @@ export const useExportOrdersStore = create<ExportOrdersStore>((set) => ({
       const response = await exportOrdersApi.listDrawings(orderIds);
       set({ drawings: response.data });
     } catch (error) {
+      console.error("Failed to fetch drawings:", error);
       set({ error: error instanceof Error ? error.message : "Failed to load drawings." });
-      throw error;
+      // Do not throw — keep whatever drawings we already have in state
     } finally {
       set({ isDrawingsLoading: false });
     }

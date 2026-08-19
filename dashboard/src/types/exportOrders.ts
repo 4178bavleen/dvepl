@@ -131,8 +131,8 @@ export const engineeringDrawingSchema = z.object({
   project: z.object({
     id: z.string(),
     name: stringValue,
-    salesOrderId: z.string(),
-  }).nullable().optional(),
+    salesOrderId: z.string().nullable().optional(),
+  }).nullable().optional().catch(null),
 
   revisions: z.array(drawingRevisionSchema).catch([]),
 
@@ -151,7 +151,7 @@ export const exportOrdersResponseSchema = z.object({
 
 export const drawingsResponseSchema = z.object({
   success: z.literal(true),
-  data: z.array(engineeringDrawingSchema),
+  data: z.array(engineeringDrawingSchema.catch(null as any)).transform(arr => arr.filter(Boolean)),
   message: z.string().optional(),
 });
 

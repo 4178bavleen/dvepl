@@ -3,13 +3,13 @@ import {
   FastifyReply,
   FastifyRequest,
 } from "fastify";
-import { WorkflowStage } from "@prisma/client";
-import NotificationService from "../../../../services/notification/notification.service";
 import { getActiveWorkflowTemplate } from "../template";
 import {
   canWorkOnOrderStage,
+  fetchOrderWithAssignments,
   isAdminUser,
 } from "../../../../utils/orderAccess";
+import NotificationService from "../../../../services/notification/notification.service";
 
 interface Params {
   orderId: string;
@@ -62,10 +62,23 @@ export default async function updateOrderWorkflowStageRoute(
       // 2. Find order
       // -----------------------------------------
 
+      // Fetch assignments via the shared helper (handles the stage field correctly
+      // even when the Prisma generated client is stale).
+      const orderWithAssignments = await fetchOrderWithAssignments(
+        fastify.prisma as any,
+        orderId,
+      );
+
+      if (!orderWithAssignments) {
+        return reply.code(404).send({
+          success: false,
+          message: "Sales order not found",
+        });
+      }
+
+      // Fetch the scalar fields we need (workflowStage, nextAction, dueDate, dveplCode, companyId).
       const order = await fastify.prisma.salesOrder.findUnique({
-        where: {
-          id: orderId,
-        },
+        where: { id: orderId },
         select: {
           id: true,
           workflowStage: true,
@@ -73,21 +86,8 @@ export default async function updateOrderWorkflowStageRoute(
           dueDate: true,
           dveplCode: true,
           companyId: true,
-          assignments: {
-            select: {
-              userId: true,
-              stage: true,
-            },
-          },
         },
       });
-
-      if (!order) {
-        return reply.code(404).send({
-          success: false,
-          message: "Sales order not found",
-        });
-      }
 
       // -----------------------------------------
       // 3. Stage-based access control
@@ -96,7 +96,12 @@ export default async function updateOrderWorkflowStageRoute(
       const userId = (request.admin as any)?.id ?? (request.user as any)?.id ?? null;
       const admin = request.admin ?? request.user;
 
-      if (!canWorkOnOrderStage(order.assignments, order.workflowStage, userId, isAdminUser(admin))) {
+      if (!canWorkOnOrderStage(
+        orderWithAssignments.assignments,
+        orderWithAssignments.workflowStage,
+        userId,
+        isAdminUser(admin),
+      )) {
         return reply.code(403).send({
           success: false,
           message:
@@ -108,7 +113,7 @@ export default async function updateOrderWorkflowStageRoute(
       // 4. Prevent unnecessary update
       // -----------------------------------------
 
-      if (order.workflowStage === stage && nextAction === undefined && dueDate === undefined) {
+      if (order?.workflowStage === stage && nextAction === undefined && dueDate === undefined) {
         return reply.code(400).send({
           success: false,
           message: `Order is already in ${activeStep.name}`,
@@ -137,7 +142,7 @@ export default async function updateOrderWorkflowStageRoute(
         const workflowEvent = await tx.workflowEvent.create({
           data: {
             salesOrderId: orderId,
-            stage,
+            stage: stage,
             title: activeStep.name,
             description: description ?? null,
             performedById: userId,
@@ -173,6 +178,10 @@ export default async function updateOrderWorkflowStageRoute(
             : "—";
 
           const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+
+          if (!order) {
+            throw new Error("Sales order not found for notification");
+          }
 
           for (const assignment of assignments) {
             const user = assignment.user;
