@@ -5,9 +5,9 @@ import { seedOrganization } from "./organization";
 import { seedAuth } from "./auth";
 import { seedPermissions } from "./auth/permission.seed";
 import { seedHrms } from "./hrms";
-import { seedCrm } from "./crm";
+// import { seedCrm } from "./crm";
 import { seedTender } from "./tender";
-import { seedSalesOrders } from "./salesOrders";
+// import { seedSalesOrders } from "./salesOrders";
 
 async function main() {
   console.log("Starting Database Seed");
@@ -22,15 +22,15 @@ async function main() {
     companyId: organization.company.id,
   });
 
-  await seedCrm(prisma, {
-    companyId: organization.company.id,
-  });
+  // await seedCrm(prisma, {
+  //   companyId: organization.company.id,
+  // });
 
   await seedTender(prisma, {
     companyId: organization.company.id,
   });
 
-  await seedSalesOrders();
+  // await seedSalesOrders();
 
   console.log("✅ Database Seed Completed");
 }
