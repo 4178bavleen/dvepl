@@ -3,11 +3,16 @@ import {
   AlertTriangle,
   CalendarDays,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Clock3,
   GripVertical,
+  Plus,
   Search,
   Send,
+  Settings2,
   ShoppingCart,
+  Trash2,
 } from "lucide-react";
 import {
   DndContext,
@@ -33,94 +38,58 @@ import {
 } from "@/components/ui/dialog";
 import workflowApi, {
   WorkflowOrder,
-  WorkflowStage,
   WorkflowEvent,
+  WorkflowTemplate,
+  WorkflowTemplateStep,
 } from "@/services/workflowApi";
 import { useERPStore } from "@/store/erpStore";
 import { canPerformPageAction } from "@/utils/pagePermissions";
 
-const STAGE_ORDER: WorkflowStage[] = [
-  "ORDER_CONFIRMED",
-  "PO_READY",
-  "DRAWING_ASSIGNED",
-  "DRAWING_SENT",
-  "REVISION_REQUIRED",
-  "DRAWING_APPROVED",
-  "PO_PLACED",
-  "INVENTORY_FOLLOW_UP",
-  "PRODUCTION_FOLLOW_UP",
-];
-
-const stages: { value: WorkflowStage; label: string }[] = [
-  { value: "ORDER_CONFIRMED", label: "Order Confirmed" },
-  { value: "PO_READY", label: "PO Ready" },
-  { value: "DRAWING_ASSIGNED", label: "Drawing Assigned" },
-  { value: "DRAWING_SENT", label: "Drawing Sent" },
-  { value: "REVISION_REQUIRED", label: "Revision Required" },
-  { value: "DRAWING_APPROVED", label: "Drawing Approved" },
-  { value: "PO_PLACED", label: "PO Placed" },
-  { value: "INVENTORY_FOLLOW_UP", label: "Inventory Follow-up" },
-  { value: "PRODUCTION_FOLLOW_UP", label: "Production Follow-up" },
-];
-
-const pipelineStages = stages;
-
-function stageLabel(stage: WorkflowStage) {
-  return (
-    stages.find((s) => s.value === stage)?.label || stage.replace(/_/g, " ")
-  );
+interface StageDef {
+  value: string;
+  label: string;
+  color: string | null;
+  isFinal: boolean;
 }
 
-const stageStyles: Record<
-  WorkflowStage,
-  { dot: string; text: string; chip: string }
-> = {
-  ORDER_CONFIRMED: {
-    dot: "bg-blue-500",
-    text: "text-blue-500 dark:text-blue-400",
-    chip: "bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400",
-  },
-  PO_READY: {
-    dot: "bg-violet-500",
-    text: "text-violet-500 dark:text-violet-400",
-    chip: "bg-violet-500/10 text-violet-600 border-violet-500/20 dark:text-violet-400",
-  },
-  DRAWING_ASSIGNED: {
-    dot: "bg-purple-500",
-    text: "text-purple-500 dark:text-purple-400",
-    chip: "bg-purple-500/10 text-purple-600 border-purple-500/20 dark:text-purple-400",
-  },
-  DRAWING_SENT: {
-    dot: "bg-indigo-500",
-    text: "text-indigo-500 dark:text-indigo-400",
-    chip: "bg-indigo-500/10 text-indigo-600 border-indigo-500/20 dark:text-indigo-400",
-  },
-  REVISION_REQUIRED: {
-    dot: "bg-orange-500",
-    text: "text-orange-500 dark:text-orange-400",
-    chip: "bg-orange-500/10 text-orange-600 border-orange-500/20 dark:text-orange-400",
-  },
-  DRAWING_APPROVED: {
-    dot: "bg-green-500",
-    text: "text-green-500 dark:text-green-400",
-    chip: "bg-green-500/10 text-green-600 border-green-500/20 dark:text-green-400",
-  },
-  PO_PLACED: {
-    dot: "bg-emerald-500",
-    text: "text-emerald-500 dark:text-emerald-400",
-    chip: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:text-emerald-400",
-  },
-  INVENTORY_FOLLOW_UP: {
-    dot: "bg-amber-500",
-    text: "text-amber-500 dark:text-amber-400",
-    chip: "bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400",
-  },
-  PRODUCTION_FOLLOW_UP: {
-    dot: "bg-cyan-500",
-    text: "text-cyan-500 dark:text-cyan-400",
-    chip: "bg-cyan-500/10 text-cyan-600 border-cyan-500/20 dark:text-cyan-400",
-  },
-};
+const DEFAULT_STAGES: StageDef[] = [
+  { value: "ORDER_CONFIRMED", label: "Order Confirmed", color: "#3b82f6", isFinal: false },
+  { value: "PO_READY", label: "PO Ready", color: "#8b5cf6", isFinal: false },
+  { value: "DRAWING_ASSIGNED", label: "Drawing Assigned", color: "#a855f7", isFinal: false },
+  { value: "DRAWING_SENT", label: "Drawing Sent", color: "#6366f1", isFinal: false },
+  { value: "REVISION_REQUIRED", label: "Revision Required", color: "#f97316", isFinal: false },
+  { value: "DRAWING_APPROVED", label: "Drawing Approved", color: "#22c55e", isFinal: false },
+  { value: "PO_PLACED", label: "PO Placed", color: "#10b981", isFinal: false },
+  { value: "INVENTORY_FOLLOW_UP", label: "Inventory Follow-up", color: "#f59e0b", isFinal: false },
+  { value: "PRODUCTION_FOLLOW_UP", label: "Production Follow-up", color: "#06b6d4", isFinal: true },
+];
+
+const FALLBACK_COLOR = "#64748b";
+
+function stageDefOf(stages: StageDef[], key?: string | null): StageDef | undefined {
+  return stages.find((s) => s.value === key);
+}
+
+function stageLabelOf(stages: StageDef[], key?: string | null) {
+  return stageDefOf(stages, key)?.label ?? (key ? key.replace(/_/g, " ") : "—");
+}
+
+function stageColorOf(stages: StageDef[], key?: string | null) {
+  return stageDefOf(stages, key)?.color ?? FALLBACK_COLOR;
+}
+
+function chipStyle(color?: string | null) {
+  const c = color || FALLBACK_COLOR;
+  return {
+    color: c,
+    backgroundColor: `${c}1a`,
+    borderColor: `${c}33`,
+  };
+}
+
+function dotStyle(color?: string | null) {
+  return { backgroundColor: color || FALLBACK_COLOR };
+}
 
 function formatDate(value?: string | Date | null) {
   if (!value) return "—";
@@ -135,14 +104,24 @@ function overdue(value?: string | Date | null) {
   return !!value && new Date(value).getTime() < Date.now();
 }
 
-function StageChip({ stage }: { stage: WorkflowStage }) {
-  const style = stageStyles[stage];
+function StageChip({
+  stages,
+  stage,
+}: {
+  stages: StageDef[];
+  stage?: string | null;
+}) {
+  const style = chipStyle(stageColorOf(stages, stage));
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium ${style.chip}`}
+      className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium"
+      style={style}
     >
-      <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
-      {stageLabel(stage)}
+      <span
+        className="h-1.5 w-1.5 rounded-full"
+        style={dotStyle(stageColorOf(stages, stage))}
+      />
+      {stageLabelOf(stages, stage)}
     </span>
   );
 }
@@ -169,6 +148,11 @@ export default function WorkflowTrackerPage() {
   const [timeline, setTimeline] = useState<WorkflowEvent[]>([]);
   const [loadingTimeline, setLoadingTimeline] = useState(false);
 
+  const [template, setTemplate] = useState<WorkflowTemplate | null>(null);
+  const [templateLoading, setTemplateLoading] = useState(true);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+
   const [reminderOpen, setReminderOpen] = useState(false);
   const [savingReminder, setSavingReminder] = useState(false);
   const [reminderForm, setReminderForm] = useState({
@@ -182,6 +166,45 @@ export default function WorkflowTrackerPage() {
     useSensor(TouchSensor, {
       activationConstraint: { delay: 250, tolerance: 8 },
     }),
+  );
+
+  const loadTemplate = useCallback(async () => {
+    try {
+      const response = await workflowApi.getTemplate();
+      if (response.data.success) {
+        setTemplate(response.data.data);
+      }
+    } catch (error) {
+      console.error("Failed to load workflow template:", error);
+    } finally {
+      setTemplateLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadTemplate();
+  }, [loadTemplate]);
+
+  const pipelineStages: StageDef[] = useMemo(() => {
+    if (template?.steps?.length) {
+      return template.steps
+        .filter((s) => s.isActive)
+        .sort((a, b) => a.position - b.position)
+        .map((s) => ({
+          value: s.key,
+          label: s.name,
+          color: s.color,
+          isFinal: s.isFinal,
+        }));
+    }
+    return DEFAULT_STAGES;
+  }, [template]);
+
+  const finalStageKey = useMemo(
+    () =>
+      pipelineStages.find((s) => s.isFinal)?.value ??
+      pipelineStages[pipelineStages.length - 1]?.value,
+    [pipelineStages],
   );
 
   const loadTracker = useCallback(async (orderId: string) => {
@@ -242,7 +265,7 @@ export default function WorkflowTrackerPage() {
 
   const handleStageChange = async (
     orderId: string,
-    stage: WorkflowStage,
+    stage: string,
     extra?: {
       nextAction?: string | null;
       dueDate?: string | null;
@@ -263,7 +286,7 @@ export default function WorkflowTrackerPage() {
       toast.success(
         extra
           ? "Workflow details updated successfully."
-          : `Order moved to "${stageLabel(stage)}".`,
+          : `Order moved to "${stageLabelOf(pipelineStages, stage)}".`,
       );
       await loadOrders();
       await loadTracker(orderId);
@@ -286,27 +309,28 @@ export default function WorkflowTrackerPage() {
     if (
       !orderId ||
       !targetStage ||
-      !(STAGE_ORDER as string[]).includes(targetStage)
+      !pipelineStages.some((s) => s.value === targetStage)
     )
       return;
 
     const order = orders.find((item) => item.id === orderId);
-    if (!order || order.workflowStage === (targetStage as WorkflowStage))
-      return;
+    if (!order || order.workflowStage === targetStage) return;
 
-    void handleStageChange(orderId, targetStage as WorkflowStage);
+    void handleStageChange(orderId, targetStage);
   };
 
   const handleMarkAsDone = async () => {
     if (!selectedOrder) return;
-    const currentIndex = STAGE_ORDER.indexOf(selectedOrder.workflowStage);
-    const nextStage = STAGE_ORDER[currentIndex + 1];
+    const currentIndex = pipelineStages.findIndex(
+      (s) => s.value === selectedOrder.workflowStage,
+    );
+    const nextStage = pipelineStages[currentIndex + 1];
     if (!nextStage) {
       toast.success("Order is already in the final stage.");
       return;
     }
-    await handleStageChange(selectedOrder.id, nextStage, {
-      description: `Marked as done — advanced to ${stageLabel(nextStage)}`,
+    await handleStageChange(selectedOrder.id, nextStage.value, {
+      description: `Marked as done — advanced to ${nextStage.label}`,
     });
   };
 
@@ -352,13 +376,13 @@ export default function WorkflowTrackerPage() {
 
   const stats = useMemo(() => {
     const total = orders.length;
-    const completed = orders.filter(
-      (o) => o.workflowStage === "PO_PLACED",
-    ).length;
+    const completed = finalStageKey
+      ? orders.filter((o) => o.workflowStage === finalStageKey).length
+      : 0;
     const inProgress = total - completed;
     const overdueCount = orders.filter((o) => overdue(o.dueDate)).length;
     return { total, inProgress, completed, overdue: overdueCount };
-  }, [orders]);
+  }, [orders, finalStageKey]);
 
   const columns = useMemo(
     () =>
@@ -366,7 +390,7 @@ export default function WorkflowTrackerPage() {
         ...stage,
         orders: orders.filter((o) => o.workflowStage === stage.value),
       })),
-    [orders],
+    [pipelineStages, orders],
   );
 
   const sortedOrders = useMemo(
@@ -389,18 +413,31 @@ export default function WorkflowTrackerPage() {
               Workflow Tracker
             </h1>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Track orders from confirmation to PO placement
+              {template?.name || "Track orders from confirmation to completion"}
             </p>
           </div>
-          <div className="flex h-9 w-full max-w-xs items-center rounded-lg border border-border bg-card px-3">
-            <Search className="mr-2 h-4 w-4 text-muted-foreground" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && void loadOrders()}
-              placeholder="Search order, PO, customer..."
-              className="w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground"
-            />
+          <div className="flex items-center gap-2">
+            <div className="flex h-9 w-full max-w-xs items-center rounded-lg border border-border bg-card px-3">
+              <Search className="mr-2 h-4 w-4 text-muted-foreground" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && void loadOrders()}
+                placeholder="Search order, PO, customer..."
+                className="w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+              />
+            </div>
+            {canEdit && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditorOpen(true)}
+                disabled={templateLoading}
+                className="h-9 gap-1.5 rounded-lg text-xs font-semibold"
+              >
+                <Settings2 className="h-3.5 w-3.5" /> Stages
+              </Button>
+            )}
           </div>
         </header>
 
@@ -424,7 +461,7 @@ export default function WorkflowTrackerPage() {
             icon={<CheckCircle2 className="h-4 w-4" />}
             title="Completed"
             value={stats.completed}
-            note="PO placed"
+            note={finalStageKey ? stageLabelOf(pipelineStages, finalStageKey) : "Done"}
             cls="bg-blue-500/10 text-blue-600 dark:text-blue-400"
           />
           <Summary
@@ -541,11 +578,14 @@ export default function WorkflowTrackerPage() {
                               onChange={(event) =>
                                 void handleStageChange(
                                   order.id,
-                                  event.target.value as WorkflowStage,
+                                  event.target.value,
                                 )
                               }
                               aria-label={`Change stage for ${order.dveplCode}`}
-                              className={`h-7 min-w-[130px] cursor-pointer rounded-md border px-1.5 text-[11px] font-medium ${stageStyles[order.workflowStage].chip} ${updatingOrderId === order.id ? "cursor-wait opacity-60" : ""}`}
+                              style={chipStyle(
+                                stageColorOf(pipelineStages, order.workflowStage),
+                              )}
+                              className={`h-7 min-w-[130px] cursor-pointer rounded-md border px-1.5 text-[11px] font-medium ${updatingOrderId === order.id ? "cursor-wait opacity-60" : ""}`}
                             >
                               {pipelineStages.map((stage) => (
                                 <option
@@ -585,6 +625,7 @@ export default function WorkflowTrackerPage() {
             {selectedOrder ? (
               <OrderDetail
                 order={selectedOrder}
+                stages={pipelineStages}
                 timeline={timeline}
                 loadingTimeline={loadingTimeline}
                 updating={updatingOrderId === selectedOrder.id}
@@ -599,6 +640,42 @@ export default function WorkflowTrackerPage() {
           </section>
         </div>
       </div>
+
+      {/* TEMPLATE EDITOR DIALOG */}
+      <TemplateEditorDialog
+        open={editorOpen}
+        onOpenChange={setEditorOpen}
+        template={template}
+        saving={savingTemplate}
+        onSave={async (steps, meta) => {
+          setSavingTemplate(true);
+          try {
+            await workflowApi.updateTemplate({
+              name: meta?.name ?? template?.name ?? "Default Order Workflow",
+              description: meta?.description ?? template?.description,
+              steps: steps.map((s, i) => ({
+                key: s.key || undefined,
+                name: s.name,
+                color: s.color || null,
+                isFinal: i === steps.length - 1 || s.isFinal,
+                isActive: true,
+              })),
+            });
+            toast.success("Workflow stages updated successfully.");
+            setEditorOpen(false);
+            await loadTemplate();
+            await loadOrders();
+          } catch (error: any) {
+            console.error("Failed to update workflow template:", error);
+            toast.error(
+              error?.response?.data?.message ??
+                "Failed to update workflow template.",
+            );
+          } finally {
+            setSavingTemplate(false);
+          }
+        }}
+      />
 
       {/* REMINDER DIALOG */}
       <Dialog
@@ -732,6 +809,7 @@ function Summary({
 
 function OrderDetail({
   order,
+  stages,
   timeline,
   loadingTimeline,
   updating,
@@ -741,6 +819,7 @@ function OrderDetail({
   onOpenReminder,
 }: {
   order: WorkflowOrder;
+  stages: StageDef[];
   timeline: WorkflowEvent[];
   loadingTimeline: boolean;
   updating: boolean;
@@ -763,7 +842,7 @@ function OrderDetail({
           </button>
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-lg font-semibold">{order.dveplCode}</h2>
-            <StageChip stage={order.workflowStage} />
+            <StageChip stages={stages} stage={order.workflowStage} />
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             {order.partyName || order.caNo || "—"}
@@ -784,7 +863,7 @@ function OrderDetail({
       </div>
 
       {/* Pipeline progress */}
-      <PipelineProgress current={order.workflowStage} />
+      <PipelineProgress stages={stages} current={order.workflowStage} />
 
       {/* Quick info */}
       <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -827,15 +906,17 @@ function OrderDetail({
                 className="flex items-start gap-2.5 rounded-lg border border-border bg-muted/20 p-3"
               >
                 <span
-                  className={`mt-1 h-2 w-2 shrink-0 rounded-full ${stageStyles[event.stage].dot}`}
+                  className="mt-1 h-2 w-2 shrink-0 rounded-full"
+                  style={dotStyle(stageColorOf(stages, event.stage))}
                 />
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-foreground">
                     {event.title}
                     <span
-                      className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${stageStyles[event.stage].chip}`}
+                      className="rounded px-1.5 py-0.5 text-[10px] font-medium"
+                      style={chipStyle(stageColorOf(stages, event.stage))}
                     >
-                      {stageLabel(event.stage)}
+                      {stageLabelOf(stages, event.stage)}
                     </span>
                   </div>
                   {event.description && (
@@ -885,12 +966,18 @@ function InfoBox({
   );
 }
 
-function PipelineProgress({ current }: { current: WorkflowStage }) {
+function PipelineProgress({
+  stages,
+  current,
+}: {
+  stages: StageDef[];
+  current: string;
+}) {
   const currentIndex = Math.max(
     0,
-    pipelineStages.findIndex((s) => s.value === current),
+    stages.findIndex((s) => s.value === current),
   );
-  const total = pipelineStages.length;
+  const total = stages.length;
   const percent = Math.round((currentIndex / (total - 1)) * 100);
   const isDone = currentIndex === total - 1;
 
@@ -904,7 +991,7 @@ function PipelineProgress({ current }: { current: WorkflowStage }) {
           <p className="mt-0.5 text-xs text-muted-foreground">
             {isDone
               ? "This order has completed all stages."
-              : `Currently at "${stageLabel(current)}" — ${total - 1 - currentIndex} stage${total - 1 - currentIndex === 1 ? "" : "s"} remaining.`}
+              : `Currently at "${stageLabelOf(stages, current)}" — ${total - 1 - currentIndex} stage${total - 1 - currentIndex === 1 ? "" : "s"} remaining.`}
           </p>
         </div>
         <div
@@ -930,7 +1017,7 @@ function PipelineProgress({ current }: { current: WorkflowStage }) {
       <div className="overflow-x-auto">
         <div className="min-w-[680px]">
           <div className="flex items-center gap-1">
-            {pipelineStages.map((stage, i) => {
+            {stages.map((stage, i) => {
               const completed = i < currentIndex;
               const active = i === currentIndex;
               return (
@@ -966,7 +1053,7 @@ function PipelineProgress({ current }: { current: WorkflowStage }) {
 
           {/* Stage labels */}
           <div className="mt-2 flex items-center">
-            {pipelineStages.map((stage, i) => (
+            {stages.map((stage, i) => (
               <div
                 key={stage.value}
                 className={`flex-1 text-center text-[10px] font-medium leading-tight ${
@@ -991,7 +1078,7 @@ function PipelineColumn({
   stage,
   onSelect,
 }: {
-  stage: { value: WorkflowStage; label: string; orders: WorkflowOrder[] };
+  stage: StageDef & { orders: WorkflowOrder[] };
   onSelect: (order: WorkflowOrder) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
@@ -1011,14 +1098,16 @@ function PipelineColumn({
       <div className="flex items-center justify-between px-1.5 py-1.5">
         <div className="flex items-center gap-1.5">
           <span
-            className={`h-2 w-2 rounded-full ${stageStyles[stage.value].dot}`}
+            className="h-2 w-2 rounded-full"
+            style={dotStyle(stage.color)}
           />
           <span className="text-xs font-semibold text-foreground">
             {stage.label}
           </span>
         </div>
         <span
-          className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${stageStyles[stage.value].chip}`}
+          className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+          style={chipStyle(stage.color)}
         >
           {stage.orders.length}
         </span>
@@ -1113,5 +1202,238 @@ function Empty({ text }: { text: string }) {
     <div className="rounded-lg border border-dashed border-border p-10 text-center text-xs text-muted-foreground">
       {text}
     </div>
+  );
+}
+
+// ============================================================
+// Template editor
+// ============================================================
+
+interface DraftStep {
+  key: string;
+  name: string;
+  color: string;
+  isFinal: boolean;
+}
+
+function TemplateEditorDialog({
+  open,
+  onOpenChange,
+  template,
+  saving,
+  onSave,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  template: WorkflowTemplate | null;
+  saving: boolean;
+  onSave: (
+    steps: DraftStep[],
+    meta: { name?: string; description?: string | null },
+  ) => Promise<void>;
+}) {
+  const [name, setName] = useState("");
+  const [steps, setSteps] = useState<DraftStep[]>([]);
+
+  useEffect(() => {
+    if (!open) return;
+    setName(template?.name || "Default Order Workflow");
+    const base: WorkflowTemplateStep[] = template?.steps?.length
+      ? template.steps
+      : DEFAULT_STAGES.map((s, i) => ({
+          id: s.value,
+          key: s.value,
+          name: s.label,
+          color: s.color,
+          position: i,
+          isFinal: s.isFinal,
+          isActive: true,
+        }));
+    setSteps(
+      base
+        .filter((s) => s.isActive)
+        .sort((a, b) => a.position - b.position)
+        .map((s) => ({
+          key: s.key,
+          name: s.name,
+          color: s.color || FALLBACK_COLOR,
+          isFinal: s.isFinal,
+        })),
+    );
+  }, [open, template]);
+
+  const updateStep = (index: number, patch: Partial<DraftStep>) => {
+    setSteps((prev) =>
+      prev.map((s, i) => (i === index ? { ...s, ...patch } : s)),
+    );
+  };
+
+  const move = (index: number, dir: -1 | 1) => {
+    setSteps((prev) => {
+      const next = [...prev];
+      const target = index + dir;
+      if (target < 0 || target >= next.length) return prev;
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  };
+
+  const addStep = () => {
+    setSteps((prev) => [
+      ...prev,
+      {
+        key: `STAGE_${prev.length + 1}`,
+        name: `New Stage ${prev.length + 1}`,
+        color: FALLBACK_COLOR,
+        isFinal: false,
+      },
+    ]);
+  };
+
+  const removeStep = (index: number) => {
+    setSteps((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSave = async () => {
+    const cleaned = steps
+      .map((s) => ({ ...s, name: s.name.trim() }))
+      .filter((s) => s.name.length > 0);
+    if (cleaned.length === 0) {
+      toast.error("At least one workflow stage is required.");
+      return;
+    }
+    await onSave(cleaned, { name: name.trim(), description: template?.description });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !saving && onOpenChange(o)}>
+      <DialogContent className="overflow-hidden rounded-xl p-0 sm:max-w-2xl">
+        <DialogHeader className="border-b bg-muted/30 px-6 py-4">
+          <DialogTitle className="text-base font-bold">
+            Workflow Stages
+          </DialogTitle>
+          <DialogDescription className="text-xs text-muted-foreground">
+            Define the stages of your order workflow. Rename, reorder, add or
+            remove stages — existing orders are mapped to their nearest
+            remaining stage automatically.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="max-h-[60vh] space-y-4 overflow-y-auto p-6">
+          <div className="space-y-1">
+            <Label className="text-xs font-semibold text-muted-foreground">
+              Template Name
+            </Label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Default Order Workflow"
+              className="h-9 text-xs"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-semibold text-muted-foreground">
+                Stages (in order)
+              </Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addStep}
+                className="h-8 gap-1 rounded-lg text-xs font-semibold"
+              >
+                <Plus className="h-3.5 w-3.5" /> Add Stage
+              </Button>
+            </div>
+
+            {steps.map((step, index) => (
+              <div
+                key={`${step.key}-${index}`}
+                className="flex items-center gap-2 rounded-lg border border-border bg-muted/20 p-2"
+              >
+                <div className="flex flex-col">
+                  <button
+                    type="button"
+                    onClick={() => move(index, -1)}
+                    disabled={index === 0}
+                    className="rounded p-0.5 text-muted-foreground hover:bg-muted disabled:opacity-30"
+                  >
+                    <ChevronUp className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => move(index, 1)}
+                    disabled={index === steps.length - 1}
+                    className="rounded p-0.5 text-muted-foreground hover:bg-muted disabled:opacity-30"
+                  >
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                <input
+                  type="color"
+                  value={step.color}
+                  onChange={(e) => updateStep(index, { color: e.target.value })}
+                  className="h-8 w-9 shrink-0 cursor-pointer rounded border border-border bg-card p-0.5"
+                  aria-label={`Color for ${step.name}`}
+                />
+
+                <Input
+                  value={step.name}
+                  onChange={(e) => updateStep(index, { name: e.target.value })}
+                  placeholder="Stage name"
+                  className="h-8 flex-1 text-xs"
+                />
+
+                <label className="flex shrink-0 cursor-pointer items-center gap-1 text-[10px] font-medium text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={step.isFinal}
+                    onChange={(e) =>
+                      updateStep(index, { isFinal: e.target.checked })
+                    }
+                    className="h-3.5 w-3.5 accent-emerald-600"
+                  />
+                  Final
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() => removeStep(index)}
+                  className="shrink-0 rounded p-1.5 text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
+                  aria-label={`Remove ${step.name}`}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 border-t bg-muted/30 px-6 py-4">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => onOpenChange(false)}
+            disabled={saving}
+            className="h-9 rounded-lg text-xs font-semibold"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => void handleSave()}
+            disabled={saving}
+            className="h-9 rounded-lg text-xs font-bold"
+          >
+            {saving ? "Saving..." : "Save Stages"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

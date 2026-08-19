@@ -110,6 +110,7 @@ export const API_ENDPOINTS = {
       create: "/customer/create/",
       update: (id: string) => `/customer/update/${id}`,
       remove: (id: string) => `/customer/delete/${id}`,
+      sync: "/customer/sync/",
     },
     leads: {
       list: '/lead/read',

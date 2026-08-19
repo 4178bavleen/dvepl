@@ -1,15 +1,23 @@
 import { apiClient as api } from "./api";
 
-export type WorkflowStage =
-  | "ORDER_CONFIRMED"
-  | "PO_READY"
-  | "DRAWING_ASSIGNED"
-  | "DRAWING_SENT"
-  | "REVISION_REQUIRED"
-  | "DRAWING_APPROVED"
-  | "PO_PLACED"
-  | "INVENTORY_FOLLOW_UP"
-  | "PRODUCTION_FOLLOW_UP";
+export type WorkflowStage = string;
+
+export interface WorkflowTemplateStep {
+  id: string;
+  key: string;
+  name: string;
+  color: string | null;
+  position: number;
+  isFinal: boolean;
+  isActive: boolean;
+}
+
+export interface WorkflowTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+  steps: WorkflowTemplateStep[];
+}
 
 export interface WorkflowOrder {
   id: string;
@@ -63,6 +71,23 @@ export interface OrderTrackerResponse {
   };
 }
 
+export interface WorkflowTemplateResponse {
+  success: boolean;
+  data: WorkflowTemplate;
+}
+
+export interface WorkflowTemplateUpdateInput {
+  name?: string;
+  description?: string | null;
+  steps: {
+    key?: string;
+    name: string;
+    color?: string | null;
+    isFinal?: boolean;
+    isActive?: boolean;
+  }[];
+}
+
 class WorkflowApi {
   getOrders(params?: {
     stage?: WorkflowStage;
@@ -78,6 +103,15 @@ class WorkflowApi {
       `/workflow/order/${orderId}/tracker`,
     );
   }
+
+  getTemplate() {
+    return api.get<WorkflowTemplateResponse>("/workflow/template");
+  }
+
+  updateTemplate(data: WorkflowTemplateUpdateInput) {
+    return api.put<WorkflowTemplateResponse>("/workflow/template", data);
+  }
+
   updateOrderWorkflowStage(
     orderId: string,
     stage: string,

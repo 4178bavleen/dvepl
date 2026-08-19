@@ -16,7 +16,7 @@ const getRequiredPermission = (pathname: string): string | null => {
   // Assignment/Task pages where the backend manages row-level access:
   // Allow all logged-in users to load the page structure.
   if (pathname.startsWith('/export-orders')) return null;
-  if (pathname.startsWith('/hrms/tasks')) return null;
+  if (pathname.startsWith('/tasks')) return null;
   if (pathname.startsWith('/hrms/leaves')) return null;
   if (pathname.startsWith('/workflow')) return null;
   if (pathname.startsWith('/purchase/orders')) return null;

@@ -3,14 +3,14 @@ import {
   FastifyReply,
   FastifyRequest,
 } from "fastify";
-import { WorkflowStage } from "@prisma/client";
+import { getActiveWorkflowTemplate } from "../template";
 
 interface Params {
   orderId: string;
 }
 
 interface Body {
-  stage: WorkflowStage;
+  stage: string;
   nextAction?: string | null;
   dueDate?: string | null;
   description?: string | null;
@@ -37,7 +37,24 @@ export default async function updateOrderWorkflowStageRoute(
       const { stage, nextAction, dueDate, description } = request.body;
 
       // -----------------------------------------
-      // 1. Find order
+      // 1. Validate stage against the active template
+      // -----------------------------------------
+
+      const template = await getActiveWorkflowTemplate(fastify.prisma);
+
+      const activeStep = template?.steps?.find(
+        (s: any) => s.key === stage && s.isActive,
+      );
+
+      if (!activeStep) {
+        return reply.code(400).send({
+          success: false,
+          message: `Invalid workflow stage "${stage}".`,
+        });
+      }
+
+      // -----------------------------------------
+      // 2. Find order
       // -----------------------------------------
 
       const order = await fastify.prisma.salesOrder.findUnique({
@@ -60,24 +77,24 @@ export default async function updateOrderWorkflowStageRoute(
       }
 
       // -----------------------------------------
-      // 2. Prevent unnecessary update
+      // 3. Prevent unnecessary update
       // -----------------------------------------
 
       if (order.workflowStage === stage && nextAction === undefined && dueDate === undefined) {
         return reply.code(400).send({
           success: false,
-          message: `Order is already in ${stage}`,
+          message: `Order is already in ${activeStep.name}`,
         });
       }
 
       // -----------------------------------------
-      // 3. Current user
+      // 4. Current user
       // -----------------------------------------
 
       const userId = (request.user as any)?.id ?? null;
 
       // -----------------------------------------
-      // 4. Update order + create history
+      // 5. Update order + create history
       // -----------------------------------------
 
       const result = await fastify.prisma.$transaction(async (tx) => {
@@ -99,7 +116,7 @@ export default async function updateOrderWorkflowStageRoute(
           data: {
             salesOrderId: orderId,
             stage,
-            title: getWorkflowStageTitle(stage),
+            title: activeStep.name,
             description: description ?? null,
             performedById: userId,
           },
@@ -112,7 +129,7 @@ export default async function updateOrderWorkflowStageRoute(
       });
 
       // -----------------------------------------
-      // 5. Response
+      // 6. Response
       // -----------------------------------------
 
       return reply.send({
@@ -122,25 +139,4 @@ export default async function updateOrderWorkflowStageRoute(
       });
     },
   );
-}
-
-
-// -----------------------------------------
-// Stage → Human readable title
-// -----------------------------------------
-
-function getWorkflowStageTitle(stage: WorkflowStage): string {
-  const titles: Record<WorkflowStage, string> = {
-    ORDER_CONFIRMED: "Order Confirmed",
-    PO_READY: "PO Ready",
-    DRAWING_ASSIGNED: "Drawing Assigned",
-    DRAWING_SENT: "Drawing Sent",
-    REVISION_REQUIRED: "Revision Required",
-    DRAWING_APPROVED: "Drawing Approved",
-    PO_PLACED: "PO Placed",
-    INVENTORY_FOLLOW_UP: "Inventory Follow-up",
-    PRODUCTION_FOLLOW_UP: "Production Follow-up",
-  };
-
-  return titles[stage];
 }

@@ -1330,7 +1330,7 @@ model SalesOrder {
   quotation             Quotation?             @relation(fields: [quotationId], references: [id])
   tender                Tender?                @relation(fields: [tenderId], references: [id])
   workOrders            WorkOrder[]
-  workflowStage         WorkflowStage          @default(ORDER_CONFIRMED)
+  workflowStage         String                 @default("ORDER_CONFIRMED")
   nextAction            String?
   dueDate               DateTime?
   workflowUpdatedAt     DateTime               @default(now())
@@ -1343,18 +1343,49 @@ model SalesOrder {
 }
 
 model WorkflowEvent {
-  id            String        @id @default(uuid())
+  id            String   @id @default(uuid())
   salesOrderId  String
-  stage         WorkflowStage
+  stage         String
   title         String
   description   String?
   performedById String?
-  createdAt     DateTime      @default(now())
+  createdAt     DateTime @default(now())
 
   salesOrder SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
 
   @@index([salesOrderId])
   @@index([createdAt])
+}
+
+model WorkflowTemplate {
+  id          String         @id @default(uuid())
+  name        String
+  description String?
+  isActive    Boolean        @default(true)
+  isSystem    Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  steps       WorkflowStep[]
+
+  @@map("workflow_templates")
+}
+
+model WorkflowStep {
+  id         String           @id @default(uuid())
+  templateId String
+  key        String
+  name       String
+  color      String?
+  position   Int
+  isFinal    Boolean          @default(false)
+  isActive   Boolean          @default(true)
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  template   WorkflowTemplate @relation(fields: [templateId], references: [id])
+
+  @@unique([templateId, key])
+  @@index([templateId])
+  @@map("workflow_steps")
 }
 
 model SalesOrderAssignment {
@@ -3196,18 +3227,6 @@ enum DynamicFieldType {
   TEXTAREA
   SELECT
   DATE
-}
-
-enum WorkflowStage {
-  ORDER_CONFIRMED
-  PO_READY
-  DRAWING_ASSIGNED
-  DRAWING_SENT
-  REVISION_REQUIRED
-  DRAWING_APPROVED
-  PO_PLACED
-  INVENTORY_FOLLOW_UP
-  PRODUCTION_FOLLOW_UP
 }
 
 enum CustomerDrawingReviewStatus {
