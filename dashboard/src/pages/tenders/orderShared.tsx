@@ -46,12 +46,25 @@ export interface QuoteTenderOrder extends RawQuoteTenderOrder {
     fileName: string;
     fileUrl: string;
   }>;
+  attachments?: SalesOrderAttachment[];
   poStatus?: string;
   poNumber?: string;
   assignments?: SalesOrderAssignment[];
   workflowStage?: string;
   nextAction?: string | null;
   dueDate?: string | null;
+}
+
+export interface SalesOrderAttachment {
+  id: string;
+  salesOrderId: string;
+  fileName: string;
+  fileUrl: string;
+  fileSize?: number | null;
+  mimeType?: string | null;
+  category?: string | null;
+  uploadedById?: string | null;
+  createdAt?: string;
 }
 
 // ============================================================
@@ -273,6 +286,7 @@ export async function fetchQuoteTenderOrders(): Promise<{
         ) || [],
       file_name: remarksFields.fileName || null,
       assignments: order.assignments || [],
+      attachments: order.salesOrderAttachments || [],
       workflowStage: order.workflowStage || undefined,
       nextAction: order.nextAction ?? null,
       dueDate: order.dueDate ? new Date(order.dueDate).toISOString() : null,

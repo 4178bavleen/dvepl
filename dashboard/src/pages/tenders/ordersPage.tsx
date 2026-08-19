@@ -13,6 +13,8 @@ import {
   ExternalLink,
   Eye,
   Plus,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 
 import {
@@ -135,6 +137,25 @@ export function OrdersPage() {
     useState<QuoteTenderOrder | null>(null);
 
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () =>
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => {});
+    } else {
+      void document.documentElement.requestFullscreen().catch(() => {});
+    }
+  };
 
   // ============================================================
   // COLUMN VISIBILITY
@@ -882,6 +903,21 @@ export function OrdersPage() {
         >
           <RefreshCw className="size-3.5" />
           Refresh
+        </Button>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={toggleFullscreen}
+          title={isFullscreen ? "Exit Full Screen" : "Enter Full Screen"}
+          className="gap-2 self-start sm:self-center h-9 shadow-2xs hover:bg-muted/60 transition-colors"
+        >
+          {isFullscreen ? (
+            <Minimize2 className="size-3.5" />
+          ) : (
+            <Maximize2 className="size-3.5" />
+          )}
+          {isFullscreen ? "Exit Full Screen" : "Full Screen"}
         </Button>
       </div>
 

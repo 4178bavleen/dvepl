@@ -8,6 +8,7 @@ import adminSalesOrderBulkUploadRoutes from "./bulkUpload";
 import adminSalesOrderDownloadTemplateRoutes from "./downloadTemplate";
 import adminSalesOrderPreviewRoutes from "./preview";
 import assignSalesOrderRoute from "./assign"
+import adminSalesOrderAttachmentRoutes from "./attachment"
 
 async function adminOrderRouteGroup(
     fastify: FastifyInstance,
@@ -22,6 +23,7 @@ async function adminOrderRouteGroup(
     fastify.register(adminSalesOrderDownloadTemplateRoutes, { prefix: "/download-template" });
     fastify.register(adminSalesOrderPreviewRoutes, { prefix: "/preview" });
     fastify.register(assignSalesOrderRoute, { prefix: "/assign" });
+    fastify.register(adminSalesOrderAttachmentRoutes, { prefix: "/attachment" });
 }
 
 export default adminOrderRouteGroup;

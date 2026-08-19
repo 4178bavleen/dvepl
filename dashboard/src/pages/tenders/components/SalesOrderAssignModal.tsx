@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -11,14 +11,25 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Search, Users, X, Loader2, UserCheck, AlertCircle } from "lucide-react";
+import {
+  Search,
+  Users,
+  X,
+  Loader2,
+  UserCheck,
+  AlertCircle,
+  Layers,
+  LayoutGrid,
+} from "lucide-react";
 import { securityApi, salesOrderApi } from "@/services/modules";
+import workflowApi from "@/services/workflowApi";
 import { toast } from "react-hot-toast";
 
 export interface SalesOrderAssignment {
   id?: string;
   salesOrderId?: string;
   userId: string;
+  stage?: string | null;
   user?: {
     id: string;
     name: string;
@@ -46,6 +57,14 @@ interface UserOption {
   isActive?: boolean;
 }
 
+interface StageOption {
+  key: string;
+  name: string;
+  color?: string | null;
+}
+
+export const ALL_STAGES_KEY = "__all_stages__";
+
 export function SalesOrderAssignModal({
   open,
   onOpenChange,
@@ -55,29 +74,17 @@ export function SalesOrderAssignModal({
   const [users, setUsers] = useState<UserOption[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [userFetchError, setUserFetchError] = useState<string | null>(null);
-  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [stages, setStages] = useState<StageOption[]>([]);
+  const [isLoadingStages, setIsLoadingStages] = useState(false);
+  const [activeStageKey, setActiveStageKey] = useState<string>(ALL_STAGES_KEY);
+  const [stageAssignments, setStageAssignments] = useState<
+    Record<string, string[]>
+  >({});
   const [search, setSearch] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  // Fetch users when modal opens
-  useEffect(() => {
-    if (open) {
-      void fetchUsers();
-      setSearch("");
-      setValidationError(null);
-    }
-  }, [open]);
-
-  // Sync initial assigned user IDs when order changes or modal opens
-  useEffect(() => {
-    if (open && order) {
-      const existingUserIds = (order.assignments || []).map((a) => a.userId).filter(Boolean);
-      setSelectedUserIds(existingUserIds);
-    }
-  }, [open, order]);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setIsLoadingUsers(true);
     setUserFetchError(null);
     try {
@@ -99,7 +106,54 @@ export function SalesOrderAssignModal({
     } finally {
       setIsLoadingUsers(false);
     }
-  };
+  }, []);
+
+  const fetchStages = useCallback(async () => {
+    setIsLoadingStages(true);
+    try {
+      const response = await workflowApi.getTemplate();
+      if (response.data.success) {
+        const steps = (response.data.data.steps || [])
+          .filter((s) => s.isActive)
+          .sort((a, b) => a.position - b.position)
+          .map((s) => ({
+            key: s.key,
+            name: s.name,
+            color: s.color,
+          }));
+        setStages(steps);
+      }
+    } catch (err) {
+      console.error("Failed to load workflow stages:", err);
+      setStages([]);
+    } finally {
+      setIsLoadingStages(false);
+    }
+  }, []);
+
+  // Fetch users + stages when modal opens
+  useEffect(() => {
+    if (open) {
+      void fetchUsers();
+      void fetchStages();
+      setSearch("");
+      setValidationError(null);
+      setActiveStageKey(ALL_STAGES_KEY);
+    }
+  }, [open, fetchUsers, fetchStages]);
+
+  // Sync initial assignments grouped by stage
+  useEffect(() => {
+    if (open && order) {
+      const grouped: Record<string, string[]> = {};
+      (order.assignments || []).forEach((a) => {
+        const key = a.stage ? a.stage : ALL_STAGES_KEY;
+        if (!grouped[key]) grouped[key] = [];
+        if (!grouped[key].includes(a.userId)) grouped[key].push(a.userId);
+      });
+      setStageAssignments(grouped);
+    }
+  }, [open, order]);
 
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -111,30 +165,50 @@ export function SalesOrderAssignModal({
     );
   }, [users, search]);
 
+  const currentStageUsers = useMemo(
+    () => stageAssignments[activeStageKey] ?? [],
+    [stageAssignments, activeStageKey],
+  );
+
   const toggleUserSelection = (userId: string) => {
     setValidationError(null);
-    setSelectedUserIds((prev) =>
-      prev.includes(userId)
-        ? prev.filter((id) => id !== userId)
-        : [...prev, userId]
-    );
+    setStageAssignments((prev) => {
+      const current = prev[activeStageKey] ?? [];
+      const next = current.includes(userId)
+        ? current.filter((id) => id !== userId)
+        : [...current, userId];
+      return { ...prev, [activeStageKey]: next };
+    });
   };
 
   const selectAllFiltered = () => {
     setValidationError(null);
     const filteredIds = filteredUsers.map((u) => u.id);
-    setSelectedUserIds((prev) => Array.from(new Set([...prev, ...filteredIds])));
+    setStageAssignments((prev) => ({
+      ...prev,
+      [activeStageKey]: Array.from(
+        new Set([...(prev[activeStageKey] ?? []), ...filteredIds]),
+      ),
+    }));
   };
 
   const clearAllSelection = () => {
     setValidationError(null);
-    setSelectedUserIds([]);
+    setStageAssignments((prev) => ({
+      ...prev,
+      [activeStageKey]: [],
+    }));
   };
+
+  const totalAssignedUsers = useMemo(
+    () => Array.from(new Set(Object.values(stageAssignments).flat())).length,
+    [stageAssignments],
+  );
 
   const handleSave = async () => {
     if (!order) return;
 
-    if (selectedUserIds.length === 0) {
+    if (totalAssignedUsers === 0) {
       setValidationError("At least one user must be assigned to the order.");
       toast.error("At least one user must be assigned.");
       return;
@@ -144,7 +218,16 @@ export function SalesOrderAssignModal({
     setValidationError(null);
 
     try {
-      const res = await salesOrderApi.salesOrders.assign(order.id, selectedUserIds);
+      const assignments = Object.entries(stageAssignments)
+        .filter(([, userIds]) => userIds.length > 0)
+        .map(([stageKey, userIds]) => ({
+          stage: stageKey === ALL_STAGES_KEY ? null : stageKey,
+          userIds,
+        }));
+
+      const res = await salesOrderApi.salesOrders.assign(order.id, {
+        assignments,
+      });
       if (res?.success !== false) {
         toast.success("Sales Order assigned successfully.");
         onSuccess();
@@ -164,7 +247,7 @@ export function SalesOrderAssignModal({
   };
 
   const selectedUsers = useMemo(() => {
-    return selectedUserIds
+    return currentStageUsers
       .map((id) => {
         const found = users.find((u) => u.id === id);
         if (found) return found;
@@ -176,11 +259,18 @@ export function SalesOrderAssignModal({
         };
       })
       .filter(Boolean);
-  }, [selectedUserIds, users, order]);
+  }, [currentStageUsers, users, order]);
+
+  const stageTabs = useMemo(() => {
+    return [
+      { key: ALL_STAGES_KEY, name: "All Stages" },
+      ...stages.map((s) => ({ key: s.key, name: s.name })),
+    ];
+  }, [stages]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg p-0 gap-0 overflow-hidden">
+      <DialogContent className="sm:max-w-2xl p-0 gap-0 overflow-hidden">
         {/* Header */}
         <DialogHeader className="px-6 py-4 border-b bg-muted/20">
           <div className="flex items-center gap-3">
@@ -196,7 +286,11 @@ export function SalesOrderAssignModal({
                 <span className="font-semibold text-foreground">
                   {order?.tender_no || order?.dveplCode || "Tender"}
                 </span>{" "}
-                to one or multiple team members.
+                to team members{" "}
+                <span className="font-semibold text-foreground">
+                  per workflow stage
+                </span>
+                .
               </DialogDescription>
             </div>
           </div>
@@ -221,19 +315,90 @@ export function SalesOrderAssignModal({
             </div>
           )}
 
+          {/* Stage Tabs */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Layers className="size-3.5 text-muted-foreground" />
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Assign by Stage
+              </label>
+            </div>
+
+            {isLoadingStages ? (
+              <div className="flex items-center gap-2 p-3 rounded-lg border text-xs text-muted-foreground">
+                <Loader2 className="size-3.5 animate-spin text-primary" />
+                Loading workflow stages...
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {stageTabs.map((tab) => {
+                  const count = (stageAssignments[tab.key] ?? []).length;
+                  const isActive = activeStageKey === tab.key;
+                  return (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      onClick={() => setActiveStageKey(tab.key)}
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                        isActive
+                          ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                          : "bg-card text-muted-foreground border-border hover:bg-muted/60"
+                      }`}
+                    >
+                      {tab.key === ALL_STAGES_KEY ? (
+                        <LayoutGrid className="size-3" />
+                      ) : null}
+                      {tab.name}
+                      {count > 0 && (
+                        <span
+                          className={`inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full text-[10px] font-bold ${
+                            isActive
+                              ? "bg-primary-foreground/20 text-primary-foreground"
+                              : "bg-primary/10 text-primary"
+                          }`}
+                        >
+                          {count}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {activeStageKey !== ALL_STAGES_KEY && (
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Users assigned here can work on this order only while it is at
+                the{" "}
+                <span className="font-semibold text-foreground">
+                  {stages.find((s) => s.key === activeStageKey)?.name ??
+                    activeStageKey}
+                </span>{" "}
+                stage.
+              </p>
+            )}
+            {activeStageKey === ALL_STAGES_KEY && (
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Users assigned to All Stages can work on the order at every
+                stage.
+              </p>
+            )}
+          </div>
+
           {/* Selected Users Chips */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Assigned Users ({selectedUserIds.length})
+                Assigned Users ({currentStageUsers.length}) · Total{" "}
+                {totalAssignedUsers}
               </label>
-              {selectedUserIds.length > 0 && (
+              {currentStageUsers.length > 0 && (
                 <button
                   type="button"
                   onClick={clearAllSelection}
                   className="text-[11px] font-semibold text-muted-foreground hover:text-rose-500 transition-colors"
                 >
-                  Clear All
+                  Clear This Stage
                 </button>
               )}
             </div>
@@ -259,7 +424,8 @@ export function SalesOrderAssignModal({
               </div>
             ) : (
               <div className="p-3 rounded-lg border border-dashed text-center text-xs text-muted-foreground">
-                No users assigned yet. Select users from the list below.
+                No users assigned for this selection. Select users from the list
+                below.
               </div>
             )}
           </div>
@@ -301,7 +467,7 @@ export function SalesOrderAssignModal({
               </div>
             ) : filteredUsers.length > 0 ? (
               filteredUsers.map((u) => {
-                const isSelected = selectedUserIds.includes(u.id);
+                const isSelected = currentStageUsers.includes(u.id);
                 return (
                   <label
                     key={u.id}

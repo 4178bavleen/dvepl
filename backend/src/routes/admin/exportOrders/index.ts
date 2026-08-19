@@ -9,6 +9,7 @@ import {
   DrawingType,
 } from "@prisma/client";
 import { adminLogs } from "../../../services/logger/contextLogger";
+import { canWorkOnOrderStage, isAdminUser } from "../../../utils/orderAccess";
 import { z } from "zod";
 import { existsSync } from "fs";
 import path from "path";
@@ -78,23 +79,6 @@ async function adminExportOrdersRouteGroup(
         ),
     );
 
-  const isAssignedToSalesOrder = async (
-    salesOrderId: string,
-    userId: string,
-  ): Promise<boolean> => {
-    const assignment =
-      await fastify.prisma.salesOrderAssignment.findUnique({
-        where: {
-          salesOrderId_userId: {
-            salesOrderId,
-            userId,
-          },
-        },
-      });
-
-    return !!assignment;
-  };
-
   const canManageDrawingOrder = async (
     salesOrderId: string,
     request: FastifyRequest,
@@ -105,7 +89,28 @@ async function adminExportOrdersRouteGroup(
 
     if (isAdminUser(request.admin)) return true;
 
-    return isAssignedToSalesOrder(salesOrderId, userId);
+    const order = await fastify.prisma.salesOrder.findUnique({
+      where: { id: salesOrderId },
+      select: {
+        id: true,
+        workflowStage: true,
+        assignments: {
+          select: {
+            userId: true,
+            stage: true,
+          },
+        },
+      },
+    });
+
+    if (!order) return false;
+
+    return canWorkOnOrderStage(
+      order.assignments,
+      order.workflowStage,
+      userId,
+      false,
+    );
   };
 
 

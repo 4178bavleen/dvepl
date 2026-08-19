@@ -34,6 +34,11 @@ export interface WorkflowOrder {
   dueDate: string | null;
   workflowUpdatedAt: string;
 
+  assignments?: Array<{
+    userId: string;
+    stage: string | null;
+  }>;
+
   lastEvent: {
     id: string;
     stage: WorkflowStage;

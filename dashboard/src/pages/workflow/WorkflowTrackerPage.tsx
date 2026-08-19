@@ -44,6 +44,7 @@ import workflowApi, {
 } from "@/services/workflowApi";
 import { useERPStore } from "@/store/erpStore";
 import { canPerformPageAction } from "@/utils/pagePermissions";
+import { canWorkOnOrder } from "@/utils/salesOrderAccess";
 
 interface StageDef {
   value: string;
@@ -135,6 +136,18 @@ export default function WorkflowTrackerPage() {
     currentUser?.actionPermissions,
     "workflow_tracker",
     "edit",
+  );
+
+  const canWorkOrder = useCallback(
+    (order: WorkflowOrder) =>
+      canWorkOnOrder(
+        {
+          assignments: order.assignments,
+          workflowStage: order.workflowStage,
+        },
+        store.currentUserId,
+      ),
+    [store.currentUserId],
   );
 
   const [orders, setOrders] = useState<WorkflowOrder[]>([]);
@@ -279,6 +292,13 @@ export default function WorkflowTrackerPage() {
       updatingOrderId === orderId
     )
       return;
+
+    if (!canWorkOrder(order)) {
+      toast.error(
+        "Access denied: you are not assigned to this order's current stage.",
+      );
+      return;
+    }
 
     try {
       setUpdatingOrderId(orderId);
@@ -572,7 +592,14 @@ export default function WorkflowTrackerPage() {
                             <select
                               value={order.workflowStage}
                               disabled={
-                                updatingOrderId === order.id || !canEdit
+                                updatingOrderId === order.id ||
+                                !canEdit ||
+                                !canWorkOrder(order)
+                              }
+                              title={
+                                !canWorkOrder(order)
+                                  ? "View only — you are not assigned to this order's current stage"
+                                  : undefined
                               }
                               onClick={(event) => event.stopPropagation()}
                               onChange={(event) =>
@@ -630,6 +657,7 @@ export default function WorkflowTrackerPage() {
                 loadingTimeline={loadingTimeline}
                 updating={updatingOrderId === selectedOrder.id}
                 canEdit={canEdit}
+                canWork={canWorkOrder(selectedOrder)}
                 onBack={() => setSelectedOrder(null)}
                 onMarkAsDone={() => void handleMarkAsDone()}
                 onOpenReminder={openReminder}
@@ -814,6 +842,7 @@ function OrderDetail({
   loadingTimeline,
   updating,
   canEdit,
+  canWork,
   onBack,
   onMarkAsDone,
   onOpenReminder,
@@ -824,6 +853,7 @@ function OrderDetail({
   loadingTimeline: boolean;
   updating: boolean;
   canEdit: boolean;
+  canWork: boolean;
   onBack: () => void;
   onMarkAsDone: () => void;
   onOpenReminder: () => void;
@@ -855,7 +885,12 @@ function OrderDetail({
           <Button
             size="sm"
             onClick={onMarkAsDone}
-            disabled={updating || !canEdit}
+            disabled={updating || !canEdit || !canWork}
+            title={
+              !canWork
+                ? "View only — you are not assigned to this order's current stage"
+                : undefined
+            }
           >
             <CheckCircle2 className="h-3.5 w-3.5" /> Mark as Done
           </Button>

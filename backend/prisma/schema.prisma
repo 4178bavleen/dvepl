@@ -1389,9 +1389,10 @@ model WorkflowStep {
 }
 
 model SalesOrderAssignment {
-  id           String @id @default(uuid())
+  id           String  @id @default(uuid())
   salesOrderId String
   userId       String
+  stage        String?
 
   salesOrder SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
 
@@ -1400,7 +1401,7 @@ model SalesOrderAssignment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([salesOrderId, userId])
+  @@unique([salesOrderId, userId, stage])
   @@index([salesOrderId])
   @@index([userId])
 }
@@ -1463,6 +1464,7 @@ model SalesOrderAttachment {
   fileUrl      String
   fileSize     Int?
   mimeType     String?
+  category     String?
   uploadedById String
   createdAt    DateTime   @default(now())
   salesOrder   SalesOrder @relation(fields: [salesOrderId], references: [id])

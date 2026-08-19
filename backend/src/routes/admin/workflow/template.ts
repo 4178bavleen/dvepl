@@ -148,117 +148,118 @@ export default async function workflowTemplateRoutes(
         .filter((s) => !incomingKeys.has(s.key))
         .map((s) => s.key);
 
-      const result = await fastify.prisma.$transaction(async (tx) => {
-        // 1. Upsert steps
-        for (const step of normalizedSteps) {
-          const existing = existingByKey.get(step.key);
-          if (existing) {
-            await tx.workflowStep.update({
-              where: { id: existing.id },
-              data: {
-                name: step.name,
-                color: step.color,
-                position: step.position,
-                isFinal: step.isFinal,
-                isActive: step.isActive,
-              },
-            });
-          } else {
-            await tx.workflowStep.create({
-              data: {
-                templateId: template.id,
-                key: step.key,
-                name: step.name,
-                color: step.color,
-                position: step.position,
-                isFinal: step.isFinal,
-                isActive: step.isActive,
-              },
+      const result = await fastify.prisma.$transaction(
+        async (tx) => {
+          // 1. Upsert steps
+          for (const step of normalizedSteps) {
+            const existing = existingByKey.get(step.key);
+            if (existing) {
+              await tx.workflowStep.update({
+                where: { id: existing.id },
+                data: {
+                  name: step.name,
+                  color: step.color,
+                  position: step.position,
+                  isFinal: step.isFinal,
+                  isActive: step.isActive,
+                },
+              });
+            } else {
+              await tx.workflowStep.create({
+                data: {
+                  templateId: template.id,
+                  key: step.key,
+                  name: step.name,
+                  color: step.color,
+                  position: step.position,
+                  isFinal: step.isFinal,
+                  isActive: step.isActive,
+                },
+              });
+            }
+          }
+
+          // 2. Delete removed steps
+          const removedSteps = existingSteps.filter((s) =>
+            removedKeys.includes(s.key),
+          );
+          for (const removed of removedSteps) {
+            await tx.workflowStep.delete({
+              where: { id: removed.id },
             });
           }
-        }
 
-        // 2. Delete removed steps
-        const removedSteps = existingSteps.filter((s) =>
-          removedKeys.includes(s.key),
-        );
-        for (const removed of removedSteps) {
-          await tx.workflowStep.delete({
-            where: { id: removed.id },
-          });
-        }
-
-        // 3. Re-map sales orders that were on removed steps to the nearest
-        //    previous remaining stage (or the first active stage).
-        if (removedSteps.length > 0) {
-          const remaining = await tx.workflowStep.findMany({
-            where: { templateId: template.id, isActive: true },
-            orderBy: { position: "asc" },
-          });
-
-          for (const removed of removedSteps) {
-            const fallback =
-              remaining.find((s: any) => s.position < removed.position) ||
-              remaining[0];
-
-            if (!fallback) continue;
-
-            const affected = await tx.salesOrder.findMany({
-              where: {
-                workflowStage: removed.key,
-                deletedAt: null,
-              },
-              select: { id: true },
-            });
-
-            if (affected.length === 0) continue;
-
-            await tx.salesOrder.updateMany({
-              where: { id: { in: affected.map((o: any) => o.id) } },
-              data: {
-                workflowStage: fallback.key,
-                workflowUpdatedAt: new Date(),
-              },
+          // 3. Re-map sales orders that were on removed steps to the nearest
+          //    previous remaining stage (or the first active stage).
+          if (removedSteps.length > 0) {
+            const remaining = await tx.workflowStep.findMany({
+              where: { templateId: template.id, isActive: true },
+              orderBy: { position: "asc" },
             });
 
             const performedById = (request.user as any)?.id ?? null;
             const now = new Date();
 
-            for (const order of affected) {
-              await tx.workflowEvent.create({
+            for (const removed of removedSteps) {
+              const fallback =
+                remaining.find((s: any) => s.position < removed.position) ||
+                remaining[0];
+
+              if (!fallback) continue;
+
+              const affected = await tx.salesOrder.findMany({
+                where: {
+                  workflowStage: removed.key,
+                  deletedAt: null,
+                },
+                select: { id: true },
+              });
+
+              if (affected.length === 0) continue;
+
+              await tx.salesOrder.updateMany({
+                where: { id: { in: affected.map((o: any) => o.id) } },
                 data: {
+                  workflowStage: fallback.key,
+                  workflowUpdatedAt: new Date(),
+                },
+              });
+
+              await tx.workflowEvent.createMany({
+                data: affected.map((order: any) => ({
                   salesOrderId: order.id,
                   stage: fallback.key,
                   title: `Workflow template updated — "${removed.name}" removed`,
                   description: `Moved from "${removed.name}" to "${fallback.name}".`,
                   performedById,
                   createdAt: now,
-                },
+                })),
               });
             }
           }
-        }
 
-        // 4. Update template meta
-        await tx.workflowTemplate.update({
-          where: { id: template.id },
-          data: {
-            ...(name !== undefined ? { name } : {}),
-            ...(description !== undefined
-              ? { description }
-              : {}),
-          },
-        });
-
-        return tx.workflowTemplate.findUnique({
-          where: { id: template.id },
-          include: {
-            steps: {
-              orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+          // 4. Update template meta
+          await tx.workflowTemplate.update({
+            where: { id: template.id },
+            data: {
+              ...(name !== undefined ? { name } : {}),
+              ...(description !== undefined
+                ? { description }
+                : {}),
             },
-          },
-        });
-      });
+          });
+
+          return tx.workflowTemplate.findUnique({
+            where: { id: template.id },
+            include: {
+              steps: {
+                orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+              },
+            },
+          });
+        },
+        { timeout: 20000 },
+      );
 
       return reply.send({
         success: true,

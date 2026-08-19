@@ -4,6 +4,10 @@ import {
   FastifyRequest,
 } from "fastify";
 import { getActiveWorkflowTemplate } from "../template";
+import {
+  canWorkOnOrderStage,
+  isAdminUser,
+} from "../../../../utils/orderAccess";
 
 interface Params {
   orderId: string;
@@ -22,19 +26,18 @@ export default async function updateOrderWorkflowStageRoute(
   fastify.patch(
     "/order/:orderId/stage",
     {
+      preHandler: [fastify.verifyToken],
       schema: {
         tags: ["Workflow Tracker"],
       },
     },
     async (
-      request: FastifyRequest<{
-        Params: Params;
-        Body: Body;
-      }>,
+      request: FastifyRequest,
       reply: FastifyReply,
     ) => {
-      const { orderId } = request.params;
-      const { stage, nextAction, dueDate, description } = request.body;
+      const { orderId } = request.params as Params;
+      const { stage, nextAction, dueDate, description } =
+        request.body as Body;
 
       // -----------------------------------------
       // 1. Validate stage against the active template
@@ -66,6 +69,12 @@ export default async function updateOrderWorkflowStageRoute(
           workflowStage: true,
           nextAction: true,
           dueDate: true,
+          assignments: {
+            select: {
+              userId: true,
+              stage: true,
+            },
+          },
         },
       });
 
@@ -77,7 +86,22 @@ export default async function updateOrderWorkflowStageRoute(
       }
 
       // -----------------------------------------
-      // 3. Prevent unnecessary update
+      // 3. Stage-based access control
+      // -----------------------------------------
+
+      const userId = (request.admin as any)?.id ?? (request.user as any)?.id ?? null;
+      const admin = request.admin ?? request.user;
+
+      if (!canWorkOnOrderStage(order.assignments, order.workflowStage, userId, isAdminUser(admin))) {
+        return reply.code(403).send({
+          success: false,
+          message:
+            "Access denied: you are not assigned to work on this order at its current stage.",
+        });
+      }
+
+      // -----------------------------------------
+      // 4. Prevent unnecessary update
       // -----------------------------------------
 
       if (order.workflowStage === stage && nextAction === undefined && dueDate === undefined) {
@@ -86,12 +110,6 @@ export default async function updateOrderWorkflowStageRoute(
           message: `Order is already in ${activeStep.name}`,
         });
       }
-
-      // -----------------------------------------
-      // 4. Current user
-      // -----------------------------------------
-
-      const userId = (request.user as any)?.id ?? null;
 
       // -----------------------------------------
       // 5. Update order + create history

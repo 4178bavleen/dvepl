@@ -8,6 +8,8 @@ import {
   FileText,
   ExternalLink,
   RefreshCw,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -20,6 +22,7 @@ import {
   SalesOrderAssignModal,
 } from "./components/SalesOrderAssignModal";
 import { AddOrderModal } from "./components/AddOrderModal";
+import { ProjectDocumentUploadPanel } from "./components/ProjectDocumentUploadPanel";
 
 import {
   QuoteTenderOrder,
@@ -53,8 +56,14 @@ export function OrderDetailPage() {
   const isOrderAssignedToCurrentUser = useCallback(
     (order: QuoteTenderOrder | null | undefined) => {
       if (!order || !currentUserId) return false;
+      const orderStage = order.workflowStage;
       return (order.assignments || []).some(
-        (assignment) => assignment.userId === currentUserId,
+        (assignment) =>
+          assignment.userId === currentUserId &&
+          (!orderStage ||
+            assignment.stage === null ||
+            assignment.stage === undefined ||
+            assignment.stage === orderStage),
       );
     },
     [currentUserId],
@@ -68,6 +77,25 @@ export function OrderDetailPage() {
   const [assigningTender, setAssigningTender] =
     useState<QuoteTenderOrder | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
+
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () =>
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => {});
+    } else {
+      void document.documentElement.requestFullscreen().catch(() => {});
+    }
+  };
 
   const loadTender = useCallback(async () => {
     if (!id) return;
@@ -100,11 +128,12 @@ export function OrderDetailPage() {
   }, [loadTender]);
 
   const drawingsCount = tender?.drawings?.length ?? 0;
+  const attachmentCount = tender?.attachments?.length ?? 0;
 
   const tabs: { id: TabId; label: string; count?: number }[] = [
     { id: "overview", label: "Overview" },
     { id: "workflow", label: "Workflow" },
-    { id: "documents", label: "Documents", count: drawingsCount },
+    { id: "documents", label: "Documents", count: drawingsCount + attachmentCount },
     { id: "audit", label: "Communication & Audit" },
   ];
 
@@ -195,6 +224,20 @@ export function OrderDetailPage() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={toggleFullscreen}
+              title={isFullscreen ? "Exit Full Screen" : "Enter Full Screen"}
+              className="h-8 text-xs font-bold rounded-xl gap-1.5"
+            >
+              {isFullscreen ? (
+                <Minimize2 className="size-3.5" />
+              ) : (
+                <Maximize2 className="size-3.5" />
+              )}
+              {isFullscreen ? "Exit Full Screen" : "Full Screen"}
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -524,6 +567,17 @@ export function OrderDetailPage() {
                               </p>
                             )}
                           </div>
+                          <span
+                            className={`ml-1 inline-flex items-center text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full border ${
+                              assignment.stage
+                                ? "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20"
+                                : "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20"
+                            }`}
+                          >
+                            {assignment.stage
+                              ? workflowStageLabel(assignment.stage, workflowStages)
+                              : "All Stages"}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -593,55 +647,75 @@ export function OrderDetailPage() {
           )}
 
           {activeTab === "documents" && (
-            <section>
-              <DetailSectionTitle title="Engineering Drawings" color="bg-primary" />
-
-              {tender.drawings && tender.drawings.length > 0 ? (
-                <div className="rounded-2xl border border-border/80 overflow-hidden shadow-3xs">
-                  <div className="divide-y divide-border/60">
-                    {tender.drawings.map((drawing) => (
-                      <div
-                        key={drawing.id}
-                        className="flex items-center justify-between gap-4 px-4 py-3 bg-muted/10 hover:bg-muted/20 transition-colors"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="p-2 rounded-lg bg-primary/10 text-primary border border-primary/15 shrink-0">
-                            <FileText className="size-4" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-xs font-bold text-foreground truncate">
-                              {drawing.title || drawing.drawingNo || "Untitled Drawing"}
-                            </p>
-                            <p className="text-[10px] text-muted-foreground font-medium truncate">
-                              {drawing.drawingNo ? `${drawing.drawingNo} · ` : ""}
-                              {drawing.fileName || "—"}
-                            </p>
-                          </div>
-                        </div>
-
-                        {drawing.fileUrl && (
-                          <a
-                            href={drawing.fileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="shrink-0 text-xs font-bold text-primary hover:text-primary-hover flex items-center gap-1"
-                          >
-                            View
-                            <ExternalLink className="size-3" />
-                          </a>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-border bg-muted/10 p-6 text-center shadow-3xs">
-                  <p className="text-xs font-medium text-muted-foreground">
-                    No engineering drawings have been attached to this order yet.
+            <>
+              <section>
+                <DetailSectionTitle title="Project Documents" color="bg-cyan-500" />
+                <ProjectDocumentUploadPanel
+                  attachments={tender.attachments || []}
+                  immediate
+                  orderId={tender.id}
+                  disabled={!isOrderAssignedToCurrentUser(tender) && !isAdmin}
+                  onUploaded={() => void loadTender()}
+                  onDeleted={() => void loadTender()}
+                />
+                {!isOrderAssignedToCurrentUser(tender) && !isAdmin && (
+                  <p className="mt-2 text-[11px] font-medium text-muted-foreground">
+                    View-only: you can open attached documents but cannot add
+                    or remove them.
                   </p>
-                </div>
-              )}
-            </section>
+                )}
+              </section>
+
+              <section className="border-t pt-7">
+                <DetailSectionTitle title="Engineering Drawings" color="bg-primary" />
+
+                {tender.drawings && tender.drawings.length > 0 ? (
+                  <div className="rounded-2xl border border-border/80 overflow-hidden shadow-3xs">
+                    <div className="divide-y divide-border/60">
+                      {tender.drawings.map((drawing) => (
+                        <div
+                          key={drawing.id}
+                          className="flex items-center justify-between gap-4 px-4 py-3 bg-muted/10 hover:bg-muted/20 transition-colors"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="p-2 rounded-lg bg-primary/10 text-primary border border-primary/15 shrink-0">
+                              <FileText className="size-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-foreground truncate">
+                                {drawing.title || drawing.drawingNo || "Untitled Drawing"}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground font-medium truncate">
+                                {drawing.drawingNo ? `${drawing.drawingNo} · ` : ""}
+                                {drawing.fileName || "—"}
+                              </p>
+                            </div>
+                          </div>
+
+                          {drawing.fileUrl && (
+                            <a
+                              href={drawing.fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="shrink-0 text-xs font-bold text-primary hover:text-primary-hover flex items-center gap-1"
+                            >
+                              View
+                              <ExternalLink className="size-3" />
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-border bg-muted/10 p-6 text-center shadow-3xs">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      No engineering drawings have been attached to this order yet.
+                    </p>
+                  </div>
+                )}
+              </section>
+            </>
           )}
 
           {activeTab === "audit" && (
