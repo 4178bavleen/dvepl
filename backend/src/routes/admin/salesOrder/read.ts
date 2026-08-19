@@ -135,6 +135,11 @@ async function adminSalesOrderReadRoutes(
                   },
                 },
               },
+              salesOrderAttachments: {
+                orderBy: {
+                  createdAt: "desc",
+                },
+              },
             },
           });
 

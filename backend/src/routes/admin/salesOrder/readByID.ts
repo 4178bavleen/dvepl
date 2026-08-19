@@ -75,6 +75,11 @@ async function adminSalesOrderReadByIdRoutes(
             },
 
             items: true,
+            salesOrderAttachments: {
+              orderBy: {
+                createdAt: "desc",
+              },
+            },
           },
         });
 

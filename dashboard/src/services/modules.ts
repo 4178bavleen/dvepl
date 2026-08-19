@@ -59,7 +59,10 @@ export const hrmsApi = {
 };
 
 export const crmApi = {
-  customers: crud(API_ENDPOINTS.crm.customers),
+  customers: {
+    ...crud(API_ENDPOINTS.crm.customers),
+    sync: () => apiClient.post(API_ENDPOINTS.crm.customers.sync).then(res => res.data),
+  },
 
   contacts: crud(API_ENDPOINTS.crm.contacts),
 
@@ -125,8 +128,19 @@ export const quotationApi = {
 export const salesOrderApi = {
   salesOrders: {
     ...crud(API_ENDPOINTS.salesOrder.salesOrders),
-    assign: (id: string, userIds: string[]) =>
-      apiClient.put(API_ENDPOINTS.salesOrder.salesOrders.assign(id), { userIds }).then(res => res.data),
+    assign: (
+      id: string,
+      payload: {
+        assignments: Array<{ stage?: string | null; userIds: string[] }>;
+      },
+    ) =>
+      apiClient
+        .put(API_ENDPOINTS.salesOrder.salesOrders.assign(id), payload)
+        .then((res) => res.data),
+    assignLegacy: (id: string, userIds: string[]) =>
+      apiClient
+        .put(API_ENDPOINTS.salesOrder.salesOrders.assign(id), { userIds })
+        .then((res) => res.data),
   },
 };
 

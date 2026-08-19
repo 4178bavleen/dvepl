@@ -197,7 +197,6 @@ const IGNORED_KEYS = new Set([
   "userPermissions",
   "createdAt",
   "updatedAt",
-  "contacts",
 ]);
 
 // Maps a foreign-key field name (as it appears on any Prisma model in

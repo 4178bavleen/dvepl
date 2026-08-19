@@ -24,6 +24,9 @@ import {
 import { apiClient } from "@/services/axios";
 import { toast } from "react-hot-toast";
 
+import { ProjectDocumentUploadPanel } from "./ProjectDocumentUploadPanel";
+import { SalesOrderAttachment } from "../orderShared";
+
 // ============================================================
 // TYPES
 // ============================================================
@@ -59,6 +62,7 @@ interface AddOrderModalProps {
     tenderID?: string;
     reference_code?: string;
     status?: string;
+    attachments?: SalesOrderAttachment[];
   } | null;
   onSuccess: () => void;
 }
@@ -146,6 +150,10 @@ export function AddOrderModal({
   const [items, setItems] = useState<OrderItemForm[]>([{ ...EMPTY_ITEM }]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [pendingDocuments, setPendingDocuments] = useState<
+    Array<{ category: string; file: File }>
+  >([]);
+
   const resetForm = () => {
     setStatus("PENDING");
     setDveplCode("");
@@ -173,6 +181,7 @@ export function AddOrderModal({
     setRemarks("");
     setSendNotification(true);
     setItems([{ ...EMPTY_ITEM }]);
+    setPendingDocuments([]);
   };
 
   const handleOpenChange = (next: boolean) => {
@@ -371,6 +380,33 @@ export function AddOrderModal({
         ? await apiClient.patch(`/order/update/${editingOrder.id}`, payload)
         : await apiClient.post("/order/create", payload);
       if (response.data?.success) {
+        const orderId = editingOrder
+          ? editingOrder.id
+          : response.data?.data?.id;
+
+        if (!editingOrder && orderId && pendingDocuments.length > 0) {
+          await Promise.all(
+            pendingDocuments.map(async ({ category, file }) => {
+              const formData = new FormData();
+              formData.append("file", file);
+              const uploadRes = await apiClient.post("/upload/", formData, {
+                headers: { "Content-Type": "multipart/form-data" },
+              });
+              const fileUrl = uploadRes.data?.data?.fileUrl;
+              if (!fileUrl) {
+                throw new Error("Upload did not return a file URL.");
+              }
+              await apiClient.post(`/order/attachment/${orderId}`, {
+                fileName: file.name,
+                fileUrl,
+                fileSize: file.size,
+                mimeType: file.type || null,
+                category,
+              });
+            }),
+          );
+        }
+
         toast.success(editingOrder ? "Order updated successfully!" : "Order created successfully!");
         resetForm();
         onOpenChange(false);
@@ -888,6 +924,35 @@ export function AddOrderModal({
                   </span>
                 </label>
               </div>
+            </section>
+
+            {/* ==================================================
+                PROJECT DOCUMENT UPLOAD
+                ================================================== */}
+            <section className="border-t pt-7">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="h-4.5 w-1 rounded-full bg-cyan-500" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
+                  Project Documents
+                </h3>
+              </div>
+
+              <ProjectDocumentUploadPanel
+                attachments={editingOrder?.attachments || []}
+                immediate={Boolean(editingOrder)}
+                orderId={editingOrder?.id || null}
+                disabled={isSubmitting}
+                uploading={isSubmitting}
+                onPendingChange={setPendingDocuments}
+                onUploaded={onSuccess}
+              />
+              {!editingOrder && pendingDocuments.length > 0 && (
+                <p className="mt-2 text-[11px] font-medium text-muted-foreground">
+                  {pendingDocuments.length} document
+                  {pendingDocuments.length === 1 ? "" : "s"} will be attached
+                  after the order is created.
+                </p>
+              )}
             </section>
           </div>
 

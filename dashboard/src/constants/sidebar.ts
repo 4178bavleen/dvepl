@@ -128,8 +128,8 @@ export const sidebarItems: SidebarItem[] = [
   {
     name: "Tasks",
     icon: CheckSquare,
-    path: ROUTES.HRMS_TASKS,
-    section: "HRMS",
+    path: ROUTES.TASKS,
+    section: "Tasks",
   },
 
   // CRM

@@ -5,6 +5,7 @@ import {
 } from "fastify";
 
 import { fetchAwardTenders } from "../../../services/quoteTender.service";
+import { syncCustomersFromQuoteTender } from "../../../services/quoteTenderCustomerSync.service";
 import { SalesOrderStatus } from "@prisma/client";
 
 function getSalesOrderStatus(statusStr: string): SalesOrderStatus {
@@ -60,6 +61,20 @@ async function quoteTenderOrderReadRoutes(
 
         fastify.log.info(`Sync found ${tendersArray.length} tenders to process.`);
 
+        // Import / update customers from the portal data and link sales orders.
+        const syncedCustomers = await syncCustomersFromQuoteTender(
+          fastify.prisma,
+          companyId,
+          tendersArray
+        );
+        const customerByFirm = new Map<string, string>();
+        for (const customer of syncedCustomers) {
+          customerByFirm.set(customer.name.toLowerCase(), customer.id);
+        }
+        fastify.log.info(
+          `Customer sync found/updated ${syncedCustomers.length} customers.`
+        );
+
         const syncedOrders: any[] = [];
 
         for (const order of tendersArray) {
@@ -68,6 +83,9 @@ async function quoteTenderOrderReadRoutes(
 
           const dveplCode = `QT-ORDER-${t_id}`;
           const referenceCode = order.reference_code || order.tenderID || String(t_id);
+          const customerId =
+            customerByFirm.get(String(order.firm_name || "").trim().toLowerCase()) ||
+            null;
 
           const remarks = [
             `Work: ${order.name_of_work || ""}`,
@@ -108,6 +126,7 @@ async function quoteTenderOrderReadRoutes(
                 companyId,
                 createdById: userId,
                 orderTakenById: userId,
+                customerId,
                 partyName: order.firm_name || "Unknown Firm",
                 caNo: order.tender_no || null,
                 dveplCode,
@@ -145,7 +164,10 @@ async function quoteTenderOrderReadRoutes(
               fastify.log.info(`Sync updating remarks/file name for t_id: ${t_id}`);
               const updatedOrder = await fastify.prisma.salesOrder.update({
                 where: { id: existing.id },
-                data: { remarks: updatedRemarks },
+                data: {
+                  remarks: updatedRemarks,
+                  ...(existing.customerId ? {} : { customerId }),
+                },
               });
               syncedOrders.push(updatedOrder);
             }
@@ -157,6 +179,7 @@ async function quoteTenderOrderReadRoutes(
           message: "Quote Tender Orders fetched and synced successfully.",
           data: awardTenders,
           syncedCount: syncedOrders.length,
+          syncedCustomersCount: syncedCustomers.length,
         });
       } catch (error: any) {
         fastify.log.error(error);

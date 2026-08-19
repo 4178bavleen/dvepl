@@ -5,6 +5,7 @@ import {
   FastifyRequest,
 } from "fastify";
 import { adminLogs } from "../../../services/logger/contextLogger";
+import { isAdminUser, getEmployeeForUser } from "./access";
 
 async function adminTaskReadByIdRoutes(
   fastify: FastifyInstance,
@@ -58,17 +59,10 @@ async function adminTaskReadByIdRoutes(
         }
 
         const userId = (request.admin as any)?.id;
-        const roles = (request.admin as any)?.roles || [];
-        const pageAccess = (request.admin as any)?.uiAccessProfile?.pageAccess || [];
-        const isManager = roles.some((r: string) => r.toLowerCase().includes("admin")) || pageAccess.includes("tasks") || pageAccess.includes("employees");
+        const isManager = isAdminUser(request.admin);
 
         if (!isManager) {
-          const employee = await fastify.prisma.employee.findFirst({
-            where: {
-              userId: userId,
-              deletedAt: null,
-            },
-          });
+          const employee = await getEmployeeForUser(fastify, userId);
 
           if (!employee) {
             return reply.status(403).send({

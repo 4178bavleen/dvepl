@@ -8,7 +8,21 @@ import { z } from "zod";
 
 import NotificationService  from "../../../services/notification/notification.service"
 
+const stageAssignmentSchema = z.object({
+  stage: z.string().nullable().optional(),
+  userIds: z
+    .array(z.string().uuid())
+    .min(1, "At least one user must be assigned."),
+});
+
 const assignSalesOrderSchema = z.object({
+  assignments: z
+    .array(stageAssignmentSchema)
+    .min(1, "At least one stage assignment is required."),
+});
+
+// Backward compatible: { userIds: [...] } treated as a whole-order (all stages) assignment.
+const legacyAssignSalesOrderSchema = z.object({
   userIds: z
     .array(z.string().uuid())
     .min(1, "At least one user must be assigned.")
@@ -31,14 +45,17 @@ export default async function assignSalesOrderRoute(
       schema: {
         tags: ["Sales Order"],
         summary: "Assign Sales Order",
-        description: "Assign a sales order to one or more users.",
+        description:
+          "Assign a sales order to one or more users, optionally per workflow stage. " +
+          "A null stage means the whole order (all stages).",
       },
     },
     async (
       request: FastifyRequest<{
         Params: Params;
         Body: {
-          userIds: string[];
+          assignments?: Array<{ stage?: string | null; userIds: string[] }>;
+          userIds?: string[];
         };
       }>,
       reply: FastifyReply,
@@ -50,19 +67,22 @@ export default async function assignSalesOrderRoute(
         // Validate Request Body
         // ==========================================
 
-        const validationResult = assignSalesOrderSchema.safeParse(
-          request.body,
-        );
+        let assignments: Array<{ stage?: string | null; userIds: string[] }>;
 
-        if (!validationResult.success) {
+        const modernResult = assignSalesOrderSchema.safeParse(request.body);
+        const legacyResult = legacyAssignSalesOrderSchema.safeParse(request.body);
+
+        if (modernResult.success) {
+          assignments = modernResult.data.assignments;
+        } else if (legacyResult.success) {
+          assignments = [{ stage: null, userIds: legacyResult.data.userIds }];
+        } else {
           return reply.status(400).send({
             success: false,
             message: "Invalid assignment data.",
-            error: validationResult.error.issues,
+            error: modernResult.error.issues,
           });
         }
-
-        const { userIds } = validationResult.data;
 
         // ==========================================
         // Check Sales Order
@@ -78,6 +98,7 @@ export default async function assignSalesOrderRoute(
             dveplCode: true,
             companyId: true,
             partyName: true,
+            workflowStage: true,
           },
         });
 
@@ -89,13 +110,49 @@ export default async function assignSalesOrderRoute(
         }
 
         // ==========================================
-        // Validate Users
+        // Validate Stages Against Active Template
         // ==========================================
+
+        const activeTemplate = await fastify.prisma.workflowTemplate.findFirst({
+          where: { isActive: true },
+          include: { steps: { where: { isActive: true } } },
+        });
+
+        const validStageKeys = new Set(
+          (activeTemplate?.steps ?? []).map((step: any) => step.key),
+        );
+
+        const invalidStages = assignments
+          .map((a) => a.stage)
+          .filter((stage) => stage !== null && stage !== undefined && !validStageKeys.has(stage));
+
+        if (invalidStages.length > 0) {
+          return reply.status(400).send({
+            success: false,
+            message: `Invalid workflow stage(s): ${invalidStages.join(", ")}.`,
+            invalidStages,
+          });
+        }
+
+        // ==========================================
+        // Validate Users (deduped across all stages)
+        // ==========================================
+
+        const uniqueUserIds = Array.from(
+          new Set(assignments.flatMap((a) => a.userIds)),
+        );
+
+        if (uniqueUserIds.length === 0) {
+          return reply.status(400).send({
+            success: false,
+            message: "At least one user must be assigned.",
+          });
+        }
 
         const users = await fastify.prisma.user.findMany({
           where: {
             id: {
-              in: userIds,
+              in: uniqueUserIds,
             },
             companyId: salesOrder.companyId,
             isActive: true,
@@ -108,10 +165,10 @@ export default async function assignSalesOrderRoute(
           },
         });
 
-        if (users.length !== userIds.length) {
+        if (users.length !== uniqueUserIds.length) {
           const foundUserIds = new Set(users.map((user) => user.id));
 
-          const invalidUserIds = userIds.filter(
+          const invalidUserIds = uniqueUserIds.filter(
             (userId) => !foundUserIds.has(userId),
           );
 
@@ -127,7 +184,7 @@ export default async function assignSalesOrderRoute(
         // Replace Existing Assignments
         // ==========================================
 
-        const assignments = await fastify.prisma.$transaction(
+        const newAssignments = await fastify.prisma.$transaction(
           async (tx) => {
             await tx.salesOrderAssignment.deleteMany({
               where: {
@@ -136,10 +193,13 @@ export default async function assignSalesOrderRoute(
             });
 
             await tx.salesOrderAssignment.createMany({
-              data: userIds.map((userId) => ({
-                salesOrderId: salesOrder.id,
-                userId,
-              })),
+              data: assignments.flatMap((a) =>
+                a.userIds.map((userId) => ({
+                  salesOrderId: salesOrder.id,
+                  userId,
+                  stage: a.stage ?? null,
+                })),
+              ),
             });
 
             return tx.salesOrderAssignment.findMany({
@@ -214,10 +274,10 @@ const emailResults = await Promise.allSettled(
           data: {
             salesOrderId: salesOrder.id,
             dveplCode: salesOrder.dveplCode,
-            assignments,
+            assignments: newAssignments,
             notifications: {
-              total: users.length,
-              sent: users.length - failedEmails.length,
+              total: uniqueUserIds.length,
+              sent: uniqueUserIds.length - failedEmails.length,
               failed: failedEmails.length,
             },
           },

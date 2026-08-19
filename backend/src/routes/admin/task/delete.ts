@@ -5,6 +5,7 @@ import {
   FastifyRequest,
 } from "fastify";
 import { adminLogs } from "../../../services/logger/contextLogger";
+import { canManageTask } from "./access";
 
 async function adminTaskDeleteRoutes(
   fastify: FastifyInstance,
@@ -31,6 +32,14 @@ async function adminTaskDeleteRoutes(
           return reply.status(404).send({
             success: false,
             message: "Task not found or already deleted.",
+          });
+        }
+
+        const hasAccess = await canManageTask(fastify, id, request);
+        if (!hasAccess) {
+          return reply.status(403).send({
+            success: false,
+            message: "Access denied: you are not assigned to this task.",
           });
         }
 

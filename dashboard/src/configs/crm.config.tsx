@@ -13,10 +13,21 @@ import {
 // ==========================================
 export const customersConfig = {
   api: crmApi.customers,
+  hideAdd: true,
   tableName: 'customers',
   moduleName: 'Customer',
   pluralName: 'Customers',
   searchPlaceholder: 'Search corporate accounts...',
+  syncAction: {
+    label: 'Sync from Portal',
+    run: async () => {
+      const res = await crmApi.customers.sync();
+      return {
+        syncedCount: res?.syncedCount ?? 0,
+        message: res?.message ?? 'Customers synced from portal.',
+      };
+    },
+  },
   zodSchema: z.object({
     name: z.string().min(2, 'Name must be at least 2 characters'),
     gst: z.string().optional().nullable(),

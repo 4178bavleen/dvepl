@@ -7,6 +7,7 @@ import NotFound from "@/pages/notFound";
 import PageLoader from "@/components/ui/pageLoader";
 import InventoryPage from "@/pages/inventory/inventoryPage";
 import WorkflowTrackerPage from "../pages/workflow/WorkflowTrackerPage";
+import OrderDetailPage from "../pages/tenders/orderdetailPage";
 // const InventoryTrackingPage = lazy(
 //   () => import("@/pages/inventory/inventoryTrackingPage"),
 // );
@@ -175,7 +176,7 @@ export function AppRouter() {
               <Route path="/hrms/shifts" element={<ShiftsPage />} />
               <Route path="/hrms/payroll" element={<PayrollPage />} />
               <Route path="/hrms/documents" element={<DocumentsPage />} />
-              <Route path="/hrms/tasks" element={<TasksPage />} />
+              <Route path="/tasks" element={<TasksPage />} />
               {/* CRM */}
               <Route path="/crm/customers" element={<CustomersPage />} />
               <Route path="/crm/contacts" element={<ContactPersonsPage />} />
@@ -293,6 +294,7 @@ export function AppRouter() {
                 element={<NotificationsPage />}
               />
               <Route path="/export-orders" element={<ExportOrdersPage />} />
+              <Route path="/orders/:id" element={<OrderDetailPage />} />
             </Route>
 
             {/* 404 Fallback */}

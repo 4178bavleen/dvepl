@@ -7,6 +7,7 @@ import {
 import { adminLogs } from "../../../services/logger/contextLogger";
 import { taskNotificationSchema } from "../../../schemas/admin/task/task.schema";
 import NotificationService from "../../../services/notification/notification.service";
+import { canManageTask, isAdminUser, getEmployeeForUser } from "./access";
 
 async function adminTaskNotificationRoutes(
   fastify: FastifyInstance,
@@ -43,6 +44,14 @@ async function adminTaskNotificationRoutes(
           return reply.status(404).send({
             success: false,
             message: "Task not found or deleted.",
+          });
+        }
+
+        const hasAccess = await canManageTask(fastify, id, request);
+        if (!hasAccess) {
+          return reply.status(403).send({
+            success: false,
+            message: "Access denied: you are not assigned to this task.",
           });
         }
 
@@ -97,12 +106,33 @@ async function adminTaskNotificationRoutes(
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         const today = new Date();
+        const isManager = isAdminUser(request.admin);
+
+        let assignmentFilter: any = {};
+        if (!isManager) {
+          const employee = await getEmployeeForUser(fastify, (request.admin as any)?.id);
+          if (!employee) {
+            return reply.status(200).send({
+              success: true,
+              message: "Reminders run completed. Dispatched 0 alert(s) for 0 task(s).",
+            });
+          }
+          assignmentFilter = {
+            assignments: {
+              some: {
+                employeeId: employee.id,
+              },
+            },
+          };
+        }
+
         const overdueTasks = await fastify.prisma.task.findMany({
           where: {
             deletedAt: null,
             status: { not: "completed" },
             dueDate: { lt: today },
             notifEnabled: true,
+            ...assignmentFilter,
           },
           include: {
             assignments: {
