@@ -3,7 +3,6 @@ import {
   FastifyReply,
   FastifyRequest,
 } from "fastify";
-import { WorkflowStage } from "@prisma/client";
 import { getActiveWorkflowTemplate } from "../template";
 import {
   canWorkOnOrderStage,
@@ -127,7 +126,7 @@ export default async function updateOrderWorkflowStageRoute(
             id: orderId,
           },
           data: {
-            workflowStage: stage as WorkflowStage,
+            workflowStage: stage,
             workflowUpdatedAt: new Date(),
             ...(nextAction !== undefined ? { nextAction } : {}),
             ...(dueDate !== undefined
@@ -139,7 +138,7 @@ export default async function updateOrderWorkflowStageRoute(
         const workflowEvent = await tx.workflowEvent.create({
           data: {
             salesOrderId: orderId,
-            stage: stage as WorkflowStage,
+            stage: stage,
             title: activeStep.name,
             description: description ?? null,
             performedById: userId,
