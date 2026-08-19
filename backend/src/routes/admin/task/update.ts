@@ -6,6 +6,7 @@ import {
 } from "fastify";
 import { adminLogs } from "../../../services/logger/contextLogger";
 import { taskSchema } from "../../../schemas/admin/task/task.schema";
+import { canManageTask } from "./access";
 
 import NotificationService from "../../../services/notification/notification.service";
 
@@ -50,6 +51,14 @@ async function adminTaskUpdateRoutes(
           return reply.status(404).send({
             success: false,
             message: "Task not found or deleted.",
+          });
+        }
+
+        const hasAccess = await canManageTask(fastify, id, request);
+        if (!hasAccess) {
+          return reply.status(403).send({
+            success: false,
+            message: "Access denied: you are not assigned to this task.",
           });
         }
 

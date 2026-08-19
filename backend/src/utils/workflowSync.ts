@@ -1,4 +1,4 @@
-import { WorkflowStage } from "@prisma/client";
+import { getActiveWorkflowTemplate } from "../routes/admin/workflow/template";
 
 export async function syncSalesOrderWorkflowFromPo(
   prisma: any,
@@ -26,27 +26,45 @@ export async function syncSalesOrderWorkflowFromPo(
 
   if (!salesOrder) return;
 
+  // Load the active template so we resolve stage keys to names
+  const template = await getActiveWorkflowTemplate(prisma);
+  const steps = (template?.steps ?? []) as any[];
+  const stepByKey = new Map<string, any>(
+    steps.map((s) => [s.key, s]),
+  );
+  const titleFor = (key: string): string =>
+    stepByKey.get(key)?.name ?? key.replace(/_/g, " ");
+
   // poStatus can be "Ready", "Placed", "Needs Revision", "Pending", "Ordered", "Partially Received", "Received", "Cancelled", "APPROVED", "SENT", "PARTIAL_RECEIVED", "COMPLETED", "CANCELLED", "DRAFT"
-  let targetStage: WorkflowStage | null = null;
+  let targetStage: string | null = null;
   if (poStatus === "Ready" || poStatus === "APPROVED") {
-    targetStage = WorkflowStage.PO_READY;
+    targetStage = "PO_READY";
   } else if (poStatus === "Placed" || poStatus === "Ordered" || poStatus === "SENT") {
-    targetStage = WorkflowStage.PO_PLACED;
+    targetStage = "PO_PLACED";
   } else if (
     poStatus === "Needs Revision" ||
     poStatus === "NeedsRevision" ||
     poStatus === "REVISION_REQUIRED"
   ) {
-    targetStage = WorkflowStage.REVISION_REQUIRED;
+    targetStage = "REVISION_REQUIRED";
   } else if (poStatus === "Pending" || poStatus === "Cancelled" || poStatus === "CANCELLED" || poStatus === "DRAFT") {
-    targetStage = WorkflowStage.ORDER_CONFIRMED;
+    targetStage = "ORDER_CONFIRMED";
   } else if (
     poStatus === "Partially Received" ||
     poStatus === "PARTIAL_RECEIVED" ||
     poStatus === "Received" ||
     poStatus === "COMPLETED"
   ) {
-    targetStage = WorkflowStage.INVENTORY_FOLLOW_UP;
+    targetStage = "INVENTORY_FOLLOW_UP";
+  }
+
+  // If the mapped key no longer exists in the active template, fall back to
+  // the first active step rather than writing an invalid key.
+  if (targetStage && !stepByKey.has(targetStage)) {
+    const firstActive = (template?.steps ?? []).find(
+      (s: any) => s.isActive,
+    );
+    if (firstActive) targetStage = firstActive.key;
   }
 
   if (!targetStage || salesOrder.workflowStage === targetStage) return;
@@ -61,26 +79,11 @@ export async function syncSalesOrderWorkflowFromPo(
       },
     });
 
-    const getWorkflowStageTitle = (stage: WorkflowStage): string => {
-      const titles: Record<WorkflowStage, string> = {
-        ORDER_CONFIRMED: "Order Confirmed",
-        PO_READY: "PO Ready",
-        DRAWING_ASSIGNED: "Drawing Assigned",
-        DRAWING_SENT: "Drawing Sent",
-        REVISION_REQUIRED: "Revision Required",
-        DRAWING_APPROVED: "Drawing Approved",
-        PO_PLACED: "PO Placed",
-        INVENTORY_FOLLOW_UP: "Inventory Follow-up",
-        PRODUCTION_FOLLOW_UP: "Production Follow-up",
-      };
-      return titles[stage];
-    };
-
     await tx.workflowEvent.create({
       data: {
         salesOrderId: salesOrder.id,
         stage: targetStage,
-        title: getWorkflowStageTitle(targetStage),
+        title: titleFor(targetStage),
         performedById: userId,
       },
     });

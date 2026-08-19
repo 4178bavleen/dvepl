@@ -64,10 +64,8 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
           const message = (log.message || "").toLowerCase();
           const eventCode = (log.eventCode || "").toUpperCase();
 
-          if (eventCode.includes("WORKFLOW") || subject.includes("workflow") || message.includes("workflow")) {
-            targetUrl = "/workflow";
-          } else if (eventCode.includes("TASK") || subject.includes("task") || message.includes("task")) {
-            targetUrl = "/hrms/tasks";
+          if (eventCode.includes("TASK") || subject.includes("task") || message.includes("task")) {
+            targetUrl = "/tasks";
           } else if (eventCode.includes("DRAWING") || subject.includes("drawing") || message.includes("drawing")) {
             targetUrl = "/export-orders";
           } else if (eventCode === "NEW_ORDER" || subject.includes("sales order") || subject.includes("order assigned") || message.includes("sales order") || message.includes("order")) {

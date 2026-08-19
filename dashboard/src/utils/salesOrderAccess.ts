@@ -2,7 +2,10 @@ import { useCallback } from "react";
 import { useERPStore } from "@/store/erpStore";
 import type { SalesOrderAssignment } from "@/types/exportOrders";
 
-type AssignableOrder = { assignments?: SalesOrderAssignment[] } | null | undefined;
+type AssignableOrder = {
+  assignments?: SalesOrderAssignment[];
+  workflowStage?: string | null;
+} | null | undefined;
 
 export function getCurrentUserId(): string {
   return useERPStore.getState().currentUserId;
@@ -22,6 +25,11 @@ export function isAdminUser(user?: any): boolean {
 
 /**
  * Assigned user (or admin) => WORK ACCESS.
+ * Stage-wise rule:
+ *  - Admin always has access.
+ *  - A user assigned to the whole order (stage === null/undefined) has access.
+ *  - A user assigned to the exact stage the order is currently at has access.
+ *  - If the order has no stage set, any assignment grants access (legacy behavior).
  * Everyone else => VIEW-ONLY.
  */
 export function canWorkOnOrder(
@@ -32,8 +40,16 @@ export function canWorkOnOrder(
   const userId = currentUserId ?? getCurrentUserId();
   if (!order || !userId) return false;
   if (isAdmin ?? isAdminUser()) return true;
+
+  const orderStage = order.workflowStage;
+
   return (order.assignments || []).some(
-    (assignment) => assignment.userId === userId
+    (assignment) =>
+      assignment.userId === userId &&
+      (!orderStage ||
+        assignment.stage === null ||
+        assignment.stage === undefined ||
+        assignment.stage === orderStage),
   );
 }
 

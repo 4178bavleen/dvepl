@@ -74,6 +74,12 @@ export default async function listWorkflowOrdersRoute(
             },
             take: 1,
           },
+          assignments: {
+            select: {
+              userId: true,
+              stage: true,
+            },
+          },
         },
       });
 
@@ -100,6 +106,8 @@ export default async function listWorkflowOrdersRoute(
           workflowUpdatedAt: order.workflowUpdatedAt,
 
           lastEvent: order.workflowEvents[0] ?? null,
+
+          assignments: order.assignments,
         })),
 
         count: orders.length,

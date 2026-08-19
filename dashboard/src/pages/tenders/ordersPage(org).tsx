@@ -13,19 +13,7 @@ import {
   ExternalLink,
   Eye,
   Plus,
-  Maximize2,
-  Minimize2,
 } from "lucide-react";
-
-import {
-  QuoteTenderOrder,
-  ALL_COLUMN_KEYS,
-  ColumnKey,
-  EMPTY_ARRAY,
-  workflowStageLabel,
-  workflowStagePercent,
-  fetchQuoteTenderOrders,
-} from "./orderShared";
 
 import {
   GenericTable,
@@ -33,6 +21,14 @@ import {
 } from "@/components/tables/genericTable";
 
 import { Button } from "@/components/ui/button";
+
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 import { Input } from "@/components/ui/input";
 
@@ -60,11 +56,123 @@ import {
   canPerformPageAction,
 } from "@/utils/pagePermissions";
 import { ConfirmDialog } from "@/components/shared/confirmDialog";
-import { SalesOrderAssignModal } from "./components/SalesOrderAssignModal";
+import {
+  SalesOrderAssignModal,
+  SalesOrderAssignment,
+} from "./components/SalesOrderAssignModal";
 
 import { AddOrderModal } from "./components/AddOrderModal";
 
+// ============================================================
+// API RESPONSE SHAPE
+// ============================================================
+
+interface RawQuoteTenderOrder {
+  name: string;
+  email_id: string;
+  mobile: string;
+  firm_name: string;
+  tender_no: string;
+  department_name: string;
+  name_of_work: string;
+  remarked_at: string;
+  file_name: string | null;
+  t_id: number;
+  section_name: string;
+  division_name: string;
+  subdivision: string;
+  tenderID: string;
+  remark: string;
+  reference_code: string;
+  state_name: string | null;
+  city_name: string | null;
+}
+
+// ============================================================
+// TABLE ROW SHAPE
+// ============================================================
+
+interface QuoteTenderOrder extends RawQuoteTenderOrder {
+  id: string;
+  dveplCode?: string;
+  drawingAttached: boolean;
+  drawings?: Array<{
+    id: string;
+    drawingNo: string;
+    title: string;
+    fileName: string;
+    fileUrl: string;
+  }>;
+  poStatus?: string;
+  poNumber?: string;
+  assignments?: SalesOrderAssignment[];
+  workflowStage?: string;
+  nextAction?: string | null;
+  dueDate?: string | null;
+}
+
+// ============================================================
+// AVAILABLE COLUMNS
+// ============================================================
+
+const ALL_COLUMN_KEYS = [
+  { id: "tenderNo", label: "TENDER NO" },
+  { id: "nameOfWork", label: "NAME OF WORK" },
+  { id: "firmName", label: "FIRM NAME" },
+  { id: "assignedUsers", label: "ASSIGNED TO" },
+  { id: "contactPerson", label: "Name" },
+  { id: "mobile", label: "MOBILE" },
+  { id: "email", label: "EMAIL" },
+  { id: "departmentName", label: "DEPARTMENT" },
+  { id: "sectionName", label: "SECTION" },
+  { id: "divisionName", label: "DIVISION" },
+  { id: "subdivision", label: "SUB DIVISION" },
+  { id: "stateCity", label: "STATE / CITY" },
+  { id: "tenderID", label: "TENDER ID" },
+  { id: "referenceCode", label: "REFERENCE CODE" },
+  { id: "poStatus", label: "PO STATUS" },
+  { id: "workflowProgress", label: "WORKFLOW PROGRESS" },
+  { id: "remark", label: "REMARK" },
+  { id: "remarkedAt", label: "REMARKED AT" },
+  { id: "drawingAttached", label: "DRAWING" },
+  { id: "fileName", label: "FILE" },
+] as const;
+
+type ColumnKey = (typeof ALL_COLUMN_KEYS)[number]["id"];
+
+const EMPTY_ARRAY: QuoteTenderOrder[] = [];
+
+// ============================================================
+// WORKFLOW STAGES (shared with the workflow tracker page)
+// ============================================================
+
+import {
+  DEFAULT_WORKFLOW_STAGES,
+  WorkflowStageMeta,
+} from "@/hooks/useWorkflowTemplate";
 import { useWorkflowTemplate } from "@/hooks/useWorkflowTemplate";
+
+function workflowStageLabel(
+  stage?: string | null,
+  stages?: WorkflowStageMeta[],
+) {
+  if (!stage) return "—";
+  const def = (stages ?? DEFAULT_WORKFLOW_STAGES).find(
+    (s) => s.key === stage,
+  );
+  return def?.name || stage.replace(/_/g, " ");
+}
+
+function workflowStagePercent(
+  stage?: string | null,
+  stages?: WorkflowStageMeta[],
+) {
+  if (!stage) return 0;
+  const list = stages ?? DEFAULT_WORKFLOW_STAGES;
+  const index = list.findIndex((s) => s.key === stage);
+  if (index === -1) return 0;
+  return Math.round((index / (list.length - 1)) * 100);
+}
 
 // ============================================================
 // GENERIC TABLE TYPE WORKAROUND
@@ -80,6 +188,116 @@ const TenderTable = GenericTable as unknown as React.ComponentType<{
   showColumnVisibility?: boolean;
   storageKey?: string;
 }>;
+
+// ============================================================
+// DETAIL ITEM COMPONENT
+// ============================================================
+
+function DetailItem({
+  label,
+  value,
+  className = "",
+  multiline = false,
+}: {
+  label: string;
+  value: string | number | null | undefined;
+  className?: string;
+  multiline?: boolean;
+}) {
+  const displayValue =
+    value !== null &&
+    value !== undefined &&
+    String(value).trim() !== ""
+      ? String(value)
+      : "—";
+
+  return (
+    <div
+      className={`rounded-xl border border-border/60 bg-muted/10 hover:bg-muted/20 transition-all duration-200 px-4 py-3 min-w-0 shadow-3xs ${className}`}
+    >
+      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
+        {label}
+      </p>
+
+      <p
+        className={`mt-1 text-xs sm:text-sm font-semibold text-foreground break-words ${
+          multiline ? "leading-relaxed whitespace-pre-wrap text-muted-foreground/90 font-medium" : ""
+        }`}
+      >
+        {displayValue}
+      </p>
+    </div>
+  );
+}
+
+// ============================================================
+// SECTION TITLE COMPONENT
+// ============================================================
+
+function DetailSectionTitle({
+  title,
+  color = "bg-primary",
+}: {
+  title: string;
+  color?: string;
+}) {
+  return (
+    <div className="flex items-center gap-2 mb-4">
+      <div className={`h-4.5 w-1 rounded-full ${color}`} />
+
+      <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
+        {title}
+      </h3>
+    </div>
+  );
+}
+
+// ============================================================
+// PARSERS
+// ============================================================
+
+function parseSalesOrderRemarks(remarks: string) {
+  const fields = {
+    workName: "",
+    department: "",
+    section: "",
+    division: "",
+    subDivision: "",
+    location: "",
+    tenderId: "",
+    referenceCode: "",
+    fileName: "",
+  };
+  if (!remarks) return fields;
+
+  const lines = remarks.split("\n");
+  lines.forEach((line) => {
+    const parts = line.split(":");
+    if (parts.length >= 2) {
+      const key = parts[0].trim().toLowerCase();
+      const val = parts.slice(1).join(":").trim();
+      if (key === "work") fields.workName = val;
+      else if (key === "department") fields.department = val;
+      else if (key === "section") fields.section = val;
+      else if (key === "division") fields.division = val;
+      else if (key === "sub division") fields.subDivision = val;
+      else if (key === "location") fields.location = val;
+      else if (key === "tender id") fields.tenderId = val;
+      else if (key === "reference code") fields.referenceCode = val;
+      else if (key === "file name") fields.fileName = val;
+    }
+  });
+  return fields;
+}
+
+function parseContactDetails(contactDetails: string) {
+  const parts = (contactDetails || "").split("|").map(p => p.trim());
+  return {
+    name: parts[0] || "",
+    mobile: parts[1] || "",
+    email: parts[2] || "",
+  };
+}
 
 // ============================================================
 // PAGE
@@ -109,6 +327,16 @@ export function OrdersPage() {
     "delete",
   );
 
+  const isOrderAssignedToCurrentUser = useCallback(
+    (order: QuoteTenderOrder | null | undefined) => {
+      if (!order || !currentUserId) return false;
+      return (order.assignments || []).some(
+        (assignment) => assignment.userId === currentUserId
+      );
+    },
+    [currentUserId]
+  );
+
   const navigate = useNavigate();
   const [quoteTenders, setQuoteTenders] =
     useState<QuoteTenderOrder[]>(EMPTY_ARRAY);
@@ -120,6 +348,10 @@ export function OrdersPage() {
   const [filterRemark, setFilterRemark] = useState<string>("");
 
   const [sortBy, setSortBy] = useState<string>("date-newest");
+
+  // Selected tender for centered overview dialog
+  const [viewingTender, setViewingTender] =
+    useState<QuoteTenderOrder | null>(null);
 
   // Selected tender for user assignment modal
   const [assigningTender, setAssigningTender] =
@@ -137,25 +369,6 @@ export function OrdersPage() {
     useState<QuoteTenderOrder | null>(null);
 
   const [isDeleting, setIsDeleting] = useState(false);
-
-  const [isFullscreen, setIsFullscreen] = useState(false);
-
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(Boolean(document.fullscreenElement));
-    };
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () =>
-      document.removeEventListener("fullscreenchange", handleFullscreenChange);
-  }, []);
-
-  const toggleFullscreen = () => {
-    if (document.fullscreenElement) {
-      void document.exitFullscreen().catch(() => {});
-    } else {
-      void document.documentElement.requestFullscreen().catch(() => {});
-    }
-  };
 
   // ============================================================
   // COLUMN VISIBILITY
@@ -206,17 +419,113 @@ export function OrdersPage() {
     setIsLoading(true);
 
     try {
-      const result = await fetchQuoteTenderOrders();
+      // 1. Fetch backend purchase orders
+      let backendPOs: any[] = [];
+      try {
+        const poRes = await apiClient.get("/purchase-order/read");
+        if (poRes.data?.success) {
+          backendPOs = poRes.data.data ?? [];
+        }
+      } catch (err) {
+        console.error("Error loading purchase orders:", err);
+      }
 
-      if (result.success) {
-        setQuoteTenders(result.rows);
+      // 2. Fetch PO revisions from backend database
+      let dbRevisions: any[] = [];
+      try {
+        const revRes = await apiClient.get("/purchase-order/revisions/list");
+        if (revRes.data?.success) {
+          dbRevisions = revRes.data.data ?? [];
+        }
+      } catch (err) {
+        console.error("Error loading revisions:", err);
+      }
+
+      const response = await apiClient.get("/order/read?page=1&limit=100");
+
+      if (response.data?.success) {
+        const rawSalesOrders = response.data?.data ?? [];
+
+        const rows: QuoteTenderOrder[] = rawSalesOrders.map((order: any) => {
+          const remarksFields = parseSalesOrderRemarks(order.remarks || "");
+          const contactFields = parseContactDetails(order.contactDetails || "");
+          const refCode = remarksFields.referenceCode || "";
+
+          // Resolve PO Status
+          const matchedRev = dbRevisions.find(
+            (rev) => rev.referenceCode && String(rev.referenceCode).trim() === String(refCode).trim()
+          );
+          const matchedPO = backendPOs.find(
+            (po) => po.referenceCode && String(po.referenceCode).trim() === String(refCode).trim()
+          );
+
+          let poStatus = "No PO";
+          let poNumber = "";
+
+          if (matchedRev) {
+            poStatus = matchedRev.poStatus;
+            poNumber = matchedRev.poNumber;
+          } else if (matchedPO) {
+            poStatus = matchedPO.status; // e.g. DRAFT, APPROVED, SENT, etc.
+            poNumber = matchedPO.poNo;
+
+            // Map backend status to human-readable/friendly
+            if (poStatus === "DRAFT") poStatus = "Draft";
+            else if (poStatus === "APPROVED") poStatus = "Approved";
+            else if (poStatus === "SENT") poStatus = "Sent";
+            else if (poStatus === "PARTIAL_RECEIVED") poStatus = "Partially Received";
+            else if (poStatus === "COMPLETED") poStatus = "Received";
+            else if (poStatus === "CANCELLED") poStatus = "Cancelled";
+          }
+
+          return {
+            id: order.id,
+            dveplCode: order.dveplCode || "",
+            t_id: order.dveplCode ? parseInt(order.dveplCode.replace(/\D/g, ""), 10) || 0 : 0,
+            tender_no: order.caNo || "",
+            name_of_work: remarksFields.workName || "",
+            firm_name: order.partyName || "",
+            name: contactFields.name || "",
+            mobile: contactFields.mobile || "",
+            email_id: contactFields.email || "",
+            department_name: remarksFields.department || "",
+            section_name: remarksFields.section || "",
+            division_name: remarksFields.division || "",
+            subdivision: remarksFields.subDivision || "",
+            state_name: remarksFields.location || "",
+            city_name: null,
+            tenderID: remarksFields.tenderId || "",
+            reference_code: refCode,
+            poStatus,
+            poNumber,
+            remark: order.status || "",
+            remarked_at: order.createdAt || "",
+            drawingAttached: order.engineeringProjects?.some((proj: any) => proj.drawings?.length > 0) || false,
+            drawings: order.engineeringProjects?.flatMap((proj: any) => proj.drawings || []) || [],
+            file_name: remarksFields.fileName || null,
+            assignments: order.assignments || [],
+            workflowStage: order.workflowStage || undefined,
+            nextAction: order.nextAction ?? null,
+            dueDate: order.dueDate ? new Date(order.dueDate).toISOString() : null,
+          };
+        });
+
+        setQuoteTenders(rows);
+        setViewingTender((prev) => {
+          if (!prev) return null;
+          const updated = rows.find((r) => r.id === prev.id);
+          return updated || prev;
+        });
         setAssigningTender((prev) => {
           if (!prev) return null;
-          const updated = result.rows.find((r) => r.id === prev.id);
+          const updated = rows.find((r) => r.id === prev.id);
           return updated || prev;
         });
       } else {
-        toast.error(result.message ?? "Unable to load orders.");
+        toast.error(
+          response.data?.message ??
+            "Unable to load orders."
+        );
       }
     } catch (error: any) {
       toast.error(
@@ -904,21 +1213,6 @@ export function OrdersPage() {
           <RefreshCw className="size-3.5" />
           Refresh
         </Button>
-
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={toggleFullscreen}
-          title={isFullscreen ? "Exit Full Screen" : "Enter Full Screen"}
-          className="gap-2 self-start sm:self-center h-9 shadow-2xs hover:bg-muted/60 transition-colors"
-        >
-          {isFullscreen ? (
-            <Minimize2 className="size-3.5" />
-          ) : (
-            <Maximize2 className="size-3.5" />
-          )}
-          {isFullscreen ? "Exit Full Screen" : "Full Screen"}
-        </Button>
       </div>
 
       {/* ========================================================
@@ -1212,7 +1506,7 @@ export function OrdersPage() {
       <TenderTable
         columns={tableColumns}
         data={processedTenders}
-        onView={(row) => navigate(`/orders/${row.id}`)}
+        onView={setViewingTender}
         onEdit={
           canEdit || isAdmin
             ? (row) => {
@@ -1232,6 +1526,615 @@ export function OrdersPage() {
         showColumnVisibility={false}
         storageKey="quote-tender-orders"
       />
+
+      {/* ========================================================
+          CENTERED OVERVIEW DIALOG
+          ======================================================== */}
+
+      <Dialog
+        open={Boolean(viewingTender)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setViewingTender(null);
+          }
+        }}
+      >
+        <DialogContent
+          className="
+            w-[calc(100%-2rem)]
+            sm:max-w-3xl
+            lg:max-w-5xl
+            max-h-[90vh]
+            overflow-hidden
+            p-0
+            gap-0
+            rounded-2xl
+            border
+            border-border/80
+            bg-background/98
+            backdrop-blur-md
+            shadow-2xl
+          "
+        >
+          {viewingTender && (
+            <>
+              {/* ==================================================
+                  DIALOG HEADER
+                  ================================================== */}
+
+              <DialogHeader className="px-6 py-5 border-b bg-muted/30">
+                <div className="flex items-center justify-between gap-4 pr-8">
+
+                  <div className="min-w-0">
+                    <DialogTitle className="text-lg font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
+                      Tender Detail Overview
+                    </DialogTitle>
+
+                    <DialogDescription className="mt-1 text-xs font-medium text-muted-foreground">
+                      Complete parameters and assignments for tender{" "}
+                      <span className="font-bold text-foreground">
+                        {viewingTender.tender_no || "—"}
+                      </span>
+                    </DialogDescription>
+                  </div>
+
+                  {/* Status */}
+                  {(() => {
+                    const r = String(viewingTender.remark || "").toLowerCase();
+                    const remarkStyles: Record<string, string> = {
+                      accepted: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+                      rejected: "bg-rose-500/10 text-rose-600 border-rose-500/20",
+                      pending: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+                    };
+                    return (
+                      <span
+                        className={`shrink-0 text-[10px] font-bold px-3 py-1 rounded-full border uppercase tracking-wider ${
+                          remarkStyles[r] || "bg-muted text-muted-foreground border-muted-foreground/10"
+                        }`}
+                      >
+                        {viewingTender.remark || "—"}
+                      </span>
+                    );
+                  })()}
+                </div>
+              </DialogHeader>
+
+              {/* ==================================================
+                  SCROLLABLE CONTENT
+                  ================================================== */}
+
+              <div className="overflow-y-auto max-h-[calc(90vh-110px)] px-6 py-6 scrollbar-thin">
+
+                <div className="space-y-7">
+
+                  {/* ==================================================
+                      BASIC INFORMATION
+                      ================================================== */}
+
+                  <section>
+                    <DetailSectionTitle
+                      title="Basic Information"
+                      color="bg-primary"
+                    />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                      <DetailItem
+                        label="Tender Number"
+                        value={
+                          viewingTender.tender_no
+                        }
+                      />
+
+                      <DetailItem
+                        label="Tender ID"
+                        value={
+                          viewingTender.tenderID
+                        }
+                      />
+
+                      <DetailItem
+                        label="Reference Code"
+                        value={
+                          viewingTender.reference_code
+                        }
+                      />
+
+                      <DetailItem
+                        label="Remark"
+                        value={
+                          viewingTender.remark
+                        }
+                      />
+
+                      <DetailItem
+                        label="Name of Work"
+                        value={
+                          viewingTender.name_of_work
+                        }
+                        multiline
+                        className="md:col-span-2"
+                      />
+                    </div>
+                  </section>
+
+                  {/* ==================================================
+                      WORKFLOW PROGRESS
+                      ================================================== */}
+
+                  <section className="border-t pt-7">
+                    <DetailSectionTitle
+                      title="Workflow Progress"
+                      color="bg-emerald-500"
+                    />
+
+                    {viewingTender.workflowStage ? (
+                      (() => {
+                        const stage = viewingTender.workflowStage;
+                        const percent = workflowStagePercent(stage, workflowStages);
+                        const currentIndex = workflowStages.findIndex(
+                          (s) => s.key === stage,
+                        );
+                        const isDone = currentIndex === workflowStages.length - 1;
+                        const stageDef = workflowStages.find(
+                          (s) => s.key === stage,
+                        );
+
+                        return (
+                          <div className="rounded-2xl border border-border/80 bg-muted/10 p-5 shadow-3xs">
+                            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="size-2.5 rounded-full"
+                                  style={{
+                                    backgroundColor: stageDef?.color || "#3b82f6",
+                                  }}
+                                />
+                                <span className="text-sm font-bold text-foreground">
+                                  {workflowStageLabel(stage, workflowStages)}
+                                </span>
+                              </div>
+                              <span
+                                className={`text-xs font-bold px-3 py-1 rounded-full border ${
+                                  isDone
+                                    ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                                    : "bg-blue-500/10 text-blue-600 border-blue-500/20"
+                                }`}
+                              >
+                                {isDone ? "100% Done" : `${percent}% Complete`}
+                              </span>
+                            </div>
+
+                            {/* Pipeline bar */}
+                            <div className="flex items-center gap-1 mb-2">
+                              {workflowStages.map((s, i) => {
+                                const active = i <= currentIndex;
+                                return (
+                                  <div key={s.key} className="flex-1" title={s.name}>
+                                    <div
+                                      className={`h-2 rounded-full transition-all ${
+                                        i === currentIndex && !isDone ? "ring-2 ring-blue-500/30" : ""
+                                      }`}
+                                      style={
+                                        active
+                                          ? { backgroundColor: s.color }
+                                          : { backgroundColor: "hsl(var(--border))" }
+                                      }
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            {/* Stage labels */}
+                            <div className="flex items-center gap-1">
+                              {workflowStages.map((s, i) => (
+                                <div
+                                  key={s.key}
+                                  className={`flex-1 text-center text-[9px] font-medium leading-tight truncate ${
+                                    i === currentIndex
+                                      ? "text-blue-600 dark:text-blue-400"
+                                      : i < currentIndex
+                                        ? "text-emerald-600 dark:text-emerald-400"
+                                        : "text-muted-foreground"
+                                  }`}
+                                >
+                                  {s.name}
+                                </div>
+                              ))}
+                            </div>
+
+                            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div className="rounded-xl border border-border/70 bg-background px-4 py-3 shadow-3xs">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
+                                  Next Action
+                                </p>
+                                <p className="mt-1 text-xs font-semibold text-foreground">
+                                  {viewingTender.nextAction || "No action assigned"}
+                                </p>
+                              </div>
+                              <div className="rounded-xl border border-border/70 bg-background px-4 py-3 shadow-3xs">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
+                                  Due Date
+                                </p>
+                                <p className="mt-1 text-xs font-semibold text-foreground">
+                                  {viewingTender.dueDate
+                                    ? new Date(viewingTender.dueDate).toLocaleDateString("en-IN", {
+                                        day: "2-digit",
+                                        month: "short",
+                                        year: "numeric",
+                                      })
+                                    : "—"}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-border bg-muted/10 p-6 text-center shadow-3xs">
+                        <p className="text-xs font-medium text-muted-foreground">
+                          No workflow has been started for this order yet.
+                        </p>
+                      </div>
+                    )}
+                  </section>
+
+                  {/* ==================================================
+                      ASSIGNED USERS
+                      ================================================== */}
+
+                  <section className="border-t pt-7">
+                    <div className="flex items-center justify-between mb-4">
+                      <DetailSectionTitle
+                        title="Assigned Users"
+                        color="bg-violet-500"
+                      />
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!isAdmin}
+                        onClick={() => {
+                          if (!isAdmin) return;
+                          setAssigningTender(viewingTender);
+                        }}
+                        title={isAdmin ? "Manage Assignments" : "Only administrators can manage assignments"}
+                        className="gap-1.5 h-8 text-xs font-bold border-violet-500/20 text-violet-600 dark:text-violet-400 hover:bg-violet-500/5 hover:border-violet-500/40 rounded-xl transition-all duration-200"
+                      >
+                        <UserPlus className="size-3.5" />
+                        Manage Assignments
+                      </Button>
+                    </div>
+
+                    <div className="rounded-2xl border border-border/80 bg-muted/10 p-4 shadow-3xs">
+                      {viewingTender.assignments && viewingTender.assignments.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {viewingTender.assignments.map((assignment, idx) => (
+                            <div
+                              key={assignment.id || assignment.userId || idx}
+                              className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border bg-background shadow-3xs"
+                            >
+                              <div className="size-7 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-[10px] uppercase border">
+                                {(assignment.user?.name || "U").charAt(0)}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-bold text-xs text-foreground">
+                                  {assignment.user?.name || "User ID: " + assignment.userId}
+                                </p>
+                                {assignment.user?.email && (
+                                  <p className="text-[10px] text-muted-foreground truncate">
+                                    {assignment.user.email}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between text-xs text-muted-foreground p-1">
+                          <span className="italic font-medium">No users are currently assigned to this order.</span>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            disabled={!isAdmin}
+                            onClick={() => {
+                              if (!isAdmin) return;
+                              setAssigningTender(viewingTender);
+                            }}
+                            title={isAdmin ? "Assign Users" : "Only administrators can manage assignments"}
+                            className="h-8 text-xs font-bold rounded-lg px-3"
+                          >
+                            ＋ Assign Now
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </section>
+
+                  {/* ==================================================
+                      WORK ACCESS
+                      ================================================== */}
+                  <section className="border-t pt-7">
+                    <DetailSectionTitle
+                      title="Work Access Status"
+                      color={
+                        isOrderAssignedToCurrentUser(viewingTender)
+                          ? "bg-emerald-500"
+                          : "bg-amber-500"
+                      }
+                    />
+
+                    <div
+                      className={`rounded-2xl border p-4 flex items-start gap-3 shadow-3xs ${
+                        isOrderAssignedToCurrentUser(viewingTender)
+                          ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-950 dark:text-emerald-300"
+                          : "border-amber-500/20 bg-amber-500/5 text-amber-950 dark:text-amber-300"
+                      }`}
+                    >
+                      {isOrderAssignedToCurrentUser(viewingTender) ? (
+                        <CheckCircle2 className="size-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                      ) : (
+                        <XCircle className="size-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                      )}
+                      <div>
+                        <p className="text-sm font-bold leading-none">
+                          {isOrderAssignedToCurrentUser(viewingTender)
+                            ? "Assigned to You"
+                            : "View-only Mode"}
+                        </p>
+                        <p className="mt-1.5 text-xs text-muted-foreground/80 leading-normal font-medium">
+                          {isOrderAssignedToCurrentUser(viewingTender)
+                            ? "You have full write access to manage this tender order, upload engineering drawings, and transition workflow states."
+                            : "You are not assigned to this tender. You have read-only access. Please request assignment from an administrator if modifications are needed."}
+                        </p>
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* ==================================================
+                      CONTACT
+                      ================================================== */}
+
+                  <section className="border-t pt-7">
+                    <DetailSectionTitle
+                      title="Contact Information"
+                      color="bg-blue-500"
+                    />
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+                      <DetailItem
+                        label="Contact Person"
+                        value={
+                          viewingTender.name
+                        }
+                      />
+
+                      <DetailItem
+                        label="Firm Name"
+                        value={
+                          viewingTender.firm_name
+                        }
+                      />
+
+                      <DetailItem
+                        label="Mobile"
+                        value={
+                          viewingTender.mobile
+                        }
+                      />
+
+                      <DetailItem
+                        label="Email"
+                        value={
+                          viewingTender.email_id
+                        }
+                      />
+                    </div>
+                  </section>
+
+                  {/* ==================================================
+                      JURISDICTION
+                      ================================================== */}
+
+                  <section className="border-t pt-7">
+                    <DetailSectionTitle
+                      title="Jurisdiction"
+                      color="bg-emerald-500"
+                    />
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+                      <DetailItem
+                        label="Department"
+                        value={
+                          viewingTender.department_name
+                        }
+                      />
+
+                      <DetailItem
+                        label="Section"
+                        value={
+                          viewingTender.section_name
+                        }
+                      />
+
+                      <DetailItem
+                        label="Division"
+                        value={
+                          viewingTender.division_name
+                        }
+                      />
+
+                      <DetailItem
+                        label="Sub Division"
+                        value={
+                          viewingTender.subdivision
+                        }
+                      />
+
+                      <DetailItem
+                        label="State"
+                        value={
+                          viewingTender.state_name
+                        }
+                      />
+
+                      <DetailItem
+                        label="City"
+                        value={
+                          viewingTender.city_name
+                        }
+                      />
+                    </div>
+                  </section>
+
+                  {/* ==================================================
+                      TENDER REFERENCE
+                      ================================================== */}
+
+                  <section className="border-t pt-7">
+                    <DetailSectionTitle
+                      title="Tender Reference"
+                      color="bg-amber-500"
+                    />
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+                      <DetailItem
+                        label="Tender ID"
+                        value={
+                          viewingTender.tenderID
+                        }
+                      />
+                      
+                      <DetailItem
+                        label="Reference Code"
+                        value={
+                          viewingTender.reference_code
+                        }
+                      />
+
+                      <DetailItem
+                        label="Remarked At"
+                        value={
+                          viewingTender.remarked_at
+                            ? new Date(
+                                viewingTender.remarked_at
+                              ).toLocaleString(
+                                "en-IN"
+                              )
+                            : null
+                        }
+                      />
+
+                      <DetailItem
+                        label="File"
+                        value={
+                          viewingTender.file_name &&
+                          viewingTender.file_name !==
+                            "null"
+                            ? viewingTender.file_name
+                            : null
+                        }
+                      />
+
+                      <DetailItem
+                        label="Internal Record ID"
+                        value={
+                          viewingTender.id
+                        }
+                      />
+
+                      <DetailItem
+                        label="Database Tender ID"
+                        value={
+                          viewingTender.t_id
+                        }
+                      />
+                    </div>
+                  </section>
+
+                  {/* ==================================================
+                      COMPLETE RECORD
+                      ================================================== */}
+
+                  <section className="border-t pt-7">
+
+                    <div className="rounded-2xl border border-border/80 bg-muted/10 p-5 shadow-3xs">
+
+                      <div className="flex items-center gap-3 mb-5">
+
+                        <div className="p-2.5 rounded-xl bg-primary/10 text-primary border border-primary/15">
+                          <FileText className="size-4.5" />
+                        </div>
+
+                        <div>
+                          <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
+                            Record Information
+                          </h3>
+
+                          <p className="text-[10px] text-muted-foreground mt-0.5 font-semibold">
+                            Metadata associated with this synchronized tender record.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+
+                        <div className="rounded-xl bg-background border border-border/80 p-3 shadow-3xs hover:border-primary/25 transition-all duration-200">
+                          <p className="text-[9px] uppercase font-bold text-muted-foreground/80 tracking-wider">
+                            Record ID
+                          </p>
+
+                          <p className="mt-1 text-xs font-bold text-foreground break-all">
+                            {viewingTender.id || "—"}
+                          </p>
+                        </div>
+
+                        <div className="rounded-xl bg-background border border-border/80 p-3 shadow-3xs hover:border-primary/25 transition-all duration-200">
+                          <p className="text-[9px] uppercase font-bold text-muted-foreground/80 tracking-wider">
+                            Tender ID
+                          </p>
+
+                          <p className="mt-1 text-xs font-bold text-foreground break-all">
+                            {viewingTender.tenderID || "—"}
+                          </p>
+                        </div>
+
+                        <div className="rounded-xl bg-background border border-border/80 p-3 shadow-3xs hover:border-primary/25 transition-all duration-200">
+                          <p className="text-[9px] uppercase font-bold text-muted-foreground/80 tracking-wider">
+                            Status
+                          </p>
+
+                          <p className="mt-1 text-xs font-bold text-foreground capitalize">
+                            {viewingTender.remark || "—"}
+                          </p>
+                        </div>
+
+                        <div className="rounded-xl bg-background border border-border/80 p-3 shadow-3xs hover:border-primary/25 transition-all duration-200">
+                          <p className="text-[9px] uppercase font-bold text-muted-foreground/80 tracking-wider">
+                            File
+                          </p>
+
+                          <p className="mt-1 text-xs font-bold text-foreground truncate">
+                            {viewingTender.file_name &&
+                            viewingTender.file_name !== "null"
+                              ? viewingTender.file_name
+                              : "—"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* ========================================================
           ASSIGN USERS MODAL

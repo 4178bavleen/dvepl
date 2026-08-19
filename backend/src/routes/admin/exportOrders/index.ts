@@ -7,9 +7,9 @@ import {
 import {
   DrawingStatus,
   DrawingType,
-  WorkflowStage,
 } from "@prisma/client";
 import { adminLogs } from "../../../services/logger/contextLogger";
+import { canWorkOnOrderStage, isAdminUser } from "../../../utils/orderAccess";
 import { z } from "zod";
 import { existsSync } from "fs";
 import path from "path";
@@ -79,23 +79,6 @@ async function adminExportOrdersRouteGroup(
         ),
     );
 
-  const isAssignedToSalesOrder = async (
-    salesOrderId: string,
-    userId: string,
-  ): Promise<boolean> => {
-    const assignment =
-      await fastify.prisma.salesOrderAssignment.findUnique({
-        where: {
-          salesOrderId_userId: {
-            salesOrderId,
-            userId,
-          },
-        },
-      });
-
-    return !!assignment;
-  };
-
   const canManageDrawingOrder = async (
     salesOrderId: string,
     request: FastifyRequest,
@@ -106,32 +89,34 @@ async function adminExportOrdersRouteGroup(
 
     if (isAdminUser(request.admin)) return true;
 
-    return isAssignedToSalesOrder(salesOrderId, userId);
+    const order = await fastify.prisma.salesOrder.findUnique({
+      where: { id: salesOrderId },
+      select: {
+        id: true,
+        workflowStage: true,
+        assignments: {
+          select: {
+            userId: true,
+            stage: true,
+          },
+        },
+      },
+    });
+
+    if (!order) return false;
+
+    return canWorkOnOrderStage(
+      order.assignments,
+      order.workflowStage,
+      userId,
+      false,
+    );
   };
 
-
-  const WORKFLOW_STAGE_ORDER: Record<WorkflowStage, number> = {
-    ORDER_CONFIRMED: 0,
-    PO_READY: 1,
-    DRAWING_ASSIGNED: 2,
-    DRAWING_SENT: 3,
-    REVISION_REQUIRED: 4,
-    DRAWING_APPROVED: 5,
-    PO_PLACED: 6,
-    INVENTORY_FOLLOW_UP: 7,
-    PRODUCTION_FOLLOW_UP: 8,
-  };
-
-  const WORKFLOW_STAGE_TITLES: Record<string, string> = {
-    DRAWING_ASSIGNED: "Drawing Assigned",
-    DRAWING_SENT: "Drawing Sent",
-    REVISION_REQUIRED: "Revision Required",
-    DRAWING_APPROVED: "Drawing Approved",
-  };
 
   const syncSalesOrderWorkflow = async (
     salesOrderId: string,
-    stage: WorkflowStage,
+    stage: string,
     performedById: string | null | undefined,
     description?: string,
   ): Promise<void> => {
@@ -143,12 +128,25 @@ async function adminExportOrdersRouteGroup(
 
       if (!order) return;
 
-      const currentIndex =
-        WORKFLOW_STAGE_ORDER[order.workflowStage] ?? -1;
+      // Resolve the current template's stage order so we only move forwards.
+      const template = await fastify.prisma.workflowTemplate.findFirst({
+        where: { isActive: true },
+        include: { steps: { where: { isActive: true } } },
+      });
 
-      const newIndex = WORKFLOW_STAGE_ORDER[stage];
+      const steps = template?.steps ?? [];
+      const positionByKey = new Map(
+        steps.map((s: any, i: number) => [s.key, i]),
+      );
 
-      if (newIndex <= currentIndex) return;
+      const currentIndex = positionByKey.get(order.workflowStage) ?? -1;
+      const newIndex = positionByKey.get(stage) ?? -1;
+
+      if (newIndex === -1 || newIndex <= currentIndex) return;
+
+      const stepTitle = steps.find(
+        (s: any) => s.key === stage,
+      )?.name ?? stage.replace(/_/g, " ");
 
       await fastify.prisma.$transaction([
         fastify.prisma.salesOrder.update({
@@ -163,7 +161,7 @@ async function adminExportOrdersRouteGroup(
           data: {
             salesOrderId,
             stage,
-            title: WORKFLOW_STAGE_TITLES[stage] ?? stage,
+            title: stepTitle,
             description: description ?? null,
             performedById,
           },
@@ -740,7 +738,7 @@ async function adminExportOrdersRouteGroup(
         await syncSalesOrderWorkflow(
           data.salesOrderId,
 
-          WorkflowStage.DRAWING_ASSIGNED,
+          "DRAWING_ASSIGNED",
 
           userId,
 
@@ -1009,7 +1007,7 @@ async function adminExportOrdersRouteGroup(
         if (status === "SUBMITTED") {
           await syncSalesOrderWorkflow(
             salesOrderId,
-            WorkflowStage.DRAWING_SENT,
+            "DRAWING_SENT",
             userId,
             `Revision R${updatedRevision.revisionNo} submitted for drawing ${drawing.drawingNo}`,
           );
@@ -1018,7 +1016,7 @@ async function adminExportOrdersRouteGroup(
         if (status === "APPROVED") {
           await syncSalesOrderWorkflow(
             salesOrderId,
-            WorkflowStage.DRAWING_APPROVED,
+            "DRAWING_APPROVED",
             userId,
             `Revision R${updatedRevision.revisionNo} approved for drawing ${drawing.drawingNo}`,
           );
@@ -1027,7 +1025,7 @@ async function adminExportOrdersRouteGroup(
         if (status === "REJECTED") {
           await syncSalesOrderWorkflow(
             salesOrderId,
-            WorkflowStage.REVISION_REQUIRED,
+            "REVISION_REQUIRED",
             userId,
             `Revision R${updatedRevision.revisionNo} rejected for drawing ${drawing.drawingNo}: ${rejectionReason!.trim()}`,
           );
@@ -1436,7 +1434,7 @@ async function adminExportOrdersRouteGroup(
           await syncSalesOrderWorkflow(
             salesOrderId,
 
-            WorkflowStage.DRAWING_APPROVED,
+            "DRAWING_APPROVED",
 
             userId,
 
@@ -1448,7 +1446,7 @@ async function adminExportOrdersRouteGroup(
           await syncSalesOrderWorkflow(
             salesOrderId,
 
-            WorkflowStage.REVISION_REQUIRED,
+            "REVISION_REQUIRED",
 
             userId,
 
@@ -2314,7 +2312,7 @@ Drawing Link: ${drawingLink}`,
           await syncSalesOrderWorkflow(
             salesOrderId,
 
-            WorkflowStage.DRAWING_SENT,
+            "DRAWING_SENT",
 
             userId,
 

@@ -18,7 +18,9 @@ export const ROUTES = {
   HRMS_SHIFTS: '/hrms/shifts',
   HRMS_PAYROLL: '/hrms/payroll',
   HRMS_DOCUMENTS: '/hrms/documents',
-  HRMS_TASKS: '/hrms/tasks',
+
+  // Tasks
+  TASKS: '/tasks',
 
   // CRM
   CRM_CUSTOMERS: '/crm/customers',

@@ -12,6 +12,7 @@ export const salesOrderAssignmentSchema = z
     id: z.string().optional(),
     salesOrderId: z.string().optional(),
     userId: z.string(),
+    stage: z.string().nullable().optional(),
     user: z
       .object({
         id: z.string(),
@@ -39,6 +40,8 @@ export const exportOrderSchema = z
     items: z
       .array(z.object({ quantity: numberValue }).passthrough())
       .catch([]),
+
+    workflowStage: z.string().nullish(),
 
     assignments: z.array(salesOrderAssignmentSchema).catch([]),
   })

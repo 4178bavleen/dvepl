@@ -45,6 +45,16 @@ async function readCustomerRoutes(
           orderBy: {
             createdAt: "desc",
           },
+          include: {
+            contacts: {
+              where: {
+                deletedAt: null,
+              },
+              orderBy: {
+                createdAt: "desc",
+              },
+            },
+          },
         });
 
         return reply.status(200).send({
