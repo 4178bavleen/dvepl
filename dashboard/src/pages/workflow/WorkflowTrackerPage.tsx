@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { ClockTimePicker } from "@/components/ui/clock-time-picker";
 import {
   AlertTriangle,
   CalendarDays,
@@ -94,11 +95,22 @@ function dotStyle(color?: string | null) {
 
 function formatDate(value?: string | Date | null) {
   if (!value) return "—";
-  return new Date(value).toLocaleDateString("en-IN", {
+  const d = new Date(value);
+  const datePart = d.toLocaleDateString("en-IN", {
     day: "2-digit",
     month: "short",
     year: "numeric",
   });
+  // Show time only if it's not midnight UTC (i.e. a real time was set)
+  const hasTime =
+    d.getHours() !== 0 || d.getMinutes() !== 0;
+  if (!hasTime) return datePart;
+  const timePart = d.toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+  return `${datePart}, ${timePart}`;
 }
 
 function overdue(value?: string | Date | null) {
@@ -171,6 +183,7 @@ export default function WorkflowTrackerPage() {
   const [reminderForm, setReminderForm] = useState({
     nextAction: "",
     dueDate: "",
+    dueTime: "",
     description: "",
   });
 
@@ -356,11 +369,22 @@ export default function WorkflowTrackerPage() {
 
   const openReminder = () => {
     if (!selectedOrder) return;
+    let dateStr = "";
+    let timeStr = "";
+    if (selectedOrder.dueDate) {
+      const d = new Date(selectedOrder.dueDate);
+      dateStr = d.toISOString().slice(0, 10);
+      // Extract local HH:mm if a real time was set
+      const h = d.getHours();
+      const m = d.getMinutes();
+      if (h !== 0 || m !== 0) {
+        timeStr = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+      }
+    }
     setReminderForm({
       nextAction: selectedOrder.nextAction || "",
-      dueDate: selectedOrder.dueDate
-        ? new Date(selectedOrder.dueDate).toISOString().slice(0, 10)
-        : "",
+      dueDate: dateStr,
+      dueTime: timeStr,
       description: "",
     });
     setReminderOpen(true);
@@ -370,6 +394,19 @@ export default function WorkflowTrackerPage() {
     e.preventDefault();
     if (!selectedOrder) return;
 
+    // Combine date + time into a full ISO datetime string
+    let combinedDueDate: string | null = null;
+    if (reminderForm.dueDate) {
+      if (reminderForm.dueTime) {
+        // Build a local datetime string and convert to ISO
+        combinedDueDate = new Date(
+          `${reminderForm.dueDate}T${reminderForm.dueTime}:00`,
+        ).toISOString();
+      } else {
+        combinedDueDate = new Date(`${reminderForm.dueDate}T00:00:00`).toISOString();
+      }
+    }
+
     setSavingReminder(true);
     try {
       await workflowApi.updateOrderWorkflowStage(
@@ -377,7 +414,7 @@ export default function WorkflowTrackerPage() {
         selectedOrder.workflowStage,
         {
           nextAction: reminderForm.nextAction.trim() || null,
-          dueDate: reminderForm.dueDate || null,
+          dueDate: combinedDueDate,
           description:
             reminderForm.description.trim() || "Reminder / follow-up scheduled",
         },
@@ -712,7 +749,7 @@ export default function WorkflowTrackerPage() {
           if (!open && !savingReminder) setReminderOpen(false);
         }}
       >
-        <DialogContent className="overflow-hidden rounded-xl p-0 sm:max-w-md">
+        <DialogContent className="overflow-visible rounded-xl p-0 sm:max-w-md">
           <DialogHeader className="border-b bg-muted/30 px-6 py-4">
             <DialogTitle className="text-base font-bold">
               {selectedOrder?.dveplCode || "Order"} — Follow Up
@@ -742,19 +779,42 @@ export default function WorkflowTrackerPage() {
 
             <div className="space-y-1">
               <Label className="text-xs font-semibold text-muted-foreground">
-                Due Date
+                Due Date &amp; Time
               </Label>
-              <Input
-                type="date"
-                value={reminderForm.dueDate}
-                onChange={(e) =>
-                  setReminderForm((prev) => ({
-                    ...prev,
-                    dueDate: e.target.value,
-                  }))
+              <div className="flex gap-2">
+                <Input
+                  type="date"
+                  value={reminderForm.dueDate}
+                  onChange={(e) =>
+                    setReminderForm((prev) => ({
+                      ...prev,
+                      dueDate: e.target.value,
+                    }))
+                  }
+                  className="h-9 flex-1 text-xs"
+                />
+              </div>
+              <ClockTimePicker
+                value={reminderForm.dueTime}
+                onChange={(v) =>
+                  setReminderForm((prev) => ({ ...prev, dueTime: v }))
                 }
-                className="h-9 text-xs"
               />
+              {reminderForm.dueDate && reminderForm.dueTime && (
+                <p className="text-[10px] text-muted-foreground">
+                  Reminder at{" "}
+                  {new Date(
+                    `${reminderForm.dueDate}T${reminderForm.dueTime}:00`,
+                  ).toLocaleString("en-IN", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: true,
+                  })}
+                </p>
+              )}
             </div>
 
             <div className="space-y-1">

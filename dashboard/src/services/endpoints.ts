@@ -231,10 +231,10 @@ export const API_ENDPOINTS = {
   },
   salesOrder: {
     salesOrders: {
-      list: '/sales-order/read/',
-      create: '/sales-order/create/',
-      update: (id: string) => `/sales-order/update/${id}`,
-      remove: (id: string) => `/sales-order/delete/${id}`,
+      list: '/order/read/',
+      create: '/order/create/',
+      update: (id: string) => `/order/update/${id}`,
+      remove: (id: string) => `/order/delete/${id}`,
       assign: (id: string) => `/order/assign/${id}`,
     },
   },

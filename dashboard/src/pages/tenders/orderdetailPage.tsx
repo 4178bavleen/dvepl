@@ -18,6 +18,18 @@ import { useERPStore } from "@/store/erpStore";
 import { isAdminUser } from "@/utils/pagePermissions";
 import { useWorkflowTemplate } from "@/hooks/useWorkflowTemplate";
 
+// Build a full URL from a relative fileUrl path returned by the backend
+const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL ?? "";
+function buildFileUrl(rawUrl: string): string {
+  if (!rawUrl) return "";
+  if (/^https?:\/\//i.test(rawUrl)) return rawUrl;
+  try {
+    return new URL(rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`, API_BASE_URL).toString();
+  } catch {
+    return rawUrl;
+  }
+}
+
 import {
   SalesOrderAssignModal,
 } from "./components/SalesOrderAssignModal";
@@ -694,7 +706,7 @@ export function OrderDetailPage() {
 
                           {drawing.fileUrl && (
                             <a
-                              href={drawing.fileUrl}
+                              href={buildFileUrl(drawing.fileUrl)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="shrink-0 text-xs font-bold text-primary hover:text-primary-hover flex items-center gap-1"

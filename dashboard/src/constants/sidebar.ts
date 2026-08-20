@@ -129,7 +129,6 @@ export const sidebarItems: SidebarItem[] = [
     name: "Tasks",
     icon: CheckSquare,
     path: ROUTES.TASKS,
-    section: "Tasks",
   },
 
   // CRM
@@ -176,6 +175,12 @@ export const sidebarItems: SidebarItem[] = [
     section: "CRM",
   },
   {
+    name: "Purchase Orders",
+    icon: FileText,
+    path: ROUTES.PURCHASE_ORDERS,
+    section: "CRM",
+  },
+  {
     name: "Inventory",
     icon: Package,
     path: ROUTES.INVENTORY_STOCKS,
@@ -193,13 +198,11 @@ export const sidebarItems: SidebarItem[] = [
     name: "Finance",
     icon: DollarSign,
     path: ROUTES.FINANCE,
-    section: "Finance",
   },
   {
     name: "Workflow Tracker",
     icon: Workflow,
     path: ROUTES.WORKFLOW_TRACKER,
-    section: "Sales",
   },
 
   // Lead Management & Tenders

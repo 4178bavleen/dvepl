@@ -44,7 +44,6 @@ export default function Sidebar({
     name: 'Workflow Tracker',
     path: '/workflow',
     icon: Workflow,
-    section: 'Sales',
   };
 
   // ---------------------------------------------------------
