@@ -47,6 +47,7 @@ export interface SalesOrderAssignModalProps {
     dveplCode?: string;
     assignments?: SalesOrderAssignment[];
   } | null;
+  initialStageKey?: string | null;
   onSuccess: () => void;
 }
 
@@ -69,6 +70,7 @@ export function SalesOrderAssignModal({
   open,
   onOpenChange,
   order,
+  initialStageKey,
   onSuccess,
 }: SalesOrderAssignModalProps) {
   const [users, setUsers] = useState<UserOption[]>([]);
@@ -138,9 +140,9 @@ export function SalesOrderAssignModal({
       void fetchStages();
       setSearch("");
       setValidationError(null);
-      setActiveStageKey(ALL_STAGES_KEY);
+      setActiveStageKey(initialStageKey ?? ALL_STAGES_KEY);
     }
-  }, [open, fetchUsers, fetchStages]);
+  }, [open, fetchUsers, fetchStages, initialStageKey]);
 
   // Sync initial assignments grouped by stage
   useEffect(() => {

@@ -10,13 +10,18 @@ import {
   RefreshCw,
   Maximize2,
   Minimize2,
+  Circle,
+  Clock3,
+  ChevronRight,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "react-hot-toast";
 import { useERPStore } from "@/store/erpStore";
 import { isAdminUser } from "@/utils/pagePermissions";
 import { useWorkflowTemplate } from "@/hooks/useWorkflowTemplate";
+import workflowApi from "@/services/workflowApi";
 
 // Build a full URL from a relative fileUrl path returned by the backend
 const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL ?? "";
@@ -86,9 +91,15 @@ export function OrderDetailPage() {
   const [notFound, setNotFound] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("overview");
 
+  const canWorkOnOrder = isAdmin || isOrderAssignedToCurrentUser(tender);
+
   const [assigningTender, setAssigningTender] =
     useState<QuoteTenderOrder | null>(null);
+  const [assigningStageKey, setAssigningStageKey] = useState<string | null>(
+    null,
+  );
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isUpdatingStage, setIsUpdatingStage] = useState(false);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -138,6 +149,57 @@ export function OrderDetailPage() {
   useEffect(() => {
     void loadTender();
   }, [loadTender]);
+
+  const handleStageToggle = async (stageKey: string, checked: boolean) => {
+    if (!tender || !canWorkOnOrder) return;
+    const currentIndex = workflowStages.findIndex(
+      (s) => s.key === tender.workflowStage,
+    );
+    const targetIndex = workflowStages.findIndex((s) => s.key === stageKey);
+    if (targetIndex === -1) return;
+
+    // Checking a stage advances the order past it; unchecking reverts the
+    // workflow back to that stage (making it the current/in-progress stage).
+    const targetStage = checked
+      ? workflowStages[Math.min(targetIndex + 1, workflowStages.length - 1)]
+          ?.key ?? stageKey
+      : stageKey;
+
+    if (targetStage === tender.workflowStage && currentIndex === targetIndex) {
+      return;
+    }
+
+    setIsUpdatingStage(true);
+    try {
+      await workflowApi.updateOrderWorkflowStage(tender.id, targetStage, {
+        description: checked
+          ? `Marked "${workflowStages[targetIndex]?.name}" as completed`
+          : `Reopened "${workflowStages[targetIndex]?.name}"`,
+      });
+      toast.success(
+        checked ? "Stage marked as completed." : "Stage reopened.",
+      );
+      await loadTender();
+    } catch (error: any) {
+      toast.error(
+        error?.response?.data?.message ?? "Failed to update workflow stage.",
+      );
+    } finally {
+      setIsUpdatingStage(false);
+    }
+  };
+
+  const openAssignForStage = (stageKey: string) => {
+    if (!isAdmin) return;
+    setAssigningStageKey(stageKey);
+    setAssigningTender(tender);
+  };
+
+  const openAssignAll = () => {
+    if (!isAdmin) return;
+    setAssigningStageKey(null);
+    setAssigningTender(tender);
+  };
 
   const drawingsCount = tender?.drawings?.length ?? 0;
   const attachmentCount = tender?.attachments?.length ?? 0;
@@ -419,80 +481,151 @@ export function OrderDetailPage() {
                   color="bg-emerald-500"
                 />
 
-                {tender.workflowStage ? (
+                {workflowStages.length > 0 ? (
                   (() => {
-                    const stage = tender.workflowStage;
-                    const percent = workflowStagePercent(stage, workflowStages);
                     const currentIndex = workflowStages.findIndex(
-                      (s) => s.key === stage,
+                      (s) => s.key === tender.workflowStage,
+                    );
+                    const percent = workflowStagePercent(
+                      tender.workflowStage,
+                      workflowStages,
                     );
                     const isDone = currentIndex === workflowStages.length - 1;
-                    const stageDef = workflowStages.find(
-                      (s) => s.key === stage,
-                    );
 
                     return (
                       <div className="rounded-2xl border border-border/80 bg-muted/10 p-5 shadow-3xs">
                         <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
                           <div className="flex items-center gap-2">
-                            <span
-                              className="size-2.5 rounded-full"
-                              style={{
-                                backgroundColor: stageDef?.color || "#3b82f6",
-                              }}
-                            />
                             <span className="text-sm font-bold text-foreground">
-                              {workflowStageLabel(stage, workflowStages)}
+                              {tender.workflowStage
+                                ? workflowStageLabel(
+                                    tender.workflowStage,
+                                    workflowStages,
+                                  )
+                                : "Pipeline"}
                             </span>
                           </div>
-                          <span
-                            className={`text-xs font-bold px-3 py-1 rounded-full border ${
-                              isDone
-                                ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
-                                : "bg-blue-500/10 text-blue-600 border-blue-500/20"
-                            }`}
-                          >
-                            {isDone ? "100% Done" : `${percent}% Complete`}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`text-xs font-bold px-3 py-1 rounded-full border ${
+                                isDone
+                                  ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                                  : "bg-blue-500/10 text-blue-600 border-blue-500/20"
+                              }`}
+                            >
+                              {isDone ? "100% Done" : `${percent}% Complete`}
+                            </span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={!isAdmin}
+                              onClick={openAssignAll}
+                              title={
+                                isAdmin
+                                  ? "Assign users to all stages"
+                                  : "Only administrators can manage assignments"
+                              }
+                              className="gap-1.5 h-8 text-xs font-bold border-blue-500/20 text-blue-600 dark:text-blue-400 hover:bg-blue-500/5 hover:border-blue-500/40 rounded-xl transition-all duration-200"
+                            >
+                              <UserPlus className="size-3.5" />
+                              Assign All Stages
+                            </Button>
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-1 mb-2">
+                        <div className="space-y-2">
                           {workflowStages.map((s, i) => {
-                            const active = i <= currentIndex;
+                            const stageCompleted = i < currentIndex;
+                            const stageCurrent = i === currentIndex;
+                            const stageUsers = (tender.assignments || []).filter(
+                              (a) =>
+                                !a.stage ||
+                                a.stage === s.key ||
+                                a.stage === "",
+                            );
+
                             return (
-                              <div key={s.key} className="flex-1" title={s.name}>
-                                <div
-                                  className={`h-2 rounded-full transition-all ${
-                                    i === currentIndex && !isDone
-                                      ? "ring-2 ring-blue-500/30"
-                                      : ""
-                                  }`}
-                                  style={
-                                    active
-                                      ? { backgroundColor: s.color }
-                                      : { backgroundColor: "hsl(var(--border))" }
+                              <div
+                                key={s.key}
+                                onClick={() => openAssignForStage(s.key)}
+                                className={`flex items-center gap-3 rounded-xl border bg-background px-3 py-2.5 transition-all duration-200 shadow-3xs ${
+                                  stageCurrent
+                                    ? "border-blue-500/40 ring-2 ring-blue-500/10"
+                                    : stageCompleted
+                                      ? "border-emerald-500/20"
+                                      : "border-border/70"
+                                } ${
+                                  isAdmin
+                                    ? "cursor-pointer hover:border-blue-500/40 hover:shadow-sm"
+                                    : ""
+                                }`}
+                                title={
+                                  isAdmin
+                                    ? `Assign users to "${s.name}"`
+                                    : "Only administrators can assign users"
+                                }
+                              >
+                                <Checkbox
+                                  checked={stageCompleted}
+                                  disabled={!canWorkOnOrder || isUpdatingStage}
+                                  onCheckedChange={(checked) => {
+                                    handleStageToggle(s.key, !!checked);
+                                  }}
+                                  className="shrink-0"
+                                  title={
+                                    canWorkOnOrder
+                                      ? `Mark "${s.name}" as ${
+                                          stageCompleted ? "in progress" : "completed"
+                                        }`
+                                      : "You don't have access to change this stage"
                                   }
                                 />
+                                <span
+                                  className="size-2.5 rounded-full shrink-0"
+                                  style={{
+                                    backgroundColor: s.color || "#3b82f6",
+                                  }}
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-bold text-foreground truncate">
+                                    {s.name}
+                                  </p>
+                                  <p className="text-[10px] text-muted-foreground truncate">
+                                    {stageUsers.length > 0
+                                      ? `${stageUsers.length} user${
+                                          stageUsers.length > 1 ? "s" : ""
+                                        } assigned`
+                                      : "No users assigned"}
+                                  </p>
+                                </div>
+                                <span
+                                  className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full border ${
+                                    stageCompleted
+                                      ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                                      : stageCurrent
+                                        ? "bg-blue-500/10 text-blue-600 border-blue-500/20"
+                                        : "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20"
+                                  }`}
+                                >
+                                  {stageCompleted ? (
+                                    <CheckCircle2 className="size-3" />
+                                  ) : stageCurrent ? (
+                                    <Clock3 className="size-3" />
+                                  ) : (
+                                    <Circle className="size-3" />
+                                  )}
+                                  {stageCompleted
+                                    ? "Completed"
+                                    : stageCurrent
+                                      ? "In Progress"
+                                      : "Pending"}
+                                </span>
+                                {isAdmin && (
+                                  <ChevronRight className="size-4 shrink-0 text-muted-foreground/50" />
+                                )}
                               </div>
                             );
                           })}
-                        </div>
-
-                        <div className="flex items-center gap-1">
-                          {workflowStages.map((s, i) => (
-                            <div
-                              key={s.key}
-                              className={`flex-1 text-center text-[9px] font-medium leading-tight truncate ${
-                                i === currentIndex
-                                  ? "text-blue-600 dark:text-blue-400"
-                                  : i < currentIndex
-                                    ? "text-emerald-600 dark:text-emerald-400"
-                                    : "text-muted-foreground"
-                              }`}
-                            >
-                              {s.name}
-                            </div>
-                          ))}
                         </div>
 
                         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -528,7 +661,8 @@ export function OrderDetailPage() {
                 ) : (
                   <div className="rounded-2xl border border-dashed border-border bg-muted/10 p-6 text-center shadow-3xs">
                     <p className="text-xs font-medium text-muted-foreground">
-                      No workflow has been started for this order yet.
+                      No workflow template has been configured for this order
+                      yet.
                     </p>
                   </div>
                 )}
@@ -818,9 +952,13 @@ export function OrderDetailPage() {
       <SalesOrderAssignModal
         open={Boolean(assigningTender)}
         onOpenChange={(open) => {
-          if (!open) setAssigningTender(null);
+          if (!open) {
+            setAssigningTender(null);
+            setAssigningStageKey(null);
+          }
         }}
         order={assigningTender}
+        initialStageKey={assigningStageKey}
         onSuccess={() => void loadTender()}
       />
 
