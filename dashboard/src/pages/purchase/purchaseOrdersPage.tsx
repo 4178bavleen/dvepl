@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import * as XLSX from "xlsx";
 import {
   Search,
@@ -12,8 +13,19 @@ import {
   RefreshCw,
   SlidersHorizontal,
   Edit,
-  MoreHorizontal,
+  MoreVertical,
+  FileDown,
+  Mail,
+  FileSpreadsheet,
+  Printer,
+  History,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import {
   DndContext,
   closestCenter,
@@ -44,6 +56,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "react-hot-toast";
 import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import { tenderApi, inventoryApi, securityApi, salesOrderApi } from "@/services/modules";
 import { apiClient } from "@/services/axios";
 import { useERPStore } from "@/store/erpStore";
@@ -263,6 +276,8 @@ export function PurchaseOrdersPage() {
   const [isAddingCol, setIsAddingCol] = useState(false);
 
   const [isPoPreviewOpen, setIsPoPreviewOpen] = useState(false);
+  const poPreviewIframeRef = useRef<HTMLIFrameElement>(null);
+  const revisionViewerIframeRef = useRef<HTMLIFrameElement>(null);
   const [isPoPlacedDialogOpen, setIsPoPlacedDialogOpen] = useState(false);
   const [placeSendWhatsapp, setPlaceSendWhatsapp] = useState(true);
   const [placeSendEmail, setPlaceSendEmail] = useState(false);
@@ -273,6 +288,9 @@ export function PurchaseOrdersPage() {
   const [colToRemove, setColToRemove] = useState<string | null>(null);
   const [deleteRevisionConfirmOpen, setDeleteRevisionConfirmOpen] = useState(false);
   const [revisionToDelete, setRevisionToDelete] = useState<string | null>(null);
+  const [isRevisionsPanelOpen, setIsRevisionsPanelOpen] = useState(false);
+  const [viewingRevision, setViewingRevision] = useState<PORevision | null>(null);
+  const [revisionSearch, setRevisionSearch] = useState("");
 
   const [poColumnOrder, setPoColumnOrder] = useState<string[]>(() => {
     if (typeof window === "undefined") return [];
@@ -290,9 +308,66 @@ export function PurchaseOrdersPage() {
   const [fieldSearch, setFieldSearch] = useState("");
   const [searchField, setSearchField] = useState<"all" | "poNo" | "status" | "vendor">("all");
 
+  // Deep-link support: /purchase/orders?order=<salesOrderId>&ref=<code>&mode=generate|view
+  // The order ID is the primary link (direct FK); ref is display/legacy fallback.
+  const location = useLocation();
+  const [linkedRefCode, setLinkedRefCode] = useState("");
+  const [linkedOrderId, setLinkedOrderId] = useState("");
+  const [linkedMode, setLinkedMode] = useState<"generate" | "view" | "">("");
+  const handledDeepLinkRef = useRef<string>("");
+
+  const clearLinkedPoParams = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("ref");
+    url.searchParams.delete("order");
+    url.searchParams.delete("mode");
+    window.history.replaceState({}, "", url.toString());
+    setLinkedRefCode("");
+    setLinkedOrderId("");
+    setLinkedMode("");
+  };
+
   useEffect(() => {
-    fetchAllData();
-  }, []);
+    const queryParams = new URLSearchParams(location.search);
+    const ref = queryParams.get("ref");
+    const orderId = queryParams.get("order") || "";
+    const mode = queryParams.get("mode") as "generate" | "view" | null;
+    if ((!ref && !orderId) || handledDeepLinkRef.current === `${orderId}::${ref}::${mode}`) return;
+    // Wait until data has loaded so we can match existing revisions.
+    if (loading || vendors.length === 0) return;
+
+    handledDeepLinkRef.current = `${orderId}::${ref}::${mode}`;
+    setLinkedRefCode(ref || "");
+    setLinkedOrderId(orderId);
+    setLinkedMode(mode || "generate");
+
+    // Auto-open the existing PO revision linked to this order — direct ID
+    // match first, reference-code string only as legacy fallback.
+    const foundRev =
+      (orderId && revisions.find((r) => (r as any).salesOrderId === orderId)) ||
+      (ref ? revisions.find((r) => r.referenceCode && String(r.referenceCode).trim() === String(ref).trim()) : undefined);
+    if (foundRev) {
+      const v = vendors.find((vendor) => vendor.id === foundRev.vendorId);
+      if (v) {
+        loadRevision(foundRev);
+        setActivePoVendor(v);
+        setIsDataEntryOpen(true);
+        toast.success(`Auto-opened existing PO revision for reference: ${foundRev.referenceCode || ref}`);
+        return;
+      }
+    }
+
+    // No existing PO for this order — start a new one pre-linked by ID + reference.
+    if (mode !== "view") {
+      openNewDataEntry(null);
+      setReferenceCode(ref || "");
+      if (orderId) setLinkedSalesOrderId(orderId);
+      toast.success(`New PO started for reference: ${ref || "linked order"}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revisions, vendors, loading, location.search]);
+
+  useEffect(() => { fetchAllData(); }, []);
 
   const fetchAllData = async () => {
     setLoading(true);
@@ -701,9 +776,9 @@ export function PurchaseOrdersPage() {
       const existingPOs = existingPOsRes.data?.data ?? [];
       const matchedPO = existingPOs.find((p: any) => p.poNo === poNumber);
       if (matchedPO) {
-        await apiClient.patch(`/purchase-order/update/${matchedPO.id}`, { vendorId: activePoVendor.id, expectedDelivery: null, paymentTerms, shippingTerms: "", remarks, referenceCode, status: mappedStatus, poStatus: newStatus, items: resolvedItems, linkedSalesOrderId: linkedSalesOrderId || null, orderType });
+        await apiClient.patch(`/purchase-order/update/${matchedPO.id}`, { vendorId: activePoVendor.id, expectedDelivery: null, paymentTerms, shippingTerms: "", remarks, referenceCode, status: mappedStatus, poStatus: newStatus, items: resolvedItems, linkedSalesOrderId: linkedSalesOrderId || null, poType: linkedSalesOrderId ? "JOB" : "STOCK" });
       } else {
-        await apiClient.post("/purchase-order/create", { poNo: poNumber, vendorId: activePoVendor.id, orderDate: poDate, expectedDelivery: null, paymentTerms, shippingTerms: "", remarks, referenceCode, status: mappedStatus, poStatus: newStatus, items: resolvedItems, linkedSalesOrderId: linkedSalesOrderId || null, orderType });
+        await apiClient.post("/purchase-order/create", { poNo: poNumber, vendorId: activePoVendor.id, orderDate: poDate, expectedDelivery: null, paymentTerms, shippingTerms: "", remarks, referenceCode, status: mappedStatus, poStatus: newStatus, items: resolvedItems, linkedSalesOrderId: linkedSalesOrderId || null, poType: linkedSalesOrderId ? "JOB" : "STOCK" });
       }
       toast.success(`Purchase Order status updated to "${newStatus}"`);
     } catch (err: any) { toast.error("Failed to update Purchase Order status"); }
@@ -743,8 +818,8 @@ export function PurchaseOrdersPage() {
     const newRevision: PORevision = {
       id: `rev-${Date.now()}`, vendorId: activePoVendor.id, poNumber, poDate, poStatus: statusToSave, paymentTerms, materialStatus, advance, remarks, cgstPercent, sgstPercent, igstPercent,
       subtotal: totals.subtotal, cgstAmount: totals.cgstAmt, sgstAmount: totals.sgstAmt, igstAmount: totals.igstAmt, grandTotal: totals.grandTotal,
-      termsAndConditions: terms, lineItems: poItems, companyDetails, createdAt: new Date().toISOString(), createdBy: useERPStore.getState().currentUserName || "Unknown User", revisionNo: nextRevisionNo, customColumns: [...customColumns], referenceCode,
-    };
+      termsAndConditions: terms, lineItems: poItems, companyDetails, createdAt: new Date().toISOString(), createdBy: useERPStore.getState().currentUserName || "Unknown User", revisionNo: nextRevisionNo, customColumns: [...customColumns], referenceCode, salesOrderId: linkedSalesOrderId || null,
+    } as PORevision;
     try {
       let mappedStatus: "DRAFT" | "APPROVED" | "SENT" | "PARTIAL_RECEIVED" | "COMPLETED" | "CANCELLED" = "DRAFT";
       if (statusToSave === "Placed" || statusToSave === "Ordered" || statusToSave === "SENT") mappedStatus = "SENT";
@@ -772,9 +847,9 @@ export function PurchaseOrdersPage() {
       const existingPOs = existingPOsRes.data?.data ?? [];
       const matchedPO = existingPOs.find((p: any) => p.poNo === poNumber);
       if (matchedPO) {
-        await apiClient.patch(`/purchase-order/update/${matchedPO.id}`, { vendorId: activePoVendor.id, expectedDelivery: null, paymentTerms, shippingTerms: "", remarks, referenceCode, status: mappedStatus, poStatus: statusToSave, items: resolvedItems, linkedSalesOrderId: linkedSalesOrderId || null, orderType });
+        await apiClient.patch(`/purchase-order/update/${matchedPO.id}`, { vendorId: activePoVendor.id, expectedDelivery: null, paymentTerms, shippingTerms: "", remarks, referenceCode, status: mappedStatus, poStatus: statusToSave, items: resolvedItems, linkedSalesOrderId: linkedSalesOrderId || null, poType: linkedSalesOrderId ? "JOB" : "STOCK" });
       } else {
-        await apiClient.post("/purchase-order/create", { poNo: poNumber, vendorId: activePoVendor.id, orderDate: poDate, expectedDelivery: null, paymentTerms, shippingTerms: "", remarks, referenceCode, status: mappedStatus, poStatus: statusToSave, items: resolvedItems, linkedSalesOrderId: linkedSalesOrderId || null, orderType });
+        await apiClient.post("/purchase-order/create", { poNo: poNumber, vendorId: activePoVendor.id, orderDate: poDate, expectedDelivery: null, paymentTerms, shippingTerms: "", remarks, referenceCode, status: mappedStatus, poStatus: statusToSave, items: resolvedItems, linkedSalesOrderId: linkedSalesOrderId || null, poType: linkedSalesOrderId ? "JOB" : "STOCK" });
       }
       const savedRevision = await apiService.revisions.create(newRevision);
       const list = await apiService.revisions.list();
@@ -784,13 +859,40 @@ export function PurchaseOrdersPage() {
     } catch (err: any) { toast.error("Failed to save PO revision"); }
   };
 
-  const buildPoDocumentHtml = (): string => {
-    if (!activePoVendor) return "";
-    const currentRevision = revisions.find((r) => r.id === selectedRevisionId);
-    const revisionNoStr = currentRevision ? `R${currentRevision.revisionNo}` : "R0";
+  // When `overrideRev` is given, renders THAT saved revision read-only
+  // (used by the Revision History viewer) without touching wizard state.
+  const buildPoDocumentHtml = (overrideRev?: PORevision | null): string => {
+    const revVendor = overrideRev ? vendors.find((v) => v.id === overrideRev.vendorId) : activePoVendor;
+    if (!revVendor) return "";
+    const revItems: POItem[] = overrideRev ? (overrideRev.lineItems as POItem[]) || [] : poItems;
+    const revNo = overrideRev ? overrideRev.poNumber : poNumber;
+    const revDate = overrideRev ? overrideRev.poDate : poDate;
+    const revPaymentTerms = overrideRev ? overrideRev.paymentTerms || "" : paymentTerms;
+    const revMaterialStatus = overrideRev ? overrideRev.materialStatus || "" : materialStatus;
+    const revRemarks = overrideRev ? overrideRev.remarks || "" : remarks;
+    const revTerms = overrideRev ? overrideRev.termsAndConditions || "" : terms;
+    const revAdvance = overrideRev ? Number(overrideRev.advance) || 0 : advance;
+    const revCgst = overrideRev ? Number(overrideRev.cgstPercent) || 0 : cgstPercent;
+    const revSgst = overrideRev ? Number(overrideRev.sgstPercent) || 0 : sgstPercent;
+    const revIgst = overrideRev ? Number(overrideRev.igstPercent) || 0 : igstPercent;
+    const revReference = overrideRev ? overrideRev.referenceCode || "" : referenceCode;
+    const revCompanyDetails = overrideRev?.companyDetails || companyDetails;
+    const wizardRevision = overrideRev ? null : revisions.find((r) => r.id === selectedRevisionId);
+    const revisionNoStr = overrideRev ? `R${overrideRev.revisionNo}` : (wizardRevision ? `R${wizardRevision.revisionNo}` : "R0");
+    const revSubtotal = revItems.reduce((sum, item) => sum + item.total, 0);
+    const revTotals = {
+      subtotal: revSubtotal,
+      cgstAmt: (revSubtotal * revCgst) / 100,
+      sgstAmt: (revSubtotal * revSgst) / 100,
+      igstAmt: (revSubtotal * revIgst) / 100,
+      grandTotal: 0,
+      balance: 0,
+    };
+    revTotals.grandTotal = revSubtotal + revTotals.cgstAmt + revTotals.sgstAmt + revTotals.igstAmt;
+    revTotals.balance = revTotals.grandTotal - revAdvance;
     const printColumns = orderedPoColumnIds.filter((id) => id !== "delete");
     const headersHtml = printColumns.map((id) => `<th>${getPoColumnLabel(id)}</th>`).join("");
-    const itemsHtml = poItems.map((item, idx) => {
+    const itemsHtml = revItems.map((item, idx) => {
       const tdsHtml = printColumns.map((id) => {
         if (id === "sno") return `<td style="text-align: center;">${idx + 1}</td>`;
         const field = inventoryFieldsMap.get(id);
@@ -827,48 +929,48 @@ export function PurchaseOrdersPage() {
         @media print { @page { size: A4; margin: 0; } html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; } body { margin: 0; padding: 10mm; } * { box-shadow: none !important; } }
       </style></head><body>
         <div class="header"><div>
-          <h2 class="company-name">${companyDetails.name}</h2>
-          <p class="company-address">${companyDetails.address}</p>
-          <p class="company-address">Phone: ${companyDetails.phone} | Email: ${companyDetails.email}</p>
-          <p class="company-address">GSTIN: ${companyDetails.gstin} | ${companyDetails.iso}</p>
-          <p class="company-address">Dept: ${companyDetails.division}</p>
+          <h2 class="company-name">${revCompanyDetails.name}</h2>
+          <p class="company-address">${revCompanyDetails.address}</p>
+          <p class="company-address">Phone: ${revCompanyDetails.phone} | Email: ${revCompanyDetails.email}</p>
+          <p class="company-address">GSTIN: ${revCompanyDetails.gstin} | ${revCompanyDetails.iso}</p>
+          <p class="company-address">Dept: ${revCompanyDetails.division}</p>
         </div><div style="text-align: right;">
           <h1 class="po-title">PURCHASE ORDER</h1>
-          <p style="margin: 0; font-size: 12px;"><strong>PO Number:</strong> ${poNumber}</p>
-          <p style="margin: 2px 0 0 0; font-size: 12px;"><strong>Date:</strong> ${poDate}</p>
+          <p style="margin: 0; font-size: 12px;"><strong>PO Number:</strong> ${revNo}</p>
+          <p style="margin: 2px 0 0 0; font-size: 12px;"><strong>Date:</strong> ${revDate}</p>
           <p style="margin: 2px 0 0 0; font-size: 12px;"><strong>Revision:</strong> ${revisionNoStr}</p>
-          ${referenceCode ? `<p style="margin: 2px 0 0 0; font-size: 12px;"><strong>Reference Code:</strong> ${referenceCode}</p>` : ""}
+          ${revReference ? `<p style="margin: 2px 0 0 0; font-size: 12px;"><strong>Reference Code:</strong> ${revReference}</p>` : ""}
         </div></div>
         <div class="meta-grid">
           <div><h3 class="meta-title">Order Placed To (Vendor):</h3><div class="meta-body">
-            <p style="margin: 0 0 2px 0; font-weight: bold; font-size: 12px;">${activePoVendor.name}</p>
-            <p style="margin: 0 0 2px 0;">Category: ${activePoVendor.category}</p>
-            <p style="margin: 0 0 2px 0;">Phone: ${activePoVendor.phone} | Email: ${activePoVendor.email}</p>
-            <p style="margin: 0 0 2px 0;">GSTIN: ${activePoVendor.gstNumber}</p>
+            <p style="margin: 0 0 2px 0; font-weight: bold; font-size: 12px;">${revVendor.name}</p>
+            <p style="margin: 0 0 2px 0;">Category: ${revVendor.category}</p>
+            <p style="margin: 0 0 2px 0;">Phone: ${revVendor.phone} | Email: ${revVendor.email}</p>
+            <p style="margin: 0 0 2px 0;">GSTIN: ${revVendor.gstNumber}</p>
           </div></div>
           <div><h3 class="meta-title">Delivery & Shipping Terms:</h3><div class="meta-body">
-            <p style="margin: 0 0 2px 0;"><strong>Material Status:</strong> ${materialStatus}</p>
-            <p style="margin: 0 0 2px 0;"><strong>Payment Terms:</strong> ${paymentTerms}</p>
-            <p style="margin: 0 0 2px 0;"><strong>Remarks:</strong> ${remarks || "None"}</p>
+            <p style="margin: 0 0 2px 0;"><strong>Material Status:</strong> ${revMaterialStatus}</p>
+            <p style="margin: 0 0 2px 0;"><strong>Payment Terms:</strong> ${revPaymentTerms}</p>
+            <p style="margin: 0 0 2px 0;"><strong>Remarks:</strong> ${revRemarks || "None"}</p>
           </div></div>
         </div>
         <table><thead><tr>${headersHtml}</tr></thead><tbody>
           ${itemsHtml}
-          ${poItems.length === 0 ? `<tr><td colspan="${colSpan}" style="text-align: center; padding: 15px; color: #6b7280;">No items added.</td></tr>` : ""}
+          ${revItems.length === 0 ? `<tr><td colspan="${colSpan}" style="text-align: center; padding: 15px; color: #6b7280;">No items added.</td></tr>` : ""}
         </tbody></table>
-        <div class="terms-box"><h4 style="margin: 0 0 2px 0; color: #1f2937; font-size: 11px; text-transform: uppercase;">Terms & Conditions:</h4><p style="margin: 0; white-space: pre-wrap; font-size: 9.5px; line-height: 1.2;">${terms}</p></div>
+        <div class="terms-box"><h4 style="margin: 0 0 2px 0; color: #1f2937; font-size: 11px; text-transform: uppercase;">Terms & Conditions:</h4><p style="margin: 0; white-space: pre-wrap; font-size: 9.5px; line-height: 1.2;">${revTerms}</p></div>
         <div class="totals-box">
-          <div class="totals-row"><span>Subtotal:</span> <span>₹${totals.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
-          <div class="totals-row"><span>CGST (${cgstPercent}%):</span> <span>₹${totals.cgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
-          <div class="totals-row"><span>SGST (${sgstPercent}%):</span> <span>₹${totals.sgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
-          <div class="totals-row"><span>IGST (${igstPercent}%):</span> <span>₹${totals.igstAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
-          <div class="totals-row grand-total"><span>Grand Total:</span> <span>₹${totals.grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
-          <div class="totals-row"><span>Advance Paid:</span> <span>₹${advance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
-          <div class="totals-row" style="font-weight: 700; color: #111827; border-top: 1px solid #e5e7eb; padding-top: 4px;"><span>Balance Due:</span> <span>₹${totals.balance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
+          <div class="totals-row"><span>Subtotal:</span> <span>₹${revTotals.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
+          <div class="totals-row"><span>CGST (${revCgst}%):</span> <span>₹${revTotals.cgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
+          <div class="totals-row"><span>SGST (${revSgst}%):</span> <span>₹${revTotals.sgstAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
+          <div class="totals-row"><span>IGST (${revIgst}%):</span> <span>₹${revTotals.igstAmt.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
+          <div class="totals-row grand-total"><span>Grand Total:</span> <span>₹${revTotals.grandTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
+          <div class="totals-row"><span>Advance Paid:</span> <span>₹${revAdvance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
+          <div class="totals-row" style="font-weight: 700; color: #111827; border-top: 1px solid #e5e7eb; padding-top: 4px;"><span>Balance Due:</span> <span>₹${revTotals.balance.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span></div>
         </div>
         <div class="sig-section">
-          <div class="sig-box" style="border: none; text-align: left;"><p class="sig-desc">Prepared By: ${companyDetails.name}</p></div>
-          <div class="sig-box"><p class="sig-title">${companyDetails.signatory}</p><p class="sig-desc">Authorized Signatory</p></div>
+          <div class="sig-box" style="border: none; text-align: left;"><p class="sig-desc">Prepared By: ${revCompanyDetails.name}</p></div>
+          <div class="sig-box"><p class="sig-title">${revCompanyDetails.signatory}</p><p class="sig-desc">Authorized Signatory</p></div>
         </div>
       </body></html>`;
   };
@@ -1005,12 +1107,9 @@ export function PurchaseOrdersPage() {
     if (placeSendWhatsapp) { const cleanPhone = placePhone.replace(/[^\d]/g, ""); window.open("https://wa.me/" + cleanPhone + "?text=" + encodeURIComponent(message), "_blank"); sentChannels.push("WhatsApp"); }
     if (placeSendEmail) {
       const emailToast = toast.loading("Sending PO email...");
-      const canvas = generatePoCanvas();
-      if (!canvas) { toast.error("Unable to generate PO document.", { id: emailToast }); return; }
-      const imgData = canvas.toDataURL("image/jpeg", 0.95);
-      const pdf = new jsPDF({ orientation: "portrait", unit: "px", format: [canvas.width, canvas.height] });
-      pdf.addImage(imgData, "JPEG", 0, 0, canvas.width, canvas.height);
-      const base64Pdf = pdf.output("datauristring").split(",")[1];
+      const placedDoc = buildPoPdfDocument();
+      if (!placedDoc) { toast.error("Unable to generate PO document.", { id: emailToast }); return; }
+      const base64Pdf = placedDoc.output("datauristring").split(",")[1];
       const subject = `Purchase Order ${poNumber} from ${companyDetails.name}`;
       const emailHtml = `<p>Dear Vendor,</p><p>Please find attached our Purchase Order <strong>${poNumber}</strong> dated ${poDate}.</p><p><strong>Summary:</strong></p><ul><li><strong>Material Status:</strong> ${materialStatus}</li><li><strong>Payment Terms:</strong> ${paymentTerms}</li></ul><p>Best regards,<br>${companyDetails.name}</p>`;
       try {
@@ -1025,6 +1124,236 @@ export function PurchaseOrdersPage() {
     toast.success("PO marked as Placed - sent via " + sentChannels.join(" & "));
     setIsPoPlacedDialogOpen(false);
   };
+
+  // ── Row-level quick actions (⋮ menu on the PO table) ──────────────────
+  // loadRevision() batches state updates, so PDF/email/excel generation must
+  // wait until the next render — otherwise the generators read stale data.
+  const [pendingRowAction, setPendingRowAction] = useState<string | null>(null);
+
+  const runRowActionOnRevision = (rev: PORevision, action: "preview" | "pdf" | "email" | "excel") => {
+    const v = vendors.find((x) => x.id === rev.vendorId);
+    if (!v) { toast.error("Vendor not found for this PO."); return; }
+    setActivePoVendor(v);
+    loadRevision(rev);
+    if (action === "preview") { setIsPoPreviewOpen(true); return; }
+    setPendingRowAction(action);
+  };
+
+  // Builds a clean vector A4 purchase-order document (crisp text, real table).
+  // Shared by "Save PO (PDF)" and "Send PO to Mail" so both produce identical,
+  // well-formatted output instead of a blurry canvas screenshot.
+  const buildPoPdfDocument = (): jsPDF | null => {
+    if (!activePoVendor) return null;
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pageW = doc.internal.pageSize.getWidth();
+    const marginX = 12;
+    const contentW = pageW - marginX * 2;
+    const inr = (n: any) => `Rs. ${Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+    const currentRevision = revisions.find((r) => r.id === selectedRevisionId);
+    const revisionNoStr = currentRevision ? `R${currentRevision.revisionNo}` : "R0";
+
+    let y = 16;
+    // ── Header ──
+    doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.setTextColor(30, 58, 138);
+    doc.text((companyDetails.name || "").toUpperCase(), marginX, y);
+    doc.setTextColor(17, 24, 39); doc.setFontSize(20);
+    doc.text("PURCHASE ORDER", pageW - marginX, y, { align: "right" });
+
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(75, 85, 99);
+    y += 5.5;
+    const companyLines = [
+      companyDetails.address || "",
+      `Phone: ${companyDetails.phone || "-"}  |  Email: ${companyDetails.email || "-"}`,
+      `GSTIN: ${companyDetails.gstin || "-"}${companyDetails.iso ? `  |  ${companyDetails.iso}` : ""}${companyDetails.division ? `  |  Dept: ${companyDetails.division}` : ""}`,
+    ].filter(Boolean) as string[];
+    companyLines.forEach((line) => { doc.text(line, marginX, y); y += 4.2; });
+
+    let ry = 21.5;
+    doc.setFontSize(9.5); doc.setTextColor(17, 24, 39);
+    [`PO Number: ${poNumber}`, `Date: ${poDate}`, `Revision: ${revisionNoStr}`, ...(referenceCode ? [`Reference Code: ${referenceCode}`] : [])].forEach((line) => {
+      doc.text(line, pageW - marginX, ry, { align: "right" }); ry += 4.6;
+    });
+
+    y = Math.max(y + 1.5, ry) ;
+    doc.setDrawColor(17, 24, 39); doc.setLineWidth(0.5);
+    doc.line(marginX, y, pageW - marginX, y);
+
+    // ── Vendor / delivery meta blocks ──
+    y += 7;
+    const colSplit = marginX + contentW * 0.55;
+    doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(37, 99, 235);
+    doc.text("ORDER PLACED TO (VENDOR):", marginX, y);
+    doc.text("DELIVERY & SHIPPING TERMS:", colSplit, y);
+    doc.setFontSize(9); doc.setTextColor(31, 41, 55);
+    let vy = y + 5;
+    doc.setFont("helvetica", "bold");
+    doc.text(activePoVendor.name || "-", marginX, vy);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(75, 85, 99);
+    [
+      `Category: ${activePoVendor.category || "-"}`,
+      `Phone: ${activePoVendor.phone || "-"}  |  Email: ${activePoVendor.email || "-"}`,
+      `GSTIN: ${activePoVendor.gstNumber || "-"}`,
+    ].forEach((line) => { vy += 4.2; doc.text(line, marginX, vy); });
+    let ty = y + 5;
+    doc.setFontSize(9); doc.setTextColor(31, 41, 55);
+    [
+      `Material Status: ${materialStatus || "-"}`,
+      `Payment Terms: ${paymentTerms || "-"}`,
+      `Remarks: ${remarks || "None"}`,
+    ].forEach((line) => { doc.text(line, colSplit, ty); ty += 4.6; });
+    y = Math.max(vy, ty) + 3;
+
+    // ── Line items table ──
+    const printColumns = orderedPoColumnIds.filter((id) => id !== "delete");
+    const head = printColumns.map((id) => getPoColumnLabel(id));
+    const body = poItems.map((item, idx) => printColumns.map((id) => {
+      if (id === "sno") return String(idx + 1);
+      const field = inventoryFieldsMap.get(id);
+      const val = item[id];
+      const isPrice = id === "net" || id === "total" || id === "rate" || (field?.label.toLowerCase().includes("price") && typeof val === "number");
+      if (isPrice) return inr(val);
+      return val !== undefined && val !== null && String(val).length > 0 ? String(val) : "-";
+    }));
+    autoTable(doc, {
+      startY: y,
+      head: [head],
+      body: body.length > 0 ? body : [printColumns.map(() => "")],
+      theme: "grid",
+      styles: { fontSize: 8, cellPadding: 1.8, lineColor: [229, 231, 235], textColor: [31, 41, 55] },
+      headStyles: { fillColor: [243, 244, 246], textColor: [55, 65, 81], fontStyle: "bold", fontSize: 7.5 },
+      alternateRowStyles: { fillColor: [250, 250, 251] },
+      columnStyles: Object.fromEntries(
+        printColumns.map((id, i) => {
+          const field = inventoryFieldsMap.get(id);
+          const isPrice = id === "net" || id === "total" || id === "rate";
+          const isNumber = isPrice || id === "qty" || id === "discountPercent" || id === "sno" || field?.type === "NUMBER";
+          return [i, { halign: isNumber ? "right" : "left", ...(id === "sno" ? { cellWidth: 10 } : {}) }];
+        }),
+      ),
+      margin: { left: marginX, right: marginX },
+    });
+    y = ((doc as any).lastAutoTable?.finalY ?? y) + 6;
+
+    // ── Totals (right) & terms (left) ──
+    const totalsRows: Array<[string, string, boolean?]> = [
+      ["Subtotal:", inr(totals.subtotal)],
+      [`CGST (${cgstPercent}%):`, inr(totals.cgstAmt)],
+      [`SGST (${sgstPercent}%):`, inr(totals.sgstAmt)],
+      [`IGST (${igstPercent}%):`, inr(totals.igstAmt)],
+      ["Grand Total:", inr(totals.grandTotal), true],
+      ["Advance Paid:", inr(advance)],
+      ["Balance Due:", inr(totals.balance), true],
+    ];
+    const boxX = pageW - marginX - 78;
+    doc.setFontSize(9);
+    totalsRows.forEach(([label, value, strong]) => {
+      doc.setFont("helvetica", strong ? "bold" : "normal");
+      doc.setTextColor(strong ? 17 : 75, strong ? 24 : 85, strong ? 39 : 99);
+      doc.text(label, boxX, y);
+      doc.text(value, pageW - marginX, y, { align: "right" });
+      y += 5;
+    });
+
+    let termsY = y - totalsRows.length * 5;
+    doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(31, 41, 55);
+    doc.text("TERMS & CONDITIONS:", marginX, termsY);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(75, 85, 99);
+    const termsLines = doc.splitTextToSize(terms || "—", boxX - marginX - 8);
+    termsLines.forEach((line: string) => { termsY += 4; doc.text(line, marginX, termsY); });
+
+    // ── Signature section ──
+    let sigY = Math.max(y, termsY) + 18;
+    if (sigY > doc.internal.pageSize.getHeight() - 25) { doc.addPage(); sigY = 25; }
+    doc.setDrawColor(17, 24, 39); doc.setLineWidth(0.3);
+    doc.line(marginX, sigY, marginX + 60, sigY);
+    doc.line(pageW - marginX - 60, sigY, pageW - marginX, sigY);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(75, 85, 99);
+    doc.text(`Prepared By: ${companyDetails.name || "-"}`, marginX, sigY + 4.5);
+    doc.setFont("helvetica", "bold"); doc.setTextColor(17, 24, 39);
+    doc.text(companyDetails.signatory || "Authorized Signatory", pageW - marginX - 30, sigY + 4.5, { align: "center" });
+    doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(107, 114, 128);
+    doc.text("Authorized Signatory", pageW - marginX - 30, sigY + 8, { align: "center" });
+
+    return doc;
+  };
+
+  const downloadPoPdf = () => {
+    if (!canExport) { toast.error("You do not have export permission."); return; }
+    if (!activePoVendor) { toast.error("No vendor context found."); return; }
+    const doc = buildPoPdfDocument();
+    if (!doc) { toast.error("Unable to generate PO document."); return; }
+    doc.save(`${poNumber || "purchase-order"}.pdf`);
+    toast.success("PO PDF saved to your downloads folder.");
+  };
+
+  const sendPoEmailDirect = async () => {
+    if (!activePoVendor) { toast.error("No vendor context found."); return; }
+    if (!activePoVendor.email?.trim()) { toast.error("This vendor has no email address on file."); return; }
+    const emailToast = toast.loading("Sending PO email...");
+    try {
+      const doc = buildPoPdfDocument();
+      if (!doc) { toast.error("Unable to generate PO document.", { id: emailToast }); return; }
+      const base64Pdf = doc.output("datauristring").split(",")[1];
+      const subject = `Purchase Order ${poNumber} from ${companyDetails.name}`;
+      const emailHtml = `<p>Dear Vendor,</p><p>Please find attached our Purchase Order <strong>${poNumber}</strong> dated ${poDate}.</p><p><strong>Summary:</strong></p><ul><li><strong>Material Status:</strong> ${materialStatus}</li><li><strong>Payment Terms:</strong> ${paymentTerms}</li></ul><p>Best regards,<br>${companyDetails.name}</p>`;
+      const res = await securityApi.settings.sendPoEmail({ vendorId: activePoVendor.id, subject, html: emailHtml, pdfBase64: base64Pdf, poNumber });
+      if (res?.success) toast.success(`PO emailed to ${activePoVendor.email}`, { id: emailToast });
+      else toast.error(res?.message || "Failed to send PO email.", { id: emailToast });
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || err?.message || "Error sending PO email.", { id: emailToast });
+    }
+  };
+
+  const exportPoItemsExcel = () => {
+    if (!canExport) { toast.error("You do not have export permission."); return; }
+    if (poItems.length === 0) { toast.error("No line items to export."); return; }
+    // "sno" is excluded because we add our own S.No column — including it
+    // produced a duplicated serial-number column in the export.
+    const itemCols = orderedPoColumnIds.filter((id) => id !== "delete" && id !== "sno");
+    const headers = ["S.No", ...itemCols.map((id) => getPoColumnLabel(id))];
+    const rows = poItems.map((item, idx) => [
+      idx + 1,
+      ...itemCols.map((id) => {
+        if (id === "qty") return Number(item.qty) || 0;
+        if (id === "discountPercent") return item.discountPercent ?? 0;
+        if (id === "net") return item.net ?? 0;
+        if (id === "total") return item.total ?? 0;
+        return (item as any)[id] ?? "";
+      }),
+    ]);
+    const lastColIdx = headers.length - 1;
+    const padToLast = (label: string, value: number) => {
+      const row: any[] = [label];
+      for (let i = 1; i < lastColIdx; i++) row.push("");
+      row.push(value);
+      return row;
+    };
+    const summary = [
+      [],
+      padToLast("Subtotal", totals.subtotal),
+      padToLast(`CGST (${cgstPercent}%)`, totals.cgstAmt),
+      padToLast(`SGST (${sgstPercent}%)`, totals.sgstAmt),
+      padToLast(`IGST (${igstPercent}%)`, totals.igstAmt),
+      padToLast("Grand Total", totals.grandTotal),
+      padToLast("Advance Paid", advance),
+      padToLast("Balance Due", totals.balance),
+    ];
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows, ...summary]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "PO Items");
+    XLSX.writeFile(wb, `${poNumber || "purchase-order"}-line-items.xlsx`);
+    toast.success("PO line items exported to Excel.");
+  };
+
+  React.useEffect(() => {
+    if (!pendingRowAction) return;
+    const action = pendingRowAction;
+    setPendingRowAction(null);
+    if (action === "pdf") downloadPoPdf();
+    else if (action === "email") void sendPoEmailDirect();
+    else if (action === "excel") exportPoItemsExcel();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingRowAction]);
 
   const handlePoColumnDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -1153,31 +1482,90 @@ export function PurchaseOrdersPage() {
       cell: ({ row }) => {
         const rev = row.original as PORevision;
         return (
-          <div className="flex items-center gap-1.5 justify-center">
-            <Button variant="ghost" size="sm"
-              onClick={(e) => { e.stopPropagation(); const v = vendors.find((v) => v.id === rev.vendorId); if (v) { setActivePoVendor(v); loadRevision(rev); setIsDataEntryOpen(true); } }}
-              className="h-8 px-2.5 hover:bg-amber-500/10 hover:text-amber-600 dark:hover:text-amber-400 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
-            >
-              <Edit className="h-3.5 w-3.5" />
-              <span className="hidden xl:inline">Edit</span>
-            </Button>
-            {canDelete && (
-              <Button variant="ghost" size="sm"
-                onClick={(e) => { e.stopPropagation(); setRevisionToDelete(rev.id); setDeleteRevisionConfirmOpen(true); }}
-                className="h-8 px-2.5 text-destructive hover:bg-destructive/15 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
+          <div
+            className="flex items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                onClick={(e) => e.stopPropagation()}
+                render={
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label="Actions"
+                    title="Actions"
+                    className="size-8 rounded-lg p-0 text-muted-foreground/60 hover:bg-primary/10 hover:text-primary data-[popup-open]:bg-primary/10 data-[popup-open]:text-primary cursor-pointer transition-colors"
+                  >
+                    <MoreVertical className="size-4" />
+                  </Button>
+                }
+              />
+              <DropdownMenuContent
+                align="end"
+                sideOffset={6}
+                className="w-44 min-w-0 rounded-xl p-1.5 shadow-lg ring-foreground/10"
               >
-                <Trash2 className="h-3.5 w-3.5" />
-                <span className="hidden xl:inline">Delete</span>
-              </Button>
-            )}
-            <div className="relative">
-              <Button variant="ghost" size="sm"
-                onClick={(e) => { e.stopPropagation(); }}
-                className="h-8 w-8 p-0 hover:bg-muted text-muted-foreground cursor-pointer transition-colors"
-              >
-                <MoreHorizontal className="h-3.5 w-3.5" />
-              </Button>
-            </div>
+                <DropdownMenuItem
+                  onClick={() => {
+                    const v = vendors.find((v) => v.id === rev.vendorId);
+                    if (v) {
+                      setActivePoVendor(v);
+                      loadRevision(rev);
+                      setIsDataEntryOpen(true);
+                    }
+                  }}
+                  className="gap-2.5 rounded-lg px-2.5 py-2 text-xs font-semibold cursor-pointer text-amber-600 dark:text-amber-400 focus:text-amber-600 dark:focus:text-amber-400"
+                >
+                  <Edit className="h-3.5 w-3.5" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => runRowActionOnRevision(rev, "preview")}
+                  className="gap-2.5 rounded-lg px-2.5 py-2 text-xs font-semibold cursor-pointer"
+                >
+                  <Eye className="h-3.5 w-3.5 text-primary" />
+                  View / Print Preview
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => runRowActionOnRevision(rev, "pdf")}
+                  className="gap-2.5 rounded-lg px-2.5 py-2 text-xs font-semibold cursor-pointer"
+                >
+                  <FileDown className="h-3.5 w-3.5 text-primary" />
+                  Save PO (PDF)
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => runRowActionOnRevision(rev, "email")}
+                  className="gap-2.5 rounded-lg px-2.5 py-2 text-xs font-semibold cursor-pointer"
+                >
+                  <Mail className="h-3.5 w-3.5 text-primary" />
+                  Send PO to Mail
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => runRowActionOnRevision(rev, "excel")}
+                  className="gap-2.5 rounded-lg px-2.5 py-2 text-xs font-semibold cursor-pointer"
+                >
+                  <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
+                  Excel Download
+                </DropdownMenuItem>
+                {canDelete && (
+                  <>
+                    <div className="-mx-1 my-1 h-px bg-border" />
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onClick={() => {
+                        setRevisionToDelete(rev.id);
+                        setDeleteRevisionConfirmOpen(true);
+                      }}
+                      className="gap-2.5 rounded-lg px-2.5 py-2 text-xs font-semibold cursor-pointer"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         );
       },
@@ -1202,12 +1590,39 @@ export function PurchaseOrdersPage() {
             <Button onClick={() => fetchAllData()} variant="outline" size="sm" className="gap-2 font-medium h-10 rounded-lg px-4">
               <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} /> Refresh
             </Button>
+            <Button onClick={() => { setIsRevisionsPanelOpen(true); setRevisionSearch(""); }} variant="outline" size="sm" className="gap-2 font-medium h-10 rounded-lg px-4">
+              <History className="size-4" /> Revision History
+            </Button>
             <Button onClick={() => openNewDataEntry(null)} className="gap-2 bg-primary text-white font-semibold h-10 rounded-lg px-4">
               <Plus className="size-4" /> New PO
             </Button>
           </div>
         )}
       </div>
+
+      {/* Linked sales-order reference banner (deep-link from Orders page) */}
+      {linkedRefCode && (
+        <div className="flex items-center justify-between gap-3 flex-wrap rounded-xl border border-blue-500/25 bg-blue-500/5 px-4 py-3">
+          <p className="text-xs font-semibold text-foreground flex items-center gap-2 flex-wrap">
+            {linkedMode === "view" ? "Viewing purchase order" : "Generating purchase order"} for Sales
+            Order Reference:{" "}
+            <span className="font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20">
+              {linkedRefCode || linkedOrderId}
+            </span>
+            {linkedOrderId && (
+              <span className="text-[10px] font-bold uppercase tracking-wide text-emerald-600 bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.5 rounded-full">
+                JO-linked (direct)
+              </span>
+            )}
+          </p>
+          <button
+            onClick={clearLinkedPoParams}
+            className="text-xs font-semibold text-muted-foreground hover:text-rose-500 transition-colors"
+          >
+            ✕ Clear link
+          </button>
+        </div>
+      )}
 
       {/* Search */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1305,6 +1720,14 @@ export function PurchaseOrdersPage() {
                 ))}
                 {activePoRevisions.length === 0 && <span className="de-rev-pill">R0</span>}
               </div>
+              <button
+                type="button"
+                onClick={() => { setIsRevisionsPanelOpen(true); setRevisionSearch(""); }}
+                style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, padding: "4px 12px", borderRadius: 20, background: "#fff7ed", border: "1px solid #fdba74", color: "#9a3412", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap" }}
+                title="Open the full revision history for every PO"
+              >
+                🕘 View all revisions
+              </button>
             </div>
 
             {/* Form Body */}
@@ -1459,7 +1882,180 @@ export function PurchaseOrdersPage() {
             <DialogTitle className="flex items-center gap-2 text-base font-bold text-primary"><Eye className="size-5" /> PO Preview — {poNumber}</DialogTitle>
           </DialogHeader>
           <div className="flex-1 min-h-0 border rounded-lg overflow-hidden bg-white">
-            {isPoPreviewOpen && <iframe title="po-preview" srcDoc={buildPoDocumentHtml()} className="w-full h-full" />}
+            {isPoPreviewOpen && <iframe ref={poPreviewIframeRef} title="po-preview" srcDoc={buildPoDocumentHtml()} className="w-full h-full" />}
+          </div>
+          <div className="flex items-center justify-end gap-2 pt-3 border-t">
+            <Button variant="outline" size="sm" className="h-9 cursor-pointer" onClick={() => setIsPoPreviewOpen(false)}>
+              Close
+            </Button>
+            <Button
+              size="sm"
+              className="h-9 gap-2 bg-primary text-white font-semibold cursor-pointer"
+              onClick={() => {
+                const win = poPreviewIframeRef.current?.contentWindow;
+                if (!win) { toast.error("Unable to access the preview document."); return; }
+                win.focus();
+                win.print();
+              }}
+            >
+              <Printer className="size-4" /> Print
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── REVISION HISTORY PANEL ── */}
+      <Dialog open={isRevisionsPanelOpen} onOpenChange={setIsRevisionsPanelOpen}>
+        <DialogContent className="max-w-3xl h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-primary"><History className="size-5" /> Revision History</DialogTitle>
+            <p className="text-xs text-muted-foreground">All saved purchase order revisions across every vendor.</p>
+          </DialogHeader>
+          {(() => {
+            const sorted = [...revisions].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            const latestByPo = new Map<string, number>();
+            sorted.forEach((r) => { if (!latestByPo.has(r.poNumber)) latestByPo.set(r.poNumber, r.revisionNo); });
+            const q = revisionSearch.trim().toLowerCase();
+            const filtered = q ? sorted.filter((r) => {
+              const vName = vendors.find((v) => v.id === r.vendorId)?.name || "";
+              return [r.poNumber, r.referenceCode, r.poStatus, vName].some((s) => String(s || "").toLowerCase().includes(q));
+            }) : sorted;
+            return (
+              <>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="rounded-xl border bg-card px-4 py-3">
+                    <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Total POs</div>
+                    <div className="text-xl font-bold">{new Set(revisions.map((r) => r.poNumber)).size}</div>
+                  </div>
+                  <div className="rounded-xl border bg-card px-4 py-3">
+                    <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Revisions</div>
+                    <div className="text-xl font-bold text-primary">{revisions.length}</div>
+                  </div>
+                  <div className="rounded-xl border bg-card px-4 py-3">
+                    <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Shown</div>
+                    <div className="text-xl font-bold">{filtered.length}</div>
+                  </div>
+                </div>
+                <div className="flex items-center w-full sm:w-72 h-9 bg-card border rounded-lg overflow-hidden mt-1">
+                  <span className="px-3 text-muted-foreground"><Search className="size-3.5" /></span>
+                  <input value={revisionSearch} onChange={(e) => setRevisionSearch(e.target.value)} placeholder="Search PO no, vendor, reference, status…" className="flex-1 h-full bg-transparent text-xs outline-none" />
+                </div>
+                <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-2.5">
+                  {filtered.map((rev) => {
+                    const revVendor = vendors.find((v) => v.id === rev.vendorId);
+                    const isLatest = latestByPo.get(rev.poNumber) === rev.revisionNo;
+                    const statusChip = String(rev.poStatus || "").toLowerCase();
+                    const chipCls = statusChip.includes("cancel") ? "bg-rose-500/10 text-rose-600 border-rose-500/25"
+                      : statusChip.includes("place") || statusChip.includes("order") || statusChip.includes("sent") ? "bg-blue-500/10 text-blue-600 border-blue-500/25"
+                      : statusChip.includes("ready") || statusChip.includes("approv") ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/25"
+                      : statusChip.includes("receiv") || statusChip.includes("complet") ? "bg-violet-500/10 text-violet-600 border-violet-500/25"
+                      : "bg-amber-500/10 text-amber-600 border-amber-500/25";
+                    return (
+                      <div key={rev.id} className="rounded-xl border bg-card p-3 hover:border-primary/40 transition-colors">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            <div className="shrink-0 size-9 rounded-lg bg-primary/10 text-primary flex flex-col items-center justify-center leading-none">
+                              <span className="text-[8px] font-bold">REV</span>
+                              <span className="text-xs font-extrabold">{rev.revisionNo}</span>
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-sm font-bold truncate">{rev.poNumber}</span>
+                                {isLatest ? (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600">LATEST</span>
+                                ) : (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">SAVED</span>
+                                )}
+                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${chipCls}`}>{rev.poStatus}</span>
+                              </div>
+                              <div className="mt-0.5 text-[11px] text-muted-foreground truncate">
+                                {revVendor?.name || "Unknown vendor"}{revVendor?.category ? ` • ${revVendor.category}` : ""}
+                              </div>
+                              <div className="mt-0.5 flex items-center gap-2 flex-wrap text-[10px] text-muted-foreground">
+                                <span>{rev.poDate}</span>
+                                <span>•</span><span>{(rev.lineItems as unknown[])?.length ?? 0} items</span>
+                                {rev.referenceCode && (<><span>•</span><span className="font-semibold text-primary">Ref: {rev.referenceCode}</span></>)}
+                              </div>
+                              <div className="mt-0.5 text-[10px] text-muted-foreground">
+                                By {rev.createdBy || "Unknown"} • {rev.createdAt ? new Date(rev.createdAt).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-1.5 shrink-0">
+                            <span className="text-sm font-extrabold">₹{(Number(rev.grandTotal) || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                            <div className="flex items-center gap-1">
+                              <Button variant="outline" size="sm" className="h-7 px-2 text-[11px] gap-1 cursor-pointer" onClick={() => setViewingRevision(rev)}>
+                                <Eye className="size-3" /> View
+                              </Button>
+                              {canCreate && (
+                                <Button variant="outline" size="sm" className="h-7 px-2 text-[11px] cursor-pointer" onClick={() => {
+                                  const v = vendors.find((vv) => vv.id === rev.vendorId);
+                                  loadRevision(rev);
+                                  if (v) setActivePoVendor(v);
+                                  setIsDataEntryOpen(true);
+                                  setIsRevisionsPanelOpen(false);
+                                  toast.success(`Loaded ${rev.poNumber} R${rev.revisionNo} into the editor.`);
+                                }}>
+                                  Load
+                                </Button>
+                              )}
+                              {canDelete && (
+                                <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] text-destructive hover:text-destructive hover:bg-destructive/10 cursor-pointer" onClick={() => { setRevisionToDelete(rev.id); setDeleteRevisionConfirmOpen(true); }}>
+                                  <Trash2 className="size-3" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {filtered.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-14 text-center">
+                      <div className="text-3xl mb-2">📂</div>
+                      <p className="text-xs text-muted-foreground">{q ? "No revisions match your search." : "No revisions found. Create a PO to get started."}</p>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center justify-end pt-3 border-t">
+                  <Button variant="outline" size="sm" className="h-9 cursor-pointer" onClick={() => setIsRevisionsPanelOpen(false)}>Close</Button>
+                </div>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── SINGLE REVISION VIEWER ── */}
+      <Dialog open={!!viewingRevision} onOpenChange={(open) => { if (!open) setViewingRevision(null); }}>
+        <DialogContent className="max-w-4xl h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-primary">
+              <FileText className="size-5" /> {viewingRevision?.poNumber} — Revision R{viewingRevision?.revisionNo}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 min-h-0 border rounded-lg overflow-hidden bg-white">
+            {viewingRevision && <iframe title="revision-viewer" srcDoc={buildPoDocumentHtml(viewingRevision)} className="w-full h-full" />}
+          </div>
+          <div className="flex items-center justify-between gap-2 pt-3 border-t">
+            <p className="text-[11px] text-muted-foreground truncate">
+              Read-only view of this saved revision.
+            </p>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button variant="outline" size="sm" className="h-9 cursor-pointer" onClick={() => setViewingRevision(null)}>Close</Button>
+              <Button
+                size="sm"
+                className="h-9 gap-2 bg-primary text-white font-semibold cursor-pointer"
+                onClick={() => {
+                  const win = revisionViewerIframeRef.current?.contentWindow;
+                  if (!win) { toast.error("Unable to access the document."); return; }
+                  win.focus();
+                  win.print();
+                }}
+              >
+                <Printer className="size-4" /> Print
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

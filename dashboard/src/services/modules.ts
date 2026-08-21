@@ -131,7 +131,11 @@ export const salesOrderApi = {
     assign: (
       id: string,
       payload: {
-        assignments: Array<{ stage?: string | null; userIds: string[] }>;
+        assignments: Array<{
+          stage?: string | null;
+          remarks?: string | null;
+          userIds: string[];
+        }>;
       },
     ) =>
       apiClient

@@ -26,6 +26,8 @@ const purchaseOrderSchema = z.object({
 
   remarks: z.string().optional().nullable(),
   referenceCode: z.string().optional().nullable(),
+  linkedSalesOrderId: z.string().uuid().optional().nullable(),
+  poType: z.enum(["JOB", "STOCK"]).optional(),
   status: z.nativeEnum(PurchaseOrderStatus).optional(),
   poStatus: z.string().optional(),
 
@@ -78,6 +80,8 @@ async function adminPurchaseOrderCreateRoutes(
           shippingTerms,
           remarks,
           referenceCode,
+          linkedSalesOrderId,
+          poType,
           status,
           items,
           poStatus,
@@ -246,6 +250,8 @@ async function adminPurchaseOrderCreateRoutes(
 
               remarks,
               referenceCode,
+              ...(linkedSalesOrderId ? { linkedSalesOrderId } : {}),
+              poType: poType || (linkedSalesOrderId ? "JOB" : "STOCK"),
 
               subtotal: new Prisma.Decimal(subtotal),
 
@@ -282,12 +288,14 @@ async function adminPurchaseOrderCreateRoutes(
           return createdPO;
         });
 
-        // Sync with SalesOrder workflow stage if referenceCode is present
+        // Sync with SalesOrder workflow stage — direct ID link first,
+        // reference-code matching only as legacy fallback
         await syncSalesOrderWorkflowFromPo(
           fastify.prisma,
           referenceCode,
           poStatus || status,
-          request.user.id
+          request.user.id,
+          linkedSalesOrderId || null
         );
 
         const result = await fastify.prisma.purchaseOrder.findUnique({

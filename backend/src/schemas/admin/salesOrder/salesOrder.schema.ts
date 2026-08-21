@@ -28,6 +28,7 @@ export const salesOrderSchema = z.object({
     "IN_PROGRESS",
     "COMPLETED",
     "ON_HOLD",
+    "NEW_ORDER",
   ]),
 
   orderTakenById: z.string().uuid().nullable().optional(),

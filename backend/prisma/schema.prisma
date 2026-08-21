@@ -1316,25 +1316,27 @@ model SalesOrder {
   sendNotification       Boolean          @default(true)
   subtotal               Decimal          @default(0) @db.Decimal(15, 2)
 
-  assignments           SalesOrderAssignment[]
-  dispatches            Dispatch[]
-  engineeringProjects   EngineeringProject[]
-  invoices              Invoice[]
-  payments              Payment[]
-  salesOrderAttachments SalesOrderAttachment[]
-  items                 SalesOrderItem[]
-  company               Company                @relation(fields: [companyId], references: [id])
-  createdBy             User                   @relation("OrderCreatedBy", fields: [createdById], references: [id])
-  customer              Customer?              @relation(fields: [customerId], references: [id])
-  orderTakenBy          User?                  @relation("OrderTakenBy", fields: [orderTakenById], references: [id])
-  quotation             Quotation?             @relation(fields: [quotationId], references: [id])
-  tender                Tender?                @relation(fields: [tenderId], references: [id])
-  workOrders            WorkOrder[]
-  workflowStage         String                 @default("ORDER_CONFIRMED")
-  nextAction            String?
-  dueDate               DateTime?
-  workflowUpdatedAt     DateTime               @default(now())
-  workflowEvents        WorkflowEvent[]
+  assignments            SalesOrderAssignment[]
+  dispatches             Dispatch[]
+  engineeringProjects    EngineeringProject[]
+  invoices               Invoice[]
+  payments               Payment[]
+  salesOrderAttachments  SalesOrderAttachment[]
+  items                  SalesOrderItem[]
+  company                Company                 @relation(fields: [companyId], references: [id])
+  createdBy              User                    @relation("OrderCreatedBy", fields: [createdById], references: [id])
+  customer               Customer?               @relation(fields: [customerId], references: [id])
+  orderTakenBy           User?                   @relation("OrderTakenBy", fields: [orderTakenById], references: [id])
+  quotation              Quotation?              @relation(fields: [quotationId], references: [id])
+  tender                 Tender?                 @relation(fields: [tenderId], references: [id])
+  workOrders             WorkOrder[]
+  workflowStage          String                  @default("ORDER_CONFIRMED")
+  nextAction             String?
+  dueDate                DateTime?
+  workflowUpdatedAt      DateTime                @default(now())
+  workflowEvents         WorkflowEvent[]
+  purchaseOrderRevisions PurchaseOrderRevision[]
+  linkedPurchaseOrders   PurchaseOrder[]         @relation("POLinkedSalesOrder")
 
   @@index([companyId])
   @@index([status])
@@ -1393,6 +1395,7 @@ model SalesOrderAssignment {
   salesOrderId String
   userId       String
   stage        String?
+  remarks      String?
 
   salesOrder SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
 
@@ -1800,41 +1803,45 @@ model PurchaseRequestItem {
 }
 
 model PurchaseOrder {
-  id               String                  @id @default(uuid())
-  companyId        String
-  poNo             String                  @unique
-  requestId        String?
-  vendorId         String
-  orderDate        DateTime                @default(now())
-  expectedDelivery DateTime?
-  status           PurchaseOrderStatus     @default(DRAFT)
-  paymentTerms     String?
-  shippingTerms    String?
-  currency         String                  @default("INR")
-  subtotal         Decimal                 @db.Decimal(15, 2)
-  tax              Decimal                 @db.Decimal(15, 2)
-  total            Decimal                 @db.Decimal(15, 2)
-  createdById      String
-  approvedById     String?
-  approvedAt       DateTime?
-  sentAt           DateTime?
-  remarks          String?
-  referenceCode    String?
-  createdAt        DateTime                @default(now())
-  updatedAt        DateTime                @updatedAt
-  deletedAt        DateTime?
-  customerId       String?
-  goodsReceipts    GoodsReceipt[]
-  invoices         Invoice[]
-  items            PurchaseOrderItem[]
-  approvedBy       User?                   @relation("PurchaseOrderApprovedBy", fields: [approvedById], references: [id])
-  company          Company                 @relation(fields: [companyId], references: [id])
-  createdBy        User                    @relation("PurchaseOrderCreatedBy", fields: [createdById], references: [id])
-  customer         Customer?               @relation(fields: [customerId], references: [id])
-  request          PurchaseRequest?        @relation(fields: [requestId], references: [id])
-  vendor           Vendor                  @relation(fields: [vendorId], references: [id])
-  revisions        PurchaseOrderRevision[]
+  id                 String                  @id @default(uuid())
+  companyId          String
+  poNo               String                  @unique
+  requestId          String?
+  vendorId           String
+  orderDate          DateTime                @default(now())
+  expectedDelivery   DateTime?
+  status             PurchaseOrderStatus     @default(DRAFT)
+  paymentTerms       String?
+  shippingTerms      String?
+  currency           String                  @default("INR")
+  subtotal           Decimal                 @db.Decimal(15, 2)
+  tax                Decimal                 @db.Decimal(15, 2)
+  total              Decimal                 @db.Decimal(15, 2)
+  createdById        String
+  approvedById       String?
+  approvedAt         DateTime?
+  sentAt             DateTime?
+  remarks            String?
+  referenceCode      String?
+  poType             PurchaseOrderType       @default(STOCK)
+  linkedSalesOrderId String?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  deletedAt          DateTime?
+  customerId         String?
+  goodsReceipts      GoodsReceipt[]
+  invoices           Invoice[]
+  items              PurchaseOrderItem[]
+  approvedBy         User?                   @relation("PurchaseOrderApprovedBy", fields: [approvedById], references: [id])
+  company            Company                 @relation(fields: [companyId], references: [id])
+  createdBy          User                    @relation("PurchaseOrderCreatedBy", fields: [createdById], references: [id])
+  customer           Customer?               @relation(fields: [customerId], references: [id])
+  request            PurchaseRequest?        @relation(fields: [requestId], references: [id])
+  vendor             Vendor                  @relation(fields: [vendorId], references: [id])
+  revisions          PurchaseOrderRevision[]
+  linkedSalesOrder   SalesOrder?             @relation("POLinkedSalesOrder", fields: [linkedSalesOrderId], references: [id])
 
+  @@index([linkedSalesOrderId])
   @@index([companyId])
   @@index([status])
   @@index([poNo])
@@ -1842,7 +1849,7 @@ model PurchaseOrder {
 }
 
 model PurchaseOrderRevision {
-  id                 String   @id @default(uuid())
+  id                 String      @id @default(uuid())
   purchaseOrderId    String?
   vendorId           String
   poNumber           String
@@ -1850,28 +1857,31 @@ model PurchaseOrderRevision {
   poStatus           String
   paymentTerms       String?
   materialStatus     String?
-  advance            Float    @default(0)
+  advance            Float       @default(0)
   remarks            String?
-  cgstPercent        Float    @default(0)
-  sgstPercent        Float    @default(0)
-  igstPercent        Float    @default(0)
-  subtotal           Float    @default(0)
-  cgstAmount         Float    @default(0)
-  sgstAmount         Float    @default(0)
-  igstAmount         Float    @default(0)
-  grandTotal         Float    @default(0)
+  cgstPercent        Float       @default(0)
+  sgstPercent        Float       @default(0)
+  igstPercent        Float       @default(0)
+  subtotal           Float       @default(0)
+  cgstAmount         Float       @default(0)
+  sgstAmount         Float       @default(0)
+  igstAmount         Float       @default(0)
+  grandTotal         Float       @default(0)
   termsAndConditions String?
   lineItems          Json
   companyDetails     Json
-  createdAt          DateTime @default(now())
+  createdAt          DateTime    @default(now())
   createdBy          String
   revisionNo         Int
   customColumns      Json?
   referenceCode      String?
+  salesOrderId       String?
+  salesOrder         SalesOrder? @relation(fields: [salesOrderId], references: [id], onDelete: SetNull)
 
   purchaseOrder PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   vendor        Vendor         @relation("VendorPurchaseOrderRevisions", fields: [vendorId], references: [id])
 
+  @@index([salesOrderId])
   @@map("purchase_order_revisions")
 }
 
@@ -3016,6 +3026,7 @@ enum SalesOrderStatus {
   IN_PROGRESS
   COMPLETED
   ON_HOLD
+  NEW_ORDER
 }
 
 enum EngineeringStatus {
@@ -3064,6 +3075,11 @@ enum PurchaseOrderStatus {
   PARTIAL_RECEIVED
   COMPLETED
   CANCELLED
+}
+
+enum PurchaseOrderType {
+  JOB
+  STOCK
 }
 
 enum GoodsReceiptStatus {

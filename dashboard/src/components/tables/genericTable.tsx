@@ -21,7 +21,14 @@ import {
   SlidersHorizontal,
   ArrowUpDown,
   GripVertical,
+  MoreVertical,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useERPStore } from "@/store/erpStore";
 import { isAdminUser } from "@/utils/pagePermissions";
@@ -408,53 +415,65 @@ export function GenericTable<TData extends { id: string }>({
         cell: ({ row }) => {
           const item = row.original;
           return (
-            <div className="flex items-center gap-1.5 justify-center">
-              {onView && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-
-                    // console.log("VIEW CLICKED");
-                    // console.log(item);
-
-                    onView(item);
-                  }}
-                  className="h-8 px-2.5 hover:bg-primary/10 hover:text-primary text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
+            <div
+              className="flex items-center justify-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  onClick={(e) => e.stopPropagation()}
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={t("Actions")}
+                      title={t("Actions")}
+                      className="size-8 rounded-lg p-0 text-muted-foreground/60 hover:bg-primary/10 hover:text-primary data-[popup-open]:bg-primary/10 data-[popup-open]:text-primary cursor-pointer transition-colors"
+                    >
+                      <MoreVertical className="size-4" />
+                    </Button>
+                  }
+                />
+                <DropdownMenuContent
+                  align="end"
+                  sideOffset={6}
+                  className="w-44 min-w-0 rounded-xl p-1.5 shadow-lg ring-foreground/10"
                 >
-                  <Eye className="h-3.5 w-3.5" />
-                  <span className="hidden xl:inline">{t("Overview")}</span>
-                </Button>
-              )}
-              {onEdit && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onEdit(item);
-                  }}
-                  className="h-8 px-2.5 hover:bg-amber-500/10 hover:text-amber-600 dark:hover:text-amber-400 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
-                >
-                  <Edit className="h-3.5 w-3.5" />
-                  <span className="hidden xl:inline">{t("Edit")}</span>
-                </Button>
-              )}
-              {onDelete && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete(item);
-                  }}
-                  className="h-8 px-2.5 text-destructive hover:bg-destructive/15 text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  <span className="hidden xl:inline">{t("Delete")}</span>
-                </Button>
-              )}
+                  {onView && (
+                    <DropdownMenuItem
+                      onClick={() => onView(item)}
+                      className="gap-2.5 rounded-lg px-2.5 py-2 text-xs font-semibold cursor-pointer"
+                    >
+                      <Eye className="h-3.5 w-3.5 text-primary" />
+                      {t("Overview")}
+                    </DropdownMenuItem>
+                  )}
+                  {onEdit && (
+                    <DropdownMenuItem
+                      onClick={() => onEdit(item)}
+                      className="gap-2.5 rounded-lg px-2.5 py-2 text-xs font-semibold cursor-pointer text-amber-600 dark:text-amber-400 focus:text-amber-600 dark:focus:text-amber-400"
+                    >
+                      <Edit className="h-3.5 w-3.5" />
+                      {t("Edit")}
+                    </DropdownMenuItem>
+                  )}
+                  {onDelete && (
+                    <>
+                      {(onView || onEdit) && (
+                        <div className="-mx-1 my-1 h-px bg-border" />
+                      )}
+                      <DropdownMenuItem
+                        variant="destructive"
+                        onClick={() => onDelete(item)}
+                        className="gap-2.5 rounded-lg px-2.5 py-2 text-xs font-semibold cursor-pointer"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        {t("Delete")}
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           );
         },
@@ -471,9 +490,15 @@ export function GenericTable<TData extends { id: string }>({
   const nonDraggableIds = React.useMemo(() => {
     const ids = new Set<string>();
     if (bulkActions) ids.add("select");
-    if (onView || onEdit || onDelete) ids.add("actions");
+    // Freeze/drag-lock the actions column whether it was injected by us
+    // (via onView/onEdit/onDelete) or supplied by the caller in `columns`
+    // (e.g. the Purchase Orders page defines its own actions column).
+    const hasCallerActionsColumn = tableColumns.some(
+      (column: any) => (column.id ?? column.accessorKey) === "actions",
+    );
+    if (onView || onEdit || onDelete || hasCallerActionsColumn) ids.add("actions");
     return ids;
-  }, [bulkActions, onView, onEdit, onDelete]);
+  }, [bulkActions, onView, onEdit, onDelete, tableColumns]);
 
   // Initialize / sync column order whenever the column set changes,
   // always keeping "select" first and "actions" last.

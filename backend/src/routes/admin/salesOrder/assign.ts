@@ -10,6 +10,7 @@ import NotificationService  from "../../../services/notification/notification.se
 
 const stageAssignmentSchema = z.object({
   stage: z.string().nullable().optional(),
+  remarks: z.string().max(1000).nullable().optional(),
   userIds: z
     .array(z.string().uuid())
     .min(1, "At least one user must be assigned."),
@@ -54,7 +55,11 @@ export default async function assignSalesOrderRoute(
       request: FastifyRequest<{
         Params: Params;
         Body: {
-          assignments?: Array<{ stage?: string | null; userIds: string[] }>;
+          assignments?: Array<{
+            stage?: string | null;
+            remarks?: string | null;
+            userIds: string[];
+          }>;
           userIds?: string[];
         };
       }>,
@@ -67,7 +72,11 @@ export default async function assignSalesOrderRoute(
         // Validate Request Body
         // ==========================================
 
-        let assignments: Array<{ stage?: string | null; userIds: string[] }>;
+        let assignments: Array<{
+          stage?: string | null;
+          remarks?: string | null;
+          userIds: string[];
+        }>;
 
         const modernResult = assignSalesOrderSchema.safeParse(request.body);
         const legacyResult = legacyAssignSalesOrderSchema.safeParse(request.body);
@@ -198,6 +207,7 @@ export default async function assignSalesOrderRoute(
                   salesOrderId: salesOrder.id,
                   userId,
                   stage: a.stage ?? null,
+                  remarks: a.remarks?.trim() ? a.remarks.trim() : null,
                 })),
               ),
             });

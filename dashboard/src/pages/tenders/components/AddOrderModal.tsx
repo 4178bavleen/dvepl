@@ -68,6 +68,7 @@ interface AddOrderModalProps {
 }
 
 const STATUS_OPTIONS = [
+  { value: "NEW_ORDER", label: "New Order" },
   { value: "PENDING", label: "Pending" },
   { value: "IN_PROGRESS", label: "In Progress" },
   { value: "COMPLETED", label: "Completed" },
@@ -121,7 +122,7 @@ export function AddOrderModal({
   editingOrder,
   onSuccess,
 }: AddOrderModalProps) {
-  const [status, setStatus] = useState("PENDING");
+  const [status, setStatus] = useState("NEW_ORDER");
   const [dveplCode, setDveplCode] = useState("");
   const [partyName, setPartyName] = useState("");
   const [caNo, setCaNo] = useState("");
@@ -155,7 +156,7 @@ export function AddOrderModal({
   >([]);
 
   const resetForm = () => {
-    setStatus("PENDING");
+    setStatus("NEW_ORDER");
     setDveplCode("");
     setPartyName("");
     setCaNo("");
@@ -266,7 +267,7 @@ export function AddOrderModal({
       setLocation(editingOrder.state_name || "");
       setTenderId(editingOrder.tenderID || "");
       setReferenceCode(editingOrder.reference_code || "");
-      setStatus(editingOrder.status || (editingOrder as any).remark || "PENDING");
+      setStatus(editingOrder.status || (editingOrder as any).remark || "NEW_ORDER");
 
       void fetchOrderDetails();
     } else {
@@ -478,13 +479,13 @@ export function AddOrderModal({
         >
           <div className="space-y-7">
             {/* ==================================================
-                ORDER IDENTIFICATION
+                ORDER & CONTACT DETAILS
                 ================================================== */}
             <section>
               <div className="flex items-center gap-2 mb-4">
                 <div className="h-4.5 w-1 rounded-full bg-primary" />
                 <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
-                  Order Details
+                  Order & Contact Details
                 </h3>
               </div>
 
@@ -516,7 +517,7 @@ export function AddOrderModal({
                   </Select>
                 </Field>
 
-                <Field label="Party / Firm Name" required>
+                <Field label="Firm Name" required>
                   <Input
                     value={partyName}
                     onChange={(e) => setPartyName(e.target.value)}
@@ -525,67 +526,7 @@ export function AddOrderModal({
                   />
                 </Field>
 
-                <Field label="CA / Tender Number">
-                  <Input
-                    value={caNo}
-                    onChange={(e) => setCaNo(e.target.value)}
-                    placeholder="e.g. CWEAFJ-48/2025"
-                    className="h-9 text-xs"
-                  />
-                </Field>
-
-                <Field label="Reference Code">
-                  <Input
-                    value={referenceCode}
-                    onChange={(e) => setReferenceCode(e.target.value)}
-                    placeholder="e.g. REF-20260302-08197"
-                    className="h-9 text-xs"
-                  />
-                </Field>
-
-                <Field label="Tender ID">
-                  <Input
-                    value={tenderId}
-                    onChange={(e) => setTenderId(e.target.value)}
-                    placeholder="e.g. 2026_MES_751133_1"
-                    className="h-9 text-xs"
-                  />
-                </Field>
-
-                <Field label="Name of Work">
-                  <Textarea
-                    value={workName}
-                    onChange={(e) => setWorkName(e.target.value)}
-                    placeholder="Description of the work / project"
-                    className="text-xs"
-                    rows={2}
-                  />
-                </Field>
-
-                <Field label="Inspection Field">
-                  <Input
-                    value={inspectionField}
-                    onChange={(e) => setInspectionField(e.target.value)}
-                    placeholder="e.g. Site / Factory"
-                    className="h-9 text-xs"
-                  />
-                </Field>
-              </div>
-            </section>
-
-            {/* ==================================================
-                CONTACT
-                ================================================== */}
-            <section className="border-t pt-7">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="h-4.5 w-1 rounded-full bg-blue-500" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
-                  Contact Information
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Field label="Contact Person">
+                <Field label="Person Name">
                   <Input
                     value={contactPerson}
                     onChange={(e) => setContactPerson(e.target.value)}
@@ -612,67 +553,37 @@ export function AddOrderModal({
                     className="h-9 text-xs"
                   />
                 </Field>
-              </div>
-            </section>
 
-            {/* ==================================================
-                JURISDICTION
-                ================================================== */}
-            <section className="border-t pt-7">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="h-4.5 w-1 rounded-full bg-emerald-500" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
-                  Jurisdiction
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <Field label="Department">
+                <Field label="CA/Tender Number">
                   <Input
-                    value={department}
-                    onChange={(e) => setDepartment(e.target.value)}
-                    placeholder="e.g. MES"
+                    value={caNo}
+                    onChange={(e) => setCaNo(e.target.value)}
+                    placeholder="e.g. CWEAFJ-48/2025"
                     className="h-9 text-xs"
                   />
                 </Field>
 
-                <Field label="Section">
+                <Field label="Project Ref Code">
                   <Input
-                    value={section}
-                    onChange={(e) => setSection(e.target.value)}
-                    placeholder="e.g. CE (AF) Udhampur"
+                    value={referenceCode}
+                    onChange={(e) => setReferenceCode(e.target.value)}
+                    placeholder="e.g. REF-20260302-08197"
                     className="h-9 text-xs"
                   />
                 </Field>
 
-                <Field label="Division">
+                <Field label="Tender ID">
                   <Input
-                    value={division}
-                    onChange={(e) => setDivision(e.target.value)}
-                    placeholder="e.g. CWE (AF) Jammu"
-                    className="h-9 text-xs"
-                  />
-                </Field>
-
-                <Field label="Sub Division">
-                  <Input
-                    value={subDivision}
-                    onChange={(e) => setSubDivision(e.target.value)}
-                    placeholder="e.g. GE AF Udhampur"
-                    className="h-9 text-xs"
-                  />
-                </Field>
-
-                <Field label="Location">
-                  <Input
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    placeholder="e.g. Udhampur, Jammu and Kashmir"
+                    value={tenderId}
+                    onChange={(e) => setTenderId(e.target.value)}
+                    placeholder="e.g. 2026_MES_751133_1"
                     className="h-9 text-xs"
                   />
                 </Field>
               </div>
             </section>
+
+
 
             {/* ==================================================
                 SCHEDULE & DRAWING

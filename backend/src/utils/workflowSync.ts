@@ -4,17 +4,25 @@ export async function syncSalesOrderWorkflowFromPo(
   prisma: any,
   referenceCode: string | null | undefined,
   poStatus: string | null | undefined,
-  userId: string | null
+  userId: string | null,
+  salesOrderId?: string | null
 ) {
-  if (!referenceCode || !poStatus) return;
+  if ((!salesOrderId && !referenceCode) || !poStatus) return;
 
-  // 1. Find the SalesOrder by referenceCode (dveplCode)
-  let salesOrder = await prisma.salesOrder.findUnique({
-    where: { dveplCode: referenceCode.trim() },
-  });
+  // 0. Preferred: direct ID link (PO ↔ SalesOrder foreign key)
+  let salesOrder = salesOrderId
+    ? await prisma.salesOrder.findUnique({ where: { id: salesOrderId } })
+    : null;
+
+  // 1. Legacy fallback: find the SalesOrder by referenceCode (dveplCode)
+  if (!salesOrder && referenceCode) {
+    salesOrder = await prisma.salesOrder.findUnique({
+      where: { dveplCode: referenceCode.trim() },
+    });
+  }
 
   // Fallback: If not found by dveplCode, try searching for the referenceCode inside the remarks field
-  if (!salesOrder) {
+  if (!salesOrder && referenceCode) {
     salesOrder = await prisma.salesOrder.findFirst({
       where: {
         remarks: {

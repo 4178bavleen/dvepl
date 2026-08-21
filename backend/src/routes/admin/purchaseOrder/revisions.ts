@@ -64,6 +64,7 @@ async function adminPurchaseOrderRevisionsRoutes(
           revisionNo: rev.revisionNo,
           customColumns: rev.customColumns || [],
           referenceCode: rev.referenceCode || "",
+          salesOrderId: rev.salesOrderId || null,
         }));
 
         // Fetch all purchase orders for the company to synthesize missing R0 revisions
@@ -147,6 +148,7 @@ async function adminPurchaseOrderRevisionsRoutes(
               revisionNo: 0,
               customColumns: [],
               referenceCode: po.referenceCode || "",
+              salesOrderId: po.linkedSalesOrderId || null,
             });
           }
         }
@@ -204,12 +206,23 @@ async function adminPurchaseOrderRevisionsRoutes(
           revisionNo: number;
           customColumns?: string[];
           referenceCode?: string;
+          salesOrderId?: string | null;
         };
       }>,
       reply: FastifyReply,
     ) => {
       try {
         const body = request.body;
+
+        // Validate the direct sales-order link (if provided)
+        let salesOrderId: string | null = body.salesOrderId || null;
+        if (salesOrderId) {
+          const linkedOrder = await fastify.prisma.salesOrder.findFirst({
+            where: { id: salesOrderId, deletedAt: null },
+            select: { id: true },
+          });
+          if (!linkedOrder) salesOrderId = null;
+        }
 
         // Try to locate a purchase order that matches the PO number
         const po = await fastify.prisma.purchaseOrder.findFirst({
@@ -247,6 +260,7 @@ async function adminPurchaseOrderRevisionsRoutes(
             revisionNo: body.revisionNo,
             customColumns: body.customColumns,
             referenceCode: body.referenceCode,
+            salesOrderId,
           },
         });
 
@@ -274,12 +288,14 @@ async function adminPurchaseOrderRevisionsRoutes(
           });
         }
 
-        // Sync with SalesOrder workflow stage if referenceCode is present
+        // Sync with SalesOrder workflow stage — direct ID link first,
+        // reference-code matching only as legacy fallback
         await syncSalesOrderWorkflowFromPo(
           fastify.prisma,
           body.referenceCode,
           body.poStatus,
-          request.user.id
+          request.user.id,
+          salesOrderId
         );
 
         adminLogs.info("PO Revision created", {

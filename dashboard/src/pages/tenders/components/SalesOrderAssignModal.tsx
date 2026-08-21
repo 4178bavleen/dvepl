@@ -20,6 +20,7 @@ import {
   AlertCircle,
   Layers,
   LayoutGrid,
+  MessageSquare,
 } from "lucide-react";
 import { securityApi, salesOrderApi } from "@/services/modules";
 import workflowApi from "@/services/workflowApi";
@@ -30,6 +31,7 @@ export interface SalesOrderAssignment {
   salesOrderId?: string;
   userId: string;
   stage?: string | null;
+  remarks?: string | null;
   user?: {
     id: string;
     name: string;
@@ -82,6 +84,7 @@ export function SalesOrderAssignModal({
   const [stageAssignments, setStageAssignments] = useState<
     Record<string, string[]>
   >({});
+  const [stageRemarks, setStageRemarks] = useState<Record<string, string>>({});
   const [search, setSearch] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -148,12 +151,15 @@ export function SalesOrderAssignModal({
   useEffect(() => {
     if (open && order) {
       const grouped: Record<string, string[]> = {};
+      const remarks: Record<string, string> = {};
       (order.assignments || []).forEach((a) => {
         const key = a.stage ? a.stage : ALL_STAGES_KEY;
         if (!grouped[key]) grouped[key] = [];
         if (!grouped[key].includes(a.userId)) grouped[key].push(a.userId);
+        if (a.remarks && !remarks[key]) remarks[key] = a.remarks;
       });
       setStageAssignments(grouped);
+      setStageRemarks(remarks);
     }
   }, [open, order]);
 
@@ -181,6 +187,11 @@ export function SalesOrderAssignModal({
         : [...current, userId];
       return { ...prev, [activeStageKey]: next };
     });
+  };
+
+  const updateStageRemark = (stageKey: string, value: string) => {
+    setValidationError(null);
+    setStageRemarks((prev) => ({ ...prev, [stageKey]: value }));
   };
 
   const selectAllFiltered = () => {
@@ -224,6 +235,7 @@ export function SalesOrderAssignModal({
         .filter(([, userIds]) => userIds.length > 0)
         .map(([stageKey, userIds]) => ({
           stage: stageKey === ALL_STAGES_KEY ? null : stageKey,
+          remarks: stageRemarks[stageKey]?.trim() || null,
           userIds,
         }));
 
@@ -231,7 +243,11 @@ export function SalesOrderAssignModal({
         assignments,
       });
       if (res?.success !== false) {
-        toast.success("Sales Order assigned successfully.");
+        toast.success(
+          isFocusedStage
+            ? `Assignment saved for "${focusedStageName}".`
+            : "Sales Order assigned successfully.",
+        );
         onSuccess();
         onOpenChange(false);
       } else {
@@ -270,6 +286,24 @@ export function SalesOrderAssignModal({
     ];
   }, [stages]);
 
+  // Focused mode: opened by clicking a specific workflow stage row.
+  // The modal scopes itself to that single stage — no pill navigation.
+  const isFocusedStage = Boolean(initialStageKey);
+
+  const focusedStage = useMemo(() => {
+    if (!initialStageKey) return null;
+    const index = stages.findIndex((s) => s.key === initialStageKey);
+    return {
+      meta: index >= 0 ? stages[index] : undefined,
+      index,
+    };
+  }, [stages, initialStageKey]);
+
+  const focusedStageName =
+    focusedStage?.meta?.name ??
+    (isFocusedStage ? initialStageKey!.replace(/_/g, " ") : "");
+  const focusedStageColor = focusedStage?.meta?.color || "#64748b";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl p-0 gap-0 overflow-hidden">
@@ -284,15 +318,31 @@ export function SalesOrderAssignModal({
                 Assign Sales Order
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground mt-0.5">
-                Assign order{" "}
-                <span className="font-semibold text-foreground">
-                  {order?.tender_no || order?.dveplCode || "Tender"}
-                </span>{" "}
-                to team members{" "}
-                <span className="font-semibold text-foreground">
-                  per workflow stage
-                </span>
-                .
+                {isFocusedStage ? (
+                  <>
+                    Assign order{" "}
+                    <span className="font-semibold text-foreground">
+                      {order?.tender_no || order?.dveplCode || "Tender"}
+                    </span>{" "}
+                    to team members for the{" "}
+                    <span className="font-semibold text-foreground">
+                      {focusedStageName}
+                    </span>{" "}
+                    stage.
+                  </>
+                ) : (
+                  <>
+                    Assign order{" "}
+                    <span className="font-semibold text-foreground">
+                      {order?.tender_no || order?.dveplCode || "Tender"}
+                    </span>{" "}
+                    to team members{" "}
+                    <span className="font-semibold text-foreground">
+                      per workflow stage
+                    </span>
+                    .
+                  </>
+                )}
               </DialogDescription>
             </div>
           </div>
@@ -317,16 +367,67 @@ export function SalesOrderAssignModal({
             </div>
           )}
 
-          {/* Stage Tabs */}
+          {/* Stage Context — focused card or multi-stage pills */}
           <div>
             <div className="flex items-center gap-2 mb-2">
               <Layers className="size-3.5 text-muted-foreground" />
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Assign by Stage
+                {isFocusedStage ? "Target Stage" : "Assign by Stage"}
               </label>
             </div>
 
-            {isLoadingStages ? (
+            {isFocusedStage ? (
+              isLoadingStages ? (
+                <div className="flex items-center gap-2 p-3 rounded-lg border text-xs text-muted-foreground">
+                  <Loader2 className="size-3.5 animate-spin text-primary" />
+                  Loading stage details...
+                </div>
+              ) : (
+                <div
+                  className="rounded-xl border bg-background px-4 py-3 flex items-center gap-3 shadow-3xs"
+                  style={{
+                    borderColor: `${focusedStageColor}55`,
+                    background: `linear-gradient(135deg, ${focusedStageColor}0d, transparent 60%)`,
+                  }}
+                >
+                  <span
+                    className="size-3 rounded-full shrink-0"
+                    style={{
+                      backgroundColor: focusedStageColor,
+                      boxShadow: `0 0 0 4px ${focusedStageColor}22`,
+                    }}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-foreground truncate">
+                      {focusedStageName}
+                    </p>
+                    {focusedStage && focusedStage.index >= 0 ? (
+                      <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
+                        Stage {focusedStage.index + 1} of {stages.length} ·
+                        order must reach this stage for assignees to gain
+                        access
+                      </p>
+                    ) : (
+                      <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
+                        Custom stage
+                      </p>
+                    )}
+                  </div>
+                  <span
+                    className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full border"
+                    style={{
+                      color: focusedStageColor,
+                      borderColor: `${focusedStageColor}44`,
+                      backgroundColor: `${focusedStageColor}14`,
+                    }}
+                  >
+                    <UserCheck className="size-3" />
+                    {currentStageUsers.length}{" "}
+                    {currentStageUsers.length === 1 ? "assignee" : "assignees"}
+                  </span>
+                </div>
+              )
+            ) : isLoadingStages ? (
               <div className="flex items-center gap-2 p-3 rounded-lg border text-xs text-muted-foreground">
                 <Loader2 className="size-3.5 animate-spin text-primary" />
                 Loading workflow stages...
@@ -368,32 +469,83 @@ export function SalesOrderAssignModal({
               </div>
             )}
 
-            {activeStageKey !== ALL_STAGES_KEY && (
+            {isFocusedStage ? (
               <p className="mt-2 text-[11px] text-muted-foreground">
                 Users assigned here can work on this order only while it is at
                 the{" "}
                 <span className="font-semibold text-foreground">
-                  {stages.find((s) => s.key === activeStageKey)?.name ??
-                    activeStageKey}
+                  {focusedStageName}
                 </span>{" "}
                 stage.
               </p>
+            ) : (
+              <>
+                {activeStageKey !== ALL_STAGES_KEY && (
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    Users assigned here can work on this order only while it is
+                    at the{" "}
+                    <span className="font-semibold text-foreground">
+                      {stages.find((s) => s.key === activeStageKey)?.name ??
+                        activeStageKey}
+                    </span>{" "}
+                    stage.
+                  </p>
+                )}
+                {activeStageKey === ALL_STAGES_KEY && (
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    Users assigned to All Stages can work on the order at every
+                    stage.
+                  </p>
+                )}
+              </>
             )}
-            {activeStageKey === ALL_STAGES_KEY && (
-              <p className="mt-2 text-[11px] text-muted-foreground">
-                Users assigned to All Stages can work on the order at every
-                stage.
-              </p>
-            )}
+          </div>
+
+          {/* Stage Remarks */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="size-3.5 text-muted-foreground" />
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Remarks{" "}
+                  <span className="normal-case font-medium text-muted-foreground/70">
+                    (optional)
+                  </span>
+                </label>
+              </div>
+              <span
+                className={`text-[10px] font-medium ${
+                  (stageRemarks[activeStageKey] ?? "").length >= 1000
+                    ? "text-rose-500"
+                    : "text-muted-foreground/70"
+                }`}
+              >
+                {(stageRemarks[activeStageKey] ?? "").length}/1000
+              </span>
+            </div>
+            <textarea
+              value={stageRemarks[activeStageKey] ?? ""}
+              onChange={(e) =>
+                updateStageRemark(activeStageKey, e.target.value.slice(0, 1000))
+              }
+              maxLength={1000}
+              rows={2}
+              placeholder={
+                isFocusedStage
+                  ? `Add a note for assignees of "${focusedStageName}"…`
+                  : "Add a note for this stage's assignees…"
+              }
+              className="w-full rounded-lg border border-border bg-card px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 resize-none transition-colors"
+            />
           </div>
 
           {/* Selected Users Chips */}
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                Assigned Users ({currentStageUsers.length}) · Total{" "}
-                {totalAssignedUsers}
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Assigned Users ({currentStageUsers.length})
+                  {!isFocusedStage && <> · Total {totalAssignedUsers}</>}
+                </label>
               {currentStageUsers.length > 0 && (
                 <button
                   type="button"
@@ -513,13 +665,13 @@ export function SalesOrderAssignModal({
         </div>
 
         {/* Footer */}
-        <DialogFooter className="px-6 py-3 border-t bg-muted/20 flex flex-row justify-between items-center">
+        <DialogFooter className="mx-0 mb-0 px-6 py-4 border-t bg-muted/20 flex flex-row justify-between items-center gap-3">
           <Button
             type="button"
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={isSubmitting}
-            className="h-9 text-xs font-semibold"
+            className="h-9 px-5 text-xs font-semibold rounded-xl"
           >
             Cancel
           </Button>
@@ -528,7 +680,7 @@ export function SalesOrderAssignModal({
             type="button"
             onClick={handleSave}
             disabled={isSubmitting || isLoadingUsers}
-            className="h-9 text-xs font-semibold gap-2"
+            className="h-9 px-5 text-xs font-semibold gap-2 rounded-xl"
           >
             {isSubmitting ? (
               <>
@@ -538,7 +690,7 @@ export function SalesOrderAssignModal({
             ) : (
               <>
                 <UserCheck className="size-3.5" />
-                Save Assignments
+                {isFocusedStage ? "Save Stage Assignment" : "Save Assignments"}
               </>
             )}
           </Button>

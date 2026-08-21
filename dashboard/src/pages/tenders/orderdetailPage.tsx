@@ -249,6 +249,8 @@ export function OrderDetailPage() {
     accepted: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
     rejected: "bg-rose-500/10 text-rose-600 border-rose-500/20",
     pending: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+    new_order: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+    "new order": "bg-blue-500/10 text-blue-600 border-blue-500/20",
   };
   const remarkKey = String(tender.remark || "").toLowerCase();
 
@@ -452,11 +454,11 @@ export function OrderDetailPage() {
                       <button
                         onClick={() =>
                           navigate(
-                            `/purchase/vendors?ref=${encodeURIComponent(
-                              tender.reference_code,
-                            )}&mode=${
-                              tender.poStatus === "No PO" ? "generate" : "view"
-                            }`,
+                            `/purchase/orders?${new URLSearchParams({
+                              ref: tender.reference_code,
+                              order: tender.id,
+                              mode: tender.poStatus === "No PO" ? "generate" : "view",
+                            }).toString()}`,
                           )
                         }
                         className="text-xs text-primary hover:text-primary-hover font-bold flex items-center gap-1"
@@ -543,6 +545,11 @@ export function OrderDetailPage() {
                                 a.stage === s.key ||
                                 a.stage === "",
                             );
+                            const stageRemark = (tender.assignments || []).find(
+                              (a) =>
+                                a.remarks &&
+                                (!a.stage || a.stage === s.key || a.stage === ""),
+                            )?.remarks;
 
                             return (
                               <div
@@ -597,6 +604,14 @@ export function OrderDetailPage() {
                                         } assigned`
                                       : "No users assigned"}
                                   </p>
+                                  {stageRemark && (
+                                    <p
+                                      className="text-[10px] text-muted-foreground/80 italic truncate mt-0.5"
+                                      title={stageRemark}
+                                    >
+                                      “{stageRemark}”
+                                    </p>
+                                  )}
                                 </div>
                                 <span
                                   className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full border ${

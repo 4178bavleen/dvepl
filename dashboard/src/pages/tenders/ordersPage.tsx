@@ -627,6 +627,7 @@ export function OrdersPage() {
             const val = String(row.original.poStatus || "No PO");
             const poNo = row.original.poNumber;
             const refCode = row.original.reference_code;
+            const orderId = row.original.id;
 
             const badge: Record<string, string> = {
               ready: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
@@ -655,7 +656,10 @@ export function OrdersPage() {
                   <button
                     onClick={() => {
                       const mode = val === "No PO" ? "generate" : "view";
-                      navigate(`/purchase/vendors?ref=${encodeURIComponent(refCode)}&mode=${mode}`);
+                      const params = new URLSearchParams({ mode });
+                      if (refCode) params.set("ref", refCode);
+                      if (orderId) params.set("order", orderId);
+                      navigate(`/purchase/orders?${params.toString()}`);
                     }}
                     className="text-[10px] text-primary hover:text-primary-hover font-bold mt-0.5 flex items-center gap-0.5 transition-colors"
                   >
@@ -744,6 +748,12 @@ export function OrdersPage() {
 
               pending:
                 "bg-amber-500/10 text-amber-600 border-amber-500/20",
+
+              new_order:
+                "bg-blue-500/10 text-blue-600 border-blue-500/20",
+
+              "new order":
+                "bg-blue-500/10 text-blue-600 border-blue-500/20",
             };
 
             return (

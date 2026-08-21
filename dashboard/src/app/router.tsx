@@ -54,27 +54,12 @@ const CommunicationHistoryPage = lazy(
   () => import("@/pages/communication/communicationHistoryPage"),
 );
 
-// Tender
-const TenderRequestsPage = lazy(
-  () => import("@/pages/tender-requests/tenderRequestsPage"),
-);
-const TendersPage = lazy(() => import("@/pages/tenders/tendersPage"));
-const GovernmentDepartmentsPage = lazy(
-  () => import("@/pages/government/governmentDepartmentsPage"),
-);
-const SectionsPage = lazy(() => import("@/pages/tenders/sectionsPage"));
-const DivisionsPage = lazy(() => import("@/pages/tenders/divisionsPage"));
-const SubDivisionsPage = lazy(() => import("@/pages/tenders/subDivisionsPage"));
-const ReferenceCodesPage = lazy(
-  () => import("@/pages/tenders/referenceCodesPage"),
-);
-const TechnicalClarificationsPage = lazy(
-  () => import("@/pages/tenders/technicalClarificationsPage"),
-);
-const QuotationsPage = lazy(() => import("@/pages/tenders/quotationsPage"));
+// Tender Management
+// NOTE: Lead Management module is parked — its routes render NotFound below.
+// Page components remain untouched in the codebase under src/pages/.
+
 const OrdersPage = lazy(() => import("@/pages/tenders/ordersPage"));
 const VendorsPage = lazy(() => import("@/pages/vendors/vendorsPage"));
-const BoqsPage = lazy(() => import("@/pages/tenders/boqsPage"));
 
 // Security & Audit
 const RolesPage = lazy(() => import("@/pages/roles/rolesPage"));
@@ -184,31 +169,31 @@ export function AppRouter() {
                 path="/crm/communication"
                 element={<CommunicationHistoryPage />}
               />
-              {/* Tender Management */}
-              <Route path="/tender/requests" element={<TenderRequestsPage />} />
-              <Route path="/tender/tenders" element={<TendersPage />} />
+              <Route path="/tender/orders" element={<OrdersPage />} />
+              {/* Tender Management — parked, renders NotFound (pages kept in src/pages/) */}
+              <Route path="/tender/requests" element={<NotFound />} />
+              <Route path="/tender/tenders" element={<NotFound />} />
               <Route
                 path="/tender/government"
-                element={<GovernmentDepartmentsPage />}
+                element={<NotFound />}
               />
-              <Route path="/tender/sections" element={<SectionsPage />} />
-              <Route path="/tender/divisions" element={<DivisionsPage />} />
+              <Route path="/tender/sections" element={<NotFound />} />
+              <Route path="/tender/divisions" element={<NotFound />} />
               <Route
                 path="/tender/subdivisions"
-                element={<SubDivisionsPage />}
+                element={<NotFound />}
               />
               <Route
                 path="/tender/reference-codes"
-                element={<ReferenceCodesPage />}
+                element={<NotFound />}
               />
               <Route
                 path="/tender/clarifications"
-                element={<TechnicalClarificationsPage />}
+                element={<NotFound />}
               />
-              <Route path="/tender/quotations" element={<QuotationsPage />} />
-              <Route path="/tender/orders" element={<OrdersPage />} />
+              <Route path="/tender/quotations" element={<NotFound />} />
               <Route path="/purchase/vendors" element={<VendorsPage />} />
-              <Route path="/tender/boqs" element={<BoqsPage />} />
+              <Route path="/tender/boqs" element={<NotFound />} />
               <Route path="/security/roles" element={<RolesPage />} />
               <Route
                 path="/security/approval-requests"

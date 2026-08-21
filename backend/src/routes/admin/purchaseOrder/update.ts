@@ -14,6 +14,8 @@ interface UpdatePurchaseOrderBody {
   shippingTerms?: string;
   remarks?: string;
   referenceCode?: string | null;
+  linkedSalesOrderId?: string | null;
+  poType?: "JOB" | "STOCK";
   status?: PurchaseOrderStatus;
   poStatus?: string;
   items?: {
@@ -55,6 +57,8 @@ async function adminPurchaseOrderUpdateRoutes(
           shippingTerms,
           remarks,
           referenceCode,
+          linkedSalesOrderId,
+          poType,
           status,
           items,
           poStatus,
@@ -194,6 +198,8 @@ async function adminPurchaseOrderUpdateRoutes(
               shippingTerms,
               remarks,
               referenceCode,
+              ...(linkedSalesOrderId !== undefined ? { linkedSalesOrderId: linkedSalesOrderId || null } : {}),
+              ...(poType ? { poType } : {}),
               status,
               expectedDelivery: expectedDelivery
                 ? new Date(expectedDelivery)
@@ -230,12 +236,14 @@ async function adminPurchaseOrderUpdateRoutes(
           }
         });
 
-        // Sync with SalesOrder workflow stage if referenceCode is present
+        // Sync with SalesOrder workflow stage — direct ID link first,
+        // reference-code matching only as legacy fallback
         await syncSalesOrderWorkflowFromPo(
           fastify.prisma,
           referenceCode || existing.referenceCode,
           poStatus || status,
-          request.user.id
+          request.user.id,
+          linkedSalesOrderId !== undefined ? linkedSalesOrderId || null : existing.linkedSalesOrderId
         );
 
         const result = await fastify.prisma.purchaseOrder.findUnique({
