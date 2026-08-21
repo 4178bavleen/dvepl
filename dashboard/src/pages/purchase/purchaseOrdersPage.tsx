@@ -1461,25 +1461,25 @@ export function PurchaseOrdersPage() {
     { accessorKey: "poNumber", header: sortableHeader("PO Number") },
     {
       accessorKey: "vendorId", header: "Vendor",
-      cell: ({ row }) => { const rev = row.original as PORevision; const v = vendors.find((v) => v.id === rev.vendorId); return v?.name || "—"; },
+      cell: ({ row }: any) => { const rev = row.original as PORevision; const v = vendors.find((v) => v.id === rev.vendorId); return v?.name || "—"; },
     },
-    { accessorKey: "poDate", header: "Date", cell: ({ getValue }) => { const d = getValue() as string; return d ? new Date(d).toLocaleDateString("en-IN") : "—"; } },
-    { accessorKey: "poStatus", header: "Status", cell: ({ getValue }) => { const s = getValue() as string; const colors: Record<string, string> = { Pending: "bg-slate-500/10 text-slate-600", Ready: "bg-blue-500/10 text-blue-600", Placed: "bg-green-500/10 text-green-600", Ordered: "bg-indigo-500/10 text-indigo-600", Cancelled: "bg-red-500/10 text-red-600", "Partially Received": "bg-amber-500/10 text-amber-600", Received: "bg-emerald-500/10 text-emerald-600", "Needs Revision": "bg-orange-500/10 text-orange-600" }; return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${colors[s] || "bg-gray-100 text-gray-600"}`}>{s || "—"}</span>; } },
+    { accessorKey: "poDate", header: "Date", cell: ({ getValue }: any) => { const d = getValue() as string; return d ? new Date(d).toLocaleDateString("en-IN") : "—"; } },
+    { accessorKey: "poStatus", header: "Status", cell: ({ getValue }: any) => { const s = getValue() as string; const colors: Record<string, string> = { Pending: "bg-slate-500/10 text-slate-600", Ready: "bg-blue-500/10 text-blue-600", Placed: "bg-green-500/10 text-green-600", Ordered: "bg-indigo-500/10 text-indigo-600", Cancelled: "bg-red-500/10 text-red-600", "Partially Received": "bg-amber-500/10 text-amber-600", Received: "bg-emerald-500/10 text-emerald-600", "Needs Revision": "bg-orange-500/10 text-orange-600" }; return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${colors[s] || "bg-gray-100 text-gray-600"}`}>{s || "—"}</span>; } },
     {
       accessorKey: "grandTotal", header: "Grand Total",
-      cell: ({ getValue }) => `₹${Number(getValue() || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+      cell: ({ getValue }: any) => `₹${Number(getValue() || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
     },
     {
       accessorKey: "revisionNo", header: "Rev",
-      cell: ({ getValue }) => <span className="text-xs font-mono text-muted-foreground">R{getValue()}</span>,
+      cell: ({ getValue }: any) => <span className="text-xs font-mono text-muted-foreground">R{getValue()}</span>,
     },
     {
       accessorKey: "createdAt", header: "Created",
-      cell: ({ getValue }) => { const d = getValue() as string; return d ? new Date(d).toLocaleDateString("en-IN") : "—"; },
+      cell: ({ getValue }: any) => { const d = getValue() as string; return d ? new Date(d).toLocaleDateString("en-IN") : "—"; },
     },
     {
       id: "actions", header: "Actions",
-      cell: ({ row }) => {
+      cell: ({ row }: any) => {
         const rev = row.original as PORevision;
         return (
           <div
@@ -1676,7 +1676,7 @@ export function PurchaseOrdersPage() {
           <div className={`de-modal ${deMaximized ? "rounded-none" : ""}`} style={deMaximized ? { width: "100vw", height: "100vh", maxWidth: "100vw", maxHeight: "100vh" } : undefined}>
             {deMaximized && (
               <div className="de-restore-bar">
-                <span>⛶ Table Maximized — <strong>{activePoVendor.name}</strong></span>
+                <span>⛶ Table Maximized — <strong>{activePoVendor?.name}</strong></span>
                 <button className="de-restore-btn" onClick={() => setDeMaximized(false)}>✕ Restore</button>
               </div>
             )}
