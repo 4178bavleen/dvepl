@@ -1449,7 +1449,16 @@ export function PurchaseOrdersPage() {
         return true;
       });
     }
-    return result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    // One row per PO: keep only the LATEST revision of each PO number.
+    // Older revisions remain accessible via the Revision History panel.
+    const seen = new Set<string>();
+    return result
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .filter((r) => {
+        if (seen.has(r.poNumber)) return false;
+        seen.add(r.poNumber);
+        return true;
+      });
   }, [revisions, globalSearch, fieldSearch, searchField, vendors]);
 
   const activePoRevisions = useMemo(() => {
@@ -1582,7 +1591,7 @@ export function PurchaseOrdersPage() {
           <div className="h-10 w-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold text-xl">📋</div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Purchase Orders</h1>
-            <p className="mt-1 text-xs text-muted-foreground">{revisions.length} PO revisions across {new Set(revisions.map((r) => r.poNumber)).size} purchase orders</p>
+            <p className="mt-1 text-xs text-muted-foreground">{new Set(revisions.map((r) => r.poNumber)).size} purchase orders • {revisions.length} revisions in history</p>
           </div>
         </div>
         {canCreate && (
