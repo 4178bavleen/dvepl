@@ -59,6 +59,7 @@ async function adminSalesOrderUpdateRoutes(
 
         const {
           companyId,
+          customerId,
           dveplCode,
           status,
           orderTakenById,
@@ -208,6 +209,12 @@ async function adminSalesOrderUpdateRoutes(
                     id: companyId,
                   },
                 };
+              }
+
+              if (customerId !== undefined) {
+                updateData.customer = customerId
+                  ? { connect: { id: customerId } }
+                  : { disconnect: true };
               }
 
               if (dveplCode !== undefined) {

@@ -199,7 +199,6 @@ export const sidebarItems: SidebarItem[] = [
     name: "Workflow Tracker",
     icon: Workflow,
     path: ROUTES.WORKFLOW_TRACKER,
-    section: "Sales",
   },
 
   // Lead Management & Tenders

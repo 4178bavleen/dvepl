@@ -1148,7 +1148,9 @@ export function OrdersPage() {
               }
             >
               <SelectTrigger className="h-9 w-[130px] rounded-xl border-muted-foreground/15 bg-background shadow-3xs font-semibold focus:ring-1 focus:ring-primary/20">
-                <SelectValue placeholder="All" />
+                <SelectValue placeholder="All">
+                  {filterRemark ? filterRemark.charAt(0).toUpperCase() + filterRemark.slice(1) : undefined}
+                </SelectValue>
               </SelectTrigger>
 
               <SelectContent>
@@ -1184,7 +1186,15 @@ export function OrdersPage() {
               }
             >
               <SelectTrigger className="h-9 w-[140px] rounded-xl border-muted-foreground/15 bg-background shadow-3xs font-semibold focus:ring-1 focus:ring-primary/20">
-                <SelectValue />
+                <SelectValue placeholder="Date Newest">
+                  {sortBy === "date-newest"
+                    ? "Date Newest"
+                    : sortBy === "date-oldest"
+                    ? "Date Oldest"
+                    : sortBy === "firm-asc"
+                    ? "Firm A-Z"
+                    : undefined}
+                </SelectValue>
               </SelectTrigger>
 
               <SelectContent>

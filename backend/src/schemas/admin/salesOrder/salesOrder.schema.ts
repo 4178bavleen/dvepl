@@ -21,6 +21,8 @@ export const salesOrderItemSchema = z.object({
 export const salesOrderSchema = z.object({
   companyId: z.string().uuid(),
 
+  customerId: z.string().uuid().nullable().optional(),
+
   dveplCode: z.string().min(1, "DVEPL Code is required"),
 
   status: z.enum([
@@ -31,8 +33,6 @@ export const salesOrderSchema = z.object({
   ]),
 
   orderTakenById: z.string().uuid().nullable().optional(),
-
-
 
   partyName: z.string().min(1, "Party name is required"),
 
@@ -75,7 +75,7 @@ export const salesOrderSchema = z.object({
 
   remarks: z.string().nullable().optional(),
 
-  items: z.array(salesOrderItemSchema).min(1),
+  items: z.array(salesOrderItemSchema).optional().default([]),
 });
 
 export type SalesOrderInput = z.infer<typeof salesOrderSchema>;
