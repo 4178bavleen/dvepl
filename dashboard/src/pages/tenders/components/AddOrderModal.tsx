@@ -113,21 +113,6 @@ interface AddOrderModalProps {
   onSuccess: () => void;
 }
 
-const STATUS_OPTIONS = [
-  { value: "NEW_ORDER", label: "New Order" },
-  { value: "PENDING", label: "Pending" },
-  { value: "IN_PROGRESS", label: "In Progress" },
-  { value: "COMPLETED", label: "Completed" },
-  { value: "ON_HOLD", label: "On Hold" },
-];
-
-const DRAWING_STATUS_OPTIONS = [
-  { value: "PENDING", label: "Pending" },
-  { value: "APPROVED", label: "Approved" },
-  { value: "REJECTED", label: "Rejected" },
-  { value: "IN_PROGRESS", label: "In Progress" },
-];
-
 const EMPTY_ITEM: OrderItemForm = {
   itemCode: "",
   description: "",
@@ -207,7 +192,6 @@ export function AddOrderModal({
   editingOrder,
   onSuccess,
 }: AddOrderModalProps) {
-  const [status, setStatus] = useState("NEW_ORDER");
   const store = useERPStore();
 
   // ------------------------------------------------------------
@@ -273,7 +257,6 @@ export function AddOrderModal({
   // RESET FORM
   // ------------------------------------------------------------
   const resetForm = () => {
-    setStatus("NEW_ORDER");
     setSelectedCustomerId(null);
     setCustomerSearchQuery("");
     setIsCustomerDropdownOpen(false);
@@ -400,34 +383,39 @@ export function AddOrderModal({
           const order = res.data.data;
 
           setDveplCode(order.dveplCode || "");
-          setPartyName(order.partyName || "");
-          setCaNo(order.caNo || "");
+          setCompanyName(order.partyName || "");
+          setCustomerPoNo(order.caNo || "");
 
           const parts = (order.contactDetails || "").split(" | ");
           setContactPerson(parts[0] || "");
-          setMobile(parts[1] || "");
-          setEmail(parts[2] || "");
+          setMobileNo(parts[1] || "");
+          setEmailId(parts[2] || "");
 
-          setOrderConfirmDate(
-            order.orderConfirmDate
-              ? new Date(order.orderConfirmDate).toISOString().slice(0, 10)
-              : ""
-          );
-          setDeliveryMonthTarget(order.deliveryMonthTarget || "");
-          setPoDate(
-            order.poDate ? new Date(order.poDate).toISOString().slice(0, 10) : ""
-          );
-          setDrawingConcernedPerson(order.drawingConcernedPerson || "");
-          setDrawingApprovedDate(
-            order.drawingApprovedDate
-              ? new Date(order.drawingApprovedDate).toISOString().slice(0, 10)
-              : ""
-          );
-          setDrawingStatus(order.drawingStatus || "");
-          setDrawingRemarks(order.drawingRemarks || "");
-          setInspectionField(order.inspectionField || "");
-          setRemarks(order.remarks || "");
-          setSendNotification(order.sendNotification ?? true);
+          if (order.poDate) {
+            setOrderDate(new Date(order.poDate).toISOString().slice(0, 10));
+          }
+          if (order.deliveryMonthTarget) {
+            setCommitmentType("fixed");
+            setCommitmentDate(new Date(order.deliveryMonthTarget).toISOString().slice(0, 10));
+          }
+          setTotalPanels(order.inspectionField || "");
+
+          if (order.remarks) {
+            const lines = order.remarks.split("\n");
+            lines.forEach((line: string) => {
+              if (line.startsWith("Project Reference: ")) {
+                setProjectReference(line.replace("Project Reference: ", ""));
+              } else if (line.startsWith("Advance: ")) {
+                setAdvance(line.replace("Advance: ", ""));
+              } else if (line.startsWith("Billing Address: ")) {
+                setBillingAddress(line.replace("Billing Address: ", ""));
+                setIsBillingChanged(true);
+              } else if (line.startsWith("Shipping Address: ")) {
+                setShippingAddress(line.replace("Shipping Address: ", ""));
+                setSameAsBilling(false);
+              }
+            });
+          }
 
           if (order.items && order.items.length > 0) {
             setItems(
@@ -450,14 +438,11 @@ export function AddOrderModal({
       }
     };
 
-    if (open && editingOrder) {
     if (!open) return;
 
     if (editingOrder) {
       setDveplCode(editingOrder.dveplCode || "");
-      setCompanyName(editingOrder.partyName || "");
-      setPartyName(editingOrder.partyName || (editingOrder as any).firm_name || "");
-      setCaNo(editingOrder.caNo || (editingOrder as any).tender_no || "");
+      setCompanyName(editingOrder.partyName || (editingOrder as any).firm_name || "");
       setContactPerson(editingOrder.name || "");
       setMobileNo(editingOrder.mobile || "");
       setEmailId(editingOrder.email_id || "");
@@ -470,6 +455,7 @@ export function AddOrderModal({
       if (editingOrder.deliveryMonthTarget) {
         setCommitmentDate(editingOrder.deliveryMonthTarget.slice(0, 10));
       }
+      void fetchOrderDetails();
     } else {
       setOrderTakenById(propOrderTakenById || null);
     }
@@ -591,24 +577,6 @@ export function AddOrderModal({
   // ------------------------------------------------------------
   // LINE ITEM MANAGEMENT
   // ------------------------------------------------------------
-      setMobile(editingOrder.mobile || "");
-      setEmail(editingOrder.email_id || "");
-      setWorkName(editingOrder.name_of_work || "");
-      setDepartment(editingOrder.department_name || "");
-      setSection(editingOrder.section_name || "");
-      setDivision(editingOrder.division_name || "");
-      setSubDivision(editingOrder.subdivision || "");
-      setLocation(editingOrder.state_name || "");
-      setTenderId(editingOrder.tenderID || "");
-      setReferenceCode(editingOrder.reference_code || "");
-      setStatus(editingOrder.status || (editingOrder as any).remark || "NEW_ORDER");
-
-      void fetchOrderDetails();
-    } else {
-      resetForm();
-    }
-  }, [open, editingOrder]);
-
   const updateItem = (
     index: number,
     key: keyof OrderItemForm,
@@ -939,95 +907,8 @@ export function AddOrderModal({
                 ) : (
                   <Search className="size-4 text-neutral-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 )}
-          className="overflow-y-auto max-h-[calc(90vh-150px)] px-6 py-6 scrollbar-thin"
-        >
-          <div className="space-y-7">
-            {/* ==================================================
-                ORDER & CONTACT DETAILS
-                ================================================== */}
-            <section>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="h-4.5 w-1 rounded-full bg-primary" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
-                  Order & Contact Details
-                </h3>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Field label="DVEPL Code" required>
-                  <Input
-                    value={dveplCode}
-                    onChange={(e) => setDveplCode(e.target.value)}
-                    placeholder="e.g. SO-2026-0001"
-                    className="h-9 text-xs"
-                  />
-                </Field>
-
-                <Field label="Status" required>
-                  <Select
-                    value={status}
-                    onValueChange={(val) => setStatus(val ?? "PENDING")}
-                  >
-                    <SelectTrigger className="h-9 rounded-xl border-muted-foreground/15 bg-background font-semibold">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STATUS_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-
-                <Field label="Firm Name" required>
-                  <Input
-                    value={partyName}
-                    onChange={(e) => setPartyName(e.target.value)}
-                    placeholder="e.g. Vijay Kumar Gupta and Co"
-                    className="h-9 text-xs"
-                  />
-                </Field>
-
-                <Field label="Person Name">
-                  <Input
-                    value={contactPerson}
-                    onChange={(e) => setContactPerson(e.target.value)}
-                    placeholder="e.g. Sh Puneet Gupta"
-                    className="h-9 text-xs"
-                  />
-                </Field>
-
-                <Field label="Mobile">
-                  <Input
-                    value={mobile}
-                    onChange={(e) => setMobile(e.target.value)}
-                    placeholder="e.g. 7889873300"
-                    className="h-9 text-xs"
-                  />
-                </Field>
-
-                <Field label="Email">
-                  <Input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="e.g. contact@firm.com"
-                    className="h-9 text-xs"
-                  />
-                </Field>
-
-                <Field label="CA/Tender Number">
-                  <Input
-                    value={caNo}
-                    onChange={(e) => setCaNo(e.target.value)}
-                    placeholder="e.g. CWEAFJ-48/2025"
-                    className="h-9 text-xs"
-                  />
-                </Field>
-
-                <Field label="Project Ref Code">
               {/* Autocomplete Dropdown Menu */}
               {isCustomerDropdownOpen && (
                 <div className="absolute left-0 right-0 top-full mt-1 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-xl z-50 max-h-64 overflow-y-auto divide-y divide-neutral-100 dark:divide-neutral-800">
@@ -1234,24 +1115,24 @@ export function AddOrderModal({
                   <button
                     type="button"
                     onClick={() => setCommitmentType("fixed")}
-                    className={`px-2.5 py-0.5 text-[11px] font-semibold rounded transition-colors ${
+                    className={`px-2 py-0.5 text-[10px] font-bold rounded-sm transition-all ${
                       commitmentType === "fixed"
-                        ? "bg-emerald-700 text-white shadow-xs"
-                        : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900"
+                        ? "bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-xs"
+                        : "text-neutral-400 dark:text-neutral-500 hover:text-neutral-600"
                     }`}
                   >
-                    Fixed Date
+                    Fixed
                   </button>
                   <button
                     type="button"
                     onClick={() => setCommitmentType("days")}
-                    className={`px-2.5 py-0.5 text-[11px] font-semibold rounded transition-colors ${
+                    className={`px-2 py-0.5 text-[10px] font-bold rounded-sm transition-all ${
                       commitmentType === "days"
-                        ? "bg-emerald-700 text-white shadow-xs"
-                        : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900"
+                        ? "bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white shadow-xs"
+                        : "text-neutral-400 dark:text-neutral-500 hover:text-neutral-600"
                     }`}
                   >
-                    No. of Days
+                    Days
                   </button>
                 </div>
               </div>
@@ -1266,10 +1147,6 @@ export function AddOrderModal({
               ) : (
                 <div className="space-y-1">
                   <Input
-                    value={referenceCode}
-                    onChange={(e) => setReferenceCode(e.target.value)}
-                    placeholder="e.g. REF-20260302-08197"
-                    className="h-9 text-xs"
                     type="number"
                     min="1"
                     value={commitmentDays}
@@ -1277,31 +1154,6 @@ export function AddOrderModal({
                     placeholder="e.g. 30 (days from order date)"
                     className="h-10 text-xs rounded-lg border-neutral-300 dark:border-neutral-700"
                   />
-                </Field>
-
-                <Field label="Tender ID">
-                  <Input
-                    value={tenderId}
-                    onChange={(e) => setTenderId(e.target.value)}
-                    placeholder="e.g. 2026_MES_751133_1"
-                    className="h-9 text-xs"
-                  />
-                </Field>
-              </div>
-            </section>
-
-
-
-            {/* ==================================================
-                SCHEDULE & DRAWING
-                ================================================== */}
-            <section className="border-t pt-7">
-              <div className="flex items-center gap-2 mb-4">
-                <div className="h-4.5 w-1 rounded-full bg-amber-500" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
-                  Schedule & Drawing
-                </h3>
-              </div>
                   {calculatedCommitmentDate && (
                     <p className="text-[10px] text-emerald-700 dark:text-emerald-400 font-medium">
                       Target Delivery Date: {formatDateDisplay(calculatedCommitmentDate)}
@@ -1673,4 +1525,3 @@ export function AddOrderModal({
 }
 
 export default AddOrderModal;
-

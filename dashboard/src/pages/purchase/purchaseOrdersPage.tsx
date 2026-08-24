@@ -1858,7 +1858,7 @@ export function PurchaseOrdersPage() {
               <div className="de-footer-actions">
                 <button className="de-tbtn" style={{ padding: "10px 18px", fontSize: "13.5px" }} onClick={() => { setIsDataEntryOpen(false); setActivePoVendor(null); }}>Cancel</button>
                 <button className="de-tbtn" style={{ padding: "10px 18px", fontSize: "13.5px" }} onClick={openPoPreview}>👁️ View PO</button>
-                <button className="btn-save-rev" style={{ background: "#4f46e5", color: "#fff" }} onClick={handleSavePoRevision}>💾 Save Revision</button>
+                <button className="btn-save-rev" style={{ background: "#4f46e5", color: "#fff" }} onClick={() => handleSavePoRevision()}>💾 Save Revision</button>
                 <button className="btn-save-rev" onClick={() => { setPoStatus("Ready"); void handleSavePoRevision("Ready"); }}>✅ PO Ready</button>
                 <button className="btn-export-pdf" style={{ background: "#0f766e" }} onClick={openPoPlacedDialog}>📨 PO Placed</button>
                 {canExport && <button className="btn-export-pdf" onClick={() => triggerExport("pdf")}>📘 Export PDF</button>}
