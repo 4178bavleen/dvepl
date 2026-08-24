@@ -348,10 +348,59 @@ async function adminPurchaseOrderRevisionsRoutes(
     ) => {
       try {
         const { id } = request.params;
+        const companyId = request.user.companyId;
+
+        // Synthesized revisions are on-the-fly R0 projections of a
+        // PurchaseOrder that has no saved revisions yet — they are not real
+        // database rows. Deleting one removes the underlying Purchase Order.
+        if (id.startsWith("synthesized-")) {
+          const poId = id.replace(/^synthesized-/, "");
+
+          const po = await fastify.prisma.purchaseOrder.findFirst({
+            where: { id: poId, companyId, deletedAt: null },
+          });
+
+          if (!po) {
+            return reply.status(404).send({
+              success: false,
+              message: "Purchase Order not found.",
+            });
+          }
+
+          await fastify.prisma.purchaseOrder.update({
+            where: { id: po.id },
+            data: { deletedAt: new Date() },
+          });
+
+          adminLogs.info("Purchase Order deleted via synthesized revision", {
+            poId: po.id,
+            poNumber: po.poNo,
+            deletedBy: request.user.id,
+          });
+
+          return reply.send({
+            success: true,
+            message: "Purchase Order removed successfully.",
+          });
+        }
+
+        const revision = await fastify.prisma.purchaseOrderRevision.findFirst({
+          where: {
+            id,
+            vendor: { companyId },
+          },
+        });
+
+        if (!revision) {
+          return reply.status(404).send({
+            success: false,
+            message: "PO Revision not found.",
+          });
+        }
 
         await fastify.prisma.purchaseOrderRevision.delete({
           where: {
-            id,
+            id: revision.id,
           },
         });
 

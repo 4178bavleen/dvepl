@@ -107,18 +107,21 @@ async function adminPurchaseOrderCreateRoutes(
           });
         }
 
+        // poNo is globally unique at the database level, so soft-deleted
+        // (recycled) orders must be considered here too.
         const existing = await fastify.prisma.purchaseOrder.findFirst({
           where: {
             poNo,
             companyId,
-            deletedAt: null,
           },
         });
 
         if (existing) {
           return reply.status(409).send({
             success: false,
-            message: "PO Number already exists.",
+            message: existing.deletedAt
+              ? "PO Number already exists — it belongs to an order currently in the Recycle Bin. Please use a different number."
+              : "PO Number already exists.",
           });
         }
 

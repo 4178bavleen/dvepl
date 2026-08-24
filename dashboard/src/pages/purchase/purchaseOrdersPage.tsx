@@ -242,6 +242,7 @@ export function PurchaseOrdersPage() {
 
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [revisions, setRevisions] = useState<PORevision[]>([]);
+  const [nextPoNo, setNextPoNo] = useState("");
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [inventoryFields, setInventoryFields] = useState<DynamicField[]>([]);
   const [inventoryRecords, setInventoryRecords] = useState<DynamicRecord[]>([]);
@@ -373,13 +374,16 @@ export function PurchaseOrdersPage() {
     setLoading(true);
     setInventoryLoading(true);
     try {
-      const [vList, rList, invList, dynFieldsRes, dynRecordsRes, soData] = await Promise.all([
+      const [vList, rList, invList, dynFieldsRes, dynRecordsRes, soData, nextNoRes] = await Promise.all([
         apiService.vendors.list(),
         apiService.revisions.list(),
         inventoryApi.list(),
         dynamicApi.getFields("inventory"),
         dynamicApi.getRecords("inventory"),
         salesOrderApi.salesOrders.list({ page: "1", limit: "500" }).catch(() => []),
+        // Server-side numbering is authoritative: it also accounts for
+        // soft-deleted POs that still own their poNo via a unique index.
+        apiClient.get("/purchase-order/next-number").catch(() => null),
       ]);
       setVendors(vList);
       setRevisions(rList);
@@ -387,8 +391,20 @@ export function PurchaseOrdersPage() {
       setInventoryFields((dynFieldsRes.data?.data || []).sort((a: any, b: any) => a.orderNo - b.orderNo));
       setInventoryRecords(dynRecordsRes.data?.data || []);
       setSalesOrders(Array.isArray(soData) ? soData : []);
+      if (nextNoRes?.data?.success && typeof nextNoRes.data.data === "string") {
+        setNextPoNo(nextNoRes.data.data);
+      }
     } catch { toast.error("Failed to load data"); }
     finally { setLoading(false); setInventoryLoading(false); }
+  };
+
+  const refreshNextPoNo = async () => {
+    try {
+      const res = await apiClient.get("/purchase-order/next-number");
+      if (res.data?.success && typeof res.data.data === "string") {
+        setNextPoNo(res.data.data);
+      }
+    } catch {}
   };
 
   const poDefaultColumnIds = useMemo(() => {
@@ -662,6 +678,8 @@ export function PurchaseOrdersPage() {
 
   const openNewDataEntry = (vendor: Vendor | null) => {
     setActivePoVendor(vendor);
+    // Prefer the server-suggested number (accounts for recycled POs that
+    // still hold their poNo); fall back to counting saved revisions.
     const currentYear = new Date().getFullYear();
     const prefix = `PO-${currentYear}-`;
     const yearRevisions = revisions.filter((r) => r.poNumber && r.poNumber.startsWith(prefix));
@@ -670,7 +688,8 @@ export function PurchaseOrdersPage() {
       const numbers = yearRevisions.map((r) => { const parts = r.poNumber.split("-"); const lastPart = parts[parts.length - 1]; const parsed = parseInt(lastPart, 10); return isNaN(parsed) ? 0 : parsed; });
       nextNum = Math.max(...numbers) + 1;
     }
-    setPoNumber(`${prefix}${String(nextNum).padStart(4, "0")}`);
+    const localNext = `${prefix}${String(nextNum).padStart(4, "0")}`;
+    setPoNumber(nextPoNo || localNext);
     setPoDate(new Date().toISOString().split("T")[0]);
     setPoStatus("Pending");
     setPaymentTerms("30 days net");
@@ -746,45 +765,7 @@ export function PurchaseOrdersPage() {
     toast.success(`Loaded PO details from revision v${rev.revisionNo}`);
   };
 
-  const handleUpdatePoStatus = async (newStatus: string) => {
-    if (!activePoVendor) return;
-    if (!poNumber.trim()) { toast.error("PO Number is required"); return; }
-    let mappedStatus: "DRAFT" | "APPROVED" | "SENT" | "PARTIAL_RECEIVED" | "COMPLETED" | "CANCELLED" = "DRAFT";
-    if (newStatus === "Placed" || newStatus === "Ordered" || newStatus === "SENT") mappedStatus = "SENT";
-    else if (newStatus === "Ready" || newStatus === "APPROVED") mappedStatus = "APPROVED";
-    else if (newStatus === "Partially Received" || newStatus === "PARTIAL_RECEIVED") mappedStatus = "PARTIAL_RECEIVED";
-    else if (newStatus === "Received" || newStatus === "COMPLETED") mappedStatus = "COMPLETED";
-    else if (newStatus === "Cancelled" || newStatus === "CANCELLED") mappedStatus = "CANCELLED";
-    try {
-      const resolvedItems = poItems.map((item) => {
-        let resolvedMaterialId = item.materialId || item.inventoryId;
-        if (!resolvedMaterialId && item.description && inventoryFields.length > 0) {
-          const primaryField = inventoryFields[0];
-          const descLower = item.description.trim().toLowerCase();
-          const matchedRecord = inventoryRecords.find((rec) => { const recName = String(getRecordValue(rec.values, primaryField) || "").trim().toLowerCase(); return recName === descLower; });
-          if (matchedRecord) resolvedMaterialId = matchedRecord.id;
-        }
-        if (!resolvedMaterialId && item.description) {
-          const descLower = item.description.trim().toLowerCase();
-          const matched = inventoryItems.find((inv) => inv.material?.name?.trim().toLowerCase() === descLower);
-          if (matched?.materialId) resolvedMaterialId = matched.materialId;
-        }
-        if (!resolvedMaterialId && inventoryItems.length > 0) resolvedMaterialId = inventoryItems[0].materialId;
-        return { materialId: resolvedMaterialId || "", quantity: (Number(item.qty) || 0) > 0 ? Number(item.qty) : 1, unitPrice: item.rate > 0 ? item.rate : 0.01, remarks: item.description || "" };
-      });
-      const existingPOsRes = await apiClient.get("/purchase-order/read");
-      const existingPOs = existingPOsRes.data?.data ?? [];
-      const matchedPO = existingPOs.find((p: any) => p.poNo === poNumber);
-      if (matchedPO) {
-        await apiClient.patch(`/purchase-order/update/${matchedPO.id}`, { vendorId: activePoVendor.id, expectedDelivery: null, paymentTerms, shippingTerms: "", remarks, referenceCode, status: mappedStatus, poStatus: newStatus, items: resolvedItems, linkedSalesOrderId: linkedSalesOrderId || null, poType: linkedSalesOrderId ? "JOB" : "STOCK" });
-      } else {
-        await apiClient.post("/purchase-order/create", { poNo: poNumber, vendorId: activePoVendor.id, orderDate: poDate, expectedDelivery: null, paymentTerms, shippingTerms: "", remarks, referenceCode, status: mappedStatus, poStatus: newStatus, items: resolvedItems, linkedSalesOrderId: linkedSalesOrderId || null, poType: linkedSalesOrderId ? "JOB" : "STOCK" });
-      }
-      toast.success(`Purchase Order status updated to "${newStatus}"`);
-    } catch (err: any) { toast.error("Failed to update Purchase Order status"); }
-  };
-
-  const handleSavePoRevision = async () => {
+  const handleSavePoRevision = async (overrideStatus?: string) => {
     if (!activePoVendor) return;
     if (!poNumber.trim()) { toast.error("PO Number is required"); return; }
     if (!poDate) { toast.error("PO Date is required"); return; }
@@ -814,7 +795,7 @@ export function PurchaseOrdersPage() {
     if (advance > totals.grandTotal && totals.grandTotal > 0) { toast.error("Advance cannot exceed the grand total"); return; }
     const existingRevisions = revisions.filter((r) => r.vendorId === activePoVendor.id && r.poNumber === poNumber);
     const nextRevisionNo = existingRevisions.length === 0 ? 0 : Math.max(...existingRevisions.map((r) => r.revisionNo)) + 1;
-    const statusToSave = poStatus;
+    const statusToSave = overrideStatus ?? poStatus;
     const newRevision: PORevision = {
       id: `rev-${Date.now()}`, vendorId: activePoVendor.id, poNumber, poDate, poStatus: statusToSave, paymentTerms, materialStatus, advance, remarks, cgstPercent, sgstPercent, igstPercent,
       subtotal: totals.subtotal, cgstAmount: totals.cgstAmt, sgstAmount: totals.sgstAmt, igstAmount: totals.igstAmt, grandTotal: totals.grandTotal,
@@ -854,8 +835,11 @@ export function PurchaseOrdersPage() {
       const savedRevision = await apiService.revisions.create(newRevision);
       const list = await apiService.revisions.list();
       setRevisions(list);
+      void refreshNextPoNo();
       setSelectedRevisionId(savedRevision?.id || newRevision.id);
-      toast.success(`Revision R${newRevision.revisionNo} saved successfully`);
+      if (overrideStatus === "Ready") toast.success(`PO marked Ready — Revision R${newRevision.revisionNo} saved`);
+      else if (overrideStatus === "Placed") toast.success(`PO marked Placed — Revision R${newRevision.revisionNo} saved`);
+      else toast.success(`Revision R${newRevision.revisionNo} saved successfully`);
     } catch (err: any) { toast.error("Failed to save PO revision"); }
   };
 
@@ -1120,7 +1104,7 @@ export function PurchaseOrdersPage() {
     }
     if (sentChannels.length === 0) return;
     setPoStatus("Placed");
-    await handleUpdatePoStatus("Placed");
+    await handleSavePoRevision("Placed");
     toast.success("PO marked as Placed - sent via " + sentChannels.join(" & "));
     setIsPoPlacedDialogOpen(false);
   };
@@ -1875,7 +1859,7 @@ export function PurchaseOrdersPage() {
                 <button className="de-tbtn" style={{ padding: "10px 18px", fontSize: "13.5px" }} onClick={() => { setIsDataEntryOpen(false); setActivePoVendor(null); }}>Cancel</button>
                 <button className="de-tbtn" style={{ padding: "10px 18px", fontSize: "13.5px" }} onClick={openPoPreview}>👁️ View PO</button>
                 <button className="btn-save-rev" style={{ background: "#4f46e5", color: "#fff" }} onClick={handleSavePoRevision}>💾 Save Revision</button>
-                <button className="btn-save-rev" onClick={() => { setPoStatus("Ready"); handleUpdatePoStatus("Ready"); }}>✅ PO Ready</button>
+                <button className="btn-save-rev" onClick={() => { setPoStatus("Ready"); void handleSavePoRevision("Ready"); }}>✅ PO Ready</button>
                 <button className="btn-export-pdf" style={{ background: "#0f766e" }} onClick={openPoPlacedDialog}>📨 PO Placed</button>
                 {canExport && <button className="btn-export-pdf" onClick={() => triggerExport("pdf")}>📘 Export PDF</button>}
               </div>
@@ -2096,7 +2080,7 @@ export function PurchaseOrdersPage() {
       {/* Confirm Dialogs */}
       <ConfirmDialog open={clearRowsConfirmOpen} onOpenChange={setClearRowsConfirmOpen} title="Clear All Line Items?" description="All line items in this PO draft will be removed." confirmText="Clear All" variant="warning" onConfirm={() => setPoItems([])} />
       <ConfirmDialog open={removeColConfirmOpen} onOpenChange={setRemoveColConfirmOpen} title="Remove Column?" description={`The column "${colToRemove}" will be removed.`} confirmText="Remove Column" variant="warning" onConfirm={() => { if (!colToRemove) return; setCustomColumns((prev) => prev.filter((c) => c !== colToRemove)); setPoItems((prev) => prev.map((item) => { const updated = { ...item }; delete updated[colToRemove]; return updated; })); toast.success(`Column "${colToRemove}" removed`); setColToRemove(null); }} />
-      <ConfirmDialog open={deleteRevisionConfirmOpen} onOpenChange={setDeleteRevisionConfirmOpen} title="Delete PO Revision?" description="This saved PO revision will be removed." confirmText="Delete Revision" onConfirm={async () => { if (!revisionToDelete) return; try { await apiService.revisions.delete(revisionToDelete); const list = await apiService.revisions.list(); setRevisions(list); if (selectedRevisionId === revisionToDelete) setSelectedRevisionId(null); toast.success("Revision deleted."); } catch { toast.error("Failed to delete revision."); } finally { setRevisionToDelete(null); } }} />
+      <ConfirmDialog open={deleteRevisionConfirmOpen} onOpenChange={setDeleteRevisionConfirmOpen} variant="danger" showRecycleHint={Boolean(revisionToDelete?.startsWith("synthesized-"))} title={revisionToDelete?.startsWith("synthesized-") ? "Delete Purchase Order?" : "Delete PO Revision?"} description={revisionToDelete?.startsWith("synthesized-") ? "This PO has no saved revisions — the purchase order itself will be removed." : "This saved PO revision will be permanently removed."} confirmText={revisionToDelete?.startsWith("synthesized-") ? "Delete PO" : "Delete Revision"} onConfirm={async () => { if (!revisionToDelete) return; const wasSynthesized = revisionToDelete.startsWith("synthesized-"); try { await apiService.revisions.delete(revisionToDelete); const list = await apiService.revisions.list(); setRevisions(list); void refreshNextPoNo(); if (selectedRevisionId === revisionToDelete) setSelectedRevisionId(null); toast.success(wasSynthesized ? "Purchase Order moved to Recycle Bin." : "Revision deleted."); } catch { toast.error(wasSynthesized ? "Failed to delete Purchase Order." : "Failed to delete revision."); } finally { setRevisionToDelete(null); } }} />
     </div>
   );
 }

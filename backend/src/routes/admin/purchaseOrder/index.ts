@@ -5,6 +5,7 @@ import readRoute from "./read";
 import updateRoute from "./update";
 import deleteRoute from "./delete";
 import revisionsRoute from "./revisions";
+import nextNumberRoute from "./next-number";
 
 export default async function purchaseOrderRoutes(
   fastify: FastifyInstance,
@@ -14,4 +15,5 @@ export default async function purchaseOrderRoutes(
   fastify.register(updateRoute, { prefix: "/update" });
   fastify.register(deleteRoute, { prefix: "/delete" });
   fastify.register(revisionsRoute, { prefix: "/revisions" });
+  fastify.register(nextNumberRoute, { prefix: "/next-number" });
 }

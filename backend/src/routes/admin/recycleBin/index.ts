@@ -361,6 +361,25 @@ const recycleBinModels: RecycleBinModelConfig[] = [
     },
   },
   {
+    module: "purchaseorder",
+    label: "Purchase Order",
+    delegate: "purchaseOrder",
+    select: { id: true, poNo: true, referenceCode: true, deletedAt: true, updatedAt: true },
+    formatName: (record) =>
+      `${record.poNo || "Purchase Order"}${record.referenceCode ? ` (Ref: ${record.referenceCode})` : ""}`,
+    permanentDelete: async (fastify, id) => {
+      // FKs are RESTRICT on goods_receipt_items / goods_receipts /
+      // purchase_order_items, so children must be removed before the PO.
+      // Revisions cascade and invoices SET NULL at the database level.
+      await fastify.prisma.goodsReceiptItem.deleteMany({
+        where: { grn: { poId: id } },
+      });
+      await fastify.prisma.goodsReceipt.deleteMany({ where: { poId: id } });
+      await fastify.prisma.purchaseOrderItem.deleteMany({ where: { poId: id } });
+      await (fastify.prisma as any).purchaseOrder.delete({ where: { id } });
+    },
+  },
+  {
     module: "customfield",
     label: "Custom Field",
     delegate: "customField",

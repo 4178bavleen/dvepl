@@ -16,6 +16,8 @@ interface ConfirmDialogProps {
   confirmText?: string;
   cancelText?: string;
   variant?: 'danger' | 'warning' | 'primary';
+  /** Show the green "recoverable from Recycle Bin" hint (danger variant only). */
+  showRecycleHint?: boolean;
   onConfirm: () => void;
   loading?: boolean;
 }
@@ -28,11 +30,13 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   confirmText = 'Move to Bin',
   cancelText = 'Cancel',
   variant = 'danger',
+  showRecycleHint = true,
   onConfirm,
   loading = false,
 }) => {
   const isDanger  = variant === 'danger';
   const isWarning = variant === 'warning';
+  const showRecycleNote = isDanger && showRecycleHint;
 
   const stripCls  = isDanger
     ? 'bg-gradient-to-r from-rose-500 via-red-500 to-rose-400'
@@ -95,22 +99,24 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             </div>
           </div>
 
-          {/* Soft-delete hint (only for danger variant) */}
-          {isDanger && (
+          {/* Soft-delete hint (danger variant, recoverable items only) */}
+          {showRecycleNote && (
             <div className="flex items-start gap-2.5 rounded-xl px-3.5 py-3 text-[12px] font-medium border bg-emerald-500/5 border-emerald-500/20 text-emerald-700 dark:text-emerald-400">
               <RotateCcw className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               <span>This item will be moved to the <strong>Recycle Bin</strong>. You can restore it anytime from Settings → Recycle Bin.</span>
             </div>
           )}
 
-          {/* Warning note for non-danger */}
-          {!isDanger && (
-            <div className={`flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-[12px] font-medium border ${noteCls}`}>
-              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+          {/* Warning note */}
+          {!showRecycleNote && (
+            <div className={`flex items-start gap-2.5 rounded-xl px-3.5 py-2.5 text-[12px] font-medium border ${noteCls}`}>
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
               <span>
                 {isWarning
                   ? 'Please review carefully before proceeding.'
-                  : 'This action will modify your data.'}
+                  : isDanger
+                    ? 'This action cannot be undone.'
+                    : 'This action will modify your data.'}
               </span>
             </div>
           )}
@@ -120,7 +126,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         <div className="flex items-center justify-between gap-2.5 px-6 py-4 bg-muted/20 border-t border-border/50">
           {/* Subtle label on left */}
           <p className="text-[11px] text-muted-foreground/60 hidden sm:block">
-            {isDanger ? 'Recoverable from Recycle Bin' : 'Review before confirming'}
+            {showRecycleNote ? 'Recoverable from Recycle Bin' : 'Review before confirming'}
           </p>
 
           <div className="flex items-center gap-2 ml-auto">
