@@ -190,6 +190,7 @@ interface GenericTableProps<TData> {
   onView?: (row: TData) => void;
   onEdit?: (row: TData) => void;
   onDelete?: (row: TData) => void;
+  onRowClick?: (row: TData) => void;
   bulkActions?: (selectedRows: TData[]) => React.ReactNode;
   isLoading?: boolean;
   showColumnVisibility?: boolean;
@@ -209,6 +210,7 @@ export function GenericTable<TData extends { id: string }>({
   onView,
   onEdit,
   onDelete,
+  onRowClick,
   bulkActions,
   isLoading = false,
   showColumnVisibility = true,
@@ -929,7 +931,25 @@ export function GenericTable<TData extends { id: string }>({
                   <TableRow
                     key={row.id}
                     data-state={row.getIsSelected() && "selected"}
-                    className="hover:bg-muted/30 border-b border-border/40 transition-colors duration-150"
+                    className={cn(
+                      "hover:bg-muted/30 border-b border-border/40 transition-colors duration-150",
+                      onRowClick && "cursor-pointer",
+                    )}
+                    onClick={
+                      onRowClick
+                        ? (e) => {
+                            const target = e.target as HTMLElement;
+                            if (
+                              target.closest(
+                                "button, a, input, select, textarea, label",
+                              )
+                            ) {
+                              return;
+                            }
+                            onRowClick(row.original);
+                          }
+                        : undefined
+                    }
                   >
                     {row.getVisibleCells().map((cell) => (
                       <TableCell

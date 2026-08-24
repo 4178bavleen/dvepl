@@ -73,24 +73,18 @@ export interface SalesOrderAttachment {
 
 export const ALL_COLUMN_KEYS = [
   { id: "tenderNo", label: "TENDER NO" },
-  { id: "nameOfWork", label: "NAME OF WORK" },
   { id: "firmName", label: "FIRM NAME" },
   { id: "assignedUsers", label: "ASSIGNED TO" },
   { id: "contactPerson", label: "Name" },
   { id: "mobile", label: "MOBILE" },
   { id: "email", label: "EMAIL" },
   { id: "departmentName", label: "DEPARTMENT" },
-  { id: "sectionName", label: "SECTION" },
-  { id: "divisionName", label: "DIVISION" },
-  { id: "subdivision", label: "SUB DIVISION" },
   { id: "stateCity", label: "STATE / CITY" },
   { id: "tenderID", label: "TENDER ID" },
   { id: "referenceCode", label: "REFERENCE CODE" },
   { id: "poStatus", label: "PO STATUS" },
-  { id: "workflowProgress", label: "WORKFLOW PROGRESS" },
   { id: "remark", label: "REMARK" },
   { id: "remarkedAt", label: "REMARKED AT" },
-  { id: "drawingAttached", label: "DRAWING" },
   { id: "fileName", label: "FILE" },
 ] as const;
 

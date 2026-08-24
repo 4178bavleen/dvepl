@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -89,7 +89,15 @@ export function OrderDetailPage() {
   const [tender, setTender] = useState<QuoteTenderOrder | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabId>("overview");
+  const [searchParams] = useSearchParams();
+  const initialTab = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState<TabId>(
+    initialTab === "workflow" ||
+      initialTab === "documents" ||
+      initialTab === "audit"
+      ? (initialTab as TabId)
+      : "overview",
+  );
 
   const canWorkOnOrder = isAdmin || isOrderAssignedToCurrentUser(tender);
 

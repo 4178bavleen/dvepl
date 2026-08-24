@@ -24,7 +24,15 @@ import {
   useDroppable,
   useSensor,
   useSensors,
+  closestCenter,
 } from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1311,6 +1319,92 @@ interface DraftStep {
   isFinal: boolean;
 }
 
+interface SortableStageRowProps {
+  step: DraftStep;
+  index: number;
+  updateStep: (index: number, patch: Partial<DraftStep>) => void;
+  removeStep: (index: number) => void;
+}
+
+function SortableStageRow({
+  step,
+  index,
+  updateStep,
+  removeStep,
+}: SortableStageRowProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: step.key });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+    position: "relative",
+    zIndex: isDragging ? 50 : undefined,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-2 rounded-lg border border-border bg-card p-2 shadow-3xs transition-colors duration-200 ${
+        isDragging ? "border-emerald-500/50 bg-emerald-500/[0.02]" : "hover:border-border/80"
+      }`}
+    >
+      <span
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing p-1.5 text-muted-foreground/50 hover:text-muted-foreground transition-colors touch-none shrink-0"
+      >
+        <GripVertical className="h-4 w-4" />
+      </span>
+
+      <input
+        type="color"
+        value={step.color}
+        onChange={(e) => updateStep(index, { color: e.target.value })}
+        className="h-8 w-9 shrink-0 cursor-pointer rounded border border-border bg-card p-0.5"
+        aria-label={`Color for ${step.name}`}
+      />
+
+      <Input
+        value={step.name}
+        onChange={(e) => updateStep(index, { name: e.target.value })}
+        placeholder="Stage name"
+        className="h-8 flex-1 text-xs"
+      />
+
+      <label className="flex shrink-0 cursor-pointer items-center gap-1 text-[10px] font-medium text-muted-foreground">
+        <input
+          type="checkbox"
+          checked={step.isFinal}
+          onChange={(e) =>
+            updateStep(index, { isFinal: e.target.checked })
+          }
+          className="h-3.5 w-3.5 accent-emerald-600"
+        />
+        Final
+      </label>
+
+      <button
+        type="button"
+        onClick={() => removeStep(index)}
+        className="shrink-0 rounded p-1.5 text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
+        aria-label={`Remove ${step.name}`}
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
+
 function TemplateEditorDialog({
   open,
   onOpenChange,
@@ -1329,6 +1423,24 @@ function TemplateEditorDialog({
 }) {
   const [name, setName] = useState("");
   const [steps, setSteps] = useState<DraftStep[]>([]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 250, tolerance: 8 },
+    }),
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setSteps((prev) => {
+      const oldIndex = prev.findIndex((s) => s.key === active.id);
+      const newIndex = prev.findIndex((s) => s.key === over.id);
+      if (oldIndex === -1 || newIndex === -1) return prev;
+      return arrayMove(prev, oldIndex, newIndex);
+    });
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -1443,67 +1555,29 @@ function TemplateEditorDialog({
               </Button>
             </div>
 
-            {steps.map((step, index) => (
-              <div
-                key={`${step.key}-${index}`}
-                className="flex items-center gap-2 rounded-lg border border-border bg-muted/20 p-2"
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={steps.map((s) => s.key)}
+                strategy={verticalListSortingStrategy}
               >
-                <div className="flex flex-col">
-                  <button
-                    type="button"
-                    onClick={() => move(index, -1)}
-                    disabled={index === 0}
-                    className="rounded p-0.5 text-muted-foreground hover:bg-muted disabled:opacity-30"
-                  >
-                    <ChevronUp className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => move(index, 1)}
-                    disabled={index === steps.length - 1}
-                    className="rounded p-0.5 text-muted-foreground hover:bg-muted disabled:opacity-30"
-                  >
-                    <ChevronDown className="h-3.5 w-3.5" />
-                  </button>
+                <div className="space-y-2">
+                  {steps.map((step, index) => (
+                    <SortableStageRow
+                      key={step.key}
+                      step={step}
+                      index={index}
+                      updateStep={updateStep}
+                      removeStep={removeStep}
+                    />
+                  ))}
                 </div>
+              </SortableContext>
+            </DndContext>
 
-                <input
-                  type="color"
-                  value={step.color}
-                  onChange={(e) => updateStep(index, { color: e.target.value })}
-                  className="h-8 w-9 shrink-0 cursor-pointer rounded border border-border bg-card p-0.5"
-                  aria-label={`Color for ${step.name}`}
-                />
-
-                <Input
-                  value={step.name}
-                  onChange={(e) => updateStep(index, { name: e.target.value })}
-                  placeholder="Stage name"
-                  className="h-8 flex-1 text-xs"
-                />
-
-                <label className="flex shrink-0 cursor-pointer items-center gap-1 text-[10px] font-medium text-muted-foreground">
-                  <input
-                    type="checkbox"
-                    checked={step.isFinal}
-                    onChange={(e) =>
-                      updateStep(index, { isFinal: e.target.checked })
-                    }
-                    className="h-3.5 w-3.5 accent-emerald-600"
-                  />
-                  Final
-                </label>
-
-                <button
-                  type="button"
-                  onClick={() => removeStep(index)}
-                  className="shrink-0 rounded p-1.5 text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
-                  aria-label={`Remove ${step.name}`}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            ))}
           </div>
         </div>
 

@@ -11,7 +11,6 @@ import {
   Users,
   UserPlus,
   ExternalLink,
-  Eye,
   Plus,
   Maximize2,
   Minimize2,
@@ -22,8 +21,6 @@ import {
   ALL_COLUMN_KEYS,
   ColumnKey,
   EMPTY_ARRAY,
-  workflowStageLabel,
-  workflowStagePercent,
   fetchQuoteTenderOrders,
 } from "./orderShared";
 
@@ -64,8 +61,6 @@ import { SalesOrderAssignModal } from "./components/SalesOrderAssignModal";
 
 import { AddOrderModal } from "./components/AddOrderModal";
 
-import { useWorkflowTemplate } from "@/hooks/useWorkflowTemplate";
-
 // ============================================================
 // GENERIC TABLE TYPE WORKAROUND
 // ============================================================
@@ -76,6 +71,7 @@ const TenderTable = GenericTable as unknown as React.ComponentType<{
   onView?: (row: QuoteTenderOrder) => void;
   onEdit?: (row: QuoteTenderOrder) => void;
   onDelete?: (row: QuoteTenderOrder) => void;
+  onRowClick?: (row: QuoteTenderOrder) => void;
   isLoading?: boolean;
   showColumnVisibility?: boolean;
   storageKey?: string;
@@ -87,8 +83,6 @@ const TenderTable = GenericTable as unknown as React.ComponentType<{
 
 export function OrdersPage() {
   const store = useERPStore();
-
-  const { stages: workflowStages } = useWorkflowTemplate();
 
   const currentUser = useMemo(() => {
     return store.users.find((user) => user.id === store.currentUserId) as any;
@@ -451,22 +445,6 @@ export function OrdersPage() {
           ),
         },
 
-        nameOfWork: {
-          accessorKey: "name_of_work",
-          header: "NAME OF WORK",
-          cell: ({ getValue }) => {
-            const val = (getValue() as string) || "—";
-            return (
-              <span
-                className="line-clamp-2 max-w-[280px] text-xs text-muted-foreground font-medium leading-relaxed"
-                title={val}
-              >
-                {val}
-              </span>
-            );
-          },
-        },
-
         firmName: {
           accessorKey: "firm_name",
           header: sortableHeader("FIRM NAME"),
@@ -568,27 +546,6 @@ export function OrdersPage() {
             (getValue() as string) || "—",
         },
 
-        sectionName: {
-          accessorKey: "section_name",
-          header: "SECTION",
-          cell: ({ getValue }) =>
-            (getValue() as string) || "—",
-        },
-
-        divisionName: {
-          accessorKey: "division_name",
-          header: "DIVISION",
-          cell: ({ getValue }) =>
-            (getValue() as string) || "—",
-        },
-
-        subdivision: {
-          accessorKey: "subdivision",
-          header: "SUB DIVISION",
-          cell: ({ getValue }) =>
-            (getValue() as string) || "—",
-        },
-
         stateCity: {
           id: "stateCity",
           header: "STATE / CITY",
@@ -671,65 +628,6 @@ export function OrdersPage() {
           },
         },
 
-        workflowProgress: {
-          id: "workflowProgress",
-          header: "WORKFLOW PROGRESS",
-          cell: ({ row }) => {
-            const stage = row.original.workflowStage;
-            if (!stage) {
-              return (
-                <span className="text-[10px] font-semibold text-muted-foreground/60 italic">
-                  Not started
-                </span>
-              );
-            }
-
-            const percent = workflowStagePercent(stage, workflowStages);
-            const currentIndex = workflowStages.findIndex(
-              (s) => s.key === stage,
-            );
-            const isDone = currentIndex === workflowStages.length - 1;
-
-            return (
-              <div className="min-w-[180px] py-1">
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <span className="text-[10px] font-bold text-foreground truncate">
-                    {workflowStageLabel(stage, workflowStages)}
-                  </span>
-                  <span
-                    className={`text-[10px] font-bold shrink-0 ${
-                      isDone
-                        ? "text-emerald-600"
-                        : percent >= 100
-                          ? "text-emerald-600"
-                          : "text-blue-600"
-                    }`}
-                  >
-                    {isDone ? "100% Done" : `${percent}%`}
-                  </span>
-                </div>
-                <div className="flex items-center gap-0.5">
-                  {workflowStages.map((s, i) => {
-                    const active = i <= currentIndex;
-                    return (
-                      <span
-                        key={s.key}
-                        className="h-1.5 flex-1 rounded-full transition-colors"
-                        style={
-                          active
-                            ? { backgroundColor: s.color }
-                            : { backgroundColor: "hsl(var(--border))" }
-                        }
-                        title={s.name}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          },
-        },
-
         remark: {
           accessorKey: "remark",
           header: "REMARK",
@@ -782,78 +680,6 @@ export function OrdersPage() {
           },
         },
 
-        drawingAttached: {
-          id: "drawingAttached",
-          header: "DRAWING",
-          cell: ({ row }) => {
-            const drawings = row.original.drawings || [];
-            if (drawings.length === 0) {
-              return (
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground/60 bg-muted/20 px-2 py-0.5 rounded border">
-                  <XCircle className="size-3" />
-                  No
-                </span>
-              );
-            }
-
-            return (
-              <Popover>
-                <PopoverTrigger
-                  render={
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1 h-7 text-[10px] font-bold text-emerald-600 border-emerald-200/50 hover:border-emerald-300 bg-emerald-50/50 hover:bg-emerald-50 transition-all duration-150 px-2 rounded-full cursor-pointer"
-                    >
-                      <CheckCircle2 className="size-3.5" />
-                      <span>{drawings.length} {drawings.length === 1 ? "Dwg" : "Dwgs"}</span>
-                    </Button>
-                  }
-                />
-                <PopoverContent align="center" className="w-80 p-3 space-y-2 z-50 bg-background/98 backdrop-blur-md border border-border/80 rounded-xl shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200">
-                  <div className="border-b pb-1.5 mb-1">
-                    <h4 className="font-bold text-xs text-foreground uppercase tracking-wider">
-                      Attached Drawings ({drawings.length})
-                    </h4>
-                  </div>
-                  <div className="space-y-1 max-h-[220px] overflow-y-auto pr-1">
-                    {drawings.map((dwg) => {
-                      const backendUrl = apiClient.defaults.baseURL?.replace("/admin", "") || "";
-                      const fullUrl = dwg.fileUrl.startsWith("http") ? dwg.fileUrl : `${backendUrl}${dwg.fileUrl}`;
-                      return (
-                        <div
-                          key={dwg.id}
-                          className="flex items-center justify-between gap-2 p-2 border rounded-lg hover:bg-muted/40 transition-colors"
-                        >
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs font-bold text-foreground truncate" title={dwg.drawingNo}>
-                              {dwg.drawingNo}
-                            </p>
-                            <p className="text-[10px] text-muted-foreground truncate" title={dwg.title || dwg.fileName}>
-                              {dwg.title || dwg.fileName || "Untitled Drawing"}
-                            </p>
-                          </div>
-                          {dwg.fileUrl && (
-                            <a
-                              href={fullUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center justify-center size-7 rounded-lg border bg-background hover:bg-muted text-muted-foreground hover:text-foreground shrink-0 transition-colors shadow-2xs"
-                              title="Open Drawing"
-                            >
-                              <Eye className="size-3.5" />
-                            </a>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </PopoverContent>
-              </Popover>
-            );
-          },
-        },
-
         fileName: {
           accessorKey: "file_name",
           header: "FILE",
@@ -882,7 +708,7 @@ export function OrdersPage() {
       return (Object.keys(allDefs) as ColumnKey[])
         .filter((key) => visibleColumns[key])
         .map((key) => allDefs[key]);
-    }, [visibleColumns, isAdmin, workflowStages]);
+    }, [visibleColumns, isAdmin]);
 
   // ============================================================
   // RENDER
@@ -1222,7 +1048,8 @@ export function OrdersPage() {
       <TenderTable
         columns={tableColumns}
         data={processedTenders}
-        onView={(row) => navigate(`/orders/${row.id}`)}
+        onView={(row) => navigate(`/orders/${row.id}?tab=workflow`)}
+        onRowClick={(row) => navigate(`/orders/${row.id}?tab=workflow`)}
         onEdit={
           canEdit || isAdmin
             ? (row) => {
