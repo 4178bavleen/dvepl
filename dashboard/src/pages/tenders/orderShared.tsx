@@ -215,17 +215,28 @@ export async function fetchQuoteTenderOrders(): Promise<{
     const contactFields = parseContactDetails(order.contactDetails || "");
     const refCode = remarksFields.referenceCode || "";
 
-    // Resolve PO Status
-    const matchedRev = dbRevisions.find(
-      (rev) =>
-        rev.referenceCode &&
-        String(rev.referenceCode).trim() === String(refCode).trim(),
-    );
-    const matchedPO = backendPOs.find(
-      (po) =>
-        po.referenceCode &&
-        String(po.referenceCode).trim() === String(refCode).trim(),
-    );
+    // Resolve PO Status — direct FK match first, reference-code string
+    // comparison only as a legacy fallback.
+    const matchedRev =
+      dbRevisions.find(
+        (rev) => rev.salesOrderId && rev.salesOrderId === order.id,
+      ) ||
+      dbRevisions.find(
+        (rev) =>
+          refCode &&
+          rev.referenceCode &&
+          String(rev.referenceCode).trim() === String(refCode).trim(),
+      );
+    const matchedPO =
+      backendPOs.find(
+        (po) => po.linkedSalesOrderId && po.linkedSalesOrderId === order.id,
+      ) ||
+      backendPOs.find(
+        (po) =>
+          refCode &&
+          po.referenceCode &&
+          String(po.referenceCode).trim() === String(refCode).trim(),
+      );
 
     let poStatus = "No PO";
     let poNumber = "";
