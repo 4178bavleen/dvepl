@@ -1,11 +1,11 @@
 import React, { useMemo, useRef, useState } from "react";
 import {
-  UploadCloud,
   Plus,
   Trash2,
   Loader2,
   FileText,
   ExternalLink,
+  CheckCircle2,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -15,16 +15,27 @@ import { apiClient } from "@/services/axios";
 import { SalesOrderAttachment } from "../orderShared";
 
 // ============================================================
-// DEFAULT DOCUMENT CATEGORIES (matching the requested upload flow)
+// DOCUMENT CATEGORIES DEFINITION (matching Screenshot 3)
 // ============================================================
 
-export const DEFAULT_DOCUMENT_CATEGORIES = [
-  "Project Document Upload (BOM / BOQ/Tender)",
+export interface DocumentCategoryDef {
+  name: string;
+  isMandatory: boolean;
+}
+
+export const INITIAL_DOCUMENT_CATEGORIES: DocumentCategoryDef[] = [
+  { name: "BOM / BOQ/Tender", isMandatory: true },
+  { name: "Customer PO Copy or DVEPL Final Offer", isMandatory: true },
+  { name: "Rough Drawings Copy", isMandatory: true },
+  { name: "Miscellaneous Document", isMandatory: false },
+  { name: "PO Copy", isMandatory: false },
+  { name: "Tender Copy", isMandatory: false },
+];
+
+export const MANDATORY_CATEGORIES = [
+  "BOM / BOQ/Tender",
   "Customer PO Copy or DVEPL Final Offer",
   "Rough Drawings Copy",
-  "Miscellaneous Document",
-  "PO Copy",
-  "Tender Copy",
 ];
 
 // ============================================================
@@ -33,10 +44,6 @@ export const DEFAULT_DOCUMENT_CATEGORIES = [
 
 interface ProjectDocumentUploadPanelProps {
   attachments?: SalesOrderAttachment[];
-  // When true (immediate mode), the file is uploaded + attached to the
-  // order immediately upon selection. When false (deferred mode), the file
-  // is buffered and reported through onPendingChange for the parent to
-  // attach after the order is created/updated.
   immediate?: boolean;
   orderId?: string | null;
   disabled?: boolean;
@@ -44,12 +51,22 @@ interface ProjectDocumentUploadPanelProps {
   onPendingChange?: (pending: Array<{ category: string; file: File }>) => void;
   onUploaded?: () => void;
   onDeleted?: (attachmentId: string) => void;
+  onMandatoryFulfilledChange?: (fulfilled: boolean) => void;
 }
 
 interface PendingDoc {
   key: string;
   category: string;
   file: File | null;
+}
+
+function formatBytes(bytes: number, decimals = 1) {
+  if (!bytes || bytes === 0) return "0 B";
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 }
 
 function buildFileUrl(url: string) {
@@ -59,32 +76,36 @@ function buildFileUrl(url: string) {
   return `${base}${url}`;
 }
 
+// Normalize strings for matching categories
+function normalizeCategory(cat: string) {
+  return cat.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
 // ============================================================
-// PANEL
+// PANEL COMPONENT
 // ============================================================
 
 export function ProjectDocumentUploadPanel({
   attachments = [],
-  immediate = true,
+  immediate = false,
   orderId,
   disabled = false,
   uploading = false,
   onPendingChange,
   onUploaded,
   onDeleted,
+  onMandatoryFulfilledChange,
 }: ProjectDocumentUploadPanelProps) {
-  const [extraCategories, setExtraCategories] = useState<string[]>([]);
+  const [categories, setCategories] = useState<DocumentCategoryDef[]>(
+    INITIAL_DOCUMENT_CATEGORIES
+  );
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [customCategory, setCustomCategory] = useState("");
   const [pendingDocs, setPendingDocs] = useState<PendingDoc[]>([]);
   const [busyCategory, setBusyCategory] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
-
-  const categories = useMemo(
-    () => [...DEFAULT_DOCUMENT_CATEGORIES, ...extraCategories],
-    [extraCategories],
-  );
 
   const attachmentsByCategory = useMemo(() => {
     const map: Record<string, SalesOrderAttachment[]> = {};
@@ -96,32 +117,77 @@ export function ProjectDocumentUploadPanel({
     return map;
   }, [attachments]);
 
+  // Check if a category has an attachment or pending file
+  const getCategoryFileStatus = (categoryName: string) => {
+    const norm = normalizeCategory(categoryName);
+    
+    // Check existing server attachments
+    const attachedKey = Object.keys(attachmentsByCategory).find(
+      (k) => normalizeCategory(k) === norm || k === categoryName
+    );
+    const existingList = attachedKey ? attachmentsByCategory[attachedKey] || [] : [];
+    
+    // Check pending local files
+    const pendingDoc = pendingDocs.find(
+      (doc) => normalizeCategory(doc.category) === norm && doc.file
+    );
+
+    return {
+      hasFile: existingList.length > 0 || Boolean(pendingDoc?.file),
+      existingList,
+      pendingFile: pendingDoc?.file || null,
+    };
+  };
+
+  // Report pending changes and mandatory status
   const reportPending = (next: PendingDoc[]) => {
     setPendingDocs(next);
-    onPendingChange?.(
-      next
-        .filter((doc) => doc.file)
-        .map((doc) => ({ category: doc.category, file: doc.file as File })),
-    );
+    const validPending = next
+      .filter((doc) => doc.file)
+      .map((doc) => ({ category: doc.category, file: doc.file as File }));
+    onPendingChange?.(validPending);
+
+    // Evaluate mandatory categories
+    const allMandatoryFulfilled = MANDATORY_CATEGORIES.every((mand) => {
+      const mandNorm = normalizeCategory(mand);
+      const hasPending = next.some(
+        (doc) => normalizeCategory(doc.category) === mandNorm && doc.file
+      );
+      const hasExisting = attachments.some(
+        (att) => normalizeCategory(att.category || "") === mandNorm
+      );
+      return hasPending || hasExisting;
+    });
+
+    onMandatoryFulfilledChange?.(allMandatoryFulfilled);
   };
 
   const handleFileSelected = (category: string, file: File) => {
-    if (immediate) {
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error(`File "${file.name}" exceeds the 50 MB limit.`);
+      return;
+    }
+
+    if (immediate && orderId) {
       void uploadImmediate(category, file);
     } else {
-      const existing = pendingDocs.find((doc) => doc.category === category);
-      if (existing) {
-        reportPending(
-          pendingDocs.map((doc) =>
-            doc.category === category ? { ...doc, file } : doc,
-          ),
+      const norm = normalizeCategory(category);
+      const existingIdx = pendingDocs.findIndex(
+        (doc) => normalizeCategory(doc.category) === norm
+      );
+
+      let next: PendingDoc[];
+      if (existingIdx >= 0) {
+        next = pendingDocs.map((doc, idx) =>
+          idx === existingIdx ? { ...doc, category, file } : doc
         );
       } else {
-        reportPending([
+        next = [
           ...pendingDocs,
           { key: `${category}-${Date.now()}`, category, file },
-        ]);
+        ];
       }
+      reportPending(next);
     }
   };
 
@@ -149,23 +215,21 @@ export function ProjectDocumentUploadPanel({
         category,
       });
 
-      toast.success("Document uploaded successfully.");
+      toast.success(`${category} uploaded successfully.`);
       onUploaded?.();
     } catch (error: any) {
       toast.error(
-        error?.response?.data?.message ?? error?.message ?? "Upload failed.",
+        error?.response?.data?.message ?? error?.message ?? "Upload failed."
       );
     } finally {
       setBusyCategory(null);
     }
   };
 
-  const handleDelete = async (attachmentId: string) => {
+  const handleDeleteAttachment = async (attachmentId: string) => {
     setDeletingId(attachmentId);
     try {
-      const res = await apiClient.delete(
-        `/order/attachment/${attachmentId}`,
-      );
+      const res = await apiClient.delete(`/order/attachment/${attachmentId}`);
       if (res.data?.success) {
         toast.success("Document removed.");
         onDeleted?.(attachmentId);
@@ -174,233 +238,240 @@ export function ProjectDocumentUploadPanel({
       }
     } catch (error: any) {
       toast.error(
-        error?.response?.data?.message ?? "Failed to remove document.",
+        error?.response?.data?.message ?? "Failed to remove document."
       );
     } finally {
       setDeletingId(null);
     }
   };
 
-  const addExtraCategory = () => {
-    const value = customCategory.trim();
-    if (!value) {
-      toast.error("Enter a document category name.");
+  const clearPendingFile = (category: string) => {
+    const norm = normalizeCategory(category);
+    const next = pendingDocs.filter(
+      (doc) => normalizeCategory(doc.category) !== norm
+    );
+    reportPending(next);
+  };
+
+  const addCustomCategory = () => {
+    const val = customCategory.trim();
+    if (!val) return;
+    if (categories.some((c) => c.name.toLowerCase() === val.toLowerCase())) {
+      toast.error("This document category already exists.");
       return;
     }
-    setExtraCategories((prev) => [...prev, value]);
+
+    setCategories((prev) => [...prev, { name: val, isMandatory: false }]);
     setCustomCategory("");
+    setIsAddingCategory(false);
   };
 
-  const removeExtraCategory = (category: string) => {
-    setExtraCategories((prev) => prev.filter((c) => c !== category));
-    fileInputs.current[category] = null;
-  };
+  return (
+    <div className="space-y-3">
+      {/* Section Header */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-[11px] font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">
+          PROJECT DOCUMENT UPLOAD
+        </h3>
+      </div>
 
-  const renderAttachmentList = (category: string) => {
-    const list = attachmentsByCategory[category] || [];
-    if (list.length === 0) return null;
+      {/* Document List Table */}
+      <div className="border-t border-b border-neutral-200/80 dark:border-neutral-800 divide-y divide-neutral-200/80 dark:divide-neutral-800">
+        {categories.map((cat, index) => {
+          const { hasFile, existingList, pendingFile } = getCategoryFileStatus(
+            cat.name
+          );
+          const isBusy = busyCategory === cat.name;
 
-    return (
-      <div className="mt-2 space-y-1.5">
-        {list.map((att) => {
-          const fullUrl = buildFileUrl(att.fileUrl);
           return (
             <div
-              key={att.id}
-              className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg border border-border/70 bg-background shadow-2xs"
+              key={`${cat.name}-${index}`}
+              className="py-2.5 flex items-center justify-between gap-4 text-xs transition-colors hover:bg-neutral-50/50 dark:hover:bg-neutral-900/30"
             >
-              <div className="flex items-center gap-2 min-w-0">
-                <FileText className="size-4 text-primary shrink-0" />
+              {/* Category Name */}
+              <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                {cat.isMandatory && (
+                  <span className="text-red-500 font-bold text-sm leading-none">
+                    *
+                  </span>
+                )}
                 <span
-                  className="text-xs font-bold text-foreground truncate"
-                  title={att.fileName}
+                  className={`font-medium ${
+                    cat.isMandatory
+                      ? "text-neutral-800 dark:text-neutral-100 font-semibold"
+                      : "text-neutral-700 dark:text-neutral-300"
+                  } truncate`}
                 >
-                  {att.fileName}
+                  {cat.name}
                 </span>
               </div>
-              <div className="flex items-center gap-1 shrink-0">
-                {fullUrl && (
-                  <a
-                    href={fullUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center size-7 rounded-lg border bg-background hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                    title="Open Document"
-                  >
-                    <ExternalLink className="size-3.5" />
-                  </a>
+
+              {/* Upload Action / Uploaded File Status */}
+              <div className="flex items-center gap-3 shrink-0">
+                {/* Existing Server Attachments */}
+                {existingList.map((att) => {
+                  const fullUrl = buildFileUrl(att.fileUrl);
+                  return (
+                    <div
+                      key={att.id}
+                      className="flex items-center gap-2 bg-emerald-50/60 dark:bg-emerald-950/40 border border-emerald-200/70 dark:border-emerald-800/60 rounded-md px-2.5 py-1 text-[11px]"
+                    >
+                      <CheckCircle2 className="size-3.5 text-emerald-600 shrink-0" />
+                      <span
+                        className="font-medium text-emerald-900 dark:text-emerald-200 max-w-[150px] sm:max-w-[200px] truncate"
+                        title={att.fileName}
+                      >
+                        {att.fileName}
+                      </span>
+                      {att.fileSize ? (
+                        <span className="text-neutral-400 text-[10px]">
+                          ({formatBytes(att.fileSize)})
+                        </span>
+                      ) : null}
+                      {fullUrl && (
+                        <a
+                          href={fullUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-emerald-700 hover:text-emerald-900 ml-1"
+                          title="View document"
+                        >
+                          <ExternalLink className="size-3" />
+                        </a>
+                      )}
+                      {!disabled && (
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteAttachment(att.id)}
+                          disabled={deletingId === att.id}
+                          className="text-neutral-400 hover:text-red-500 ml-1 transition-colors"
+                          title="Remove file"
+                        >
+                          {deletingId === att.id ? (
+                            <Loader2 className="size-3 animate-spin" />
+                          ) : (
+                            <Trash2 className="size-3" />
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Pending Local File */}
+                {pendingFile && (
+                  <div className="flex items-center gap-2 bg-emerald-50/60 dark:bg-emerald-950/40 border border-emerald-200/70 dark:border-emerald-800/60 rounded-md px-2.5 py-1 text-[11px]">
+                    <CheckCircle2 className="size-3.5 text-emerald-600 shrink-0" />
+                    <span
+                      className="font-medium text-emerald-900 dark:text-emerald-200 max-w-[150px] sm:max-w-[200px] truncate"
+                      title={pendingFile.name}
+                    >
+                      {pendingFile.name}
+                    </span>
+                    <span className="text-neutral-400 text-[10px]">
+                      ({formatBytes(pendingFile.size)})
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => clearPendingFile(cat.name)}
+                      className="text-neutral-400 hover:text-red-500 ml-1 transition-colors"
+                      title="Clear file"
+                    >
+                      <Trash2 className="size-3" />
+                    </button>
+                  </div>
                 )}
-                {!disabled && (
+
+                {/* Upload Trigger Button */}
+                {!hasFile && (
                   <button
                     type="button"
-                    onClick={() => void handleDelete(att.id)}
-                    disabled={deletingId === att.id}
-                    className="inline-flex items-center justify-center size-7 rounded-lg text-muted-foreground hover:text-rose-500 hover:bg-rose-500/5 border border-transparent hover:border-rose-500/20 transition-colors"
-                    title="Remove Document"
+                    disabled={disabled || uploading || isBusy}
+                    onClick={() => fileInputs.current[cat.name]?.click()}
+                    className="text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 font-semibold text-xs hover:underline cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    <Trash2 className="size-3.5" />
+                    {isBusy ? (
+                      <span className="flex items-center gap-1">
+                        <Loader2 className="size-3 animate-spin" /> Uploading...
+                      </span>
+                    ) : (
+                      "Upload"
+                    )}
                   </button>
                 )}
+
+                {/* Hidden File Input */}
+                <input
+                  ref={(el) => {
+                    fileInputs.current[cat.name] = el;
+                  }}
+                  type="file"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleFileSelected(cat.name, file);
+                    e.target.value = "";
+                  }}
+                />
               </div>
             </div>
           );
         })}
       </div>
-    );
-  };
 
-  return (
-    <div className="space-y-3">
-      <div className="rounded-2xl border border-border/80 bg-muted/10 p-4 shadow-3xs">
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-primary/10 text-primary border border-primary/15">
-              <UploadCloud className="size-4" />
-            </div>
-            <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
-                Project Document Upload
-              </h3>
-              <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
-                Attach BOM/BOQ, tender, PO copies and rough drawings for this order.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-2.5">
-          {categories.map((category, index) => {
-            const existing = (attachmentsByCategory[category] || []).length;
-            const pending = pendingDocs.find(
-              (doc) => doc.category === category,
-            );
-
-            return (
-              <div
-                key={`${category}-${index}`}
-                className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl border border-border/70 bg-background shadow-2xs flex-wrap"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold text-foreground truncate">
-                    {category}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
-                    {existing > 0
-                      ? `${existing} attached`
-                      : "Not attached yet"}
-                    {pending?.file ? " · ready to attach" : ""}
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  {pending?.file ? (
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold text-muted-foreground truncate max-w-[140px]">
-                        {pending.file.name}
-                      </span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          reportPending(
-                            pendingDocs.map((doc) =>
-                              doc.category === category
-                                ? { ...doc, file: null }
-                                : doc,
-                            ),
-                          );
-                        }}
-                        className="size-7 rounded-lg text-muted-foreground hover:text-rose-500 hover:bg-rose-500/5"
-                        title="Clear file"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={disabled || uploading}
-                      onClick={() => fileInputs.current[category]?.click()}
-                      className="h-8 text-xs font-bold rounded-xl gap-1.5"
-                    >
-                      {busyCategory === category ? (
-                        <Loader2 className="size-3.5 animate-spin" />
-                      ) : (
-                        <UploadCloud className="size-3.5" />
-                      )}
-                      {busyCategory === category ? "Uploading..." : "Upload"}
-                    </Button>
-                  )}
-                  <input
-                    ref={(el) => {
-                      fileInputs.current[category] = el;
-                    }}
-                    type="file"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleFileSelected(category, file);
-                      e.target.value = "";
-                    }}
-                  />
-                </div>
-
-                {renderAttachmentList(category)}
-              </div>
-            );
-          })}
-
-          {/* "+ Add more Document" */}
-          <div className="flex items-center gap-2 flex-wrap">
+      {/* Add More Document Link / Inline Input */}
+      <div className="pt-1">
+        {isAddingCategory ? (
+          <div className="flex items-center gap-2 max-w-md">
             <Input
               value={customCategory}
               onChange={(e) => setCustomCategory(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
-                  addExtraCategory();
+                  addCustomCategory();
+                } else if (e.key === "Escape") {
+                  setIsAddingCategory(false);
                 }
               }}
-              placeholder="Enter a custom document category..."
-              className="h-9 flex-1 min-w-[200px] text-xs rounded-xl"
+              placeholder="Enter document name..."
+              className="h-8 text-xs rounded-lg"
+              autoFocus
             />
             <Button
               type="button"
-              variant="outline"
               size="sm"
-              onClick={addExtraCategory}
-              className="h-9 gap-1.5 text-xs font-bold rounded-xl"
+              onClick={addCustomCategory}
+              className="h-8 text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg px-3"
             >
-              <Plus className="size-3.5" />
-              Add more Document
+              Add
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsAddingCategory(false)}
+              className="h-8 text-xs rounded-lg"
+            >
+              Cancel
             </Button>
           </div>
-
-          {extraCategories.length > 0 && (
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {extraCategories.map((cat) => (
-                <span
-                  key={cat}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-primary/20 bg-primary/5 text-[10px] font-bold text-primary"
-                >
-                  {cat}
-                  <button
-                    type="button"
-                    onClick={() => removeExtraCategory(cat)}
-                    className="hover:text-rose-500 transition-colors"
-                    title="Remove category"
-                  >
-                    <Trash2 className="size-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setIsAddingCategory(true)}
+            className="text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 font-semibold text-xs inline-flex items-center gap-1 transition-colors cursor-pointer"
+          >
+            <Plus className="size-3.5" />
+            Add more Document
+          </button>
+        )}
       </div>
+
+      {/* Mandatory Help Note at Bottom */}
+      <p className="text-[11px] text-neutral-500 dark:text-neutral-400 font-normal leading-relaxed pt-1">
+        Red * = mandatory (shown first) — all mandatory documents must be uploaded before you can save this order. Max file size: 50 MB per file.
+      </p>
     </div>
   );
 }

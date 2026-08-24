@@ -46,6 +46,7 @@ async function adminSalesOrderCreateRoutes(
 
         const {
           companyId,
+          customerId,
           dveplCode,
           status,
           orderTakenById,
@@ -166,6 +167,7 @@ async function adminSalesOrderCreateRoutes(
           const salesOrder = await tx.salesOrder.create({
             data: {
               companyId,
+              customerId: customerId ?? null,
               dveplCode,
               status,
 
