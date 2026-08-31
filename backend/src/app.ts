@@ -22,6 +22,9 @@ import utilsPlugin from "./plugins/utilsPlugin";
 
 async function buildApp() {
   const fastify = Fastify({
+    routerOptions: {
+      ignoreTrailingSlash: true,
+    },
     logger: {
       level: "info",
       transport: {
@@ -38,7 +41,11 @@ async function buildApp() {
   fastify.register(authPlugin);
   fastify.register(prismaPlugin);
   fastify.register(utilsPlugin);
-  fastify.register(multipart);
+  fastify.register(multipart, {
+    limits: {
+      fileSize: 50 * 1024 * 1024, // 50 MB
+    },
+  });
   fastify.register(fastifyStatic, {
     root: path.join(__dirname, "../uploads"),
     prefix: "/uploads/",

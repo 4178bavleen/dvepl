@@ -13,7 +13,29 @@ import {
   Circle,
   Clock3,
   ChevronRight,
+  MoreVertical,
+  ShieldCheck,
+  Cpu,
+  Layers,
+  Check,
+  RotateCcw,
+  Users,
+  Building2,
+  Phone,
+  Mail,
+  MapPin,
+  Calendar,
+  Tag,
+  Briefcase,
 } from "lucide-react";
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -268,43 +290,36 @@ export function OrderDetailPage() {
           PAGE HEADER
           ======================================================== */}
 
-      <div className="border-b bg-muted/30 px-4 sm:px-6 py-5">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="min-w-0">
+      <div className="border-b bg-card/60 backdrop-blur px-4 sm:px-6 py-4 space-y-4">
+        {/* Top Action Bar */}
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => navigate("/tender/orders")}
-              className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors mb-2"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors px-2 py-1 -ml-2 rounded-lg hover:bg-muted"
             >
               <ArrowLeft className="size-3.5" />
               Back to Orders
             </button>
-
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-lg font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-                {tender.tender_no || "—"}
-              </h1>
-
+            <span className="text-muted-foreground/40">|</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-foreground">
+                {tender.tender_no || tender.dveplCode || "Order Details"}
+              </span>
               <span
-                className={`text-[10px] font-bold px-3 py-1 rounded-full border uppercase tracking-wider ${
+                className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border uppercase tracking-wider ${
                   remarkStyles[remarkKey] ||
                   "bg-muted text-muted-foreground border-muted-foreground/10"
                 }`}
               >
-                {tender.remark || "—"}
+                {tender.remark || "Pending"}
               </span>
-
               {tender.dveplCode && (
-                <span className="text-[10px] font-bold px-3 py-1 rounded-full border bg-background text-muted-foreground">
+                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-md border bg-muted/40 text-muted-foreground">
                   {tender.dveplCode}
                 </span>
               )}
             </div>
-
-            {tender.name_of_work && (
-              <p className="mt-1.5 text-xs font-medium text-muted-foreground max-w-2xl line-clamp-2">
-                {tender.name_of_work}
-              </p>
-            )}
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
@@ -313,25 +328,27 @@ export function OrderDetailPage() {
               size="sm"
               onClick={toggleFullscreen}
               title={isFullscreen ? "Exit Full Screen" : "Enter Full Screen"}
-              className="h-8 text-xs font-bold rounded-xl gap-1.5"
+              className="h-8 text-xs font-semibold rounded-xl gap-1.5"
             >
               {isFullscreen ? (
                 <Minimize2 className="size-3.5" />
               ) : (
                 <Maximize2 className="size-3.5" />
               )}
-              {isFullscreen ? "Exit Full Screen" : "Full Screen"}
+              <span className="hidden sm:inline">
+                {isFullscreen ? "Exit Full Screen" : "Full Screen"}
+              </span>
             </Button>
             <Button
               variant="outline"
               size="sm"
-              className="h-8 text-xs font-bold rounded-xl"
+              className="h-8 text-xs font-semibold rounded-xl"
               onClick={() => setIsEditOpen(true)}
             >
               Edit
             </Button>
             <Button
-              variant="outline"
+              variant="default"
               size="sm"
               disabled={!isAdmin}
               onClick={() => {
@@ -350,6 +367,88 @@ export function OrderDetailPage() {
             </Button>
           </div>
         </div>
+
+        {/* Basic Order & Customer Details Summary Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Order Info */}
+          <div className="rounded-xl border border-border/70 bg-background/80 p-3 shadow-2xs">
+            <div className="flex items-center gap-2 text-muted-foreground mb-1">
+              <FileText className="size-3.5 text-primary" />
+              <span className="text-[10px] font-bold uppercase tracking-wider">Order No / CA</span>
+            </div>
+            <p className="text-xs font-bold text-foreground truncate" title={tender.tender_no}>
+              {tender.tender_no || "—"}
+            </p>
+            {tender.reference_code && (
+              <p className="text-[10px] text-muted-foreground font-mono mt-0.5 truncate">
+                Ref: {tender.reference_code}
+              </p>
+            )}
+          </div>
+
+          {/* Customer / Firm */}
+          <div className="rounded-xl border border-border/70 bg-background/80 p-3 shadow-2xs">
+            <div className="flex items-center gap-2 text-muted-foreground mb-1">
+              <Building2 className="size-3.5 text-blue-500" />
+              <span className="text-[10px] font-bold uppercase tracking-wider">Customer / Firm</span>
+            </div>
+            <p className="text-xs font-bold text-foreground truncate" title={tender.firm_name}>
+              {tender.firm_name || "—"}
+            </p>
+            {tender.name && (
+              <p className="text-[10px] text-muted-foreground font-medium mt-0.5 truncate">
+                Contact: {tender.name}
+              </p>
+            )}
+          </div>
+
+          {/* Contact Details */}
+          <div className="rounded-xl border border-border/70 bg-background/80 p-3 shadow-2xs">
+            <div className="flex items-center gap-2 text-muted-foreground mb-1">
+              <Phone className="size-3.5 text-emerald-500" />
+              <span className="text-[10px] font-bold uppercase tracking-wider">Phone & Email</span>
+            </div>
+            <p className="text-xs font-bold text-foreground truncate">
+              {tender.mobile || "—"}
+            </p>
+            {tender.email_id && (
+              <p className="text-[10px] text-muted-foreground font-medium mt-0.5 truncate" title={tender.email_id}>
+                {tender.email_id}
+              </p>
+            )}
+          </div>
+
+          {/* Department / Jurisdiction */}
+          <div className="rounded-xl border border-border/70 bg-background/80 p-3 shadow-2xs">
+            <div className="flex items-center gap-2 text-muted-foreground mb-1">
+              <MapPin className="size-3.5 text-purple-500" />
+              <span className="text-[10px] font-bold uppercase tracking-wider">Department / Location</span>
+            </div>
+            <p className="text-xs font-bold text-foreground truncate" title={tender.department_name}>
+              {tender.department_name || "—"}
+            </p>
+            {(tender.state_name || tender.city_name) && (
+              <p className="text-[10px] text-muted-foreground font-medium mt-0.5 truncate">
+                {[tender.city_name, tender.state_name].filter(Boolean).join(", ")}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Name of Work (if present) */}
+        {tender.name_of_work && (
+          <div className="flex items-start gap-2 bg-muted/40 rounded-xl px-3 py-2 border border-border/60">
+            <Briefcase className="size-3.5 text-muted-foreground shrink-0 mt-0.5" />
+            <div className="min-w-0 flex-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mr-1.5">
+                Work:
+              </span>
+              <span className="text-xs font-medium text-foreground line-clamp-2">
+                {tender.name_of_work}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ========================================================
@@ -391,72 +490,99 @@ export function OrderDetailPage() {
         <div className="max-w-5xl mx-auto space-y-7">
           {activeTab === "overview" && (
             <>
-              <section>
+              {/* Order & Tender Information */}
+              <section className="space-y-3">
                 <DetailSectionTitle
-                  title="Basic Information"
+                  title="Order & Tender Specifications"
                   color="bg-primary"
                 />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <DetailItem label="Tender Number" value={tender.tender_no} />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <DetailItem label="Tender / CA Number" value={tender.tender_no} />
+                  <DetailItem label="Internal DVEPL Code" value={tender.dveplCode} />
                   <DetailItem label="Tender ID" value={tender.tenderID} />
+                  <DetailItem label="Reference Code" value={tender.reference_code} />
+                  <DetailItem label="Order Status" value={tender.remark} />
                   <DetailItem
-                    label="Reference Code"
-                    value={tender.reference_code}
+                    label="Created On"
+                    value={
+                      tender.remarked_at
+                        ? new Date(tender.remarked_at).toLocaleDateString("en-IN", {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                          })
+                        : "—"
+                    }
                   />
-                  <DetailItem label="Remark" value={tender.remark} />
-                  <DetailItem
-                    label="Name of Work"
-                    value={tender.name_of_work}
-                    multiline
-                    className="md:col-span-2"
-                  />
+                  {tender.dueDate && (
+                    <DetailItem
+                      label="Target Due Date"
+                      value={new Date(tender.dueDate).toLocaleDateString("en-IN", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    />
+                  )}
+                  {tender.nextAction && (
+                    <DetailItem
+                      label="Next Action"
+                      value={tender.nextAction}
+                      className="sm:col-span-2"
+                    />
+                  )}
                 </div>
               </section>
 
-              <section className="border-t pt-7">
+              {/* Customer & Contact Details */}
+              <section className="border-t pt-6 space-y-3">
                 <DetailSectionTitle
-                  title="Contact Information"
+                  title="Customer & Contact Details"
                   color="bg-blue-500"
                 />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <DetailItem label="Customer / Firm Name" value={tender.firm_name} className="sm:col-span-2" />
                   <DetailItem label="Contact Person" value={tender.name} />
-                  <DetailItem label="Firm Name" value={tender.firm_name} />
-                  <DetailItem label="Mobile" value={tender.mobile} />
-                  <DetailItem label="Email" value={tender.email_id} />
-                </div>
-              </section>
-
-              <section className="border-t pt-7">
-                <DetailSectionTitle title="Jurisdiction" color="bg-emerald-500" />
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <DetailItem
-                    label="Department"
-                    value={tender.department_name}
-                  />
-                  <DetailItem label="Section" value={tender.section_name} />
-                  <DetailItem label="Division" value={tender.division_name} />
-                  <DetailItem label="Sub Division" value={tender.subdivision} />
-                  <DetailItem label="State" value={tender.state_name} />
+                  <DetailItem label="Mobile / Phone" value={tender.mobile} />
+                  <DetailItem label="Email Address" value={tender.email_id} className="sm:col-span-2" />
+                  <DetailItem label="State / Region" value={tender.state_name} />
                   <DetailItem label="City" value={tender.city_name} />
                 </div>
               </section>
 
+              {/* Jurisdiction & Department */}
+              <section className="border-t pt-6 space-y-3">
+                <DetailSectionTitle title="Jurisdiction & Structure" color="bg-emerald-500" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <DetailItem label="Department" value={tender.department_name} />
+                  <DetailItem label="Division" value={tender.division_name} />
+                  <DetailItem label="Sub Division" value={tender.subdivision} />
+                  <DetailItem label="Section" value={tender.section_name} />
+                </div>
+              </section>
+
+              {/* Purchase Order Status */}
               {tender.poStatus && (
-                <section className="border-t pt-7">
+                <section className="border-t pt-6 space-y-3">
                   <DetailSectionTitle
                     title="Purchase Order Status"
                     color="bg-indigo-500"
                   />
-                  <div className="rounded-2xl border border-border/80 bg-muted/10 p-4 flex items-center justify-between gap-4 flex-wrap shadow-3xs">
-                    <div>
-                      <p className="text-xs font-bold text-foreground">
-                        {tender.poStatus}
+                  <div className="rounded-2xl border border-border/80 bg-muted/20 p-4 flex items-center justify-between gap-4 flex-wrap shadow-2xs">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-foreground">
+                          {tender.poStatus}
+                        </span>
+                        {tender.poNumber && (
+                          <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded-md bg-muted text-foreground border border-border/60">
+                            PO #{tender.poNumber}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Purchase Order synchronization status for this sales record.
                       </p>
-                      {tender.poNumber && (
-                        <p className="text-[10px] text-muted-foreground font-semibold mt-0.5">
-                          {tender.poNumber}
-                        </p>
-                      )}
                     </div>
                     {tender.reference_code && (
                       <button
@@ -469,7 +595,7 @@ export function OrderDetailPage() {
                             }).toString()}`,
                           )
                         }
-                        className="text-xs text-primary hover:text-primary-hover font-bold flex items-center gap-1"
+                        className="text-xs bg-primary/10 hover:bg-primary/20 text-primary px-3 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition-colors border border-primary/20"
                       >
                         {tender.poStatus === "No PO"
                           ? "＋ Generate PO"
@@ -485,211 +611,300 @@ export function OrderDetailPage() {
 
           {activeTab === "workflow" && (
             <>
-              <section>
-                <DetailSectionTitle
-                  title="Workflow Progress"
-                  color="bg-emerald-500"
-                />
+              {workflowStages.length > 0 ? (
+                (() => {
+                  const currentIndex = workflowStages.findIndex(
+                    (s) => s.key === tender.workflowStage,
+                  );
+                  const percent = workflowStagePercent(
+                    tender.workflowStage,
+                    workflowStages,
+                  );
+                  const isDone = currentIndex === workflowStages.length - 1;
 
-                {workflowStages.length > 0 ? (
-                  (() => {
-                    const currentIndex = workflowStages.findIndex(
-                      (s) => s.key === tender.workflowStage,
-                    );
-                    const percent = workflowStagePercent(
-                      tender.workflowStage,
-                      workflowStages,
-                    );
-                    const isDone = currentIndex === workflowStages.length - 1;
+                  // Helper function to pick an intuitive, themed Lucide icon for each stage
+                  const getStageIcon = (stageKey: string, index: number) => {
+                    const key = stageKey.toUpperCase();
+                    if (key.includes("DOC") || key.includes("INITIAL")) {
+                      return <FileText className="size-4.5" />;
+                    }
+                    if (
+                      key.includes("SEC") ||
+                      key.includes("CLEAR") ||
+                      key.includes("APPROVAL") ||
+                      key.includes("APPROVED")
+                    ) {
+                      return <ShieldCheck className="size-4.5" />;
+                    }
+                    if (
+                      key.includes("CONF") ||
+                      key.includes("SYS") ||
+                      key.includes("DRAWING") ||
+                      key.includes("REVISION")
+                    ) {
+                      return <Cpu className="size-4.5" />;
+                    }
+                    if (key.includes("PO") || key.includes("ORDER")) {
+                      return <Layers className="size-4.5" />;
+                    }
+                    // Fallback cycles based on stage index
+                    const icons = [
+                      <FileText className="size-4.5" />,
+                      <ShieldCheck className="size-4.5" />,
+                      <Cpu className="size-4.5" />,
+                      <Layers className="size-4.5" />,
+                      <CheckCircle2 className="size-4.5" />,
+                    ];
+                    return icons[index % icons.length];
+                  };
 
-                    return (
-                      <div className="rounded-2xl border border-border/80 bg-muted/10 p-5 shadow-3xs">
-                        <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold text-foreground">
-                              {tender.workflowStage
-                                ? workflowStageLabel(
-                                    tender.workflowStage,
-                                    workflowStages,
-                                  )
-                                : "Pipeline"}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`text-xs font-bold px-3 py-1 rounded-full border ${
-                                isDone
-                                  ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
-                                  : "bg-blue-500/10 text-blue-600 border-blue-500/20"
+                  return (
+                    <div className="space-y-6">
+                      {/* Top Header Card */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                          <h2 className="text-xl font-bold tracking-tight text-foreground">
+                            {tender.tender_no
+                              ? `${tender.tender_no} Workflow Sequence`
+                              : "Onboarding & Production Sequence"}
+                          </h2>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Manage and track the critical pipeline stages for this order.
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2.5 shrink-0">
+                          <Button
+                            size="sm"
+                            disabled={!isAdmin}
+                            onClick={openAssignAll}
+                            title={
+                              isAdmin
+                                ? "Assign users to all stages"
+                                : "Only administrators can assign all stages"
+                            }
+                            className="h-9 px-4 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-all flex items-center gap-2"
+                          >
+                            <UserPlus className="size-3.5" />
+                            Assign All Stages
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Overall Completion Box */}
+                      <div className="rounded-2xl border border-border/80 bg-card p-4 sm:p-5 shadow-xs transition-all">
+                        <div className="flex items-center justify-between mb-2.5">
+                          <span className="text-xs sm:text-sm font-bold text-foreground">
+                            Overall Completion
+                          </span>
+                          <span className="text-xs sm:text-sm font-extrabold text-emerald-600 dark:text-emerald-400">
+                            {isDone ? "100%" : `${percent}%`}
+                          </span>
+                        </div>
+                        <div className="w-full bg-muted/60 dark:bg-muted/40 rounded-full h-2 overflow-hidden">
+                          <div
+                            className="bg-emerald-500 h-full rounded-full transition-all duration-500 ease-out"
+                            style={{ width: `${Math.max(percent, isDone ? 100 : 0)}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Workflow Step Cards */}
+                      <div className="space-y-3">
+                        {workflowStages.map((s, i) => {
+                          const stageCompleted = i < currentIndex;
+                          const stageCurrent = i === currentIndex;
+                          const stagePending = i > currentIndex;
+
+                          const stageUsers = (tender.assignments || []).filter(
+                            (a) =>
+                              !a.stage ||
+                              a.stage === s.key ||
+                              a.stage === "",
+                          );
+                          const stageRemark = (tender.assignments || []).find(
+                            (a) =>
+                              a.remarks &&
+                              (!a.stage || a.stage === s.key || a.stage === ""),
+                          )?.remarks;
+
+                          return (
+                            <div
+                              key={s.key}
+                              className={`group relative flex items-center justify-between gap-3 sm:gap-4 rounded-2xl border bg-card p-3.5 sm:p-4 transition-all duration-200 shadow-xs hover:shadow-md ${
+                                stageCurrent
+                                  ? "border-blue-500/40 ring-1 ring-blue-500/20 bg-blue-500/[0.02]"
+                                  : stageCompleted
+                                    ? "border-emerald-500/30 bg-emerald-500/[0.01]"
+                                    : "border-border/80 hover:border-border"
                               }`}
                             >
-                              {isDone ? "100% Done" : `${percent}% Complete`}
-                            </span>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              disabled={!isAdmin}
-                              onClick={openAssignAll}
-                              title={
-                                isAdmin
-                                  ? "Assign users to all stages"
-                                  : "Only administrators can manage assignments"
-                              }
-                              className="gap-1.5 h-8 text-xs font-bold border-blue-500/20 text-blue-600 dark:text-blue-400 hover:bg-blue-500/5 hover:border-blue-500/40 rounded-xl transition-all duration-200"
-                            >
-                              <UserPlus className="size-3.5" />
-                              Assign All Stages
-                            </Button>
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          {workflowStages.map((s, i) => {
-                            const stageCompleted = i < currentIndex;
-                            const stageCurrent = i === currentIndex;
-                            const stageUsers = (tender.assignments || []).filter(
-                              (a) =>
-                                !a.stage ||
-                                a.stage === s.key ||
-                                a.stage === "",
-                            );
-                            const stageRemark = (tender.assignments || []).find(
-                              (a) =>
-                                a.remarks &&
-                                (!a.stage || a.stage === s.key || a.stage === ""),
-                            )?.remarks;
-
-                            return (
-                              <div
-                                key={s.key}
-                                onClick={() => openAssignForStage(s.key)}
-                                className={`flex items-center gap-3 rounded-xl border bg-background px-3 py-2.5 transition-all duration-200 shadow-3xs ${
-                                  stageCurrent
-                                    ? "border-blue-500/40 ring-2 ring-blue-500/10"
-                                    : stageCompleted
-                                      ? "border-emerald-500/20"
-                                      : "border-border/70"
-                                } ${
-                                  isAdmin
-                                    ? "cursor-pointer hover:border-blue-500/40 hover:shadow-sm"
-                                    : ""
-                                }`}
-                                title={
-                                  isAdmin
-                                    ? `Assign users to "${s.name}"`
-                                    : "Only administrators can assign users"
-                                }
-                              >
-                                <Checkbox
-                                  checked={stageCompleted}
-                                  disabled={!canWorkOnOrder || isUpdatingStage}
-                                  onCheckedChange={(checked) => {
-                                    handleStageToggle(s.key, !!checked);
-                                  }}
-                                  className="shrink-0"
-                                  title={
-                                    canWorkOnOrder
-                                      ? `Mark "${s.name}" as ${
-                                          stageCompleted ? "in progress" : "completed"
-                                        }`
-                                      : "You don't have access to change this stage"
-                                  }
-                                />
-                                <span
-                                  className="size-2.5 rounded-full shrink-0"
-                                  style={{
-                                    backgroundColor: s.color || "#3b82f6",
-                                  }}
-                                />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-bold text-foreground truncate">
-                                    {s.name}
-                                  </p>
-                                  <p className="text-[10px] text-muted-foreground truncate">
-                                    {stageUsers.length > 0
-                                      ? `${stageUsers.length} user${
-                                          stageUsers.length > 1 ? "s" : ""
-                                        } assigned`
-                                      : "No users assigned"}
-                                  </p>
-                                  {stageRemark && (
-                                    <p
-                                      className="text-[10px] text-muted-foreground/80 italic truncate mt-0.5"
-                                      title={stageRemark}
-                                    >
-                                      “{stageRemark}”
-                                    </p>
-                                  )}
-                                </div>
-                                <span
-                                  className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full border ${
-                                    stageCompleted
-                                      ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
-                                      : stageCurrent
-                                        ? "bg-blue-500/10 text-blue-600 border-blue-500/20"
-                                        : "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20"
+                              <div className="flex items-center gap-3 sm:gap-3.5 min-w-0">
+                                {/* Left icon badge */}
+                                <div
+                                  className={`size-10 sm:size-11 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                                    stageCurrent
+                                      ? "bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400"
+                                      : stageCompleted
+                                        ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400"
+                                        : "bg-purple-50 text-purple-600 dark:bg-purple-950/30 dark:text-purple-400"
                                   }`}
                                 >
-                                  {stageCompleted ? (
-                                    <CheckCircle2 className="size-3" />
-                                  ) : stageCurrent ? (
-                                    <Clock3 className="size-3" />
-                                  ) : (
-                                    <Circle className="size-3" />
-                                  )}
+                                  {getStageIcon(s.key, i)}
+                                </div>
+
+                                {/* Step Title and assigned users */}
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    {/* Small status dot indicator */}
+                                    <span
+                                      className={`size-2 rounded-full shrink-0 ${
+                                        stageCurrent
+                                          ? "bg-blue-600 dark:bg-blue-400 animate-pulse"
+                                          : stageCompleted
+                                            ? "bg-emerald-500"
+                                            : "bg-muted-foreground/40"
+                                      }`}
+                                    />
+                                    <h4 className="text-xs sm:text-sm font-bold text-foreground truncate">
+                                      {s.name}
+                                    </h4>
+                                  </div>
+
+                                  <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground">
+                                    <span className="flex items-center gap-1">
+                                      <Users className="size-3 shrink-0 opacity-70" />
+                                      {stageUsers.length > 0
+                                        ? `${stageUsers.length} user${stageUsers.length > 1 ? "s" : ""} assigned`
+                                        : "No users assigned"}
+                                    </span>
+                                    {stageRemark && (
+                                      <>
+                                        <span>•</span>
+                                        <span className="italic truncate max-w-[220px]" title={stageRemark}>
+                                          “{stageRemark}”
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Right Side: Status Badge + Action Menu */}
+                              <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                                {/* Status Pill Badge */}
+                                <span
+                                  className={`inline-flex items-center justify-center font-bold text-[10px] tracking-wider uppercase px-3 py-1 rounded-full border ${
+                                    stageCompleted
+                                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                                      : stageCurrent
+                                        ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20"
+                                        : "bg-muted text-muted-foreground border-border/80"
+                                  }`}
+                                >
                                   {stageCompleted
                                     ? "Completed"
                                     : stageCurrent
                                       ? "In Progress"
                                       : "Pending"}
                                 </span>
-                                {isAdmin && (
-                                  <ChevronRight className="size-4 shrink-0 text-muted-foreground/50" />
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
 
-                        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <div className="rounded-xl border border-border/70 bg-background px-4 py-3 shadow-3xs">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
-                              Next Action
-                            </p>
-                            <p className="mt-1 text-xs font-semibold text-foreground">
-                              {tender.nextAction || "No action assigned"}
-                            </p>
-                          </div>
-                          <div className="rounded-xl border border-border/70 bg-background px-4 py-3 shadow-3xs">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
-                              Due Date
-                            </p>
-                            <p className="mt-1 text-xs font-semibold text-foreground">
-                              {tender.dueDate
-                                ? new Date(tender.dueDate).toLocaleDateString(
-                                    "en-IN",
-                                    {
-                                      day: "2-digit",
-                                      month: "short",
-                                      year: "numeric",
-                                    },
-                                  )
-                                : "—"}
-                            </p>
-                          </div>
+                                {/* 3-Dots Action Menu */}
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger
+                                    render={
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        aria-label="Stage actions"
+                                        className="size-8 rounded-lg p-0 text-muted-foreground/70 hover:text-foreground hover:bg-muted cursor-pointer"
+                                      >
+                                        <MoreVertical className="size-4" />
+                                      </Button>
+                                    }
+                                  />
+                                  <DropdownMenuContent
+                                    align="end"
+                                    sideOffset={6}
+                                    className="w-48 rounded-xl p-1.5 shadow-lg border border-border bg-popover text-popover-foreground"
+                                  >
+                                    {canWorkOnOrder && (
+                                      <DropdownMenuItem
+                                        onClick={() => handleStageToggle(s.key, !stageCompleted)}
+                                        disabled={isUpdatingStage}
+                                        className="gap-2.5 rounded-lg px-2.5 py-2 text-xs font-semibold cursor-pointer"
+                                      >
+                                        {stageCompleted ? (
+                                          <>
+                                            <RotateCcw className="size-3.5 text-amber-500" />
+                                            Reopen Stage
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Check className="size-3.5 text-emerald-500" />
+                                            Mark as Completed
+                                          </>
+                                        )}
+                                      </DropdownMenuItem>
+                                    )}
+
+                                    {isAdmin && (
+                                      <>
+                                        {canWorkOnOrder && <DropdownMenuSeparator />}
+                                        <DropdownMenuItem
+                                          onClick={() => openAssignForStage(s.key)}
+                                          className="gap-2.5 rounded-lg px-2.5 py-2 text-xs font-semibold cursor-pointer"
+                                        >
+                                          <UserPlus className="size-3.5 text-primary" />
+                                          Assign Users
+                                        </DropdownMenuItem>
+                                      </>
+                                    )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Next Action & Due Date Footer Grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                        <div className="rounded-2xl border border-border/70 bg-card px-4 py-3.5 shadow-xs">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                            Next Action
+                          </p>
+                          <p className="mt-1 text-xs font-semibold text-foreground">
+                            {tender.nextAction || "No action assigned"}
+                          </p>
+                        </div>
+                        <div className="rounded-2xl border border-border/70 bg-card px-4 py-3.5 shadow-xs">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                            Target Due Date
+                          </p>
+                          <p className="mt-1 text-xs font-semibold text-foreground">
+                            {tender.dueDate
+                              ? new Date(tender.dueDate).toLocaleDateString(
+                                  "en-IN",
+                                  {
+                                    day: "2-digit",
+                                    month: "short",
+                                    year: "numeric",
+                                  },
+                                )
+                              : "—"}
+                          </p>
                         </div>
                       </div>
-                    );
-                  })()
-                ) : (
-                  <div className="rounded-2xl border border-dashed border-border bg-muted/10 p-6 text-center shadow-3xs">
-                    <p className="text-xs font-medium text-muted-foreground">
-                      No workflow template has been configured for this order
-                      yet.
-                    </p>
-                  </div>
-                )}
-              </section>
+                    </div>
+                  );
+                })()
+              ) : (
+                <div className="rounded-2xl border border-dashed border-border bg-muted/10 p-8 text-center shadow-xs">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    No workflow template has been configured for this order yet.
+                  </p>
+                </div>
+              )}
 
               <section className="border-t pt-7">
                 <div className="flex items-center justify-between mb-4">

@@ -8,6 +8,8 @@ import {
   Search,
   Check,
   ChevronDown,
+  ExternalLink,
+  Settings,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -30,15 +32,22 @@ import {
 
 import { apiClient } from "@/services/axios";
 import { securityApi, crmApi } from "@/services/modules";
+import { organizationApi } from "@/services/organization";
 import workflowApi from "@/services/workflowApi";
 import { toast } from "react-hot-toast";
 import { useERPStore } from "@/store/erpStore";
 
 import {
   ProjectDocumentUploadPanel,
-  MANDATORY_CATEGORIES,
 } from "./ProjectDocumentUploadPanel";
+import { ManageOrderDocumentsModal } from "./ManageOrderDocumentsModal";
+import {
+  getOrderDocumentCategories,
+  normalizeCategoryName,
+} from "./orderDocumentsConfig";
+import { isAdminUser } from "@/utils/pagePermissions";
 import { SalesOrderAttachment } from "../orderShared";
+
 
 // ============================================================
 // TYPES
@@ -243,15 +252,54 @@ export function AddOrderModal({
   const [items, setItems] = useState<OrderItemForm[]>([{ ...EMPTY_ITEM }]);
 
   // Document upload state
+  const [orderAttachments, setOrderAttachments] = useState<SalesOrderAttachment[]>([]);
   const [pendingDocuments, setPendingDocuments] = useState<
     Array<{ category: string; file: File }>
   >([]);
   const [allMandatoryDocsUploaded, setAllMandatoryDocsUploaded] = useState(false);
+  const [isManageDocsOpen, setIsManageDocsOpen] = useState(false);
+
+  const currentUser = useMemo(() => {
+    return store.users.find((user) => user.id === store.currentUserId) as any;
+  }, [store.users, store.currentUserId]);
+  const isAdmin = isAdminUser(currentUser);
 
   // Data fetching state
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [teamMembers, setTeamMembers] = useState<UserOption[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Derive effective company ID with robust fallback logic
+  const effectiveCompanyId = useMemo(() => {
+    if (companyId && typeof companyId === "string" && companyId.trim() !== "" && companyId !== "comp-1") {
+      return companyId.trim();
+    }
+    if (store.currentCompanyId && typeof store.currentCompanyId === "string" && store.currentCompanyId.trim() !== "" && store.currentCompanyId !== "comp-1") {
+      return store.currentCompanyId.trim();
+    }
+    const realCompany = store.companies?.find((c) => c.id && c.id !== "comp-1");
+    if (realCompany?.id) return realCompany.id;
+
+    const userCompanyId = (currentUser as any)?.companyId;
+    if (userCompanyId && typeof userCompanyId === "string" && userCompanyId.trim() !== "" && userCompanyId !== "comp-1") {
+      return userCompanyId.trim();
+    }
+    return null;
+  }, [companyId, store.currentCompanyId, store.companies, currentUser]);
+
+  // Safe date helper to avoid timezone offset day-shifting
+  const safeDateStr = (val: any): string => {
+    if (!val) return "";
+    if (typeof val === "string") {
+      const match = val.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (match) return match[1];
+    }
+    try {
+      return toDateInputFormat(new Date(val));
+    } catch {
+      return "";
+    }
+  };
 
   // ------------------------------------------------------------
   // RESET FORM
@@ -288,6 +336,7 @@ export function AddOrderModal({
 
     setIsOrderDetailOpen(false);
     setItems([{ ...EMPTY_ITEM }]);
+    setOrderAttachments([]);
     setPendingDocuments([]);
     setAllMandatoryDocsUploaded(false);
   };
@@ -297,6 +346,25 @@ export function AddOrderModal({
   // ------------------------------------------------------------
   useEffect(() => {
     if (!open) return;
+
+    // 0. Ensure Company Context is loaded
+    if (!effectiveCompanyId) {
+      (async () => {
+        try {
+          const comps = await organizationApi.companies.list();
+          const list = Array.isArray(comps) ? comps : (comps as any)?.data || [];
+          if (list.length > 0) {
+            useERPStore.setState({ companies: list as any });
+            const validComp = list.find((c: any) => c.id && c.id !== "comp-1") || list[0];
+            if (validComp?.id) {
+              store.setCompanyId(validComp.id);
+            }
+          }
+        } catch (err) {
+          console.error("Failed to load companies in AddOrderModal:", err);
+        }
+      })();
+    }
 
     // 1. Fetch Customers
     (async () => {
@@ -332,7 +400,7 @@ export function AddOrderModal({
     })();
 
     // 3. Fetch Workflow Template Steps
-    (async () => {
+    const loadWorkflowTemplate = async () => {
       try {
         const res = await workflowApi.getTemplate();
         if (res.data?.success && res.data?.data?.steps) {
@@ -368,7 +436,26 @@ export function AddOrderModal({
       } catch (err) {
         console.error("Failed to load workflow template:", err);
       }
-    })();
+    };
+    void loadWorkflowTemplate();
+
+    // Listen for postMessage from workflow stages editor tab or window focus
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === "WORKFLOW_STAGES_UPDATED") {
+        void loadWorkflowTemplate();
+        toast.success("Workflow stages updated.");
+      }
+    };
+    const handleFocus = () => {
+      void loadWorkflowTemplate();
+    };
+
+    window.addEventListener("message", handleMessage);
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      window.removeEventListener("message", handleMessage);
+      window.removeEventListener("focus", handleFocus);
+    };
   }, [open, store.users]);
 
   // ------------------------------------------------------------
@@ -384,7 +471,30 @@ export function AddOrderModal({
 
           setDveplCode(order.dveplCode || "");
           setCompanyName(order.partyName || "");
+          setCustomerSearchQuery(order.partyName || "");
           setCustomerPoNo(order.caNo || "");
+
+          if (order.customerId) {
+            setSelectedCustomerId(order.customerId);
+          }
+
+          if (order.orderTakenById) {
+            setOrderTakenById(order.orderTakenById);
+          } else if (order.orderTakenBy?.id) {
+            setOrderTakenById(order.orderTakenBy.id);
+          }
+
+          if (Array.isArray(order.assignments) && order.assignments.length > 0) {
+            const mappedAssignments: Record<string, string> = {};
+            order.assignments.forEach((a: any) => {
+              if (a.stage && a.userId) {
+                mappedAssignments[a.stage] = a.userId;
+              }
+            });
+            if (Object.keys(mappedAssignments).length > 0) {
+              setStageAssignments((prev) => ({ ...prev, ...mappedAssignments }));
+            }
+          }
 
           const parts = (order.contactDetails || "").split(" | ");
           setContactPerson(parts[0] || "");
@@ -392,11 +502,11 @@ export function AddOrderModal({
           setEmailId(parts[2] || "");
 
           if (order.poDate) {
-            setOrderDate(new Date(order.poDate).toISOString().slice(0, 10));
+            setOrderDate(safeDateStr(order.poDate));
           }
           if (order.deliveryMonthTarget) {
             setCommitmentType("fixed");
-            setCommitmentDate(new Date(order.deliveryMonthTarget).toISOString().slice(0, 10));
+            setCommitmentDate(safeDateStr(order.deliveryMonthTarget));
           }
           setTotalPanels(order.inspectionField || "");
 
@@ -415,6 +525,12 @@ export function AddOrderModal({
                 setSameAsBilling(false);
               }
             });
+          }
+
+          if (Array.isArray(order.salesOrderAttachments)) {
+            setOrderAttachments(order.salesOrderAttachments);
+          } else if (Array.isArray(order.attachments)) {
+            setOrderAttachments(order.attachments);
           }
 
           if (order.items && order.items.length > 0) {
@@ -442,7 +558,9 @@ export function AddOrderModal({
 
     if (editingOrder) {
       setDveplCode(editingOrder.dveplCode || "");
-      setCompanyName(editingOrder.partyName || (editingOrder as any).firm_name || "");
+      const initialParty = editingOrder.partyName || (editingOrder as any).firm_name || "";
+      setCompanyName(initialParty);
+      setCustomerSearchQuery(initialParty);
       setContactPerson(editingOrder.name || "");
       setMobileNo(editingOrder.mobile || "");
       setEmailId(editingOrder.email_id || "");
@@ -450,13 +568,17 @@ export function AddOrderModal({
       setProjectReference(editingOrder.reference_code || "");
       setTotalPanels(editingOrder.inspectionField || "");
       if (editingOrder.poDate) {
-        setOrderDate(editingOrder.poDate.slice(0, 10));
+        setOrderDate(safeDateStr(editingOrder.poDate));
       }
       if (editingOrder.deliveryMonthTarget) {
-        setCommitmentDate(editingOrder.deliveryMonthTarget.slice(0, 10));
+        setCommitmentDate(safeDateStr(editingOrder.deliveryMonthTarget));
+      }
+      if (Array.isArray(editingOrder.attachments)) {
+        setOrderAttachments(editingOrder.attachments);
       }
       void fetchOrderDetails();
     } else {
+      setOrderAttachments([]);
       setOrderTakenById(propOrderTakenById || null);
     }
   }, [open, editingOrder, propOrderTakenById]);
@@ -632,8 +754,8 @@ export function AddOrderModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!editingOrder && !companyId) {
-      toast.error("Company context is missing. Cannot create order.");
+    if (!editingOrder && !effectiveCompanyId) {
+      toast.error("Company context is missing. Please make sure an active company is selected.");
       return;
     }
 
@@ -642,8 +764,9 @@ export function AddOrderModal({
       return;
     }
 
-    if (!companyName.trim()) {
-      toast.error("Company Name is required.");
+    const effectiveCompanyName = companyName.trim() || customerSearchQuery.trim();
+    if (!effectiveCompanyName) {
+      toast.error("Company / Firm Name is required.");
       return;
     }
 
@@ -668,17 +791,18 @@ export function AddOrderModal({
 
     // Check mandatory documents for new orders
     if (!editingOrder && !allMandatoryDocsUploaded) {
-      const missing = MANDATORY_CATEGORIES.filter((mand) => {
-        const mandNorm = mand.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const configuredDocs = getOrderDocumentCategories(store.settings);
+      const mandatoryDocs = configuredDocs.filter((d) => d.isMandatory);
+      const missing = mandatoryDocs.filter((mand) => {
+        const mandNorm = normalizeCategoryName(mand.name);
         return !pendingDocuments.some(
-          (doc) =>
-            doc.category.toLowerCase().replace(/[^a-z0-9]/g, "") === mandNorm
+          (doc) => normalizeCategoryName(doc.category) === mandNorm
         );
       });
 
       if (missing.length > 0) {
         toast.error(
-          `Please upload mandatory document(s): ${missing.join(", ")}`
+          `Please upload mandatory document(s): ${missing.map((m) => m.name).join(", ")}`
         );
         return;
       }
@@ -696,9 +820,9 @@ export function AddOrderModal({
         itemCode: item.itemCode.trim() || "ITEM-1",
         description: item.description.trim() || "Order Item",
         unit: item.unit.trim() || "Nos",
-        quantity: Number(item.quantity) || 1,
-        rate: Number(item.rate) || 0,
-        gstPercentage: Number(item.gstPercentage) || 18,
+        quantity: Math.max(1, Number(item.quantity) || 1),
+        rate: Math.max(0, Number(item.rate) || 0),
+        gstPercentage: Math.max(0, Number(item.gstPercentage) || 18),
         remarks: null,
       }));
 
@@ -708,7 +832,7 @@ export function AddOrderModal({
         : [
             {
               itemCode: dveplCode.trim(),
-              description: `Sales Order for ${companyName.trim()}`,
+              description: `Sales Order for ${effectiveCompanyName}`,
               unit: "Nos",
               quantity: 1,
               rate: 0,
@@ -719,12 +843,17 @@ export function AddOrderModal({
 
     const payload = {
       ...(editingOrder
-        ? {}
-        : { companyId, orderTakenById: orderTakenById || null }),
+        ? {
+            ...(orderTakenById ? { orderTakenById } : {}),
+          }
+        : {
+            companyId: effectiveCompanyId,
+            orderTakenById: orderTakenById || null,
+          }),
       customerId: selectedCustomerId || null,
       dveplCode: dveplCode.trim(),
       status: editingOrder?.status || "PENDING",
-      partyName: companyName.trim(),
+      partyName: effectiveCompanyName,
       caNo: customerPoNo.trim() || null,
       contactDetails,
       poDate: orderDate || null,
@@ -757,31 +886,9 @@ export function AddOrderModal({
         ? editingOrder.id
         : response.data?.data?.id;
 
-      // 2. Upload and Attach Pending Documents
-      if (orderId && pendingDocuments.length > 0) {
-        await Promise.all(
-          pendingDocuments.map(async ({ category, file }) => {
-            const formData = new FormData();
-            formData.append("file", file);
-            const uploadRes = await apiClient.post("/upload/", formData, {
-              headers: { "Content-Type": "multipart/form-data" },
-            });
-            const fileUrl = uploadRes.data?.data?.fileUrl;
-            if (!fileUrl) {
-              throw new Error("Upload did not return a file URL.");
-            }
-            await apiClient.post(`/order/attachment/${orderId}`, {
-              fileName: file.name,
-              fileUrl,
-              fileSize: file.size,
-              mimeType: file.type || null,
-              category,
-            });
-          })
-        );
-      }
-
-      // 3. Save Stage Responsibilities (Assignments)
+      // 2. Save Stage Responsibilities (Assignments) FIRST
+      // Saving assignments first ensures that if the creator or assignee is checked
+      // for stage authorization when uploading attachments, their permissions exist.
       const stageAssignmentsPayload = Object.entries(stageAssignments)
         .filter(([_, userId]) => Boolean(userId) && userId !== "__none__")
         .map(([stage, userId]) => ({
@@ -799,11 +906,48 @@ export function AddOrderModal({
         }
       }
 
-      toast.success(
-        editingOrder
-          ? "Order updated successfully!"
-          : "Order created successfully!"
-      );
+      // 3. Upload and Attach Pending Documents
+      let uploadIssuesCount = 0;
+      const failedCategories: string[] = [];
+
+      if (orderId && pendingDocuments.length > 0) {
+        for (const { category, file } of pendingDocuments) {
+          try {
+            const formData = new FormData();
+            formData.append("file", file);
+            const uploadRes = await apiClient.post("/upload/", formData, {
+              headers: { "Content-Type": "multipart/form-data" },
+            });
+            const fileUrl = uploadRes.data?.data?.fileUrl;
+            if (!fileUrl) {
+              throw new Error("Upload did not return a file URL.");
+            }
+            await apiClient.post(`/order/attachment/${orderId}`, {
+              fileName: file.name,
+              fileUrl,
+              fileSize: file.size,
+              mimeType: file.type || null,
+              category,
+            });
+          } catch (uploadErr: any) {
+            console.error(`Document upload failed for ${category}:`, uploadErr);
+            uploadIssuesCount++;
+            failedCategories.push(category);
+          }
+        }
+      }
+
+      if (uploadIssuesCount > 0) {
+        toast.error(
+          `Order saved, but failed to upload: ${failedCategories.join(", ")}. Please re-upload in order details.`
+        );
+      } else {
+        toast.success(
+          editingOrder
+            ? "Order updated successfully!"
+            : "Order created successfully!"
+        );
+      }
       resetForm();
       onOpenChange(false);
       onSuccess();
@@ -869,26 +1013,28 @@ export function AddOrderModal({
           className="overflow-y-auto max-h-[calc(92vh-140px)] px-6 py-6 space-y-6 scrollbar-thin text-neutral-800 dark:text-neutral-200"
         >
           {/* ======================================================
-              ROW 1: EXISTING CUSTOMER & DVEPL REF CODE
+              ROW 1: CUSTOMER / COMPANY NAME & DVEPL REF CODE
               ====================================================== */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            {/* Existing Customer Combobox */}
+            {/* Customer / Company Combobox */}
             <div className="lg:col-span-8 space-y-1 relative" ref={customerDropdownRef}>
               <label className="text-[11px] font-bold tracking-wider text-neutral-700 dark:text-neutral-300 uppercase block">
-                EXISTING CUSTOMER
+                <span className="text-red-500 font-bold">*</span> CUSTOMER / COMPANY NAME
               </label>
               <div className="relative">
                 <Input
                   value={customerSearchQuery}
                   onChange={(e) => {
-                    setCustomerSearchQuery(e.target.value);
+                    const val = e.target.value;
+                    setCustomerSearchQuery(val);
+                    setCompanyName(val);
                     setIsCustomerDropdownOpen(true);
-                    if (!e.target.value) {
+                    if (!val) {
                       setSelectedCustomerId(null);
                     }
                   }}
                   onFocus={() => setIsCustomerDropdownOpen(true)}
-                  placeholder="Search by company/firm or contact person name..."
+                  placeholder="Search existing customer or enter company name..."
                   className={`h-10 text-xs rounded-lg transition-all pr-8 ${
                     selectedCustomerId
                       ? "border-emerald-600 ring-1 ring-emerald-600 font-medium"
@@ -966,21 +1112,9 @@ export function AddOrderModal({
           </div>
 
           {/* ======================================================
-              ROW 2: COMPANY NAME, CONTACT PERSON, MOBILE NO, EMAIL ID
+              ROW 2: CONTACT PERSON, MOBILE NO, EMAIL ID
               ====================================================== */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="space-y-1">
-              <label className="text-[11px] font-bold tracking-wider text-neutral-700 dark:text-neutral-300 uppercase block">
-                <span className="text-red-500 font-bold">*</span> COMPANY NAME
-              </label>
-              <Input
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
-                placeholder="Company/Firm name"
-                className="h-10 text-xs rounded-lg border-neutral-300 dark:border-neutral-700 focus:border-emerald-600 focus:ring-emerald-500"
-              />
-            </div>
-
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-1">
               <label className="text-[11px] font-bold tracking-wider text-neutral-700 dark:text-neutral-300 uppercase block">
                 CONTACT PERSON
@@ -1151,7 +1285,7 @@ export function AddOrderModal({
                     min="1"
                     value={commitmentDays}
                     onChange={(e) => setCommitmentDays(e.target.value)}
-                    placeholder="e.g. 30 (days from order date)"
+                    placeholder="e.g. 30 (days from approval of drawing)"
                     className="h-10 text-xs rounded-lg border-neutral-300 dark:border-neutral-700"
                   />
                   {calculatedCommitmentDate && (
@@ -1251,13 +1385,29 @@ export function AddOrderModal({
               SECTION: * JOB RESPONSIBILITY — WHO HANDLES EACH STAGE
               ====================================================== */}
           <div className="space-y-2 pt-2">
-            <div>
-              <h3 className="text-[11px] font-bold tracking-wider text-neutral-800 dark:text-neutral-200 uppercase">
-                <span className="text-red-500 font-bold">*</span> JOB RESPONSIBILITY — WHO HANDLES EACH STAGE
-              </h3>
-              <p className="text-[11px] text-neutral-500 dark:text-neutral-400 font-normal leading-relaxed mt-0.5">
-                Pick who's responsible for each stage that varies per order. Stages with a Fixed Responsible Person (set on the Workflow Template) are auto-assigned and not asked here. Changing this later needs Admin, Manager or HR.
-              </p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-[11px] font-bold tracking-wider text-neutral-800 dark:text-neutral-200 uppercase">
+                  <span className="text-red-500 font-bold">*</span> JOB RESPONSIBILITY — WHO HANDLES EACH STAGE
+                </h3>
+                <p className="text-[11px] text-neutral-500 dark:text-neutral-400 font-normal leading-relaxed mt-0.5">
+                  Pick who's responsible for each stage that varies per order. Stages with a Fixed Responsible Person (set on the Workflow Template) are auto-assigned and not asked here. Changing this later needs Admin, Manager or HR.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  window.open("/workflow?stages=true&from=orders", "_blank");
+                }}
+                className="shrink-0 h-7 text-[11px] font-semibold gap-1.5 rounded-lg border-blue-200 dark:border-blue-900/50 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-all shadow-3xs"
+                title="Open Workflow Tracker to manage stages / steps"
+              >
+                <Settings className="size-3" />
+                Manage Stages
+                <ExternalLink className="size-2.5 opacity-60 ml-0.5" />
+              </Button>
             </div>
 
             <div className="border border-neutral-200 dark:border-neutral-800 rounded-lg divide-y divide-neutral-200 dark:divide-neutral-800 overflow-hidden bg-white dark:bg-neutral-900">
@@ -1474,16 +1624,40 @@ export function AddOrderModal({
               ====================================================== */}
           <div className="pt-2">
             <ProjectDocumentUploadPanel
-              attachments={editingOrder?.attachments || []}
+              attachments={orderAttachments}
               immediate={Boolean(editingOrder)}
               orderId={editingOrder?.id || null}
               disabled={isSubmitting}
               uploading={isSubmitting}
+              isAdmin={isAdmin}
               onPendingChange={setPendingDocuments}
-              onUploaded={onSuccess}
+              onUploaded={() => {
+                onSuccess();
+                if (editingOrder?.id) {
+                  apiClient.get(`/order/read/${editingOrder.id}`).then((res) => {
+                    if (res.data?.data?.salesOrderAttachments) {
+                      setOrderAttachments(res.data.data.salesOrderAttachments);
+                    }
+                  }).catch(() => {});
+                }
+              }}
+              onDeleted={(attachmentId) => {
+                setOrderAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
+                onSuccess();
+              }}
               onMandatoryFulfilledChange={setAllMandatoryDocsUploaded}
+              onOpenManageDocs={isAdmin ? () => setIsManageDocsOpen(true) : undefined}
             />
           </div>
+
+          {/* Manage Document Types Modal for Admin */}
+          {isAdmin && (
+            <ManageOrderDocumentsModal
+              open={isManageDocsOpen}
+              onOpenChange={setIsManageDocsOpen}
+              categories={getOrderDocumentCategories(store.settings)}
+            />
+          )}
 
           {/* ======================================================
               FOOTER ACTION: SAVE & PROCEED (Matching Screenshot 1-3)

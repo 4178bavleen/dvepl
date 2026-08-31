@@ -1,7 +1,17 @@
+import { useState, useEffect, useMemo } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { ExportOrder } from "@/types/exportOrders";
 import { useSalesOrderAccess } from "@/utils/salesOrderAccess";
-import { FileText } from "lucide-react";
+import { FileText, Columns3 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { STATUS_CONFIG, type DrawingStatus } from "./constants";
 
 interface Props {
   orders: ExportOrder[];
@@ -11,28 +21,67 @@ interface Props {
   onSelectAll: (checked: boolean) => void;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  PENDING: "bg-yellow-100 text-yellow-700",
-  APPROVED: "bg-green-100 text-green-700",
-  DRAFT: "bg-gray-100 text-gray-600",
-  COMPLETED: "bg-blue-100 text-blue-700",
-  CANCELLED: "bg-red-100 text-red-600",
-};
+type ColumnKey =
+  | "soNumber"
+  | "customer"
+  | "drawing"
+  | "status"
+  | "amount"
+  | "delivery"
+  | "access";
 
-function fmt(amount: any) {
+interface ColumnDef {
+  key: ColumnKey;
+  label: string;
+  defaultVisible: boolean;
+}
+
+const COLUMNS: ColumnDef[] = [
+  { key: "soNumber", label: "SO Number", defaultVisible: true },
+  { key: "customer", label: "Customer", defaultVisible: true },
+  { key: "drawing", label: "Drawing", defaultVisible: true },
+  { key: "status", label: "Status", defaultVisible: true },
+  { key: "amount", label: "Amount", defaultVisible: true },
+  { key: "delivery", label: "Delivery Target", defaultVisible: true },
+  { key: "access", label: "Access", defaultVisible: true },
+];
+
+const STORAGE_KEY = "engineering-drawings.orderColumns";
+
+const DEFAULT_VISIBILITY = COLUMNS.reduce<Record<ColumnKey, boolean>>(
+  (acc, c) => {
+    acc[c.key] = c.defaultVisible;
+    return acc;
+  },
+  {} as Record<ColumnKey, boolean>,
+);
+
+function loadVisibility(): Record<ColumnKey, boolean> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { ...DEFAULT_VISIBILITY };
+    const parsed = JSON.parse(raw);
+    // Merge with defaults so new columns default to visible
+    return { ...DEFAULT_VISIBILITY, ...parsed };
+  } catch {
+    return { ...DEFAULT_VISIBILITY };
+  }
+}
+
+function fmt(amount: unknown) {
   return `₹${Number(amount ?? 0).toLocaleString("en-IN")}`;
 }
 
-function fmtDate(val: any) {
+function fmtDate(val: unknown) {
   if (!val) return "—";
   try {
-    return new Date(val).toLocaleDateString("en-IN", {
+    return new Date(val as string).toLocaleDateString("en-IN", {
       day: "2-digit",
       month: "short",
       year: "numeric",
     });
   } catch {
-    return val;
+    return String(val);
   }
 }
 
@@ -44,17 +93,94 @@ export default function OrdersTable({
   onSelectAll,
 }: Props) {
   const { canWorkOnOrder, isAdmin } = useSalesOrderAccess();
-  const allSelected = orders.length > 0 && selectedOrderIds.length === orders.length;
+  const [visibility, setVisibility] = useState<Record<ColumnKey, boolean>>(
+    loadVisibility,
+  );
+
+  // Persist to localStorage whenever visibility changes
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(visibility));
+  }, [visibility]);
+
+  const visibleCount = useMemo(
+    () => COLUMNS.filter((c) => visibility[c.key]).length,
+    [visibility],
+  );
+
+  const allSelected =
+    orders.length > 0 && selectedOrderIds.length === orders.length;
   const someSelected = selectedOrderIds.length > 0 && !allSelected;
+
+  // Total columns including the selection checkbox (always shown)
+  const totalColumns = visibleCount + 1;
+
+  const toggleColumn = (key: ColumnKey) => {
+    setVisibility((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const resetColumns = () => setVisibility({ ...DEFAULT_VISIBILITY });
 
   return (
     <div className="rounded-lg border bg-background overflow-hidden">
       <div className="flex items-center justify-between border-b p-4">
-        <h2 className="text-lg font-semibold">Matching Orders</h2>
-        <span className="text-sm text-muted-foreground">
-          {isLoading ? "Loading…" : `${orders.length} Orders`}
-          {selectedOrderIds.length > 0 && ` · ${selectedOrderIds.length} selected`}
-        </span>
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold">Matching Orders</h2>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-muted-foreground">
+            {isLoading ? "Loading…" : `${orders.length} Orders`}
+            {selectedOrderIds.length > 0 &&
+              ` · ${selectedOrderIds.length} selected`}
+          </span>
+
+          {/* Column customizer */}
+          <Popover>
+            <PopoverTrigger
+              render={
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Columns3 className="h-4 w-4" />
+                  Columns
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                </Button>
+              }
+            />
+            <PopoverContent align="end" className="w-64">
+              <PopoverHeader>
+                <PopoverTitle>Customize Columns</PopoverTitle>
+                <p className="text-xs text-muted-foreground">
+                  Choose which fields to show. Saved to your browser.
+                </p>
+              </PopoverHeader>
+
+              <div className="flex flex-col gap-1">
+                {COLUMNS.map((col) => (
+                  <label
+                    key={col.key}
+                    className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 hover:bg-muted/50 cursor-pointer"
+                  >
+                    <span className="text-sm">{col.label}</span>
+                    <Checkbox
+                      checked={visibility[col.key]}
+                      onCheckedChange={() => toggleColumn(col.key)}
+                    />
+                  </label>
+                ))}
+              </div>
+
+              <div className="border-t pt-2 mt-1 flex justify-between">
+                <button
+                  onClick={resetColumns}
+                  className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Reset defaults
+                </button>
+                <span className="text-xs text-muted-foreground">
+                  {visibleCount}/{COLUMNS.length} showing
+                </span>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
 
       <div className="overflow-x-auto">
@@ -68,13 +194,27 @@ export default function OrdersTable({
                   onCheckedChange={(v) => onSelectAll(!!v)}
                 />
               </th>
-              <th className="px-4 py-3 text-left">SO Number</th>
-              <th className="px-4 py-3 text-left">Customer</th>
-              <th className="px-4 py-3 text-left">Drawing</th>
-              <th className="px-4 py-3 text-left">Status</th>
-              <th className="px-4 py-3 text-left">Amount</th>
-              <th className="px-4 py-3 text-left">Delivery Target</th>
-              <th className="px-4 py-3 text-left">Access</th>
+              {visibility.soNumber && (
+                <th className="px-4 py-3 text-left">SO Number</th>
+              )}
+              {visibility.customer && (
+                <th className="px-4 py-3 text-left">Customer</th>
+              )}
+              {visibility.drawing && (
+                <th className="px-4 py-3 text-left">Drawing</th>
+              )}
+              {visibility.status && (
+                <th className="px-4 py-3 text-left">Status</th>
+              )}
+              {visibility.amount && (
+                <th className="px-4 py-3 text-left">Amount</th>
+              )}
+              {visibility.delivery && (
+                <th className="px-4 py-3 text-left">Delivery Target</th>
+              )}
+              {visibility.access && (
+                <th className="px-4 py-3 text-left">Access</th>
+              )}
             </tr>
           </thead>
 
@@ -82,7 +222,7 @@ export default function OrdersTable({
             {isLoading &&
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i} className="border-t">
-                  {Array.from({ length: 8 }).map((__, j) => (
+                  {Array.from({ length: totalColumns }).map((__, j) => (
                     <td key={j} className="px-4 py-3">
                       <div className="h-4 w-full rounded bg-muted animate-pulse" />
                     </td>
@@ -92,23 +232,25 @@ export default function OrdersTable({
 
             {!isLoading && orders.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
+                <td
+                  colSpan={totalColumns}
+                  className="px-4 py-10 text-center text-muted-foreground"
+                >
                   No orders found. Use the filter above to search.
                 </td>
               </tr>
             )}
 
             {!isLoading &&
-              orders.map((row: any) => {
+              orders.map((row: ExportOrder) => {
                 const isSelected = selectedOrderIds.includes(row.id);
-                const statusClass =
-                  STATUS_COLORS[row.status] ?? "bg-gray-100 text-gray-600";
-                
-                const hasDrawing = row.engineeringProjects?.some(
-                  (p: any) => p.drawings?.length > 0
+                const hasDrawing = (row as any).engineeringProjects?.some(
+                  (p: any) => p.drawings?.length > 0,
                 );
-
                 const canWork = canWorkOnOrder(row);
+                const statusCfg =
+                  STATUS_CONFIG[row.status as DrawingStatus] ??
+                  STATUS_CONFIG.DRAFT;
 
                 return (
                   <tr
@@ -118,57 +260,75 @@ export default function OrdersTable({
                     }`}
                     onClick={() => onSelectOrder(row.id, !isSelected)}
                   >
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <td
+                      className="px-4 py-3"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <Checkbox
                         checked={isSelected}
                         onCheckedChange={(v) => onSelectOrder(row.id, !!v)}
                       />
                     </td>
 
-                    <td className="px-4 py-3 font-medium">{row.dveplCode}</td>
-                    <td className="px-4 py-3">{row.partyName}</td>
-                    
-                    <td className="px-4 py-3">
-                      {hasDrawing ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          <FileText className="w-3 h-3 text-emerald-500" />
-                          Attached
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground border">
-                          —
-                        </span>
-                      )}
-                    </td>
+                    {visibility.soNumber && (
+                      <td className="px-4 py-3 font-medium">{row.dveplCode}</td>
+                    )}
+                    {visibility.customer && (
+                      <td className="px-4 py-3">{row.partyName}</td>
+                    )}
 
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full ${statusClass}`}
-                      >
-                        {row.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">{fmt(row.grandTotal)}</td>
-                    <td className="px-4 py-3 text-muted-foreground text-xs">
-                      {row.deliveryMonthTarget || fmtDate(row.orderConfirmDate)}
-                    </td>
-                    <td className="px-4 py-3">
-                      {canWork ? (
-                        isAdmin ? (
-                          <span className="inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                            Admin access
+                    {visibility.drawing && (
+                      <td className="px-4 py-3">
+                        {hasDrawing ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <FileText className="w-3 h-3 text-emerald-500" />
+                            Attached
                           </span>
                         ) : (
-                          <span className="inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            Assigned to you
+                          <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground border">
+                            —
                           </span>
-                        )
-                      ) : (
-                        <span className="inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground border">
-                          View only
+                        )}
+                      </td>
+                    )}
+
+                    {visibility.status && (
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full ${statusCfg.pill}`}
+                        >
+                          {row.status}
                         </span>
-                      )}
-                    </td>
+                      </td>
+                    )}
+                    {visibility.amount && (
+                      <td className="px-4 py-3">{fmt(row.grandTotal)}</td>
+                    )}
+                    {visibility.delivery && (
+                      <td className="px-4 py-3 text-muted-foreground text-xs">
+                        {row.deliveryMonthTarget ||
+                          fmtDate(row.orderConfirmDate)}
+                      </td>
+                    )}
+                    {visibility.access && (
+                      <td className="px-4 py-3">
+                        {canWork ? (
+                          isAdmin ? (
+                            <span className="inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                              Admin access
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              Assigned to you
+                            </span>
+                          )
+                        ) : (
+                          <span className="inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground border">
+                            View only
+                          </span>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 );
               })}

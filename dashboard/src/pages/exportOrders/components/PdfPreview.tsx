@@ -18,14 +18,21 @@ export default function PdfPreview({ selectedOrders, pdfOptions }: Props) {
       </div>
 
       <div className="p-5">
-        <div className="aspect-[210/297] rounded-md border bg-white shadow-sm p-6 overflow-hidden">
+        <div className="aspect-[210/297] rounded-md border bg-white shadow-sm p-6 overflow-hidden relative">
+          {/* Header */}
           {pdfOptions.companyHeader && (
             <div className="border-b pb-4 mb-4">
               <h1 className="text-xl font-bold">DV Electromatic Pvt. Ltd.</h1>
-              <p className="text-xs text-gray-500">Export Report Preview</p>
+              <p className="text-xs text-gray-500">
+                Engineering Drawings Report
+              </p>
+              <p className="text-[10px] text-gray-400 mt-1">
+                Generated: {new Date().toLocaleDateString("en-IN")}
+              </p>
             </div>
           )}
 
+          {/* Orders */}
           {selectedOrders.length === 0 ? (
             <div className="mt-8 border rounded p-4">
               <p className="font-medium">Orders Preview</p>
@@ -35,17 +42,49 @@ export default function PdfPreview({ selectedOrders, pdfOptions }: Props) {
             </div>
           ) : (
             <div className="space-y-2 mt-2">
-              {/* Mini table header */}
-              <div className="grid grid-cols-3 text-xs font-semibold text-gray-500 border-b pb-1">
+              <div
+                className={`grid text-xs font-semibold text-gray-500 border-b pb-1 ${
+                  pdfOptions.landscapeMode
+                    ? "grid-cols-5"
+                    : "grid-cols-3"
+                }`}
+              >
                 <span>SO No</span>
                 <span>Customer</span>
-                <span>Amount</span>
+                {pdfOptions.landscapeMode && <span>Status</span>}
+                {pdfOptions.landscapeMode && <span>Amount</span>}
+                {pdfOptions.landscapeMode && <span>Delivery</span>}
+                {!pdfOptions.landscapeMode && <span>Amount</span>}
               </div>
-              {selectedOrders.slice(0, 8).map((o) => (
-                <div key={o.id} className="grid grid-cols-3 text-xs py-0.5 border-b border-gray-100">
+              {selectedOrders.slice(0, 8).map((o, idx) => (
+                <div
+                  key={o.id}
+                  className={`grid text-xs py-0.5 border-b border-gray-100 ${
+                    pdfOptions.alternateRows && idx % 2 === 1
+                      ? "bg-gray-50"
+                      : ""
+                  } ${pdfOptions.landscapeMode ? "grid-cols-5" : "grid-cols-3"}`}
+                >
                   <span className="font-medium truncate">{o.dveplCode}</span>
                   <span className="truncate text-gray-600">{o.partyName}</span>
-                  <span>₹{Number(o.grandTotal ?? 0).toLocaleString("en-IN")}</span>
+                  {pdfOptions.landscapeMode && (
+                    <span className="text-gray-500">{o.status}</span>
+                  )}
+                  {pdfOptions.landscapeMode && (
+                    <span>
+                      ₹{Number(o.grandTotal ?? 0).toLocaleString("en-IN")}
+                    </span>
+                  )}
+                  {pdfOptions.landscapeMode && (
+                    <span className="text-gray-500 truncate">
+                      {o.deliveryMonthTarget || "—"}
+                    </span>
+                  )}
+                  {!pdfOptions.landscapeMode && (
+                    <span>
+                      ₹{Number(o.grandTotal ?? 0).toLocaleString("en-IN")}
+                    </span>
+                  )}
                 </div>
               ))}
               {selectedOrders.length > 8 && (
@@ -56,10 +95,11 @@ export default function PdfPreview({ selectedOrders, pdfOptions }: Props) {
             </div>
           )}
 
+          {/* Footer */}
           {pdfOptions.companyFooter && (
             <div className="absolute bottom-4 left-4 right-4 border-t pt-2">
               <p className="text-[9px] text-gray-400">
-                DV Electromatic Pvt. Ltd. | Confidential
+                DV Electromatic Pvt. Ltd. | Confidential Engineering Report
                 {pdfOptions.pageNumbers && "  ·  Page 1"}
               </p>
             </div>

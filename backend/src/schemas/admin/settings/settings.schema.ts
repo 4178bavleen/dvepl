@@ -2,6 +2,12 @@ import { z } from "zod";
 
 export const settingsSchema = z.object({
   orderFields: z.array(z.any()).optional(),
+  orderDocuments: z.array(z.object({
+    id: z.string().optional(),
+    name: z.string().min(1, "Document name is required"),
+    isMandatory: z.boolean().default(false),
+    description: z.string().optional(),
+  })).optional(),
   concernedPersons: z.array(z.any()).optional(),
   waSettings: z.object({
     orderGen: z.boolean().optional(),

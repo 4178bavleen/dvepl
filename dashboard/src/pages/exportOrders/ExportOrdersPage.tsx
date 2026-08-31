@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useExportOrdersStore } from "@/store/exportOrders.store";
 import { useERPStore } from "@/store/erpStore";
 import { canPerformPageAction } from "@/utils/pagePermissions";
@@ -51,63 +51,87 @@ const DEFAULT_PDF_OPTS: PdfOpts = {
 
 export default function ExportOrdersPage() {
   const store = useERPStore();
-  const currentUser = store.users?.find((u: any) => u.id === store.currentUserId) as any;
-  const canCreate = canPerformPageAction(currentUser?.actionPermissions, "export_orders", "create");
-  const canEdit = canPerformPageAction(currentUser?.actionPermissions, "export_orders", "edit");
-  const orders = useExportOrdersStore((state) => state.orders);
-  const availableOrders = useExportOrdersStore((state) => state.availableOrders);
-  const allDrawings = useExportOrdersStore((state) => state.drawings);
-  const ordersLoading = useExportOrdersStore((state) => state.isOrdersLoading);
-  const fetchOrders = useExportOrdersStore((state) => state.fetchOrders);
-  const fetchAvailableOrders = useExportOrdersStore((state) => state.fetchAvailableOrders);
-  const fetchDrawings = useExportOrdersStore((state) => state.fetchDrawings);
+  const currentUser = store.users?.find(
+    (u: any) => u.id === store.currentUserId,
+  ) as any;
+  const canCreate = canPerformPageAction(
+    currentUser?.actionPermissions,
+    "export_orders",
+    "create",
+  );
+  const canEdit = canPerformPageAction(
+    currentUser?.actionPermissions,
+    "export_orders",
+    "edit",
+  );
 
-  // ── Filter state ──────────────────────────────────────────────────
+  const orders = useExportOrdersStore((s) => s.orders);
+  const availableOrders = useExportOrdersStore((s) => s.availableOrders);
+  const allDrawings = useExportOrdersStore((s) => s.drawings);
+  const ordersLoading = useExportOrdersStore((s) => s.isOrdersLoading);
+  const fetchOrders = useExportOrdersStore((s) => s.fetchOrders);
+  const fetchAvailableOrders = useExportOrdersStore((s) => s.fetchAvailableOrders);
+  const fetchDrawings = useExportOrdersStore((s) => s.fetchDrawings);
+
+  // ── Filter state ─────────────────────────────────────────────────────────
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [activeFilters, setActiveFilters] = useState<Partial<Filters>>({});
+  const [filterOpen, setFilterOpen] = useState(false);
 
-  // ── Selection state ───────────────────────────────────────────────
+  // ── Selection state ──────────────────────────────────────────────────────
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [selectedDrawingIds, setSelectedDrawingIds] = useState<string[]>([]);
 
-  // ── PDF Options ───────────────────────────────────────────────────
+  // ── PDF Options ──────────────────────────────────────────────────────────
   const [pdfOptions, setPdfOptions] = useState<PdfOpts>(DEFAULT_PDF_OPTS);
 
-  // ── Upload dialog state ───────────────────────────────────────────
-  const [uploadOpen, setUploadOpen] = useState(false);
+  // ── Fetch data ───────────────────────────────────────────────────────────
 
-  // ── Backend data → typed service → Export Orders store ────────────
   useEffect(() => {
     void fetchOrders({
-        search: (activeFilters.soNo || activeFilters.customer) || undefined,
-        status: activeFilters.status && activeFilters.status !== "all" ? activeFilters.status : undefined,
-        assignedEngineer: activeFilters.assignedEngineer || undefined,
-        startDate: activeFilters.startDate || undefined,
-        endDate: activeFilters.endDate || undefined,
+      search: activeFilters.soNo || activeFilters.customer || undefined,
+      status:
+        activeFilters.status && activeFilters.status !== "all"
+          ? activeFilters.status
+          : undefined,
+      assignedEngineer: activeFilters.assignedEngineer || undefined,
+      startDate: activeFilters.startDate || undefined,
+      endDate: activeFilters.endDate || undefined,
     });
   }, [activeFilters, fetchOrders]);
 
-
-  
   useEffect(() => {
     void fetchAvailableOrders();
   }, [fetchAvailableOrders]);
 
-  const allOrderIds = orders.map((order) => order.id);
+  const allOrderIds = useMemo(() => orders.map((o) => o.id), [orders]);
+  const allOrderIdsKey = allOrderIds.join(",");
   useEffect(() => {
     void fetchDrawings(allOrderIds);
-  }, [allOrderIds.join(","), fetchDrawings]);
+  }, [allOrderIds, allOrderIdsKey, fetchDrawings]);
 
-  // ── Computed ──────────────────────────────────────────────────────
+  // ── Computed ─────────────────────────────────────────────────────────────
+
   const selectedOrders = orders.filter((o) => selectedOrderIds.includes(o.id));
-  const drawings = allDrawings.filter((drawing) =>
-    drawing.project?.salesOrderId && selectedOrderIds.includes(drawing.project.salesOrderId),
+  const drawings = allDrawings.filter(
+    (d) =>
+      d.project?.salesOrderId &&
+      selectedOrderIds.includes(d.project.salesOrderId),
   );
 
-  // ── Handlers ──────────────────────────────────────────────────────
+  const hasActiveFilters = Boolean(
+    activeFilters.soNo ||
+      activeFilters.customer ||
+      (activeFilters.status && activeFilters.status !== "all") ||
+      activeFilters.assignedEngineer ||
+      activeFilters.startDate ||
+      activeFilters.endDate,
+  );
+
+  // ── Handlers ─────────────────────────────────────────────────────────────
+
   const handleSearch = useCallback(() => {
     setActiveFilters({ ...filters });
-    // clear selection when re-searching
     setSelectedOrderIds([]);
     setSelectedDrawingIds([]);
   }, [filters]);
@@ -119,32 +143,49 @@ export default function ExportOrdersPage() {
     setSelectedDrawingIds([]);
   }, []);
 
-  const handleSelectOrder = useCallback((id: string, checked: boolean) => {
-    setSelectedOrderIds((prev) =>
-      checked ? [...prev, id] : prev.filter((x) => x !== id)
-    );
-    if (!checked) {
-      // deselect drawings that belonged to this order
-      setSelectedDrawingIds([]);
-    }
-  }, []);
+  const handleSelectOrder = useCallback(
+    (id: string, checked: boolean) => {
+      setSelectedOrderIds((prev) =>
+        checked ? [...prev, id] : prev.filter((x) => x !== id),
+      );
+
+      // Only clear drawings belonging to THIS order when deselecting
+      if (!checked) {
+        const drawingsToRemove = allDrawings
+          .filter((d) => d.project?.salesOrderId === id)
+          .map((d) => d.id);
+        setSelectedDrawingIds((prev) =>
+          prev.filter((did) => !drawingsToRemove.includes(did)),
+        );
+      }
+    },
+    [allDrawings],
+  );
 
   const handleSelectAll = useCallback(
     (checked: boolean) => {
       setSelectedOrderIds(checked ? orders.map((o) => o.id) : []);
       if (!checked) setSelectedDrawingIds([]);
     },
-    [orders]
+    [orders],
   );
 
   const handleDrawingCreated = useCallback(() => {
     void fetchDrawings(allOrderIds);
-  }, [allOrderIds.join(","), fetchDrawings]);
+  }, [allOrderIds, fetchDrawings]);
+
+  // Pass all available orders so DrawingLibrary can resolve orderForDrawing
+  const allKnownOrders = useMemo(() => {
+    const merged = [...orders];
+    availableOrders.forEach((ao) => {
+      if (!merged.some((o) => o.id === ao.id)) merged.push(ao);
+    });
+    return merged;
+  }, [orders, availableOrders]);
 
   return (
     <div className="flex flex-col gap-6 p-6">
-
-      {/* Page toolbar */}
+      {/* Toolbar */}
       <ExportToolbar
         selectedOrderIds={selectedOrderIds}
         selectedDrawingIds={selectedDrawingIds}
@@ -153,61 +194,75 @@ export default function ExportOrdersPage() {
         drawings={drawings}
         pdfOptions={pdfOptions}
         onReset={handleReset}
+        onOpenFilters={() => setFilterOpen(true)}
+        hasActiveFilters={hasActiveFilters}
       />
 
-      {/* Filter bar */}
+      {/* Filters (right drawer) */}
       <FilterPanel
         filters={filters}
         setFilters={setFilters}
         onSearch={handleSearch}
+        open={filterOpen}
+        setOpen={setFilterOpen}
       />
 
-      {/* Main grid: table + PDF preview */}
-      <div className="grid grid-cols-12 gap-6">
-        <Card className="col-span-8">
-          <CardContent className="p-5">
-            <OrdersTable
-              orders={orders}
-              isLoading={ordersLoading}
-              selectedOrderIds={selectedOrderIds}
-              onSelectOrder={handleSelectOrder}
-              onSelectAll={handleSelectAll}
-            />
-          </CardContent>
-        </Card>
+      {/* Main grid: orders + uploader on left, PDF tools on right */}
+      <div className="grid grid-cols-12 gap-6 items-start">
+        {/* Left column */}
+        <div className="col-span-12 lg:col-span-8 flex flex-col gap-6">
+          <Card>
+            <CardContent className="p-5">
+              <OrdersTable
+                orders={orders}
+                isLoading={ordersLoading}
+                selectedOrderIds={selectedOrderIds}
+                onSelectOrder={handleSelectOrder}
+                onSelectAll={handleSelectAll}
+              />
+            </CardContent>
+          </Card>
 
-        <Card className="col-span-4">
-          <CardContent className="p-5">
-            <PdfPreview
-              selectedOrders={selectedOrders}
-              pdfOptions={pdfOptions}
-            />
-          </CardContent>
-        </Card>
+          <SelectedOrdersCard
+            selectedOrders={selectedOrders}
+            drawings={drawings}
+            selectedDrawingIds={selectedDrawingIds}
+          />
+
+          {canCreate && (
+            <Card>
+              <CardContent className="p-5">
+                <DrawingUploader
+                  selectedOrderIds={selectedOrderIds}
+                  selectedOrders={selectedOrders}
+                  availableOrders={availableOrders}
+                  onSuccess={handleDrawingCreated}
+                />
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Right column: sticky PDF tools */}
+        <div className="col-span-12 lg:col-span-4 flex flex-col gap-6 lg:sticky lg:top-6">
+          <Card>
+            <CardContent className="p-5">
+              <PdfPreview
+                selectedOrders={selectedOrders}
+                pdfOptions={pdfOptions}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-5">
+              <PdfOptions options={pdfOptions} setOptions={setPdfOptions} />
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
-      {/* Selection summary */}
-      <SelectedOrdersCard
-        selectedOrders={selectedOrders}
-        drawings={drawings}
-        selectedDrawingIds={selectedDrawingIds}
-      />
-
-      {/* Drawing uploader */}
-      {canCreate && (
-        <Card>
-          <CardContent className="p-5">
-            <DrawingUploader
-              selectedOrderIds={selectedOrderIds}
-              selectedOrders={selectedOrders}
-              availableOrders={availableOrders}
-              onSuccess={handleDrawingCreated}
-            />
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Drawing library */}
+      {/* Drawing library — full width */}
       <Card>
         <CardContent className="p-5">
           <DrawingLibrary
@@ -216,18 +271,10 @@ export default function ExportOrdersPage() {
             setSelectedDrawingIds={setSelectedDrawingIds}
             onStatusChanged={handleDrawingCreated}
             canEdit={canEdit}
-            orders={orders}
+            orders={allKnownOrders}
           />
         </CardContent>
       </Card>
-
-      {/* PDF export options */}
-      <Card>
-        <CardContent className="p-5">
-          <PdfOptions options={pdfOptions} setOptions={setPdfOptions} />
-        </CardContent>
-      </Card>
-
     </div>
   );
 }

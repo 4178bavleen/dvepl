@@ -5,8 +5,15 @@ import { securityApi } from "@/services/modules";
 import { organizationApi } from "@/services/organization";
 import { toast } from "react-hot-toast";
 import * as XLSX from "xlsx";
-import { Eye, EyeOff, AlertTriangle } from "lucide-react";
+import { Eye, EyeOff, AlertTriangle, FileText, Plus, Trash2, Check, RotateCcw, ArrowUpDown, Info } from "lucide-react";
 import { ConfirmDialog } from "@/components/shared/confirmDialog";
+import {
+  DocumentCategoryDef,
+  INITIAL_DOCUMENT_CATEGORIES,
+  getOrderDocumentCategories,
+  saveOrderDocumentCategories,
+  ORDER_DOCUMENTS_CHANGED_EVENT,
+} from "../tenders/components/orderDocumentsConfig";
 import {
   ACTION_PERMISSION_KEYS,
   LEGACY_ACTION_DEFAULTS,
@@ -210,6 +217,14 @@ export function SettingsPage() {
 
   const [concernedPersons, setConcernedPersons] = useState<string[]>([]);
   const [newPersonName, setNewPersonName] = useState("");
+
+  // Order Documents State
+  const [orderDocuments, setOrderDocuments] = useState<DocumentCategoryDef[]>(() =>
+    getOrderDocumentCategories(store.settings)
+  );
+  const [newDocTitle, setNewDocTitle] = useState("");
+  const [newDocMandatory, setNewDocMandatory] = useState(false);
+  const [isSavingDocs, setIsSavingDocs] = useState(false);
 
   // Notifications state
   const [notifTab, setNotifTab] = useState<
@@ -503,6 +518,13 @@ export function SettingsPage() {
         await store.fetchSettings();
         const settings = store.settings || {};
         if (settings.orderFields) setOrderFields(settings.orderFields);
+        if (settings.orderDocuments && Array.isArray(settings.orderDocuments)) {
+          setOrderDocuments(settings.orderDocuments);
+          localStorage.setItem(
+            "dvepl_order_documents",
+            JSON.stringify(settings.orderDocuments)
+          );
+        }
         if (settings.concernedPersons)
           setConcernedPersons(settings.concernedPersons);
         if (settings.waSettings)
@@ -1339,6 +1361,89 @@ export function SettingsPage() {
     toast.success("Concerned person removed");
   };
 
+  // 3b. Order Documents Handlers
+  const handleToggleDocMandatory = (index: number) => {
+    setOrderDocuments((prev) =>
+      prev.map((item, idx) =>
+        idx === index ? { ...item, isMandatory: !item.isMandatory } : item
+      )
+    );
+  };
+
+  const handleUpdateDocTitle = (index: number, name: string) => {
+    setOrderDocuments((prev) =>
+      prev.map((item, idx) => (idx === index ? { ...item, name } : item))
+    );
+  };
+
+  const handleRemoveDoc = (index: number) => {
+    setOrderDocuments((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleAddDoc = () => {
+    const trimmed = newDocTitle.trim();
+    if (!trimmed) {
+      toast.error("Please enter a document title.");
+      return;
+    }
+    if (
+      orderDocuments.some(
+        (doc) => doc.name.trim().toLowerCase() === trimmed.toLowerCase()
+      )
+    ) {
+      toast.error(`"${trimmed}" already exists in the document list.`);
+      return;
+    }
+
+    setOrderDocuments((prev) => [
+      ...prev,
+      {
+        name: trimmed,
+        isMandatory: newDocMandatory,
+        description: "",
+      },
+    ]);
+    setNewDocTitle("");
+    setNewDocMandatory(false);
+  };
+
+  const handleResetDocs = () => {
+    setOrderDocuments(INITIAL_DOCUMENT_CATEGORIES.map((c) => ({ ...c })));
+    toast.success("Reset document categories to system defaults.");
+  };
+
+  const handleSaveDocs = async () => {
+    const cleaned = orderDocuments
+      .map((d) => ({ ...d, name: d.name.trim() }))
+      .filter((d) => d.name.length > 0);
+
+    if (cleaned.length === 0) {
+      toast.error("At least one document type must be configured.");
+      return;
+    }
+
+    const setNames = new Set<string>();
+    for (const d of cleaned) {
+      const lower = d.name.toLowerCase();
+      if (setNames.has(lower)) {
+        toast.error(`Duplicate document "${d.name}" found.`);
+        return;
+      }
+      setNames.add(lower);
+    }
+
+    setIsSavingDocs(true);
+    try {
+      await saveOrderDocumentCategories(cleaned, store.updateSettings);
+      toast.success("Order documents configuration saved successfully!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save order documents.");
+    } finally {
+      setIsSavingDocs(false);
+    }
+  };
+
   // 4. Notifications Handlers
   const saveNotifSettings = () => {
     localStorage.setItem("dvepl_whatsapp_settings", JSON.stringify(waSettings));
@@ -1832,6 +1937,20 @@ export function SettingsPage() {
               <div className="hub-card-title">Create User</div>
               <div className="hub-card-desc">
                 Add a new team member individually or bulk import from Excel.
+              </div>
+            </div>
+            <div className="hub-arrow">→</div>
+          </div>
+
+          <div
+            className="hub-card"
+            onClick={() => setActiveSection("order-documents")}
+          >
+            <div className="hub-icon-wrap teal">📑</div>
+            <div className="hub-card-body">
+              <div className="hub-card-title">Order Documents</div>
+              <div className="hub-card-desc">
+                Customize document types and mandatory requirements for order creation.
               </div>
             </div>
             <div className="hub-arrow">→</div>
@@ -2375,6 +2494,163 @@ export function SettingsPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ─── SECTION 2B: ORDER DOCUMENTS CONFIGURATION ─── */}
+      {activeSection === "order-documents" && (
+        <div className="space-y-6">
+          <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-5">
+              <div>
+                <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+                  <span>📑</span> Order Documents Configuration
+                </h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Define the list of documents required or accepted during Sales Order creation. Changes apply company-wide.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleResetDocs}
+                  className="px-3 py-2 border border-border rounded-lg bg-card text-xs font-semibold text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition shadow-sm"
+                  title="Reset to system default document list"
+                >
+                  <RotateCcw className="size-3.5" />
+                  Reset Defaults
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveDocs}
+                  disabled={isSavingDocs}
+                  className="px-5 py-2 bg-primary text-white font-bold rounded-lg text-xs hover:bg-primary/95 transition shadow-sm flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <Check className="size-4" />
+                  {isSavingDocs ? "Saving..." : "Save Configuration"}
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Add Form */}
+            <div className="mt-5 p-4 rounded-xl bg-muted/30 border border-border space-y-3">
+              <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <Plus className="size-3.5 text-primary" /> Add New Document Type
+              </div>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <input
+                  type="text"
+                  value={newDocTitle}
+                  onChange={(e) => setNewDocTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddDoc();
+                    }
+                  }}
+                  placeholder="e.g. Tax Invoice Copy, Client Specification Sheet, Inspection Clearance"
+                  className="flex-1 px-3.5 py-2 bg-background border border-border rounded-lg text-xs font-medium text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+                <label className="flex items-center gap-2 px-3 py-2 bg-background border border-border rounded-lg text-xs font-medium text-foreground cursor-pointer select-none shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={newDocMandatory}
+                    onChange={(e) => setNewDocMandatory(e.target.checked)}
+                    className="rounded border-border text-primary focus:ring-primary size-4"
+                  />
+                  <span>Mandatory (Required *)</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={handleAddDoc}
+                  className="px-4 py-2 bg-primary hover:bg-primary/90 text-white rounded-lg text-xs font-bold shrink-0 transition flex items-center gap-1"
+                >
+                  <Plus className="size-3.5" /> Add Document
+                </button>
+              </div>
+            </div>
+
+            {/* Documents List */}
+            <div className="mt-6 space-y-2">
+              <div className="flex items-center justify-between text-xs font-bold text-muted-foreground px-2">
+                <span>DOCUMENT TITLE ({orderDocuments.length})</span>
+                <div className="flex items-center gap-8">
+                  <span className="w-28 text-center">MANDATORY</span>
+                  <span className="w-10 text-center">ACTION</span>
+                </div>
+              </div>
+
+              <div className="border border-border rounded-xl divide-y divide-border overflow-hidden bg-card">
+                {orderDocuments.length === 0 ? (
+                  <div className="py-8 text-center text-xs text-muted-foreground">
+                    No order document types configured. Add one above or click Reset Defaults.
+                  </div>
+                ) : (
+                  orderDocuments.map((doc, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3.5 flex items-center justify-between gap-3 hover:bg-muted/20 transition-colors"
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <span className="text-xs font-bold text-muted-foreground/60 w-6">
+                          {idx + 1}.
+                        </span>
+                        <input
+                          type="text"
+                          value={doc.name}
+                          onChange={(e) => handleUpdateDocTitle(idx, e.target.value)}
+                          placeholder="Document title"
+                          className="flex-1 px-3 py-1.5 bg-background border border-border rounded-md text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-8 shrink-0">
+                        <div className="w-28 flex justify-center">
+                          <label className="flex items-center gap-1.5 text-xs font-medium cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={doc.isMandatory}
+                              onChange={() => handleToggleDocMandatory(idx)}
+                              className="rounded border-border text-primary focus:ring-primary size-4"
+                            />
+                            <span
+                              className={`text-[11px] font-bold ${
+                                doc.isMandatory ? "text-red-500" : "text-muted-foreground"
+                              }`}
+                            >
+                              {doc.isMandatory ? "Required *" : "Optional"}
+                            </span>
+                          </label>
+                        </div>
+
+                        <div className="w-10 flex justify-center">
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveDoc(idx)}
+                            className="text-muted-foreground hover:text-red-500 transition-colors p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-950/30"
+                            title="Remove document type"
+                          >
+                            <Trash2 className="size-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Explanatory note */}
+            <div className="mt-6 rounded-xl bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-900/40 p-4 text-xs text-blue-900 dark:text-blue-200 flex items-start gap-2.5">
+              <Info className="size-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-semibold">How Order Documents Work:</p>
+                <p className="text-[11px] text-blue-800 dark:text-blue-300 leading-relaxed">
+                  The document categories configured here appear in the <strong>Project Document Upload</strong> section when any user creates a new sales order manually. Any document marked as <strong>Required *</strong> must be uploaded before the order can be saved.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

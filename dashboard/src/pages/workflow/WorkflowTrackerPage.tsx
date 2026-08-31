@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ClockTimePicker } from "@/components/ui/clock-time-picker";
 import {
   AlertTriangle,
@@ -170,6 +171,8 @@ export default function WorkflowTrackerPage() {
     [store.currentUserId],
   );
 
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [orders, setOrders] = useState<WorkflowOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -183,8 +186,16 @@ export default function WorkflowTrackerPage() {
 
   const [template, setTemplate] = useState<WorkflowTemplate | null>(null);
   const [templateLoading, setTemplateLoading] = useState(true);
-  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(() => {
+    return searchParams.get("stages") === "true" || searchParams.get("open") === "stages";
+  });
   const [savingTemplate, setSavingTemplate] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("stages") === "true" || searchParams.get("open") === "stages") {
+      setEditorOpen(true);
+    }
+  }, [searchParams]);
 
   const [reminderOpen, setReminderOpen] = useState(false);
   const [savingReminder, setSavingReminder] = useState(false);
@@ -738,6 +749,20 @@ export default function WorkflowTrackerPage() {
             setEditorOpen(false);
             await loadTemplate();
             await loadOrders();
+
+            const fromOrders = searchParams.get("from") === "orders" || searchParams.get("returnTo") === "orders";
+            if (fromOrders) {
+              // Notify opener window if opened in a popup/tab
+              try {
+                if (window.opener && !window.opener.closed) {
+                  window.opener.postMessage({ type: "WORKFLOW_STAGES_UPDATED" }, "*");
+                  window.close();
+                  return;
+                }
+              } catch {}
+              // Otherwise navigate back to orders page
+              navigate("/tender/orders");
+            }
           } catch (error: any) {
             console.error("Failed to update workflow template:", error);
             toast.error(

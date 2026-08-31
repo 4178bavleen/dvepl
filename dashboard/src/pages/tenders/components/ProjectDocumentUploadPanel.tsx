@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState, useEffect } from "react";
 import {
   Plus,
   Trash2,
@@ -6,37 +6,36 @@ import {
   FileText,
   ExternalLink,
   CheckCircle2,
+  Settings,
+  Eye,
+  Download,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "react-hot-toast";
 import { apiClient } from "@/services/axios";
 import { SalesOrderAttachment } from "../orderShared";
+import { useERPStore } from "@/store/erpStore";
+import {
+  DocumentCategoryDef,
+  INITIAL_DOCUMENT_CATEGORIES,
+  ORDER_DOCUMENTS_CHANGED_EVENT,
+  getOrderDocumentCategories,
+  normalizeCategoryName,
+} from "./orderDocumentsConfig";
 
-// ============================================================
-// DOCUMENT CATEGORIES DEFINITION (matching Screenshot 3)
-// ============================================================
+export {
+  type DocumentCategoryDef,
+  INITIAL_DOCUMENT_CATEGORIES,
+};
 
-export interface DocumentCategoryDef {
-  name: string;
-  isMandatory: boolean;
-}
-
-export const INITIAL_DOCUMENT_CATEGORIES: DocumentCategoryDef[] = [
-  { name: "BOM / BOQ/Tender", isMandatory: true },
-  { name: "Customer PO Copy or DVEPL Final Offer", isMandatory: true },
-  { name: "Rough Drawings Copy", isMandatory: true },
-  { name: "Miscellaneous Document", isMandatory: false },
-  { name: "PO Copy", isMandatory: false },
-  { name: "Tender Copy", isMandatory: false },
-];
-
-export const MANDATORY_CATEGORIES = [
-  "BOM / BOQ/Tender",
-  "Customer PO Copy or DVEPL Final Offer",
-  "Rough Drawings Copy",
-];
 
 // ============================================================
 // PROPS
@@ -48,10 +47,12 @@ interface ProjectDocumentUploadPanelProps {
   orderId?: string | null;
   disabled?: boolean;
   uploading?: boolean;
+  isAdmin?: boolean;
   onPendingChange?: (pending: Array<{ category: string; file: File }>) => void;
   onUploaded?: () => void;
   onDeleted?: (attachmentId: string) => void;
   onMandatoryFulfilledChange?: (fulfilled: boolean) => void;
+  onOpenManageDocs?: () => void;
 }
 
 interface PendingDoc {
@@ -91,13 +92,16 @@ export function ProjectDocumentUploadPanel({
   orderId,
   disabled = false,
   uploading = false,
+  isAdmin = false,
   onPendingChange,
   onUploaded,
   onDeleted,
   onMandatoryFulfilledChange,
+  onOpenManageDocs,
 }: ProjectDocumentUploadPanelProps) {
-  const [categories, setCategories] = useState<DocumentCategoryDef[]>(
-    INITIAL_DOCUMENT_CATEGORIES
+  const store = useERPStore();
+  const [categories, setCategories] = useState<DocumentCategoryDef[]>(() =>
+    getOrderDocumentCategories(store.settings)
   );
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [customCategory, setCustomCategory] = useState("");
@@ -105,7 +109,53 @@ export function ProjectDocumentUploadPanel({
   const [busyCategory, setBusyCategory] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // Preview modal state
+  const [previewDoc, setPreviewDoc] = useState<{
+    title: string;
+    url: string;
+    isBlob?: boolean;
+    mimeType?: string;
+  } | null>(null);
+
   const fileInputs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  // Clean up object URLs when preview closes or changes
+  useEffect(() => {
+    return () => {
+      if (previewDoc?.isBlob && previewDoc?.url) {
+        URL.revokeObjectURL(previewDoc.url);
+      }
+    };
+  }, [previewDoc]);
+
+  const handlePreview = (doc: { title: string; url: string; isBlob?: boolean; mimeType?: string }) => {
+    setPreviewDoc(doc);
+  };
+
+  const handleClosePreview = () => {
+    if (previewDoc?.isBlob && previewDoc?.url) {
+      URL.revokeObjectURL(previewDoc.url);
+    }
+    setPreviewDoc(null);
+  };
+
+  // Synchronize when store.settings changes or when global document config updates
+  React.useEffect(() => {
+    const configured = getOrderDocumentCategories(store.settings);
+    setCategories(configured);
+  }, [store.settings]);
+
+  React.useEffect(() => {
+    const handleCategorySync = (e: any) => {
+      if (e?.detail && Array.isArray(e.detail)) {
+        setCategories(e.detail);
+      }
+    };
+    window.addEventListener(ORDER_DOCUMENTS_CHANGED_EVENT, handleCategorySync);
+    return () => {
+      window.removeEventListener(ORDER_DOCUMENTS_CHANGED_EVENT, handleCategorySync);
+    };
+  }, []);
 
   const attachmentsByCategory = useMemo(() => {
     const map: Record<string, SalesOrderAttachment[]> = {};
@@ -139,17 +189,18 @@ export function ProjectDocumentUploadPanel({
     };
   };
 
-  // Report pending changes and mandatory status
-  const reportPending = (next: PendingDoc[]) => {
+  // Report pending changes and mandatory status based on active categories
+  const reportPending = (next: PendingDoc[], currentCats = categories) => {
     setPendingDocs(next);
     const validPending = next
       .filter((doc) => doc.file)
       .map((doc) => ({ category: doc.category, file: doc.file as File }));
     onPendingChange?.(validPending);
 
-    // Evaluate mandatory categories
-    const allMandatoryFulfilled = MANDATORY_CATEGORIES.every((mand) => {
-      const mandNorm = normalizeCategory(mand);
+    // Evaluate mandatory categories dynamically
+    const mandatoryCategories = currentCats.filter((c) => c.isMandatory);
+    const allMandatoryFulfilled = mandatoryCategories.every((mand) => {
+      const mandNorm = normalizeCategory(mand.name);
       const hasPending = next.some(
         (doc) => normalizeCategory(doc.category) === mandNorm && doc.file
       );
@@ -161,6 +212,11 @@ export function ProjectDocumentUploadPanel({
 
     onMandatoryFulfilledChange?.(allMandatoryFulfilled);
   };
+
+  // Re-check fulfillment when categories or attachments change
+  React.useEffect(() => {
+    reportPending(pendingDocs, categories);
+  }, [categories, attachments]);
 
   const handleFileSelected = (category: string, file: File) => {
     if (file.size > 50 * 1024 * 1024) {
@@ -273,6 +329,17 @@ export function ProjectDocumentUploadPanel({
         <h3 className="text-[11px] font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">
           PROJECT DOCUMENT UPLOAD
         </h3>
+        {onOpenManageDocs && (
+          <button
+            type="button"
+            onClick={onOpenManageDocs}
+            className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 hover:underline flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Configure document categories company-wide"
+          >
+            <Settings className="size-3" />
+            Manage Documents
+          </button>
+        )}
       </div>
 
       {/* Document List Table */}
@@ -314,11 +381,11 @@ export function ProjectDocumentUploadPanel({
                   return (
                     <div
                       key={att.id}
-                      className="flex items-center gap-2 bg-emerald-50/60 dark:bg-emerald-950/40 border border-emerald-200/70 dark:border-emerald-800/60 rounded-md px-2.5 py-1 text-[11px]"
+                      className="flex items-center gap-1.5 bg-emerald-50/60 dark:bg-emerald-950/40 border border-emerald-200/70 dark:border-emerald-800/60 rounded-md px-2.5 py-1 text-[11px]"
                     >
                       <CheckCircle2 className="size-3.5 text-emerald-600 shrink-0" />
                       <span
-                        className="font-medium text-emerald-900 dark:text-emerald-200 max-w-[150px] sm:max-w-[200px] truncate"
+                        className="font-medium text-emerald-900 dark:text-emerald-200 max-w-[140px] sm:max-w-[180px] truncate"
                         title={att.fileName}
                       >
                         {att.fileName}
@@ -328,23 +395,33 @@ export function ProjectDocumentUploadPanel({
                           ({formatBytes(att.fileSize)})
                         </span>
                       ) : null}
+
+                      {/* View / Preview button for existing attachment */}
                       {fullUrl && (
-                        <a
-                          href={fullUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-emerald-700 hover:text-emerald-900 ml-1"
-                          title="View document"
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handlePreview({
+                              title: att.fileName,
+                              url: fullUrl,
+                              isBlob: false,
+                              mimeType: att.mimeType || undefined,
+                            })
+                          }
+                          className="flex items-center gap-1 text-emerald-700 hover:text-emerald-900 dark:text-emerald-400 dark:hover:text-emerald-200 px-1.5 py-0.5 rounded hover:bg-emerald-100/50 dark:hover:bg-emerald-900/30 transition-colors"
+                          title="View / preview document"
                         >
-                          <ExternalLink className="size-3" />
-                        </a>
+                          <Eye className="size-3 shrink-0" />
+                          <span className="font-semibold text-[10px]">View</span>
+                        </button>
                       )}
+
                       {!disabled && (
                         <button
                           type="button"
                           onClick={() => void handleDeleteAttachment(att.id)}
                           disabled={deletingId === att.id}
-                          className="text-neutral-400 hover:text-red-500 ml-1 transition-colors"
+                          className="text-neutral-400 hover:text-red-500 ml-0.5 p-0.5 rounded hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
                           title="Remove file"
                         >
                           {deletingId === att.id ? (
@@ -360,10 +437,10 @@ export function ProjectDocumentUploadPanel({
 
                 {/* Pending Local File */}
                 {pendingFile && (
-                  <div className="flex items-center gap-2 bg-emerald-50/60 dark:bg-emerald-950/40 border border-emerald-200/70 dark:border-emerald-800/60 rounded-md px-2.5 py-1 text-[11px]">
+                  <div className="flex items-center gap-1.5 bg-emerald-50/60 dark:bg-emerald-950/40 border border-emerald-200/70 dark:border-emerald-800/60 rounded-md px-2.5 py-1 text-[11px]">
                     <CheckCircle2 className="size-3.5 text-emerald-600 shrink-0" />
                     <span
-                      className="font-medium text-emerald-900 dark:text-emerald-200 max-w-[150px] sm:max-w-[200px] truncate"
+                      className="font-medium text-emerald-900 dark:text-emerald-200 max-w-[140px] sm:max-w-[180px] truncate"
                       title={pendingFile.name}
                     >
                       {pendingFile.name}
@@ -371,10 +448,30 @@ export function ProjectDocumentUploadPanel({
                     <span className="text-neutral-400 text-[10px]">
                       ({formatBytes(pendingFile.size)})
                     </span>
+
+                    {/* View / Preview button for pending local file */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const blobUrl = URL.createObjectURL(pendingFile);
+                        handlePreview({
+                          title: pendingFile.name,
+                          url: blobUrl,
+                          isBlob: true,
+                          mimeType: pendingFile.type || undefined,
+                        });
+                      }}
+                      className="flex items-center gap-1 text-emerald-700 hover:text-emerald-900 dark:text-emerald-400 dark:hover:text-emerald-200 px-1.5 py-0.5 rounded hover:bg-emerald-100/50 dark:hover:bg-emerald-900/30 transition-colors"
+                      title="View / preview document"
+                    >
+                      <Eye className="size-3 shrink-0" />
+                      <span className="font-semibold text-[10px]">View</span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => clearPendingFile(cat.name)}
-                      className="text-neutral-400 hover:text-red-500 ml-1 transition-colors"
+                      className="text-neutral-400 hover:text-red-500 ml-0.5 p-0.5 rounded hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
                       title="Clear file"
                     >
                       <Trash2 className="size-3" />
@@ -419,59 +516,84 @@ export function ProjectDocumentUploadPanel({
         })}
       </div>
 
-      {/* Add More Document Link / Inline Input */}
-      <div className="pt-1">
-        {isAddingCategory ? (
-          <div className="flex items-center gap-2 max-w-md">
-            <Input
-              value={customCategory}
-              onChange={(e) => setCustomCategory(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  addCustomCategory();
-                } else if (e.key === "Escape") {
-                  setIsAddingCategory(false);
-                }
-              }}
-              placeholder="Enter document name..."
-              className="h-8 text-xs rounded-lg"
-              autoFocus
-            />
-            <Button
-              type="button"
-              size="sm"
-              onClick={addCustomCategory}
-              className="h-8 text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg px-3"
-            >
-              Add
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsAddingCategory(false)}
-              className="h-8 text-xs rounded-lg"
-            >
-              Cancel
-            </Button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setIsAddingCategory(true)}
-            className="text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 font-semibold text-xs inline-flex items-center gap-1 transition-colors cursor-pointer"
-          >
-            <Plus className="size-3.5" />
-            Add more Document
-          </button>
-        )}
-      </div>
-
       {/* Mandatory Help Note at Bottom */}
       <p className="text-[11px] text-neutral-500 dark:text-neutral-400 font-normal leading-relaxed pt-1">
         Red * = mandatory (shown first) — all mandatory documents must be uploaded before you can save this order. Max file size: 50 MB per file.
       </p>
+
+      {/* Document Preview Dialog */}
+      {previewDoc && (
+        <Dialog open={Boolean(previewDoc)} onOpenChange={(open) => !open && handleClosePreview()}>
+          <DialogContent className="max-w-4xl w-[95vw] h-[85vh] p-0 flex flex-col overflow-hidden">
+            <DialogHeader className="p-4 border-b border-border flex flex-row items-center justify-between space-y-0 shrink-0">
+              <div className="flex items-center gap-2 overflow-hidden mr-4">
+                <FileText className="size-5 text-emerald-600 shrink-0" />
+                <DialogTitle className="text-sm font-semibold truncate" title={previewDoc.title}>
+                  {previewDoc.title}
+                </DialogTitle>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 pr-6">
+                <a
+                  href={previewDoc.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-md border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 transition-colors"
+                >
+                  <ExternalLink className="size-3.5" />
+                  <span>Open in Tab</span>
+                </a>
+                <a
+                  href={previewDoc.url}
+                  download={previewDoc.title}
+                  className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
+                >
+                  <Download className="size-3.5" />
+                  <span>Download</span>
+                </a>
+              </div>
+            </DialogHeader>
+
+            <div className="flex-1 bg-neutral-100 dark:bg-neutral-900 p-2 overflow-hidden flex items-center justify-center">
+              {previewDoc.title.toLowerCase().endsWith(".pdf") ||
+              previewDoc.mimeType === "application/pdf" ? (
+                <iframe
+                  src={previewDoc.url}
+                  className="w-full h-full rounded border-0 bg-white dark:bg-neutral-950"
+                  title={previewDoc.title}
+                />
+              ) : /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(previewDoc.title) ||
+                previewDoc.mimeType?.startsWith("image/") ? (
+                <div className="w-full h-full flex items-center justify-center overflow-auto p-4">
+                  <img
+                    src={previewDoc.url}
+                    alt={previewDoc.title}
+                    className="max-w-full max-h-full object-contain rounded shadow"
+                  />
+                </div>
+              ) : (
+                <div className="text-center p-8 bg-white dark:bg-neutral-800 rounded-lg shadow-sm max-w-md">
+                  <FileText className="size-16 text-neutral-400 mx-auto mb-3" />
+                  <p className="text-sm font-medium text-neutral-800 dark:text-neutral-200 mb-1">
+                    {previewDoc.title}
+                  </p>
+                  <p className="text-xs text-neutral-500 mb-4">
+                    Inline preview is not available for this file type.
+                  </p>
+                  <a
+                    href={previewDoc.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-medium transition-colors"
+                  >
+                    <ExternalLink className="size-3.5" />
+                    Open or Download File
+                  </a>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

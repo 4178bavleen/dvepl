@@ -1,4 +1,13 @@
 import "dotenv/config";
+import dns from "dns";
+
+// Ensure Node.js resolves cloud hostnames (such as Neon PostgreSQL) even if the local Wi-Fi router DNS drops or refuses queries
+try {
+  dns.setServers(["8.8.8.8", "1.1.1.1", "8.8.4.4"]);
+} catch (e) {
+  console.warn("Could not set custom DNS servers:", e);
+}
+
 import buildApp from "../app";
 
 const start = async () => {

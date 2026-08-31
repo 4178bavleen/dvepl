@@ -24,6 +24,7 @@ import type {
   EngineeringDrawing,
 } from "@/types/exportOrders";
 import { useSalesOrderAccess } from "@/utils/salesOrderAccess";
+import { DRAWING_TYPES } from "./constants";
 
 interface Props {
   selectedOrderIds: string[];
@@ -32,15 +33,6 @@ interface Props {
   onSuccess: () => void;
   revisionDrawing?: EngineeringDrawing | null;
 }
-
-const DRAWING_TYPES = [
-  "SLD",
-  "GA_DRAWING",
-  "WIRING_DIAGRAM",
-  "LAYOUT",
-  "CAD",
-  "PDF",
-];
 
 export default function DrawingUploader({
   selectedOrderIds,
