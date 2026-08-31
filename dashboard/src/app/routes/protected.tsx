@@ -22,6 +22,8 @@ const getRequiredPermission = (pathname: string): string | null => {
   if (pathname.startsWith('/purchase/orders')) return null;
   if (pathname.startsWith('/logistics/delivery')) return null;
   if (pathname.startsWith('/tender/orders')) return null;
+  if (pathname.startsWith('/orders')) return null;
+  if (pathname.startsWith('/accounts')) return null;
   
   if (pathname.startsWith('/finance')) return 'finance';
   if (pathname.startsWith('/settings/custom-fields')) return 'custom_fields';
