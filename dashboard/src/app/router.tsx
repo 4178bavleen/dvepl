@@ -122,6 +122,8 @@ const DeliveryPage = lazy(() => import("@/pages/delivery/deliveryPage"));
 const ExportOrdersPage = lazy(
   () => import("@/pages/exportOrders/ExportOrdersPage"),
 );
+const AccountsPage = lazy(() => import("@/pages/accounts/AccountsPage"));
+
 
 export function AppRouter() {
   return (
@@ -133,6 +135,11 @@ export function AppRouter() {
             <Route element={<PublicRoute />}>
               <Route path="/login" element={<LoginPage />} />
             </Route>
+
+            {/* Direct preview routes (accessible without login) */}
+            <Route path="/accounts-preview" element={<AccountsPage />} />
+            <Route path="/accounts-preview/:id" element={<AccountsPage />} />
+
 
             {/* Protected Application Routes */}
             <Route element={<ProtectedRoute />}>
@@ -280,6 +287,8 @@ export function AppRouter() {
               />
               <Route path="/export-orders" element={<ExportOrdersPage />} />
               <Route path="/orders/:id" element={<OrderDetailPage />} />
+              <Route path="/accounts" element={<AccountsPage />} />
+              <Route path="/accounts/:id" element={<AccountsPage />} />
             </Route>
 
             {/* 404 Fallback */}
