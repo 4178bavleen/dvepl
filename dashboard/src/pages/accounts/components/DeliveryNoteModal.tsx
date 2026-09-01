@@ -82,9 +82,6 @@ export const DeliveryNoteModal: React.FC<DeliveryNoteModalProps> = ({
               <div>
                 <h1 className="text-xl font-extrabold tracking-tight flex items-center gap-2">
                   <span className="text-primary font-black text-2xl tracking-wider">DVEPL</span>
-                  <span className="text-xs sm:text-sm font-semibold text-muted-foreground border-l border-border pl-2">
-                    Deep Valves & Engineering Pvt. Ltd.
-                  </span>
                 </h1>
                 <p className="text-xs text-muted-foreground mt-1">
                   Industrial Valves, Control Panels & Engineering Solutions

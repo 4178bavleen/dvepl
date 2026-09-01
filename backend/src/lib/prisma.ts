@@ -49,9 +49,10 @@ function createPrismaClient(): PrismaClient {
   }
 
   try {
+    const requiresSsl = /(?:^|[?&])sslmode=(?:require|verify-ca|verify-full)(?:&|$)/i.test(connectionString);
     const pool = new Pool({
       connectionString,
-      ssl: { rejectUnauthorized: false },
+      ssl: requiresSsl ? { rejectUnauthorized: false } : false,
     });
     const adapter = new PrismaPg(pool);
     return new PrismaClient({ adapter });
