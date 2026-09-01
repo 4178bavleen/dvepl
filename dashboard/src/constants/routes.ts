@@ -72,6 +72,7 @@ export const ROUTES = {
 
   // Finance & Accounts
   FINANCE: '/finance',
+  ACCOUNTS: '/accounts',
   
   AUDIT_LOGS: '/audit-logs',
   REPORTS: '/reports',

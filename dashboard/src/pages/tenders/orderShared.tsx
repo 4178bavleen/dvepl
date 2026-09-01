@@ -75,6 +75,7 @@ export const ALL_COLUMN_KEYS = [
   { id: "tenderNo", label: "TENDER NO" },
   { id: "firmName", label: "FIRM NAME" },
   { id: "assignedUsers", label: "ASSIGNED TO" },
+  { id: "accounts", label: "ACCOUNTS / COSTING" },
   { id: "contactPerson", label: "Name" },
   { id: "mobile", label: "MOBILE" },
   { id: "email", label: "EMAIL" },

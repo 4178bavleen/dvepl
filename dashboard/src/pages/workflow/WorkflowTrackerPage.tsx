@@ -15,6 +15,7 @@ import {
   Settings2,
   ShoppingCart,
   Trash2,
+  FileSpreadsheet,
 } from "lucide-react";
 import {
   DndContext,
@@ -951,6 +952,7 @@ function OrderDetail({
   onMarkAsDone: () => void;
   onOpenReminder: () => void;
 }) {
+  const navigate = useNavigate();
   const isOverdue = overdue(order.dueDate);
 
   return (
@@ -972,6 +974,15 @@ function OrderDetail({
           </p>
         </div>
         <div className="flex items-center gap-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate(`/accounts/${order.id}`)}
+            className="gap-1 text-sky-600 dark:text-sky-400 border-sky-500/30 bg-sky-500/5 hover:bg-sky-500/10 cursor-pointer shadow-3xs"
+            title="Open Accounts Costing & Quotation sheet"
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5" /> Accounts
+          </Button>
           <Button variant="outline" size="sm" onClick={onOpenReminder}>
             <Send className="h-3.5 w-3.5" /> Reminder
           </Button>

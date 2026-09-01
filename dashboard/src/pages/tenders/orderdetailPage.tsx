@@ -27,6 +27,7 @@ import {
   Calendar,
   Tag,
   Briefcase,
+  FileSpreadsheet,
 } from "lucide-react";
 
 import {
@@ -338,6 +339,16 @@ export function OrderDetailPage() {
               <span className="hidden sm:inline">
                 {isFullscreen ? "Exit Full Screen" : "Full Screen"}
               </span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/accounts/${tender.id}`)}
+              className="h-8 text-xs font-bold rounded-xl gap-1.5 border-sky-500/30 text-sky-600 dark:text-sky-400 bg-sky-500/5 hover:bg-sky-500/10 transition-all cursor-pointer shadow-3xs"
+              title="Open Accounts Costing & Quotation sheet"
+            >
+              <FileSpreadsheet className="size-3.5" />
+              <span>Accounts & Costing</span>
             </Button>
             <Button
               variant="outline"

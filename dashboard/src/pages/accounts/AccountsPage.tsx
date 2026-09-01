@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ChevronLeft,
@@ -10,10 +10,20 @@ import {
   Printer,
   Save,
   FileText,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { apiClient } from "@/services/axios";
 
 // Modals
 import { CustomerMasterEditModal } from "./components/CustomerMasterEditModal";
@@ -30,38 +40,7 @@ import {
   AccountCostingData,
 } from "./types";
 
-const DEFAULT_SHARED_FILES: SharedOrderFile[] = [
-  {
-    id: "shared-1",
-    name: "Redesigned about pages.pdf",
-    uploader: "Business Owner",
-    uploadTime: "31 Aug, 10:49 am",
-    location: "stored in this Order's Documents",
-    size: "2.4 MB",
-    isBlocked: true,
-    allowedRoles: ["admin", "accounts"],
-  },
-  {
-    id: "shared-2",
-    name: "Redesigned about pages.pdf",
-    uploader: "Business Owner",
-    uploadTime: "31 Aug, 10:49 am",
-    location: "stored in this Order's Documents",
-    size: "2.4 MB",
-    isBlocked: true,
-    allowedRoles: ["admin", "accounts"],
-  },
-  {
-    id: "shared-3",
-    name: "Redesigned about pages.pdf",
-    uploader: "Business Owner",
-    uploadTime: "31 Aug, 10:49 am",
-    location: "stored in this Order's Documents",
-    size: "2.4 MB",
-    isBlocked: true,
-    allowedRoles: ["admin", "accounts"],
-  },
-];
+const DEFAULT_SHARED_FILES: SharedOrderFile[] = [];
 
 const DEFAULT_CUSTOMER_DETAILS: CustomerMasterDetails = {
   companyName: "gk enterprises",
@@ -75,23 +54,54 @@ const DEFAULT_CUSTOMER_DETAILS: CustomerMasterDetails = {
   specialNotes: "—",
 };
 
-const DEFAULT_ITEMS: PanelItem[] = [
-  {
-    id: "item-1",
+function createDefaultItem(): PanelItem {
+  return {
+    id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     panelName: "",
     qty: 1,
     price: 0,
     total: 0,
-  },
-];
+  };
+}
+
+const DEFAULT_ITEMS: PanelItem[] = [createDefaultItem()];
+
+function parseRemarksField(remarks: string | undefined | null, keyName: string): string {
+  if (!remarks) return "";
+  const lines = remarks.split("\n");
+  for (const line of lines) {
+    if (line.toLowerCase().startsWith(keyName.toLowerCase() + ":")) {
+      return line.substring(keyName.length + 1).trim();
+    }
+  }
+  return "";
+}
+
+const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL ?? "";
+function buildFileUrl(rawUrl?: string): string {
+  if (!rawUrl) return "";
+  if (/^https?:\/\//i.test(rawUrl) || rawUrl.startsWith("blob:")) return rawUrl;
+  try {
+    return new URL(rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`, API_BASE_URL || window.location.origin).toString();
+  } catch {
+    return rawUrl;
+  }
+}
 
 export function AccountsPage() {
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const loadedTargetIdRef = useRef<string | null>(null);
 
-  const orderCode = id ? (id.startsWith("ORD-") ? id : `ORD-2026-${id.padStart(5, "0")}`) : "ORD-2026-00265";
-  const storageKey = `dvepl_accounts_costing_${orderCode}`;
+  // Orders list for dropdown selector
+  const [orderList, setOrderList] = useState<Array<{ id: string; dveplCode?: string; partyName?: string; caNo?: string }>>([]);
+  const [isLoadingOrder, setIsLoadingOrder] = useState(false);
+  const [rawOrder, setRawOrder] = useState<any>(null);
+
+  const currentOrderId = rawOrder?.id || id || "";
+  const orderCode = rawOrder?.dveplCode || (id ? (id.startsWith("ORD-") ? id : id.startsWith("SO-") ? id : `ORD-2026-${id.padStart(5, "0")}`) : "ORD-2026-00265");
+  const storageKey = `dvepl_accounts_costing_${currentOrderId || orderCode}`;
 
   // State
   const [customerDetails, setCustomerDetails] = useState<CustomerMasterDetails>(() => {
@@ -183,6 +193,188 @@ export function AccountsPage() {
   } | null>(null);
   const [isDeliveryNoteOpen, setIsDeliveryNoteOpen] = useState(false);
 
+  // Fetch available orders for dropdown
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await apiClient.get("/order/read?page=1&limit=100");
+        if (res.data?.success && Array.isArray(res.data?.data)) {
+          setOrderList(res.data.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch order list for accounts selector:", err);
+      }
+    })();
+  }, []);
+
+  // Fetch target order details from backend
+  const fetchOrderData = useCallback(async (targetId?: string) => {
+    if (!targetId) return;
+    setIsLoadingOrder(true);
+
+    try {
+      let orderData: any = null;
+
+      // Try read by ID
+      try {
+        const res = await apiClient.get(`/order/read/${targetId}`);
+        if (res.data?.success && res.data?.data) {
+          orderData = res.data.data;
+        }
+      } catch {
+        // Fallback: search in list
+        const listRes = await apiClient.get("/order/read?page=1&limit=100");
+        if (listRes.data?.success && Array.isArray(listRes.data?.data)) {
+          orderData = listRes.data.data.find(
+            (o: any) =>
+              o.id === targetId ||
+              o.dveplCode === targetId ||
+              o.caNo === targetId
+          );
+        }
+      }
+
+      if (orderData) {
+        setRawOrder(orderData);
+
+        const currentKey = `dvepl_accounts_costing_${orderData.id}`;
+        const fallbackKey = `dvepl_accounts_costing_${orderData.dveplCode}`;
+        let savedCosting: any = null;
+        try {
+          const raw = localStorage.getItem(currentKey) || localStorage.getItem(fallbackKey);
+          if (raw) savedCosting = JSON.parse(raw);
+        } catch {}
+
+        // Parse contact
+        const contactParts = (orderData.contactDetails || "").split("|").map((s: string) => s.trim());
+        const contactName = contactParts[0] || orderData.partyName || "—";
+
+        // Parse remarks fields
+        const projectRefFromRemarks = parseRemarksField(orderData.remarks, "Project Reference");
+        const billingAddressFromRemarks = parseRemarksField(orderData.remarks, "Billing Address");
+        const advanceFromRemarks = parseRemarksField(orderData.remarks, "Advance");
+
+        const parsedAdvance = advanceFromRemarks
+          ? parseFloat(advanceFromRemarks.replace(/[^\d.-]/g, "")) || 0
+          : 0;
+
+        const effectiveCustomerDetails: CustomerMasterDetails = {
+          companyName: orderData.partyName || orderData.firm_name || "—",
+          contactPerson: contactName,
+          dveplRefCode: orderData.dveplCode || orderData.caNo || "—",
+          dateOfOrder: orderData.poDate ? orderData.poDate.substring(0, 10) : (orderData.createdAt ? orderData.createdAt.substring(0, 10) : "—"),
+          dateOfCommitment: orderData.deliveryMonthTarget ? orderData.deliveryMonthTarget.substring(0, 10) : "—",
+          projectRef: projectRefFromRemarks || orderData.reference_code || "—",
+          gstNumber: orderData.customer?.gstNumber || "—",
+          billingAddress: billingAddressFromRemarks || orderData.customer?.billingAddress || "—",
+          specialNotes: orderData.remarks || "—",
+        };
+
+        setCustomerDetails(savedCosting?.customerDetails || effectiveCustomerDetails);
+
+        // Map shared attachments
+        const attachments: any[] = orderData.salesOrderAttachments || orderData.attachments || [];
+        const drawings: any[] = orderData.drawings || orderData.engineeringProjects?.flatMap((p: any) => p.drawings || []) || [];
+
+        const mappedFiles: SharedOrderFile[] = [
+          ...attachments.map((att) => {
+            const now = att.createdAt ? new Date(att.createdAt) : new Date();
+            const timeStr = `${now.getDate()} ${now.toLocaleString("default", { month: "short" })}, ${now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+            const sizeMb = att.fileSize ? `${(att.fileSize / (1024 * 1024)).toFixed(1)} MB` : "1.2 MB";
+            return {
+              id: att.id || `att-${Math.random()}`,
+              name: att.fileName || "Document",
+              uploader: att.uploader?.name || orderData.orderTakenBy?.name || "Order Creator",
+              uploadTime: timeStr,
+              location: att.category ? `Category: ${att.category}` : "stored in this Order's Documents",
+              size: sizeMb,
+              fileUrl: buildFileUrl(att.fileUrl),
+              isBlocked: false,
+              allowedRoles: ["admin", "accounts"],
+            };
+          }),
+          ...drawings.map((dwg) => {
+            const sizeMb = "2.5 MB";
+            return {
+              id: dwg.id || `dwg-${Math.random()}`,
+              name: dwg.title || dwg.fileName || "Engineering Drawing",
+              uploader: "Design Team",
+              uploadTime: "Attached to Order",
+              location: "Engineering Drawings",
+              size: sizeMb,
+              fileUrl: buildFileUrl(dwg.fileUrl),
+              isBlocked: false,
+              allowedRoles: ["admin", "accounts"],
+            };
+          }),
+        ];
+
+        setSharedFiles(savedCosting?.sharedFiles || mappedFiles);
+
+        // Items mapping
+        if (savedCosting?.items && savedCosting.items.length > 0) {
+          setItems(savedCosting.items);
+        } else if (orderData.items && orderData.items.length > 0) {
+          setItems(
+            orderData.items.map((it: any, idx: number) => {
+              const qty = Number(it.quantity) || 1;
+              const price = Number(it.unitPrice || it.rate) || 0;
+              return {
+                id: it.id || `item-${idx + 1}-${Math.random().toString(36).substring(2, 7)}`,
+                panelName: it.description || it.itemCode || `Panel ${idx + 1}`,
+                qty,
+                price,
+                total: qty * price,
+              };
+            })
+          );
+        } else {
+          setItems([createDefaultItem()]);
+        }
+
+        if (typeof savedCosting?.taxPercent === "number") {
+          setTaxPercent(savedCosting.taxPercent);
+        } else {
+          setTaxPercent(18);
+        }
+
+        if (typeof savedCosting?.lessAdvance === "number") {
+          setLessAdvance(savedCosting.lessAdvance);
+        } else if (parsedAdvance > 0) {
+          setLessAdvance(parsedAdvance);
+        } else {
+          setLessAdvance(0);
+        }
+
+        if (typeof savedCosting?.specialNote === "string") {
+          setSpecialNote(savedCosting.specialNote);
+        } else {
+          setSpecialNote("");
+        }
+
+        if (Array.isArray(savedCosting?.accountFiles)) {
+          setAccountFiles(savedCosting.accountFiles);
+        } else {
+          setAccountFiles([]);
+        }
+      }
+    } catch (err) {
+      console.error("Error hydrating order for AccountsPage:", err);
+    } finally {
+      setIsLoadingOrder(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const targetId = id || (orderList.length > 0 ? orderList[0].id : null);
+    if (!targetId) return;
+
+    if (loadedTargetIdRef.current === targetId) return;
+    loadedTargetIdRef.current = targetId;
+
+    void fetchOrderData(targetId);
+  }, [id, orderList, fetchOrderData]);
+
   // Calculations
   const calculatedValues = useMemo(() => {
     const subtotal = items.reduce((sum, item) => sum + (Number(item.total) || 0), 0);
@@ -197,17 +389,17 @@ export function AccountsPage() {
 
   // Handlers for Items
   const handleItemChange = (
-    id: string,
+    itemId: string,
     field: "panelName" | "qty" | "price",
     value: any
   ) => {
     setItems((prev) =>
       prev.map((item) => {
-        if (item.id !== id) return item;
+        if (item.id !== itemId) return item;
         const updated = { ...item, [field]: value };
         if (field === "qty" || field === "price") {
-          const qty = field === "qty" ? Number(value) || 0 : item.qty;
-          const price = field === "price" ? Number(value) || 0 : item.price;
+          const qty = field === "qty" ? (value === "" ? 0 : Number(value) || 0) : Number(item.qty) || 0;
+          const price = field === "price" ? (value === "" ? 0 : Number(value) || 0) : Number(item.price) || 0;
           updated.total = qty * price;
         }
         return updated;
@@ -215,8 +407,12 @@ export function AccountsPage() {
     );
   };
 
-  const handleAddRow = () => {
-    const newId = `item-${Date.now()}`;
+  const handleAddRow = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const newId = `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     setItems((prev) => [
       ...prev,
       {
@@ -229,20 +425,15 @@ export function AccountsPage() {
     ]);
   };
 
-  const handleDeleteRow = (itemId: string) => {
-    if (items.length <= 1) {
-      setItems([
-        {
-          id: `item-${Date.now()}`,
-          panelName: "",
-          qty: 1,
-          price: 0,
-          total: 0,
-        },
-      ]);
-      return;
+  const handleDeleteRow = (itemId: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
     }
-    setItems((prev) => prev.filter((item) => item.id !== itemId));
+    setItems((prev) => {
+      const remaining = prev.filter((item) => item.id !== itemId);
+      return remaining.length > 0 ? remaining : [createDefaultItem()];
+    });
   };
 
   // Handlers for Account Section File Upload
@@ -278,7 +469,7 @@ export function AccountsPage() {
   // Save Costing Handler
   const handleSaveCosting = () => {
     const payload: AccountCostingData = {
-      orderId: id || "ORD-2026-00265",
+      orderId: currentOrderId || "ORD-2026-00265",
       orderCode,
       customerDetails,
       sharedFiles,
@@ -291,9 +482,12 @@ export function AccountsPage() {
     };
 
     try {
-      localStorage.setItem(storageKey, JSON.stringify(payload));
+      localStorage.setItem(`dvepl_accounts_costing_${currentOrderId || orderCode}`, JSON.stringify(payload));
+      if (orderCode) {
+        localStorage.setItem(`dvepl_accounts_costing_${orderCode}`, JSON.stringify(payload));
+      }
       toast.success("Costing & account details saved successfully!");
-    } catch (e) {
+    } catch {
       toast.error("Failed to save costing locally.");
     }
   };
@@ -307,7 +501,7 @@ export function AccountsPage() {
   };
 
   const costingData: AccountCostingData = {
-    orderId: id || "ORD-2026-00265",
+    orderId: currentOrderId || "ORD-2026-00265",
     orderCode,
     customerDetails,
     sharedFiles,
@@ -327,25 +521,80 @@ export function AccountsPage() {
           {/* Back to Order Link */}
           <button
             type="button"
-            onClick={() => navigate(-1)}
+            onClick={() => {
+              if (currentOrderId) {
+                navigate(`/orders/${currentOrderId}`);
+              } else {
+                navigate("/tender/orders");
+              }
+            }}
             className="inline-flex items-center gap-1 text-xs md:text-sm font-semibold text-foreground hover:text-primary transition-colors mb-2 group cursor-pointer"
           >
             <ChevronLeft className="size-4 group-hover:-translate-x-0.5 transition-transform text-foreground" />
             <span>Back to order</span>
           </button>
 
-          {/* Order Code */}
-          <div className="text-sm md:text-base font-bold font-mono tracking-wider text-primary uppercase">
-            {orderCode}
-          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              {/* Order Code */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm md:text-base font-bold font-mono tracking-wider text-primary uppercase">
+                  {orderCode}
+                </span>
+                {isLoadingOrder && (
+                  <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
+                )}
+              </div>
 
-          {/* Account Section Heading & Subtitle */}
-          <h1 className="text-2xl md:text-3xl font-extrabold text-foreground tracking-tight mt-0.5">
-            Account Section
-          </h1>
-          <p className="text-xs md:text-sm text-muted-foreground mt-1 font-normal">
-            Costing & quotation sheet — for the customer, separate from internal purchase orders.
-          </p>
+              {/* Account Section Heading & Subtitle */}
+              <h1 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight mt-0.5">
+                Account Section
+              </h1>
+              <p className="text-xs md:text-sm text-muted-foreground mt-1 font-normal">
+                Costing & quotation sheet — for the customer, separate from internal purchase orders.
+              </p>
+            </div>
+
+            {/* Switch Order Dropdown */}
+            {orderList.length > 0 && (
+              <div className="flex items-center gap-2 shrink-0 bg-card border border-border/80 rounded-xl p-1.5 shadow-2xs">
+                <span className="text-xs font-semibold text-muted-foreground pl-2 whitespace-nowrap">
+                  Order:
+                </span>
+                <Select
+                  value={currentOrderId || id || ""}
+                  onValueChange={(val) => {
+                    if (val) navigate(`/accounts/${val}`);
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-[200px] sm:w-[240px] rounded-lg text-xs font-medium border-border/60 bg-background">
+                    <SelectValue placeholder="Select an order..." />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {orderList.map((ord) => (
+                      <SelectItem key={ord.id} value={ord.id} className="text-xs">
+                        <span className="font-mono font-bold text-primary mr-1.5">
+                          {ord.dveplCode || ord.caNo || ord.id.slice(0, 8)}
+                        </span>
+                        <span className="text-muted-foreground truncate">
+                          {ord.partyName ? `(${ord.partyName})` : ""}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => fetchOrderData(currentOrderId || id)}
+                  title="Refresh order data"
+                  className="size-8 rounded-lg text-muted-foreground hover:text-foreground"
+                >
+                  <RefreshCw className="size-3.5" />
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Card 1: Order Metadata Summary Grid */}
@@ -354,7 +603,7 @@ export function AccountsPage() {
             <div>
               <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Company Name</p>
               <p className="text-xs font-semibold text-card-foreground line-clamp-1">
-                {customerDetails.companyName || "gk enterprises"}
+                {customerDetails.companyName || "—"}
               </p>
             </div>
 
@@ -368,28 +617,28 @@ export function AccountsPage() {
             <div>
               <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">DVEPL Ref Code</p>
               <p className="text-xs font-mono font-bold text-card-foreground">
-                {customerDetails.dveplRefCode || "123456"}
+                {customerDetails.dveplRefCode || "—"}
               </p>
             </div>
 
             <div>
               <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Date of Order</p>
               <p className="text-xs font-medium text-card-foreground">
-                {customerDetails.dateOfOrder || "2026-08-31"}
+                {customerDetails.dateOfOrder || "—"}
               </p>
             </div>
 
             <div>
               <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Date of Commitment</p>
               <p className="text-xs font-medium text-card-foreground">
-                {customerDetails.dateOfCommitment || "2026-10-15"}
+                {customerDetails.dateOfCommitment || "—"}
               </p>
             </div>
 
             <div>
               <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Project Ref</p>
               <p className="text-xs font-mono font-bold text-card-foreground">
-                {customerDetails.projectRef || "1234"}
+                {customerDetails.projectRef || "—"}
               </p>
             </div>
           </div>
@@ -442,41 +691,47 @@ export function AccountsPage() {
           </h3>
 
           <div className="bg-card border border-border rounded-xl divide-y divide-border overflow-hidden shadow-xs">
-            {sharedFiles.map((file) => (
-              <div
-                key={file.id}
-                className="px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-muted/40 transition-colors"
-              >
-                {/* Left Side: Icon, Name, Metadata */}
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <Eye className="size-4 text-primary shrink-0" />
-                  <div className="flex items-baseline gap-1.5 flex-wrap">
+            {sharedFiles.length === 0 ? (
+              <div className="p-4 text-xs text-muted-foreground text-center">
+                No files uploaded during order creation or attached from other tabs yet.
+              </div>
+            ) : (
+              sharedFiles.map((file) => (
+                <div
+                  key={file.id}
+                  className="px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-muted/40 transition-colors"
+                >
+                  {/* Left Side: Icon, Name, Metadata */}
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Eye className="size-4 text-primary shrink-0" />
+                    <div className="flex items-baseline gap-1.5 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewFile(file)}
+                        className="text-xs sm:text-sm font-semibold text-primary hover:underline text-left cursor-pointer"
+                      >
+                        {file.name}
+                      </button>
+                      <span className="text-xs text-muted-foreground font-normal">
+                        · uploaded by {file.uploader} · {file.uploadTime} · {file.location}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Right Side: Manage Access Button */}
+                  <div className="shrink-0">
                     <button
                       type="button"
-                      onClick={() => setPreviewFile(file)}
-                      className="text-xs sm:text-sm font-semibold text-primary hover:underline text-left cursor-pointer"
+                      onClick={() => setSelectedFileForAccess(file)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-rose-500 bg-rose-500/10 border border-rose-500/20 rounded-lg hover:bg-rose-500/20 transition-colors shadow-2xs cursor-pointer"
                     >
-                      {file.name}
+                      <Users className="size-3.5" />
+                      <span>Manage Access {file.isBlocked ? "(Blocked)" : "(Allowed)"}</span>
                     </button>
-                    <span className="text-xs text-muted-foreground font-normal">
-                      · uploaded by {file.uploader} · {file.uploadTime} · {file.location}
-                    </span>
                   </div>
                 </div>
-
-                {/* Right Side: Manage Access Button */}
-                <div className="shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedFileForAccess(file)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-rose-500 bg-rose-500/10 border border-rose-500/20 rounded-lg hover:bg-rose-500/20 transition-colors shadow-2xs cursor-pointer"
-                  >
-                    <Users className="size-3.5" />
-                    <span>Manage Access {file.isBlocked ? "(Blocked)" : "(Allowed)"}</span>
-                  </button>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
@@ -603,7 +858,7 @@ export function AccountsPage() {
                       <td className="py-1 px-3 border-r border-border">
                         <input
                           type="text"
-                          value={item.panelName}
+                          value={item.panelName || ""}
                           onChange={(e) => handleItemChange(item.id, "panelName", e.target.value)}
                           placeholder="S.No or Name of Panel"
                           className="w-full py-1.5 text-xs text-foreground placeholder:text-muted-foreground bg-transparent border-0 focus:outline-hidden focus:ring-0"
@@ -615,7 +870,7 @@ export function AccountsPage() {
                         <input
                           type="number"
                           min="0"
-                          value={item.qty}
+                          value={item.qty === 0 ? "0" : item.qty || ""}
                           onChange={(e) => handleItemChange(item.id, "qty", e.target.value)}
                           className="w-full py-1.5 text-xs text-center text-foreground bg-transparent border-0 focus:outline-hidden focus:ring-0"
                         />
@@ -626,7 +881,7 @@ export function AccountsPage() {
                         <input
                           type="number"
                           min="0"
-                          value={item.price}
+                          value={item.price === 0 ? "0" : item.price || ""}
                           onChange={(e) => handleItemChange(item.id, "price", e.target.value)}
                           className="w-full py-1.5 text-xs text-center text-foreground bg-transparent border-0 focus:outline-hidden focus:ring-0 font-mono"
                         />
@@ -634,15 +889,15 @@ export function AccountsPage() {
 
                       {/* Total */}
                       <td className="py-2.5 px-4 text-center border-r border-border sm:border-r-0 text-xs text-foreground font-mono font-semibold">
-                        {Number(item.total).toLocaleString("en-IN")}
+                        {Number(item.total || 0).toLocaleString("en-IN")}
                       </td>
 
                       {/* Action Delete */}
                       <td className="py-1 px-2 text-center">
                         <button
                           type="button"
-                          onClick={() => handleDeleteRow(item.id)}
-                          className="text-muted-foreground/40 hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                          onClick={(e) => handleDeleteRow(item.id, e)}
+                          className="text-muted-foreground/40 hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity p-1 cursor-pointer"
                           title="Remove row"
                         >
                           <Trash2 className="size-3.5" />
@@ -658,7 +913,7 @@ export function AccountsPage() {
           {/* Add Row Button */}
           <button
             type="button"
-            onClick={handleAddRow}
+            onClick={(e) => handleAddRow(e)}
             className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 transition-colors mt-2 cursor-pointer"
           >
             <Plus className="size-3.5" />

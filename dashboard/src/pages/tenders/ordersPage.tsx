@@ -14,6 +14,7 @@ import {
   Plus,
   Maximize2,
   Minimize2,
+  FileSpreadsheet,
 } from "lucide-react";
 
 import {
@@ -513,6 +514,26 @@ export function OrdersPage() {
               </div>
             );
           },
+        },
+
+        accounts: {
+          id: "accounts",
+          header: "ACCOUNTS",
+          cell: ({ row }) => (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/accounts/${row.original.id}`);
+              }}
+              className="h-7 px-2.5 text-[11px] font-bold text-sky-600 dark:text-sky-400 bg-sky-500/10 border-sky-500/20 hover:bg-sky-500/20 hover:text-sky-700 rounded-lg gap-1.5 shadow-3xs cursor-pointer"
+              title="Open Costing & Quotation sheet"
+            >
+              <FileSpreadsheet className="size-3 text-sky-600 dark:text-sky-400" />
+              <span>Accounts</span>
+            </Button>
+          ),
         },
 
         contactPerson: {
