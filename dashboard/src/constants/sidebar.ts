@@ -163,6 +163,12 @@ export const sidebarItems: SidebarItem[] = [
     section: "CRM",
   },
   {
+    name: "Accounts",
+    icon: FileSpreadsheet,
+    path: ROUTES.ACCOUNTS,
+    section: "CRM",
+  },
+  {
     name: "Delivery",
     icon: Truck,
     path: ROUTES.LOGISTICS_DELIVERY,

@@ -14,6 +14,17 @@ interface FilePreviewModalProps {
   } | null;
 }
 
+const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL ?? "";
+function buildFileUrl(rawUrl?: string): string {
+  if (!rawUrl) return "";
+  if (/^https?:\/\//i.test(rawUrl) || rawUrl.startsWith("blob:")) return rawUrl;
+  try {
+    return new URL(rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`, API_BASE_URL || window.location.origin).toString();
+  } catch {
+    return rawUrl;
+  }
+}
+
 export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
   isOpen,
   onClose,
@@ -21,9 +32,11 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
 }) => {
   if (!isOpen || !file) return null;
 
+  const resolvedUrl = file.fileUrl ? buildFileUrl(file.fileUrl) : undefined;
+
   const handleDownload = () => {
-    if (file.fileUrl) {
-      window.open(file.fileUrl, "_blank");
+    if (resolvedUrl) {
+      window.open(resolvedUrl, "_blank");
     } else {
       const element = document.createElement("a");
       const sampleBlob = new Blob([`Content of ${file.name}`], { type: "application/pdf" });
@@ -108,12 +121,12 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({
                 <Download className="size-3.5" />
                 Download Document
               </Button>
-              {file.fileUrl && (
+              {resolvedUrl && (
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
-                  onClick={() => window.open(file.fileUrl, "_blank")}
+                  onClick={() => window.open(resolvedUrl, "_blank")}
                   className="text-xs gap-1.5 rounded-xl border-border hover:bg-muted"
                 >
                   <ExternalLink className="size-3.5" />

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   X,
   Plus,
@@ -202,6 +203,7 @@ export function AddOrderModal({
   onSuccess,
 }: AddOrderModalProps) {
   const store = useERPStore();
+  const navigate = useNavigate();
 
   // ------------------------------------------------------------
   // FORM STATE
@@ -945,12 +947,16 @@ export function AddOrderModal({
         toast.success(
           editingOrder
             ? "Order updated successfully!"
-            : "Order created successfully!"
+            : "Order created successfully! Redirecting to Accounts..."
         );
       }
       resetForm();
       onOpenChange(false);
       onSuccess();
+
+      if (!editingOrder && orderId) {
+        navigate(`/accounts/${orderId}`);
+      }
     } catch (error: any) {
       toast.error(
         error.response?.data?.message ??

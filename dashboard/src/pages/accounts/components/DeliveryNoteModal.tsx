@@ -248,7 +248,7 @@ export const DeliveryNoteModal: React.FC<DeliveryNoteModalProps> = ({
                 <p className="text-[10px] text-muted-foreground mt-0.5">Date & Time</p>
               </div>
               <div className="text-center pt-8 border-t border-dashed border-border">
-                <p className="font-bold text-foreground">For Deep Valves & Engineering Pvt. Ltd.</p>
+                <p className="font-bold text-foreground">For D.V & Engineering Pvt. Ltd.</p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">Authorized Signatory</p>
               </div>
             </div>
