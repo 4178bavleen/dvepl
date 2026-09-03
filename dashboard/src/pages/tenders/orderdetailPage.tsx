@@ -636,6 +636,9 @@ export function OrderDetailPage() {
                   // Helper function to pick an intuitive, themed Lucide icon for each stage
                   const getStageIcon = (stageKey: string, index: number) => {
                     const key = stageKey.toUpperCase();
+                    if (key.includes("ACCOUNT") || key.includes("COSTING")) {
+                      return <FileSpreadsheet className="size-4.5" />;
+                    }
                     if (key.includes("DOC") || key.includes("INITIAL")) {
                       return <FileText className="size-4.5" />;
                     }
@@ -725,6 +728,10 @@ export function OrderDetailPage() {
                           const stageCompleted = i < currentIndex;
                           const stageCurrent = i === currentIndex;
                           const stagePending = i > currentIndex;
+                          const isAccountsStage =
+                            s.key === "ACCOUNTS_COSTING" ||
+                            s.key.toUpperCase().includes("ACCOUNT") ||
+                            s.name.toLowerCase().includes("account");
 
                           const stageUsers = (tender.assignments || []).filter(
                             (a) =>
@@ -741,7 +748,16 @@ export function OrderDetailPage() {
                           return (
                             <div
                               key={s.key}
+                              onClick={() => {
+                                if (isAccountsStage) {
+                                  navigate(`/accounts/${tender.id}`);
+                                }
+                              }}
                               className={`group relative flex items-center justify-between gap-3 sm:gap-4 rounded-2xl border bg-card p-3.5 sm:p-4 transition-all duration-200 shadow-xs hover:shadow-md ${
+                                isAccountsStage
+                                  ? "cursor-pointer hover:border-sky-500/50 hover:bg-sky-500/[0.02]"
+                                  : ""
+                              } ${
                                 stageCurrent
                                   ? "border-blue-500/40 ring-1 ring-blue-500/20 bg-blue-500/[0.02]"
                                   : stageCompleted
@@ -753,11 +769,13 @@ export function OrderDetailPage() {
                                 {/* Left icon badge */}
                                 <div
                                   className={`size-10 sm:size-11 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
-                                    stageCurrent
-                                      ? "bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400"
-                                      : stageCompleted
-                                        ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400"
-                                        : "bg-purple-50 text-purple-600 dark:bg-purple-950/30 dark:text-purple-400"
+                                    isAccountsStage
+                                      ? "bg-sky-50 text-sky-600 dark:bg-sky-950/40 dark:text-sky-400"
+                                      : stageCurrent
+                                        ? "bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400"
+                                        : stageCompleted
+                                          ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400"
+                                          : "bg-purple-50 text-purple-600 dark:bg-purple-950/30 dark:text-purple-400"
                                   }`}
                                 >
                                   {getStageIcon(s.key, i)}
@@ -779,6 +797,11 @@ export function OrderDetailPage() {
                                     <h4 className="text-xs sm:text-sm font-bold text-foreground truncate">
                                       {s.name}
                                     </h4>
+                                    {isAccountsStage && (
+                                      <span className="text-[10px] font-semibold text-sky-600 dark:text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded-md">
+                                        Click to open accounts
+                                      </span>
+                                    )}
                                   </div>
 
                                   <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground">
@@ -801,7 +824,24 @@ export function OrderDetailPage() {
                               </div>
 
                               {/* Right Side: Status Badge + Action Menu */}
-                              <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                              <div
+                                className="flex items-center gap-2 sm:gap-3 shrink-0"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {isAccountsStage && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => navigate(`/accounts/${tender.id}`)}
+                                    className="h-7 text-xs font-semibold rounded-lg gap-1.5 border-sky-500/30 text-sky-600 dark:text-sky-400 bg-sky-500/10 hover:bg-sky-500/20 cursor-pointer shadow-3xs"
+                                    title="Open Accounts & Costing page"
+                                  >
+                                    <FileSpreadsheet className="size-3.5" />
+                                    <span className="hidden sm:inline">Open Accounts Page</span>
+                                    <ChevronRight className="size-3" />
+                                  </Button>
+                                )}
+
                                 {/* Status Pill Badge */}
                                 <span
                                   className={`inline-flex items-center justify-center font-bold text-[10px] tracking-wider uppercase px-3 py-1 rounded-full border ${
@@ -836,8 +876,21 @@ export function OrderDetailPage() {
                                   <DropdownMenuContent
                                     align="end"
                                     sideOffset={6}
-                                    className="w-48 rounded-xl p-1.5 shadow-lg border border-border bg-popover text-popover-foreground"
+                                    className="w-52 rounded-xl p-1.5 shadow-lg border border-border bg-popover text-popover-foreground"
                                   >
+                                    {isAccountsStage && (
+                                      <>
+                                        <DropdownMenuItem
+                                          onClick={() => navigate(`/accounts/${tender.id}`)}
+                                          className="gap-2.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-sky-600 dark:text-sky-400 cursor-pointer"
+                                        >
+                                          <FileSpreadsheet className="size-3.5 text-sky-500" />
+                                          Open Accounts & Costing
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                      </>
+                                    )}
+
                                     {canWorkOnOrder && (
                                       <DropdownMenuItem
                                         onClick={() => handleStageToggle(s.key, !stageCompleted)}

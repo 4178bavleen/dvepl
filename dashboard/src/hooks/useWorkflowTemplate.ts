@@ -12,6 +12,7 @@ export interface WorkflowStageMeta {
 
 export const DEFAULT_WORKFLOW_STAGES: WorkflowStageMeta[] = [
   { key: "ORDER_CONFIRMED", name: "Order Confirmed", color: "#3b82f6", isFinal: false },
+  { key: "ACCOUNTS_COSTING", name: "Accounts & Costing", color: "#0284c7", isFinal: false },
   { key: "PO_READY", name: "PO Ready", color: "#8b5cf6", isFinal: false },
   { key: "DRAWING_ASSIGNED", name: "Drawing Assigned", color: "#a855f7", isFinal: false },
   { key: "DRAWING_SENT", name: "Drawing Sent", color: "#6366f1", isFinal: false },

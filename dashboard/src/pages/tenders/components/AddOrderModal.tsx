@@ -264,7 +264,19 @@ export function AddOrderModal({
   const currentUser = useMemo(() => {
     return store.users.find((user) => user.id === store.currentUserId) as any;
   }, [store.users, store.currentUserId]);
-  const isAdmin = isAdminUser(currentUser);
+
+  const isAdmin = useMemo(() => {
+    if (!currentUser) return false;
+    return (
+      isAdminUser(currentUser) ||
+      currentUser?.name?.toLowerCase() === "admin" ||
+      currentUser?.email?.toLowerCase() === "admin@dvepl.com" ||
+      (Array.isArray(currentUser?.roles) &&
+        currentUser.roles.some((r: any) =>
+          String(r?.name || r).toLowerCase().includes("admin")
+        ))
+    );
+  }, [currentUser]);
 
   // Data fetching state
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
@@ -349,7 +361,10 @@ export function AddOrderModal({
   useEffect(() => {
     if (!open) return;
 
-    // 0. Ensure Company Context is loaded
+    // 0. Ensure Company Settings are loaded for document categories & fields
+    void store.fetchSettings();
+
+    // Ensure Company Context is loaded
     if (!effectiveCompanyId) {
       (async () => {
         try {
@@ -1393,27 +1408,38 @@ export function AddOrderModal({
           <div className="space-y-2 pt-2">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <h3 className="text-[11px] font-bold tracking-wider text-neutral-800 dark:text-neutral-200 uppercase">
-                  <span className="text-red-500 font-bold">*</span> JOB RESPONSIBILITY — WHO HANDLES EACH STAGE
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-[11px] font-bold tracking-wider text-neutral-800 dark:text-neutral-200 uppercase">
+                    <span className="text-red-500 font-bold">*</span> JOB RESPONSIBILITY — WHO HANDLES EACH STAGE
+                  </h3>
+                  {!isAdmin && (
+                    <span className="text-[10px] bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 font-medium px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
+                      Admin Managed Only
+                    </span>
+                  )}
+                </div>
                 <p className="text-[11px] text-neutral-500 dark:text-neutral-400 font-normal leading-relaxed mt-0.5">
-                  Pick who's responsible for each stage that varies per order. Stages with a Fixed Responsible Person (set on the Workflow Template) are auto-assigned and not asked here. Changing this later needs Admin, Manager or HR.
+                  {isAdmin
+                    ? "Pick who's responsible for each stage that varies per order. Stages with a Fixed Responsible Person (set on the Workflow Template) are auto-assigned and not asked here."
+                    : "Stage responsibilities are managed and assigned exclusively by Administrators."}
                 </p>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  window.open("/workflow?stages=true&from=orders", "_blank");
-                }}
-                className="shrink-0 h-7 text-[11px] font-semibold gap-1.5 rounded-lg border-blue-200 dark:border-blue-900/50 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-all shadow-3xs"
-                title="Open Workflow Tracker to manage stages / steps"
-              >
-                <Settings className="size-3" />
-                Manage Stages
-                <ExternalLink className="size-2.5 opacity-60 ml-0.5" />
-              </Button>
+              {isAdmin && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    window.open("/workflow?stages=true&from=orders", "_blank");
+                  }}
+                  className="shrink-0 h-7 text-[11px] font-semibold gap-1.5 rounded-lg border-blue-200 dark:border-blue-900/50 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-all shadow-3xs"
+                  title="Open Workflow Tracker to manage stages / steps"
+                >
+                  <Settings className="size-3" />
+                  Manage Stages
+                  <ExternalLink className="size-2.5 opacity-60 ml-0.5" />
+                </Button>
+              )}
             </div>
 
             <div className="border border-neutral-200 dark:border-neutral-800 rounded-lg divide-y divide-neutral-200 dark:divide-neutral-800 overflow-hidden bg-white dark:bg-neutral-900">
@@ -1438,191 +1464,38 @@ export function AddOrderModal({
                     <div className="w-56 shrink-0">
                       <Select
                         value={assignedVal}
+                        disabled={!isAdmin}
                         onValueChange={(val) =>
                           handleStageAssignmentChange(stage.key, val ?? "")
                         }
                       >
-                        <SelectTrigger className="h-8 text-xs rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-950 font-normal">
-                          <SelectValue placeholder="Who's responsible?">
+                        <SelectTrigger
+                          className={`h-8 text-xs rounded-lg border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-950 font-normal ${
+                            !isAdmin ? "cursor-not-allowed opacity-75 bg-neutral-100/70 dark:bg-neutral-900" : ""
+                          }`}
+                        >
+                          <SelectValue placeholder={isAdmin ? "Who's responsible?" : "Unassigned"}>
                             {stageLabel || undefined}
                           </SelectValue>
                         </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">
-                            Who's responsible?
-                          </SelectItem>
-                          {teamMembers.map((member) => (
-                            <SelectItem key={member.id} value={member.id}>
-                              {member.name}
+                        {isAdmin && (
+                          <SelectContent>
+                            <SelectItem value="__none__">
+                              Who's responsible?
                             </SelectItem>
-                          ))}
-                        </SelectContent>
+                            {teamMembers.map((member) => (
+                              <SelectItem key={member.id} value={member.id}>
+                                {member.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        )}
                       </Select>
                     </div>
                   </div>
                 );
               })}
             </div>
-          </div>
-
-          {/* ======================================================
-              SECTION: ORDER DETAIL TABS
-              ====================================================== */}
-          <div className="space-y-3 pt-2">
-            <div className="flex items-center justify-between">
-              <h3 className="text-[11px] font-bold tracking-wider text-neutral-700 dark:text-neutral-300 uppercase">
-                ORDER DETAIL TABS
-              </h3>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsOrderDetailOpen(!isOrderDetailOpen);
-                  if (!isOrderDetailOpen && items.length === 0) {
-                    addItem();
-                  }
-                }}
-                className="text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 font-semibold text-xs flex items-center gap-1 cursor-pointer transition-colors"
-              >
-                <Plus className="size-3.5" />
-                {isOrderDetailOpen ? "Hide details" : "+ Add detail"}
-              </button>
-            </div>
-
-            {isOrderDetailOpen && (
-              <div className="space-y-3 p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/30">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
-                    Line Items ({items.length})
-                  </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addItem}
-                    className="h-7 text-xs rounded-lg gap-1"
-                  >
-                    <Plus className="size-3" /> Add Item
-                  </Button>
-                </div>
-
-                <div className="space-y-3">
-                  {items.map((item, index) => (
-                    <div
-                      key={index}
-                      className="p-3 bg-white dark:bg-neutral-900 rounded-lg border border-neutral-200 dark:border-neutral-800 space-y-3"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                          Item #{index + 1}
-                        </span>
-                        {items.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeItem(index)}
-                            className="text-neutral-400 hover:text-red-500 transition-colors"
-                            title="Remove item"
-                          >
-                            <Trash2 className="size-3.5" />
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
-                        <div className="lg:col-span-2 space-y-1">
-                          <label className="text-[10px] font-bold uppercase text-neutral-500">
-                            Item Code
-                          </label>
-                          <Input
-                            value={item.itemCode}
-                            onChange={(e) =>
-                              updateItem(index, "itemCode", e.target.value)
-                            }
-                            placeholder="e.g. TR-1001"
-                            className="h-8 text-xs rounded-lg"
-                          />
-                        </div>
-
-                        <div className="lg:col-span-4 space-y-1">
-                          <label className="text-[10px] font-bold uppercase text-neutral-500">
-                            Description
-                          </label>
-                          <Input
-                            value={item.description}
-                            onChange={(e) =>
-                              updateItem(index, "description", e.target.value)
-                            }
-                            placeholder="Description of the panel or item"
-                            className="h-8 text-xs rounded-lg"
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold uppercase text-neutral-500">
-                            Unit
-                          </label>
-                          <Input
-                            value={item.unit}
-                            onChange={(e) =>
-                              updateItem(index, "unit", e.target.value)
-                            }
-                            className="h-8 text-xs rounded-lg"
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold uppercase text-neutral-500">
-                            Quantity
-                          </label>
-                          <Input
-                            type="number"
-                            min="0"
-                            step="any"
-                            value={item.quantity}
-                            onChange={(e) =>
-                              updateItem(index, "quantity", e.target.value)
-                            }
-                            className="h-8 text-xs rounded-lg"
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold uppercase text-neutral-500">
-                            Rate
-                          </label>
-                          <Input
-                            type="number"
-                            min="0"
-                            step="any"
-                            value={item.rate}
-                            onChange={(e) =>
-                              updateItem(index, "rate", e.target.value)
-                            }
-                            className="h-8 text-xs rounded-lg"
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-[10px] font-bold uppercase text-neutral-500">
-                            GST %
-                          </label>
-                          <Input
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="any"
-                            value={item.gstPercentage}
-                            onChange={(e) =>
-                              updateItem(index, "gstPercentage", e.target.value)
-                            }
-                            className="h-8 text-xs rounded-lg"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
           {/* ======================================================

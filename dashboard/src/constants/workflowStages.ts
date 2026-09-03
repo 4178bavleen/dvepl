@@ -4,6 +4,10 @@ export const WORKFLOW_STAGES = [
     label: "Order Confirmed",
   },
   {
+    value: "ACCOUNTS_COSTING",
+    label: "Accounts & Costing",
+  },
+  {
     value: "PO_READY",
     label: "PO Ready",
   },

@@ -97,6 +97,10 @@ export default async function assignSalesOrderRoute(
         // Check Sales Order
         // ==========================================
 
+        // ==========================
+        // Fetch Order Details with Target Dates
+        // ==========================
+
         const salesOrder = await fastify.prisma.salesOrder.findFirst({
           where: {
             id,
@@ -108,6 +112,9 @@ export default async function assignSalesOrderRoute(
             companyId: true,
             partyName: true,
             workflowStage: true,
+            deliveryMonthTarget: true,
+            dueDate: true,
+            poDate: true,
           },
         });
 
@@ -118,34 +125,45 @@ export default async function assignSalesOrderRoute(
           });
         }
 
-        // ==========================================
-        // Validate Stages Against Active Template
-        // ==========================================
+        // ==========================
+        // Validate Stages Against Active Template & Standard Stages
+        // ==========================
 
         const activeTemplate = await fastify.prisma.workflowTemplate.findFirst({
           where: { isActive: true },
           include: { steps: { where: { isActive: true } } },
         });
 
-        const validStageKeys = new Set(
-          (activeTemplate?.steps ?? []).map((step: any) => step.key),
+        const STANDARD_STAGE_KEYS = [
+          "ORDER_CONFIRMED",
+          "ACCOUNTS_COSTING",
+          "PO_READY",
+          "DRAWING_ASSIGNED",
+          "DRAWING_SENT",
+          "REVISION_REQUIRED",
+          "DRAWING_APPROVED",
+          "PO_PLACED",
+          "INVENTORY_FOLLOW_UP",
+          "PRODUCTION_FOLLOW_UP",
+          "UPLOAD_CUSTOMER_ORDER_DETAILS",
+          "UPLOAD_PO_VENDOR",
+          "UPLOAD_DRAWINGS",
+          "UPLOAD_APPROVED_DRAWINGS",
+          "TEST_STAGE",
+        ];
+
+        const stepByKey = new Map<string, any>(
+          (activeTemplate?.steps ?? []).map((step: any) => [step.key, step]),
         );
 
-        const invalidStages = assignments
-          .map((a) => a.stage)
-          .filter((stage) => stage !== null && stage !== undefined && !validStageKeys.has(stage));
+        const validStageKeys = new Set([
+          ...STANDARD_STAGE_KEYS,
+          ...(activeTemplate?.steps ?? []).map((step: any) => step.key),
+        ]);
 
-        if (invalidStages.length > 0) {
-          return reply.status(400).send({
-            success: false,
-            message: `Invalid workflow stage(s): ${invalidStages.join(", ")}.`,
-            invalidStages,
-          });
-        }
-
-        // ==========================================
+        // ==========================
         // Validate Users (deduped across all stages)
-        // ==========================================
+        // ==========================
 
         const uniqueUserIds = Array.from(
           new Set(assignments.flatMap((a) => a.userIds)),
@@ -189,18 +207,22 @@ export default async function assignSalesOrderRoute(
           });
         }
 
-        // ==========================================
-        // Replace Existing Assignments
-        // ==========================================
+        // ==========================
+        // Replace Existing Assignments & Create Tasks
+        // ==========================
 
-        const newAssignments = await fastify.prisma.$transaction(
+        const userById = new Map(users.map((u) => [u.id, u]));
+
+        const { newAssignments, createdTasks } = await fastify.prisma.$transaction(
           async (tx) => {
+            // 1. Delete previous sales order assignments
             await tx.salesOrderAssignment.deleteMany({
               where: {
                 salesOrderId: salesOrder.id,
               },
             });
 
+            // 2. Create new sales order assignments
             await tx.salesOrderAssignment.createMany({
               data: assignments.flatMap((a) =>
                 a.userIds.map((userId) => ({
@@ -212,7 +234,116 @@ export default async function assignSalesOrderRoute(
               ),
             });
 
-            return tx.salesOrderAssignment.findMany({
+            // 3. Ensure employee records exist for all assigned users
+            const userEmployeeMap = new Map<string, string>();
+            for (const user of users) {
+              let employee = await tx.employee.findFirst({
+                where: {
+                  OR: [{ userId: user.id }, { id: user.id }],
+                  deletedAt: null,
+                },
+                select: { id: true },
+              });
+
+              if (!employee) {
+                const nameParts = (user.name || "Team Member").trim().split(" ");
+                const firstName = nameParts[0] || "Team";
+                const lastName = nameParts.slice(1).join(" ") || "Member";
+                const code = `EMP-${user.id.slice(0, 6).toUpperCase()}`;
+                const existingWithCode = await tx.employee.findFirst({
+                  where: { employeeCode: code },
+                });
+                const finalCode = existingWithCode
+                  ? `EMP-${Date.now().toString().slice(-6)}`
+                  : code;
+
+                employee = await tx.employee.create({
+                  data: {
+                    userId: user.id,
+                    companyId: salesOrder.companyId,
+                    employeeCode: finalCode,
+                    firstName,
+                    lastName,
+                    status: "ACTIVE",
+                  },
+                  select: { id: true },
+                });
+              }
+
+              if (employee) {
+                userEmployeeMap.set(user.id, employee.id);
+              }
+            }
+
+            // 4. Calculate task due date
+            const rawDueDate = salesOrder.deliveryMonthTarget
+              ? new Date(salesOrder.deliveryMonthTarget)
+              : salesOrder.dueDate
+                ? new Date(salesOrder.dueDate)
+                : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+            const taskDueDate = isNaN(rawDueDate.getTime())
+              ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+              : rawDueDate;
+
+            // 5. Create Portal Tasks for each assigned stage
+            const tasksCreated: any[] = [];
+            for (const a of assignments) {
+              const stepObj = a.stage ? stepByKey.get(a.stage) : null;
+              const stageName =
+                stepObj?.name ||
+                (a.stage ? a.stage.replace(/_/g, " ") : "Overall Order Management");
+
+              const taskTitle = `[Order ${salesOrder.dveplCode}] ${stageName}`;
+              const taskDescription = [
+                `You have been assigned responsibility for stage "${stageName}" on Order ${salesOrder.dveplCode} (${salesOrder.partyName || "Customer Order"}).`,
+                salesOrder.deliveryMonthTarget
+                  ? `Target Commitment: ${salesOrder.deliveryMonthTarget}`
+                  : null,
+                a.remarks?.trim()
+                  ? `Instructions: ${a.remarks.trim()}`
+                  : "Please log into the portal to review order details and take the necessary action.",
+              ]
+                .filter(Boolean)
+                .join("\n\n");
+
+              const task = await tx.task.create({
+                data: {
+                  title: taskTitle,
+                  description: taskDescription,
+                  priority: "high",
+                  dueDate: taskDueDate,
+                  status: "pending",
+                  notifEnabled: true,
+                  notifType: "automatic",
+                  notifDays: 1,
+                  notifUnit: "days",
+                  notifFrequency: "once",
+                },
+              });
+
+              // Assign task to corresponding employees
+              const employeeIds = a.userIds
+                .map((uId) => userEmployeeMap.get(uId))
+                .filter((eId): eId is string => Boolean(eId));
+
+              if (employeeIds.length > 0) {
+                await tx.taskAssignment.createMany({
+                  data: employeeIds.map((employeeId) => ({
+                    taskId: task.id,
+                    employeeId,
+                  })),
+                });
+              }
+
+              tasksCreated.push({
+                taskId: task.id,
+                stage: a.stage,
+                stageName,
+                assignedUserIds: a.userIds,
+              });
+            }
+
+            const freshAssignments = await tx.salesOrderAssignment.findMany({
               where: {
                 salesOrderId: salesOrder.id,
               },
@@ -229,32 +360,84 @@ export default async function assignSalesOrderRoute(
                 createdAt: "asc",
               },
             });
+
+            return {
+              newAssignments: freshAssignments,
+              createdTasks: tasksCreated,
+            };
           },
+          { timeout: 25000 },
         );
 
-      // ==========================================
-// Send Assignment Emails
-// ==========================================
+        // ==========================
+        // Send Assignment Emails
+        // ==========================
 
-const emailResults = await Promise.allSettled(
-  users.map(async (user) => {
-    if (!user.email) {
-      throw new Error(
-        `User ${user.name || user.id} does not have an email address.`,
-      );
-    }
+        const formattedDueDate = salesOrder.deliveryMonthTarget
+          ? new Date(salesOrder.deliveryMonthTarget).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })
+          : salesOrder.dueDate
+            ? new Date(salesOrder.dueDate).toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              })
+            : null;
 
-    await NotificationService.sendSalesOrderAssignmentNotification({
-      to: user.email,
-      userName: user.name || "User",
-      dveplCode: salesOrder.dveplCode,
-    }, salesOrder.companyId);
-  }),
-);
+        const emailResults = await Promise.allSettled(
+          users.map(async (user) => {
+            if (!user.email) {
+              throw new Error(
+                `User ${user.name || user.id} does not have an email address.`,
+              );
+            }
 
-        // ==========================================
+            // Find all stages assigned to this user
+            const userAssignments = assignments.filter((a) =>
+              a.userIds.includes(user.id),
+            );
+            const userStageNames = userAssignments
+              .map((a) => {
+                const s = a.stage ? stepByKey.get(a.stage) : null;
+                return (
+                  s?.name ||
+                  (a.stage ? a.stage.replace(/_/g, " ") : "Overall Order")
+                );
+              })
+              .filter(Boolean);
+
+            const userRemarks = userAssignments
+              .map((a) => a.remarks?.trim())
+              .filter(Boolean)
+              .join("; ");
+
+            const stageLabel =
+              userStageNames.length > 0
+                ? userStageNames.join(", ")
+                : "Order Responsibility";
+
+            await NotificationService.sendSalesOrderAssignmentNotification(
+              {
+                to: user.email,
+                userName: user.name || "Team Member",
+                dveplCode: salesOrder.dveplCode,
+                partyName: salesOrder.partyName,
+                stageName: stageLabel,
+                remarks: userRemarks || undefined,
+                dueDate: formattedDueDate || undefined,
+                orderId: salesOrder.id,
+              },
+              salesOrder.companyId,
+            );
+          }),
+        );
+
+        // ==========================
         // Log Email Results
-        // ==========================================
+        // ==========================
 
         const failedEmails = emailResults.filter(
           (result) => result.status === "rejected",

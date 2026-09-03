@@ -113,8 +113,9 @@ async function adminRoutes(
         else if (url.includes("/update")) requiredPermissions = ["employee.update"];
         else if (url.includes("/delete")) requiredPermissions = ["employee.delete"];
       } else if (url.includes("/settings/")) {
-        // Settings are administrative, allow company.update, company.create, or role.update
-        requiredPermissions = ["company.update", "company.create", "role.update"];
+        if (url.includes("/update") || url.includes("/backup") || url.includes("/test-") || url.includes("/send-")) {
+          requiredPermissions = ["company.update", "company.create", "role.update"];
+        }
       } else if (url.includes("/order/")) {
         if (url.includes("/create") || url.includes("/update") || url.includes("/delete") || url.includes("/bulk")) {
           requiredPermissions = ["company.create", "tender.update"];

@@ -75,6 +75,7 @@ async function adminSalesOrderAttachmentRoutes(
           where: { id, companyId, deletedAt: null },
           select: {
             id: true,
+            createdById: true,
             workflowStage: true,
             assignments: {
               select: {
@@ -92,14 +93,18 @@ async function adminSalesOrderAttachmentRoutes(
           });
         }
 
-        if (
-          !canWorkOnOrderStage(
+        const isCreator = salesOrder.createdById === performerId;
+        const canWork =
+          isCreator ||
+          isAdminUser(request.admin) ||
+          canWorkOnOrderStage(
             salesOrder.assignments,
             salesOrder.workflowStage,
             performerId,
             isAdminUser(request.admin),
-          )
-        ) {
+          );
+
+        if (!canWork) {
           return reply.status(403).send({
             success: false,
             message:
@@ -240,6 +245,7 @@ async function adminSalesOrderAttachmentRoutes(
           include: {
             salesOrder: {
               select: {
+                createdById: true,
                 workflowStage: true,
                 assignments: {
                   select: {
@@ -259,14 +265,20 @@ async function adminSalesOrderAttachmentRoutes(
           });
         }
 
-        if (
-          !canWorkOnOrderStage(
+        const isOwner =
+          existing.salesOrder.createdById === request.admin?.id ||
+          existing.uploadedById === request.admin?.id;
+        const canWork =
+          isOwner ||
+          isAdminUser(request.admin) ||
+          canWorkOnOrderStage(
             existing.salesOrder.assignments,
             existing.salesOrder.workflowStage,
             request.admin?.id,
             isAdminUser(request.admin),
-          )
-        ) {
+          );
+
+        if (!canWork) {
           return reply.status(403).send({
             success: false,
             message:

@@ -93,6 +93,11 @@ export function OrdersPage() {
 
   const isAdmin = isAdminUser(currentUser);
 
+  const canCreate = canPerformPageAction(
+    currentUser?.actionPermissions,
+    "orders",
+    "create",
+  );
   const canEdit = canPerformPageAction(
     currentUser?.actionPermissions,
     "orders",
@@ -891,9 +896,9 @@ export function OrdersPage() {
           <Button
             variant="outline"
             size="sm"
-            disabled={!isAdmin}
+            disabled={!canCreate}
             onClick={() => setIsAddOrderOpen(true)}
-            title={isAdmin ? "Add a sales order manually" : "Only administrators can add orders"}
+            title={canCreate ? "Add a sales order manually" : "You do not have permission to add orders"}
             className="gap-1.5 h-9 rounded-xl border-emerald-500/20 hover:border-emerald-500/40 text-emerald-600 bg-emerald-500/5 hover:bg-emerald-500/10 transition-all duration-200 text-xs font-semibold"
           >
             <Plus className="size-3.5" />

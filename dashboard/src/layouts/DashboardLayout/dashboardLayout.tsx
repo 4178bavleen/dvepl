@@ -125,7 +125,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
         const [usersList, rolesList] = await Promise.all([
           hasUsersAccess ? securityApi.users.list().catch(() => []) : Promise.resolve([]),
-          hasRolesAccess ? securityApi.roles.list().catch(() => []) : Promise.resolve([])
+          hasRolesAccess ? securityApi.roles.list().catch(() => []) : Promise.resolve([]),
+          store.fetchSettings().catch(() => {})
         ]);
 
         if (!isMounted) return;

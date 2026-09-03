@@ -28,6 +28,7 @@ import {
   INITIAL_DOCUMENT_CATEGORIES,
   ORDER_DOCUMENTS_CHANGED_EVENT,
   getOrderDocumentCategories,
+  fetchOrderDocumentCategories,
   normalizeCategoryName,
 } from "./orderDocumentsConfig";
 
@@ -140,6 +141,10 @@ export function ProjectDocumentUploadPanel({
   };
 
   // Synchronize when store.settings changes or when global document config updates
+  React.useEffect(() => {
+    void fetchOrderDocumentCategories();
+  }, []);
+
   React.useEffect(() => {
     const configured = getOrderDocumentCategories(store.settings);
     setCategories(configured);
@@ -329,7 +334,7 @@ export function ProjectDocumentUploadPanel({
         <h3 className="text-[11px] font-bold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">
           PROJECT DOCUMENT UPLOAD
         </h3>
-        {onOpenManageDocs && (
+        {isAdmin && onOpenManageDocs && (
           <button
             type="button"
             onClick={onOpenManageDocs}

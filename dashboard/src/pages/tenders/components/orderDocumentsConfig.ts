@@ -1,4 +1,5 @@
-﻿import { useERPStore } from "@/store/erpStore";
+import { useERPStore } from "@/store/erpStore";
+import { securityApi } from "@/services/modules";
 
 export interface DocumentCategoryDef {
   id?: string;
@@ -79,6 +80,30 @@ export function getOrderDocumentCategories(settings?: any): DocumentCategoryDef[
 }
 
 /**
+ * Directly fetch latest document categories from backend database and sync store/storage
+ */
+export async function fetchOrderDocumentCategories(): Promise<DocumentCategoryDef[]> {
+  try {
+    const data = await securityApi.settings.read();
+    if (data?.orderDocuments && Array.isArray(data.orderDocuments) && data.orderDocuments.length > 0) {
+      try {
+        localStorage.setItem(ORDER_DOCUMENTS_STORAGE_KEY, JSON.stringify(data.orderDocuments));
+      } catch {}
+      useERPStore.setState((prev) => ({
+        settings: { ...prev.settings, ...data },
+      }));
+      window.dispatchEvent(
+        new CustomEvent(ORDER_DOCUMENTS_CHANGED_EVENT, { detail: data.orderDocuments })
+      );
+      return data.orderDocuments;
+    }
+  } catch (e) {
+    console.error("Failed to fetch order document categories from backend:", e);
+  }
+  return getOrderDocumentCategories(useERPStore.getState().settings);
+}
+
+/**
  * Persists document categories to backend company settings & localStorage,
  * and notifies all active listeners in the application.
  */
@@ -86,7 +111,7 @@ export async function saveOrderDocumentCategories(
   categories: DocumentCategoryDef[],
   updateSettingsFn?: (payload: any) => Promise<void>
 ): Promise<void> {
-  // 1. Save to localStorage for quick paint
+  // 1. Save to localStorage for instant local update
   try {
     localStorage.setItem(
       ORDER_DOCUMENTS_STORAGE_KEY,
@@ -96,12 +121,22 @@ export async function saveOrderDocumentCategories(
     console.error("Failed to save order documents to localStorage:", e);
   }
 
-  // 2. Save to database settings if updateSettingsFn provided
-  if (updateSettingsFn) {
-    await updateSettingsFn({ orderDocuments: categories });
+  // 2. Save to database settings via updateSettingsFn or directly via securityApi
+  try {
+    if (updateSettingsFn) {
+      await updateSettingsFn({ orderDocuments: categories });
+    } else {
+      await securityApi.settings.update({ orderDocuments: categories });
+    }
+    useERPStore.setState((prev) => ({
+      settings: { ...prev.settings, orderDocuments: categories },
+    }));
+  } catch (e) {
+    console.error("Failed to update backend document categories:", e);
+    throw e;
   }
 
-  // 3. Dispatch global event for instant UI sync
+  // 3. Dispatch global event for instant UI sync across open components
   window.dispatchEvent(
     new CustomEvent(ORDER_DOCUMENTS_CHANGED_EVENT, { detail: categories })
   );

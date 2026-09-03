@@ -24,7 +24,7 @@ const DEFAULT_TEMPLATE_ID = "00000000-0000-0000-0000-000000000001";
 export async function getActiveWorkflowTemplate(
   prisma: any,
 ) {
-  const template = await prisma.workflowTemplate.findFirst({
+  let template = await prisma.workflowTemplate.findFirst({
     where: { isActive: true },
     include: {
       steps: {
@@ -34,7 +34,7 @@ export async function getActiveWorkflowTemplate(
   });
 
   if (!template) {
-    return prisma.workflowTemplate.findUnique({
+    template = await prisma.workflowTemplate.findUnique({
       where: { id: DEFAULT_TEMPLATE_ID },
       include: {
         steps: {
@@ -42,6 +42,54 @@ export async function getActiveWorkflowTemplate(
         },
       },
     });
+  }
+
+  // Ensure default template has ACCOUNTS_COSTING as second step if missing
+  if (template && Array.isArray(template.steps)) {
+    const hasAccountsStep = template.steps.some(
+      (s: any) => s.key === "ACCOUNTS_COSTING" || s.key === "ACCOUNTS_AND_COSTING"
+    );
+    if (!hasAccountsStep && template.steps.length > 0) {
+      try {
+        await prisma.$transaction(async (tx: any) => {
+          // Shift positions >= 1 to make room at position 1
+          await tx.workflowStep.updateMany({
+            where: {
+              templateId: template.id,
+              position: { gte: 1 },
+            },
+            data: {
+              position: { increment: 1 },
+            },
+          });
+
+          // Insert ACCOUNTS_COSTING at position 1
+          await tx.workflowStep.create({
+            data: {
+              templateId: template.id,
+              key: "ACCOUNTS_COSTING",
+              name: "Accounts & Costing",
+              color: "#0284c7",
+              position: 1,
+              isFinal: false,
+              isActive: true,
+            },
+          });
+        });
+
+        // Re-fetch template with updated steps
+        template = await prisma.workflowTemplate.findUnique({
+          where: { id: template.id },
+          include: {
+            steps: {
+              orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+            },
+          },
+        });
+      } catch (err) {
+        console.error("Auto-adding ACCOUNTS_COSTING to template failed:", err);
+      }
+    }
   }
 
   return template;

@@ -66,6 +66,7 @@ interface StageDef {
 
 const DEFAULT_STAGES: StageDef[] = [
   { value: "ORDER_CONFIRMED", label: "Order Confirmed", color: "#3b82f6", isFinal: false },
+  { value: "ACCOUNTS_COSTING", label: "Accounts & Costing", color: "#0284c7", isFinal: false },
   { value: "PO_READY", label: "PO Ready", color: "#8b5cf6", isFinal: false },
   { value: "DRAWING_ASSIGNED", label: "Drawing Assigned", color: "#a855f7", isFinal: false },
   { value: "DRAWING_SENT", label: "Drawing Sent", color: "#6366f1", isFinal: false },

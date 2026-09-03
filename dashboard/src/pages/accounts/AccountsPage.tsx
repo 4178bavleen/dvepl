@@ -12,6 +12,8 @@ import {
   FileText,
   Loader2,
   RefreshCw,
+  ArrowRight,
+  CheckCircle2,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { Button } from "@/components/ui/button";
@@ -24,6 +26,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { apiClient } from "@/services/axios";
+import { useWorkflowTemplate } from "@/hooks/useWorkflowTemplate";
+import workflowApi from "@/services/workflowApi";
 
 // Modals
 import { CustomerMasterEditModal } from "./components/CustomerMasterEditModal";
@@ -102,6 +106,25 @@ export function AccountsPage() {
   const currentOrderId = rawOrder?.id || id || "";
   const orderCode = rawOrder?.dveplCode || (id ? (id.startsWith("ORD-") ? id : id.startsWith("SO-") ? id : `ORD-2026-${id.padStart(5, "0")}`) : "ORD-2026-00265");
   const storageKey = `dvepl_accounts_costing_${currentOrderId || orderCode}`;
+
+  const { stages: workflowStages } = useWorkflowTemplate();
+  const [isSavingCosting, setIsSavingCosting] = useState(false);
+
+  const currentWorkflowStage = rawOrder?.workflowStage || "ORDER_CONFIRMED";
+  const accountsStageIndex = workflowStages.findIndex(
+    (s) =>
+      s.key === "ACCOUNTS_COSTING" ||
+      s.key.toUpperCase().includes("ACCOUNT") ||
+      s.name.toLowerCase().includes("account")
+  );
+  const effectiveAccountsIndex = accountsStageIndex !== -1 ? accountsStageIndex : 1;
+  const accountsStage = workflowStages[effectiveAccountsIndex] || null;
+  const nextStage = workflowStages[effectiveAccountsIndex + 1] || null;
+  const currentStageIndex = workflowStages.findIndex((s) => s.key === currentWorkflowStage);
+  const isCurrentlyAccountsOrEarlier =
+    currentStageIndex <= effectiveAccountsIndex ||
+    currentWorkflowStage === "ORDER_CONFIRMED" ||
+    currentWorkflowStage === "ACCOUNTS_COSTING";
 
   // State
   const [customerDetails, setCustomerDetails] = useState<CustomerMasterDetails>(() => {
@@ -467,7 +490,8 @@ export function AccountsPage() {
   };
 
   // Save Costing Handler
-  const handleSaveCosting = () => {
+  const handleSaveCosting = async (advanceWorkflow: boolean = true) => {
+    setIsSavingCosting(true);
     const payload: AccountCostingData = {
       orderId: currentOrderId || "ORD-2026-00265",
       orderCode,
@@ -486,9 +510,32 @@ export function AccountsPage() {
       if (orderCode) {
         localStorage.setItem(`dvepl_accounts_costing_${orderCode}`, JSON.stringify(payload));
       }
-      toast.success("Costing & account details saved successfully!");
+
+      if (advanceWorkflow && currentOrderId && nextStage) {
+        try {
+          await workflowApi.updateOrderWorkflowStage(currentOrderId, nextStage.key, {
+            description: "Accounts & Costing details completed and saved.",
+          });
+          toast.success(
+            `Costing saved! Order advanced to Step ${effectiveAccountsIndex + 2}: "${nextStage.name}".`
+          );
+          setRawOrder((prev: any) =>
+            prev ? { ...prev, workflowStage: nextStage.key } : prev
+          );
+          setTimeout(() => {
+            navigate(`/orders/${currentOrderId}?tab=workflow`);
+          }, 1000);
+        } catch (stageErr: any) {
+          console.error("Workflow advancement error:", stageErr);
+          toast.success("Costing details saved successfully!");
+        }
+      } else {
+        toast.success("Costing & account details saved successfully!");
+      }
     } catch {
       toast.error("Failed to save costing locally.");
+    } finally {
+      setIsSavingCosting(false);
     }
   };
 
@@ -596,6 +643,44 @@ export function AccountsPage() {
             )}
           </div>
         </div>
+
+        {/* Step 2 Workflow Banner */}
+        {rawOrder && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-sky-500/10 border border-sky-500/20 rounded-xl p-3 sm:px-4 shadow-2xs">
+            <div className="flex items-center gap-3">
+              <div className="size-8 rounded-lg bg-sky-500/20 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 font-bold text-xs">
+                2
+              </div>
+              <div>
+                <p className="text-xs font-bold text-foreground flex items-center gap-2">
+                  <span>Workflow Step 2: Accounts & Costing</span>
+                  {isCurrentlyAccountsOrEarlier ? (
+                    <span className="text-[10px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/20">
+                      In Progress
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1">
+                      <CheckCircle2 className="size-3" /> Completed
+                    </span>
+                  )}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Fill in the customer costing & pricing details. Saving will automatically advance this order to{" "}
+                  <strong className="text-foreground">{nextStage ? nextStage.name : "the next workflow step"}</strong>.
+                </p>
+              </div>
+            </div>
+
+            {nextStage && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0 font-medium">
+                <span>Next Stage:</span>
+                <span className="font-semibold text-foreground bg-background px-2.5 py-1 rounded-lg border border-border">
+                  {nextStage.name}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Card 1: Order Metadata Summary Grid */}
         <div className="bg-card border border-border rounded-xl p-5 shadow-xs">
@@ -996,26 +1081,48 @@ export function AccountsPage() {
         </div>
 
         {/* Bottom Action Buttons */}
-        <div className="flex items-center justify-end gap-3 pt-2">
+        <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
           {/* Delivery Note Button */}
           <Button
             type="button"
             variant="outline"
             onClick={() => setIsDeliveryNoteOpen(true)}
-            className="h-9 px-4 text-xs font-semibold border-sky-500 text-sky-500 hover:bg-sky-500/10 bg-card rounded-xl gap-2 shadow-xs"
+            className="h-9 px-4 text-xs font-semibold border-sky-500 text-sky-500 hover:bg-sky-500/10 bg-card rounded-xl gap-2 shadow-xs cursor-pointer"
           >
             <Printer className="size-4" />
             <span>Delivery Note</span>
           </Button>
 
-          {/* Save Costing Button */}
+          {/* Save Draft Button */}
           <Button
             type="button"
-            onClick={handleSaveCosting}
-            className="h-9 px-5 text-xs font-semibold bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl gap-2 shadow-xs transition-all"
+            variant="outline"
+            disabled={isSavingCosting}
+            onClick={() => handleSaveCosting(false)}
+            className="h-9 px-4 text-xs font-semibold rounded-xl gap-2 shadow-xs cursor-pointer"
           >
             <Save className="size-4" />
-            <span>Save Costing</span>
+            <span>Save Draft</span>
+          </Button>
+
+          {/* Save & Advance to Next Step Button */}
+          <Button
+            type="button"
+            disabled={isSavingCosting}
+            onClick={() => handleSaveCosting(true)}
+            className="h-9 px-5 text-xs font-bold bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl gap-2 shadow-xs transition-all cursor-pointer"
+          >
+            {isSavingCosting ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <CheckCircle2 className="size-4" />
+            )}
+            <span>
+              {nextStage
+                ? `Save & Move to ${nextStage.name}`
+                : "Save Costing"}
+            </span>
+            <ArrowRight className="size-3.5" />
           </Button>
         </div>
       </main>

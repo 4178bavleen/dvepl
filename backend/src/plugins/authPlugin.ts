@@ -383,6 +383,11 @@ async function authPlugin(fastify: FastifyInstance) {
           return;
         }
 
+        // Allow reading company-level public settings (document categories, theme, etc.) for all authenticated members
+        if (request.url.includes("/settings/read")) {
+          return;
+        }
+
         const uiAccessProfile = (request.admin as any)?.uiAccessProfile;
         const moduleKey = getModuleForRequest(request.url) ?? getModuleForPermission(allowedPermissions);
 
@@ -406,11 +411,26 @@ async function authPlugin(fastify: FastifyInstance) {
           ? uiAccessProfile.pageAccess
           : [];
         const requiredAction = getRequiredAction(request.url, allowedPermissions);
-        const hasPageAccess = pageAccess.includes(moduleKey);
-        const hasActionAccess = !requiredAction || getModuleActions(
-          uiAccessProfile.actionPermissions,
-          moduleKey,
-        )[requiredAction];
+
+        // Allow reading customer list for order, quotation and tender workflows
+        const isCustomerRead =
+          (moduleKey === "customers" || request.url.includes("/customer/read") || request.url.includes("/customer/sync")) &&
+          !requiredAction;
+        const hasCustomerAccessForOrders =
+          isCustomerRead &&
+          (pageAccess.includes("orders") ||
+            pageAccess.includes("tenders") ||
+            pageAccess.includes("quotations") ||
+            pageAccess.includes("export_orders"));
+
+        const hasPageAccess = pageAccess.includes(moduleKey) || hasCustomerAccessForOrders;
+        const hasActionAccess =
+          !requiredAction ||
+          hasCustomerAccessForOrders ||
+          getModuleActions(
+            uiAccessProfile.actionPermissions,
+            moduleKey,
+          )[requiredAction];
 
         if (!hasPageAccess || !hasActionAccess) {
           return reply.status(403).send({
