@@ -5,6 +5,7 @@ import {
   FastifyRequest,
 } from "fastify";
 import { adminLogs } from "../../../services/logger/contextLogger";
+import { encrypt, maskApiKey } from "../../../utils/encryption";
 
 async function backupRestoreRoutes(
   fastify: FastifyInstance,
@@ -50,6 +51,11 @@ async function backupRestoreRoutes(
             if (!settings.emailSettings) settings.emailSettings = {};
             settings.emailSettings.address = dbConfig.smtpFromEmail || settings.emailSettings.address || "";
             settings.emailSettings.name = dbConfig.smtpFromName || settings.emailSettings.name || "";
+
+            if (!settings.gatewaySettings) settings.gatewaySettings = {};
+            settings.gatewaySettings.apiKey = dbConfig.whatsappApiKey ? maskApiKey(dbConfig.whatsappApiKey) : "";
+            settings.gatewaySettings.campaignName = dbConfig.whatsappCampaignName || "";
+            settings.gatewaySettings.number = dbConfig.whatsappNumber || "";
           }
         }
 
@@ -114,7 +120,7 @@ async function backupRestoreRoutes(
 
           let providerEnum: any = null;
           const p = data.gatewaySettings?.provider?.toUpperCase();
-          if (p === "SMTP" || p === "META" || p === "TWILIO" || p === "WATI") {
+          if (p === "SMTP" || p === "META" || p === "TWILIO" || p === "WATI" || p === "AISENSY") {
             providerEnum = p;
           }
 
@@ -122,34 +128,34 @@ async function backupRestoreRoutes(
             ? parseInt(String(data.smtpSettings.port), 10) 
             : null;
 
+          const rawApiKey = data.gatewaySettings?.apiKey;
+          const encryptedApiKey = rawApiKey ? encrypt(rawApiKey) : null;
+
+          const upsertData = {
+            emailEnabled,
+            smtpHost: data.smtpSettings?.host || null,
+            smtpPort: isNaN(smtpPortVal as any) ? null : smtpPortVal,
+            smtpUsername: data.smtpSettings?.username || null,
+            smtpPassword: data.smtpSettings?.password || null,
+            smtpFromEmail: data.emailSettings?.address || null,
+            smtpFromName: data.emailSettings?.name || null,
+            whatsappEnabled,
+            whatsappProvider: providerEnum,
+            whatsappEndpoint: data.gatewaySettings?.instanceId || null,
+            whatsappCampaignName: data.gatewaySettings?.campaignName || null,
+            whatsappNumber: data.gatewaySettings?.number || null,
+          };
+
           await fastify.prisma.notificationConfiguration.upsert({
             where: { companyId },
             update: {
-              emailEnabled,
-              smtpHost: data.smtpSettings?.host || null,
-              smtpPort: isNaN(smtpPortVal as any) ? null : smtpPortVal,
-              smtpUsername: data.smtpSettings?.username || null,
-              smtpPassword: data.smtpSettings?.password || null,
-              smtpFromEmail: data.emailSettings?.address || null,
-              smtpFromName: data.emailSettings?.name || null,
-              whatsappEnabled,
-              whatsappProvider: providerEnum,
-              whatsappApiKey: data.gatewaySettings?.apiKey || null,
-              whatsappEndpoint: data.gatewaySettings?.instanceId || null,
+              ...upsertData,
+              ...(encryptedApiKey ? { whatsappApiKey: encryptedApiKey } : {}),
             },
             create: {
+              ...upsertData,
               companyId,
-              emailEnabled,
-              smtpHost: data.smtpSettings?.host || null,
-              smtpPort: isNaN(smtpPortVal as any) ? null : smtpPortVal,
-              smtpUsername: data.smtpSettings?.username || null,
-              smtpPassword: data.smtpSettings?.password || null,
-              smtpFromEmail: data.emailSettings?.address || null,
-              smtpFromName: data.emailSettings?.name || null,
-              whatsappEnabled,
-              whatsappProvider: providerEnum,
-              whatsappApiKey: data.gatewaySettings?.apiKey || null,
-              whatsappEndpoint: data.gatewaySettings?.instanceId || null,
+              ...(encryptedApiKey ? { whatsappApiKey: encryptedApiKey } : {}),
             }
           });
         }

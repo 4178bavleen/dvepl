@@ -5,6 +5,7 @@ import {
   FastifyRequest,
 } from "fastify";
 import { adminLogs } from "../../../services/logger/contextLogger";
+import { WhatsappService } from "../../../services/notification/whatsapp.service";
 
 async function testWhatsappRoute(
   fastify: FastifyInstance,
@@ -16,7 +17,7 @@ async function testWhatsappRoute(
       schema: {
         tags: ["Settings"],
         summary: "Test WhatsApp Connection",
-        description: "Tests the WhatsApp gateway API connection.",
+        description: "Tests the WhatsApp gateway API connection with AiSensy.",
       },
       preHandler: [
         fastify.verifyToken
@@ -24,7 +25,7 @@ async function testWhatsappRoute(
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { provider, apiKey, instanceId, number } = request.body as any;
+        const { provider, apiKey, campaignName, number } = request.body as any;
 
         if (!provider) {
           return reply.status(400).send({
@@ -33,15 +34,34 @@ async function testWhatsappRoute(
           });
         }
 
-        // Simulating the API response for Wati / Meta / Twilio
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        if (provider.toUpperCase() !== "AISENSY") {
+          return reply.status(400).send({
+            success: false,
+            message: "Only AiSensy provider is supported for WhatsApp testing.",
+          });
+        }
+
+        if (!apiKey) {
+          return reply.status(400).send({
+            success: false,
+            message: "AiSensy API key is required.",
+          });
+        }
+
+        const result = await WhatsappService.verifyWithCredentials({
+          apiKey,
+          campaignName,
+          number,
+        });
 
         return reply.status(200).send({
           success: true,
-          message: `WhatsApp Gateway connection handshake successful with ${provider}!`,
+          message: result.message,
         });
       } catch (error: any) {
-        adminLogs.error("WhatsApp Gateway connection failed", { error });
+        adminLogs.error("WhatsApp Gateway connection failed", {
+          error: error.message,
+        });
         return reply.status(500).send({
           success: false,
           message: error.message || "Failed to connect to WhatsApp Gateway.",

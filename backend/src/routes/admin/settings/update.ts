@@ -6,6 +6,7 @@ import {
 } from "fastify";
 import { adminLogs } from "../../../services/logger/contextLogger";
 import { settingsSchema } from "../../../schemas/admin/settings/settings.schema";
+import { encrypt } from "../../../utils/encryption";
 
 async function updateSettingsRoute(
   fastify: FastifyInstance,
@@ -63,7 +64,7 @@ async function updateSettingsRoute(
 
           let providerEnum: any = null;
           const p = validationResult.data.gatewaySettings?.provider?.toUpperCase();
-          if (p === "SMTP" || p === "META" || p === "TWILIO" || p === "WATI") {
+          if (p === "SMTP" || p === "META" || p === "TWILIO" || p === "WATI" || p === "AISENSY") {
             providerEnum = p;
           }
 
@@ -71,35 +72,44 @@ async function updateSettingsRoute(
             ? parseInt(String(validationResult.data.smtpSettings.port), 10) 
             : null;
 
+          const rawApiKey = validationResult.data.gatewaySettings?.apiKey;
+          const encryptedApiKey = rawApiKey ? encrypt(rawApiKey) : null;
+
+          const upsertData = {
+            emailEnabled,
+            smtpHost: validationResult.data.smtpSettings?.host || null,
+            smtpPort: isNaN(smtpPortVal as any) ? null : smtpPortVal,
+            smtpUsername: validationResult.data.smtpSettings?.username || null,
+            smtpPassword: validationResult.data.smtpSettings?.password || null,
+            smtpFromEmail: validationResult.data.smtpSettings?.username || validationResult.data.emailSettings?.address || null,
+            smtpFromName: validationResult.data.smtpSettings?.title || validationResult.data.emailSettings?.name || null,
+            whatsappEnabled: validationResult.data.gatewaySettings?.enabled ?? whatsappEnabled,
+            whatsappProvider: providerEnum,
+            whatsappEndpoint: validationResult.data.gatewaySettings?.instanceId || validationResult.data.gatewaySettings?.baseUrl || null,
+            whatsappCampaignName: validationResult.data.gatewaySettings?.campaignName || null,
+            whatsappNumber: validationResult.data.gatewaySettings?.number || null,
+          };
+
+          const existingConfig = await fastify.prisma.notificationConfiguration.findUnique({ where: { companyId } });
+
+          const createData = {
+            ...upsertData,
+            companyId,
+            ...(encryptedApiKey ? { whatsappApiKey: encryptedApiKey } : {}),
+          };
+
+          const updateData: any = {
+            ...upsertData,
+          };
+
+          if (encryptedApiKey) {
+            updateData.whatsappApiKey = encryptedApiKey;
+          }
+
           await fastify.prisma.notificationConfiguration.upsert({
             where: { companyId },
-            update: {
-              emailEnabled,
-              smtpHost: validationResult.data.smtpSettings?.host || null,
-              smtpPort: isNaN(smtpPortVal as any) ? null : smtpPortVal,
-              smtpUsername: validationResult.data.smtpSettings?.username || null,
-              smtpPassword: validationResult.data.smtpSettings?.password || null,
-              smtpFromEmail: validationResult.data.smtpSettings?.username || validationResult.data.emailSettings?.address || null,
-              smtpFromName: validationResult.data.smtpSettings?.title || validationResult.data.emailSettings?.name || null,
-              whatsappEnabled: validationResult.data.gatewaySettings?.enabled ?? whatsappEnabled,
-              whatsappProvider: providerEnum,
-              whatsappApiKey: validationResult.data.gatewaySettings?.apiKey || null,
-              whatsappEndpoint: validationResult.data.gatewaySettings?.instanceId || validationResult.data.gatewaySettings?.baseUrl || null,
-            },
-            create: {
-              companyId,
-              emailEnabled,
-              smtpHost: validationResult.data.smtpSettings?.host || null,
-              smtpPort: isNaN(smtpPortVal as any) ? null : smtpPortVal,
-              smtpUsername: validationResult.data.smtpSettings?.username || null,
-              smtpPassword: validationResult.data.smtpSettings?.password || null,
-              smtpFromEmail: validationResult.data.smtpSettings?.username || validationResult.data.emailSettings?.address || null,
-              smtpFromName: validationResult.data.smtpSettings?.title || validationResult.data.emailSettings?.name || null,
-              whatsappEnabled: validationResult.data.gatewaySettings?.enabled ?? whatsappEnabled,
-              whatsappProvider: providerEnum,
-              whatsappApiKey: validationResult.data.gatewaySettings?.apiKey || null,
-              whatsappEndpoint: validationResult.data.gatewaySettings?.instanceId || validationResult.data.gatewaySettings?.baseUrl || null,
-            }
+            update: updateData,
+            create: createData,
           });
         }
 

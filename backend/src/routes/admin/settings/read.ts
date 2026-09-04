@@ -5,6 +5,7 @@ import {
   FastifyRequest,
 } from "fastify";
 import { adminLogs } from "../../../services/logger/contextLogger";
+import { maskApiKey } from "../../../utils/encryption";
 
 async function readSettingsRoute(
   fastify: FastifyInstance,
@@ -65,11 +66,13 @@ async function readSettingsRoute(
 
             if (!settings.gatewaySettings) settings.gatewaySettings = {};
             settings.gatewaySettings.provider = dbConfig.whatsappProvider?.toLowerCase() || settings.gatewaySettings.provider || "twilio";
-            settings.gatewaySettings.apiKey = dbConfig.whatsappApiKey || settings.gatewaySettings.apiKey || "";
+            settings.gatewaySettings.apiKey = dbConfig.whatsappApiKey ? maskApiKey(dbConfig.whatsappApiKey) : settings.gatewaySettings.apiKey || "";
             settings.gatewaySettings.instanceId = dbConfig.whatsappEndpoint || settings.gatewaySettings.instanceId || "";
             settings.gatewaySettings.baseUrl = dbConfig.whatsappEndpoint || settings.gatewaySettings.baseUrl || "";
             settings.gatewaySettings.secretKey = settings.gatewaySettings.secretKey || "";
             settings.gatewaySettings.enabled = dbConfig.whatsappEnabled;
+            settings.gatewaySettings.campaignName = dbConfig.whatsappCampaignName || settings.gatewaySettings.campaignName || "";
+            settings.gatewaySettings.number = dbConfig.whatsappNumber || settings.gatewaySettings.number || "";
           }
         }
 

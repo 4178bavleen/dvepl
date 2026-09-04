@@ -1,4 +1,5 @@
 import EmailService from "./email.service";
+import { WhatsappService } from "./whatsapp.service";
 
 export interface SalesOrderAssignmentNotificationOptions {
   to: string;
@@ -165,6 +166,38 @@ export class NotificationService {
       subject,
       html,
     }, companyId, eventCode, relatedModule, relatedRecordId);
+  }
+
+  /**
+   * Send a WhatsApp notification via AiSensy.
+   */
+  static async sendWhatsAppNotification(
+    options: {
+      to: string;
+      userName: string;
+      campaignName?: string;
+      templateParams?: string[];
+      eventCode?: string;
+      relatedModule?: string;
+      relatedRecordId?: string;
+    },
+    companyId?: string,
+  ) {
+    const { to, userName, campaignName, templateParams, eventCode, relatedModule, relatedRecordId } = options;
+
+    return WhatsappService.send(
+      {
+        to,
+        userName,
+        campaignName: campaignName || "",
+        templateParams,
+        source: "DVEPL_CRM",
+      },
+      companyId,
+      eventCode,
+      relatedModule,
+      relatedRecordId
+    );
   }
 }
 
