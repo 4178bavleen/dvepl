@@ -2755,11 +2755,13 @@ model NotificationConfiguration {
   smtpFromName     String?
   whatsappEnabled  Boolean               @default(false)
   whatsappProvider NotificationProvider?
-  whatsappApiKey   String?
-  whatsappEndpoint String?
-  createdAt        DateTime              @default(now())
-  updatedAt        DateTime              @updatedAt
-  company          Company               @relation(fields: [companyId], references: [id])
+  whatsappApiKey        String?
+  whatsappEndpoint      String?
+  whatsappCampaignName  String?
+  whatsappNumber        String?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  company               Company               @relation(fields: [companyId], references: [id])
 }
 
 model NotificationEvent {
@@ -3230,6 +3232,7 @@ enum NotificationProvider {
   META
   TWILIO
   WATI
+  AISENSY
 }
 
 enum TransactionType {

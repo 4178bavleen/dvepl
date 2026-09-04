@@ -47,9 +47,11 @@ export const settingsSchema = z.object({
   gatewaySettings: z.object({
     provider: z.string().optional(),
     apiKey: z.string().optional(),
+    campaignName: z.string().optional(),
     instanceId: z.string().optional(),
     baseUrl: z.string().optional(),
     secretKey: z.string().optional(),
+    number: z.string().optional(),
     enabled: z.boolean().optional(),
     sandbox: z.boolean().optional()
   }).optional(),

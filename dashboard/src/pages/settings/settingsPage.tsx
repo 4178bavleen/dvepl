@@ -109,8 +109,11 @@ const defaultCaptchaSettings = {
 };
 
 const defaultGatewaySettings = {
+  provider: "aisensy",
   baseUrl: "",
   apiKey: "",
+  campaignName: "",
+  number: "",
   secretKey: "",
   enabled: false,
 };
@@ -1363,9 +1366,9 @@ export function SettingsPage() {
     }
     try {
       const promise = securityApi.settings.testWhatsapp({
-        provider: "wati",
+        provider: gatewaySettings.provider || "aisensy",
         apiKey: gatewaySettings.apiKey,
-        instanceId: gatewaySettings.baseUrl,
+        campaignName: gatewaySettings.campaignName,
         number: waSettings.number,
       });
       await toast.promise(promise, {
@@ -1485,6 +1488,7 @@ export function SettingsPage() {
   const saveGatewaySettings = () => {
     const updatedGateway = {
       ...gatewaySettings,
+      provider: gatewaySettings.provider || "aisensy",
       instanceId: gatewaySettings.baseUrl,
     };
     localStorage.setItem(
@@ -1499,15 +1503,16 @@ export function SettingsPage() {
   const testGateway = async () => {
     try {
       const promise = securityApi.settings.testWhatsapp({
-        provider: "wati",
+        provider: gatewaySettings.provider || "aisensy",
         apiKey: gatewaySettings.apiKey,
-        instanceId: gatewaySettings.baseUrl,
+        campaignName: gatewaySettings.campaignName,
+        number: gatewaySettings.number,
       });
       await toast.promise(promise, {
-        loading: "Connecting to Gateway...",
-        success: "Gateway handshake successful!",
+        loading: "Connecting to AiSensy...",
+        success: "AiSensy connection verified!",
         error: (err: any) =>
-          err?.response?.data?.message || "Gateway unreachable.",
+          err?.response?.data?.message || "AiSensy unreachable.",
       });
     } catch (e) {
       console.error(e);
@@ -3316,7 +3321,7 @@ export function SettingsPage() {
                     </div>
                   </div>
                 </div>
-                {!isEditingGateway && gatewaySettings.baseUrl && (
+                {!isEditingGateway && (gatewaySettings.apiKey || gatewaySettings.campaignName) && (
                   <button
                     onClick={() => setIsEditingGateway(true)}
                     className="px-3.5 py-1.5 bg-primary text-white font-bold rounded-lg text-xs hover:bg-primary/95 transition shadow-sm"
@@ -3326,7 +3331,7 @@ export function SettingsPage() {
                 )}
               </div>
 
-              {!isEditingGateway && gatewaySettings.baseUrl ? (
+              {!isEditingGateway && (gatewaySettings.apiKey || gatewaySettings.campaignName) ? (
                 <div className="overflow-x-auto p-4 space-y-4">
                   <table className="w-full text-xs text-left border-collapse border border-border rounded-lg overflow-hidden">
                     <thead className="bg-muted/15 border-b border-border">
@@ -3341,9 +3346,9 @@ export function SettingsPage() {
                     </thead>
                     <tbody className="divide-y divide-border">
                       <tr className="hover:bg-muted/5">
-                        <td className="p-3 font-semibold">API Base URL</td>
+                        <td className="p-3 font-semibold">Provider</td>
                         <td className="p-3 text-foreground">
-                          {gatewaySettings.baseUrl || (
+                          {gatewaySettings.provider === "aisensy" ? "AiSensy" : gatewaySettings.provider || (
                             <span className="text-muted-foreground italic">
                               Not set
                             </span>
@@ -3351,9 +3356,7 @@ export function SettingsPage() {
                         </td>
                       </tr>
                       <tr className="hover:bg-muted/5">
-                        <td className="p-3 font-semibold">
-                          API Authorization Key
-                        </td>
+                        <td className="p-3 font-semibold">API Authorization Key</td>
                         <td className="p-3 text-foreground">
                           {gatewaySettings.apiKey || (
                             <span className="text-muted-foreground italic">
@@ -3363,11 +3366,19 @@ export function SettingsPage() {
                         </td>
                       </tr>
                       <tr className="hover:bg-muted/5">
-                        <td className="p-3 font-semibold">HMAC Secret Key</td>
+                        <td className="p-3 font-semibold">Campaign Name</td>
                         <td className="p-3 text-foreground">
-                          {gatewaySettings.secretKey ? (
-                            "••••••••••••••••"
-                          ) : (
+                          {gatewaySettings.campaignName || (
+                            <span className="text-muted-foreground italic">
+                              Not set
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-muted/5">
+                        <td className="p-3 font-semibold">WhatsApp Number</td>
+                        <td className="p-3 text-foreground">
+                          {gatewaySettings.number || (
                             <span className="text-muted-foreground italic">
                               Not set
                             </span>
@@ -3398,7 +3409,7 @@ export function SettingsPage() {
                       onClick={testGateway}
                       className="px-4 py-2 border border-border rounded-lg bg-card text-xs font-bold text-muted-foreground hover:text-foreground transition"
                     >
-                      🔌 Test Gateway Handshake
+                      🔌 Test AiSensy Connection
                     </button>
                   </div>
                 </div>
@@ -3421,29 +3432,27 @@ export function SettingsPage() {
                   <div className="space-y-3">
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                        API Base URL
+                        WhatsApp Provider
                       </label>
-                      <input
-                        type="text"
-                        name="wa_gateway_base_url"
-                        autoComplete="off"
-                        value={gatewaySettings.baseUrl}
+                      <select
+                        value={gatewaySettings.provider || "aisensy"}
                         onChange={(e) =>
                           setGatewaySettings({
                             ...gatewaySettings,
-                            baseUrl: e.target.value,
+                            provider: e.target.value,
                           })
                         }
-                        placeholder="e.g. https://api.whatsapp-gateway.dvepl.com"
                         className="w-full px-3 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
-                      />
+                      >
+                        <option value="aisensy">AiSensy</option>
+                      </select>
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                        API Authorization Key
+                        AiSensy API Key
                       </label>
                       <input
-                        type="text"
+                        type="password"
                         name="wa_gateway_api_key"
                         autoComplete="new-password"
                         value={gatewaySettings.apiKey}
@@ -3453,26 +3462,45 @@ export function SettingsPage() {
                             apiKey: e.target.value,
                           })
                         }
-                        placeholder="ak_dvepl_whatsapp_..."
+                        placeholder="Enter your AiSensy API key"
                         className="w-full px-3 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
                       />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                        HMAC Signature Secret Key
+                        Campaign Name
                       </label>
                       <input
-                        type="password"
-                        name="wa_gateway_secret_key"
-                        autoComplete="new-password"
-                        value={gatewaySettings.secretKey}
+                        type="text"
+                        name="wa_gateway_campaign_name"
+                        autoComplete="off"
+                        value={gatewaySettings.campaignName || ""}
                         onChange={(e) =>
                           setGatewaySettings({
                             ...gatewaySettings,
-                            secretKey: e.target.value,
+                            campaignName: e.target.value,
                           })
                         }
-                        placeholder="••••••••••••••••••••••••••••••••"
+                        placeholder="e.g. order_notification"
+                        className="w-full px-3 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                        WhatsApp Business Number
+                      </label>
+                      <input
+                        type="text"
+                        name="wa_gateway_number"
+                        autoComplete="off"
+                        value={gatewaySettings.number || ""}
+                        onChange={(e) =>
+                          setGatewaySettings({
+                            ...gatewaySettings,
+                            number: e.target.value,
+                          })
+                        }
+                        placeholder="e.g. +917428526285"
                         className="w-full px-3 py-1.5 text-xs border border-border bg-card rounded-lg outline-none focus:border-primary"
                       />
                     </div>
@@ -3492,7 +3520,7 @@ export function SettingsPage() {
                       <span className="toggle-slider"></span>
                     </label>
                     <span className="text-xs font-semibold text-foreground">
-                      Activate custom Gateway Integration
+                      Activate AiSensy WhatsApp Integration
                     </span>
                   </div>
                   <div className="border-t border-border pt-4 flex gap-2">
@@ -3500,9 +3528,9 @@ export function SettingsPage() {
                       onClick={saveGatewaySettings}
                       className="px-4 py-2 bg-primary text-white font-bold rounded-lg text-xs hover:bg-primary/95 transition shadow-sm"
                     >
-                      💾 Save Gateway
+                      💾 Save Configuration
                     </button>
-                    {gatewaySettings.baseUrl && (
+                    {gatewaySettings.apiKey && (
                       <button
                         onClick={() => setIsEditingGateway(false)}
                         className="px-4 py-2 border border-border rounded-lg bg-card text-xs font-bold text-muted-foreground hover:text-foreground transition"
@@ -3514,7 +3542,7 @@ export function SettingsPage() {
                       onClick={testGateway}
                       className="px-4 py-2 border border-border rounded-lg bg-card text-xs font-bold text-muted-foreground hover:text-foreground transition"
                     >
-                      🔌 Test Gateway
+                      🔌 Test Connection
                     </button>
                   </div>
                 </div>
