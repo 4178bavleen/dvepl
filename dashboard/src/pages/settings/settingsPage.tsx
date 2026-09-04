@@ -667,6 +667,7 @@ export function SettingsPage() {
     { key: "branches", label: "🌿 Branches" },
     { key: "departments", label: "🌿 Departments" },
     { key: "teams", label: "👥 Teams" },
+    { key: "designations", label: "💼 Designations" },
     { key: "cost_centers", label: "💼 Cost Centers" },
 
     // HRMS
@@ -674,12 +675,15 @@ export function SettingsPage() {
     { key: "attendance", label: "⏰ Attendance" },
     { key: "leaves", label: "📅 Leaves" },
     { key: "holidays", label: "📅 Holidays" },
+    { key: "shift_management", label: "🕑 Shift Management" },
+    { key: "documents", label: "📄 Documents" },
     { key: "tasks", label: "✅ Tasks" },
     { key: "roles", label: "🛡️ Roles" },
 
     // CRM
     { key: "customers", label: "🤝 Customers" },
     { key: "contacts", label: "📇 Contact Persons" },
+    { key: "communication", label: "💬 Communication" },
     { key: "orders", label: "🛒 Orders" },
     { key: "delivery", label: "🚚 Delivery" },
     { key: "vendors", label: "🚚 Vendors" },
@@ -688,6 +692,7 @@ export function SettingsPage() {
 
     // Finance
     { key: "finance", label: "💵 Finance / Accounts" },
+    { key: "payroll", label: "💰 Payroll" },
 
     // Sales
     { key: "workflow_tracker", label: "🔄 Workflow Tracker" },
