@@ -15,7 +15,6 @@ export const ROUTES = {
   HRMS_ATTENDANCE: '/hrms/attendance',
   HRMS_LEAVES: '/hrms/leaves',
   HRMS_HOLIDAYS: '/hrms/holidays',
-  HRMS_SHIFTS: '/hrms/shifts',
   HRMS_PAYROLL: '/hrms/payroll',
   HRMS_DOCUMENTS: '/hrms/documents',
 

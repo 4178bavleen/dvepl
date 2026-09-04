@@ -39,7 +39,6 @@ const EmployeePage = lazy(() => import("@/pages/employee/employeePage"));
 const AttendancePage = lazy(() => import("@/pages/attendance/attendancePage"));
 const LeavePage = lazy(() => import("@/pages/leave/leavePage"));
 const HolidaysPage = lazy(() => import("@/pages/holidays/holidaysPage"));
-const ShiftsPage = lazy(() => import("@/pages/shifts/shiftsPage"));
 const PayrollPage = lazy(() => import("@/pages/payroll/payrollPage"));
 const DocumentsPage = lazy(() => import("@/pages/documents/documentsPage"));
 const TasksPage = lazy(() => import("@/pages/tasks/tasksPage"));
@@ -165,7 +164,6 @@ export function AppRouter() {
               <Route path="/hrms/attendance" element={<AttendancePage />} />
               <Route path="/hrms/leaves" element={<LeavePage />} />
               <Route path="/hrms/holidays" element={<HolidaysPage />} />
-              <Route path="/hrms/shifts" element={<ShiftsPage />} />
               <Route path="/hrms/payroll" element={<PayrollPage />} />
               <Route path="/hrms/documents" element={<DocumentsPage />} />
               <Route path="/tasks" element={<TasksPage />} />

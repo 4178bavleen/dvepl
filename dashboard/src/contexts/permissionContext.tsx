@@ -19,7 +19,6 @@ const PERMISSION_CODE_MODULE_MAP: Record<string, string> = {
   attendance: 'attendance',
   leave: 'leaves',
   holiday: 'holidays',
-  shift: 'shift_management',
   salary: 'payroll',
   employeeDocument: 'documents',
   task: 'tasks',

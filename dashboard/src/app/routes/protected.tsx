@@ -41,7 +41,6 @@ const getRequiredPermission = (pathname: string): string | null => {
     '/hrms/employees': 'employees',
     '/hrms/attendance': 'attendance',
     '/hrms/holidays': 'holidays',
-    '/hrms/shifts': 'shift_management',
     '/hrms/payroll': 'payroll',
     '/hrms/documents': 'documents',
     '/crm/customers': 'customers',

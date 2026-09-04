@@ -86,9 +86,6 @@ export const API_ENDPOINTS = {
 
     shifts: {
       list: "/shift/read/",
-      create: "/shift/create/",
-      update: (id: string) => `/shift/update/${id}`,
-      remove: (id: string) => `/shift/delete/${id}`,
     },
 
     documents: {

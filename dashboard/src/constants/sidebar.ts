@@ -108,12 +108,6 @@ export const sidebarItems: SidebarItem[] = [
     section: "HRMS",
   },
   // {
-  //   name: "Shift Management",
-  //   icon: Clock,
-  //   path: ROUTES.HRMS_SHIFTS,
-  //   section: "HRMS",
-  // },
-  // {
   //   name: "Payroll",
   //   icon: DollarSign,
   //   path: ROUTES.HRMS_PAYROLL,

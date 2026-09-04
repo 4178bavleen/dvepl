@@ -23,7 +23,6 @@ const PREFIX_TO_MODULE: Record<string, string> = {
     attendance: "attendance",
     leave: "leaves",
     holiday: "holidays",
-    shift: "shift_management",
     salary: "payroll",
     employeeDocument: "documents",
     task: "tasks",

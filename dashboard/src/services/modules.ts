@@ -49,7 +49,8 @@ export const hrmsApi = {
     sync: () => apiClient.post("/employee/sync").then(res => res.data),
   },
   attendance: crud(API_ENDPOINTS.hrms.attendance), leave: crud(API_ENDPOINTS.hrms.leave),
-  salary: crud(API_ENDPOINTS.hrms.salary), holidays: crud(API_ENDPOINTS.hrms.holidays), shifts: crud(API_ENDPOINTS.hrms.shifts),
+  salary: crud(API_ENDPOINTS.hrms.salary), holidays: crud(API_ENDPOINTS.hrms.holidays),
+  shifts: { list: () => apiClient.get(API_ENDPOINTS.hrms.shifts.list).then((res) => res.data.data) },
   documents: crud(API_ENDPOINTS.hrms.documents),
   tasks: {
     ...crud((API_ENDPOINTS.hrms as any).tasks, { updateMethod: 'patch' }),

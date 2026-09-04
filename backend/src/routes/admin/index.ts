@@ -244,12 +244,6 @@ async function adminRoutes(
         } else {
           requiredPermissions = ["salary.view"];
         }
-      } else if (url.includes("/shift/")) {
-        if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
-          requiredPermissions = ["shift.create"];
-        } else {
-          requiredPermissions = ["shift.view"];
-        }
       } else if (url.includes("/employee-shift/")) {
         if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
           requiredPermissions = ["shift.create"];

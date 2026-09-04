@@ -227,7 +227,6 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       'attendance': 'attendance',
       'leaves': 'leaves',
       'holidays': 'holidays',
-      'shift_management': 'shift_management',
       'payroll': 'payroll',
       'documents': 'documents',
       'tasks': 'tasks',

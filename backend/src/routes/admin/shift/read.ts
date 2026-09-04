@@ -21,7 +21,6 @@ async function readShiftRoutes(
       },
       preHandler: [
         fastify.verifyToken,
-        fastify.authorizePermissions(["employee.view"]),
       ],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
@@ -65,7 +64,6 @@ async function readShiftRoutes(
       },
       preHandler: [
         fastify.verifyToken,
-        fastify.authorizePermissions(["employee.view"]),
       ],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {

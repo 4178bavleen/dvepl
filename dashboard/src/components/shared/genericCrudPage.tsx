@@ -36,7 +36,6 @@ const TABLE_NAME_TO_MODULE: Record<string, string> = {
   attendances: "attendance",
   leaves: "leaves",
   holidays: "holidays",
-  shifts: "shift_management",
   salaries: "payroll",
   employeeDocuments: "documents",
   customers: "customers",

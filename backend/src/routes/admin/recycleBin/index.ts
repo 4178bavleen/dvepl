@@ -260,13 +260,6 @@ const recycleBinModels: RecycleBinModelConfig[] = [
     },
   },
   {
-    module: "shift",
-    label: "Shift",
-    delegate: "shift",
-    select: { id: true, name: true, deletedAt: true, updatedAt: true },
-    formatName: (record) => record.name || "Shift Record",
-  },
-  {
     module: "customer",
     label: "Customer",
     delegate: "customer",

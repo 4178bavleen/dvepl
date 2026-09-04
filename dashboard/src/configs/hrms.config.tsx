@@ -647,50 +647,6 @@ export const holidaysConfig = {
 };
 
 // ==========================================
-// 12. SHIFT MANAGEMENT CONFIG
-// ==========================================
-export const shiftsConfig = {
-  api: hrmsApi.shifts,
-  tableName: "shifts",
-  moduleName: "Shift",
-  pluralName: "Shifts",
-  zodSchema: z.object({
-    name: z.string().min(2, "Name is required"),
-    startTime: z.string().min(2, "Start Time is required"),
-    endTime: z.string().min(2, "End Time is required"),
-  }),
-  defaultFormValues: { name: "", startTime: "", endTime: "" },
-  breadcrumbs: [{ label: "Dashboard", href: "/" }, { label: "Shifts" }],
-  columns: [
-    { accessorKey: "name", header: sortableHeader("Shift Name") },
-    { accessorKey: "startTime", header: "Start time" },
-    { accessorKey: "endTime", header: "End time" },
-  ] as ColumnDef<any>[],
-  fields: [
-    {
-      name: "name",
-      label: "Shift Name",
-      type: "text",
-      placeholder: "Day Shift A",
-      required: true,
-    },
-    {
-      name: "startTime",
-      label: "Start Time (HH:MM)",
-      type: "text",
-      placeholder: "09:00",
-      required: true,
-    },
-    {
-      name: "endTime",
-      label: "End Time (HH:MM)",
-      type: "text",
-      placeholder: "18:00",
-      required: true,
-    },
-  ] as any[],
-};
-
 // ==========================================
 // 13. DOCUMENTS MASTER CONFIG
 // ==========================================

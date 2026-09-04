@@ -3,7 +3,7 @@ import {
   ReferenceCodeAction, Company, Branch, Department, Team, Designation,
   CostCenter, User, Role, Employee,
   Attendance, Leave, Salary, Tender, TenderRequest, GovernmentDepartment, Section, Division,
-  SubDivision, ReferenceCode, AuditLog, Shift, Holiday, DeliveryOrder
+  SubDivision, ReferenceCode, AuditLog, Holiday, DeliveryOrder
 } from '../types/erp';
 import { securityApi } from '@/services/modules';
 
@@ -26,7 +26,6 @@ import {
   initialSubDivisions,
   initialTenderRequests,
   initialTenders,
-  initialShifts,
   initialHolidays,
   initialReferenceCodes,
   initialAuditLogs
@@ -55,7 +54,6 @@ interface ERPStore {
   subDivisions: SubDivision[];
   referenceCodes: ReferenceCode[];
   auditLogs: AuditLog[];
-  shifts: Shift[];
   holidays: Holiday[];
   deliveryOrders: DeliveryOrder[];
 
@@ -107,7 +105,6 @@ export const useERPStore = create<ERPStore>((set) => ({
   subDivisions: initialSubDivisions,
   referenceCodes: initialReferenceCodes,
   auditLogs: initialAuditLogs,
-  shifts: initialShifts,
   holidays: initialHolidays,
   deliveryOrders: [],
 
