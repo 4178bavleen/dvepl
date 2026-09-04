@@ -85,6 +85,27 @@ async function adminRoutes(
       const userAgent = req.headers["user-agent"] || undefined;
       requestContextStorage.enterWith({ userId, ipAddress, userAgent });
 
+      // Read requests (GET/HEAD) are available to any authenticated user. Sensitive
+      // reads (user list, roles, audit logs, access, payroll, etc.) remain protected
+      // by their own route-level authorizePermissions guards. Admin-only notification
+      // management reads and permission-group reads stay gated here. The Admin bypass
+      // in authorizePermissions also applies.
+      const method = req.method;
+      if (method === "GET" || method === "HEAD") {
+        const readUrl = req.url;
+        const adminOnlyRead =
+          readUrl.includes("/notification/configuration") ||
+          readUrl.includes("/notification/event") ||
+          readUrl.includes("/notification/recipient") ||
+          readUrl.includes("/notification/template") ||
+          readUrl.includes("/permission-group") ||
+          readUrl.includes("/access/");
+        if (adminOnlyRead) {
+          await instance.authorizePermissions(["settings.update"])(req, reply);
+        }
+        return;
+      }
+
       // Determine required permissions dynamically based on the request URL and method
       const url = req.url;
       let requiredPermissions: string[] = [];
