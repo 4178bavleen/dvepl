@@ -106,7 +106,7 @@ async function adminRoutes(
         if (url.includes("/create")) requiredPermissions = ["employee.create"];
         else if (url.includes("/update")) requiredPermissions = ["employee.update"];
         else if (url.includes("/delete")) requiredPermissions = ["employee.delete"];
-        else if (url.includes("/read")) requiredPermissions = ["employee.view"];
+        // else: read allowed for any authenticated user (tasks/quote/dashboard assignee mapping)
       } else if (url.includes("/task/")) {
         if (url.includes("/create")) requiredPermissions = ["employee.create"];
         else if (url.includes("/update")) requiredPermissions = ["employee.update"];
@@ -139,7 +139,14 @@ async function adminRoutes(
       } else if (url.includes("/audit-log/")) {
         requiredPermissions = ["company.view"];
       } else if (url.includes("/notification/")) {
-        requiredPermissions = ["settings.update"];
+        // Notification logs are user-facing (the header bell fetches each user's
+        // own notifications), so any authenticated user may read them. Admin-only
+        // configuration, event, template, recipient and test routes stay gated.
+        if (url.includes("/notification/logs")) {
+          requiredPermissions = [];
+        } else {
+          requiredPermissions = ["settings.update"];
+        }
       } else if (url.includes("/payment/")) {
         if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
           requiredPermissions = ["finance.create"];
@@ -297,15 +304,13 @@ async function adminRoutes(
       } else if (url.includes("/employee-document/")) {
         if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
           requiredPermissions = ["employeeDocument.create"];
-        } else {
-          requiredPermissions = ["employeeDocument.view"];
         }
+        // else: read allowed for any authenticated user
       } else if (url.includes("/employee-contact/") || url.includes("/employee-emergency-contact/") || url.includes("/employee-education/") || url.includes("/employee-experience/")) {
         if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
           requiredPermissions = ["employee.create"];
-        } else {
-          requiredPermissions = ["employee.view"];
         }
+        // else: read allowed for any authenticated user
       } else if (url.includes("/export-orders/")) {
         if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
           requiredPermissions = ["exportOrder.create"];

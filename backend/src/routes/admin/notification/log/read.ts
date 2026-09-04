@@ -21,6 +21,14 @@ async function notificationLogRead(
 
       const where: any = {};
 
+      // Scope non-admin users to their own notifications. Admins see all.
+      const requesterEmail = (request as any).admin?.email;
+      const roles: string[] = (request as any).admin?.roles ?? [];
+      const isAdmin = roles.some((r: string) => r === "Admin");
+      if (!isAdmin && requesterEmail) {
+        where.recipient = requesterEmail;
+      }
+
       if (channel) {
         where.channel = channel;
       }

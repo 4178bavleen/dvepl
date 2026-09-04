@@ -430,6 +430,7 @@ async function authPlugin(fastify: FastifyInstance) {
         const tokenUser = {
           id: decoded.userId,
           companyId: activeCompanyId,
+          email: dbUser.email,
           roles: dbUser.userRoles.map((ur) => ur.role.name) || [],
           uiAccessProfile: {
             pageAccess: resolvedPageAccess,
