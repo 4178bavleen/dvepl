@@ -100,6 +100,7 @@ async function adminTaskCreateRoutes(
         // Trigger task assignment notifications
         if (assignedUserIds && assignedUserIds.length > 0) {
           try {
+            const companyId = (request.user as any)?.companyId || (request.admin as any)?.companyId;
             const assignedUsers = await fastify.prisma.user.findMany({
               where: {
                 OR: [
@@ -116,8 +117,10 @@ async function adminTaskCreateRoutes(
                   to: user.email,
                   subject: `New Task Assigned: ${title}`,
                   message: `Hello ${user.name || "User"},\n\nYou have been assigned to a new task: "${title}".\nPriority: ${priority || "medium"}.\nDue Date: ${new Date(dueDate).toLocaleDateString()}.\n\nDescription:\n${description || "No description provided."}`,
-                  eventCode: "TASK_ASSIGNED"
-                });
+                  eventCode: "TASK_ASSIGNED",
+                  relatedModule: "TASK",
+                  relatedRecordId: task.id,
+                }, companyId);
               }
             }
           } catch (notifErr) {

@@ -26,7 +26,7 @@ export default function PdfOptions({ options, setOptions }: Props) {
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-5 p-6">
         {OPTION_LABELS.map(({ key, label }) => (
-          <label key={key} className="flex items-center gap-3 cursor-pointer">
+          <label key={String(key)} className="flex items-center gap-3 cursor-pointer">
             <Checkbox checked={options[key]} onCheckedChange={() => toggle(key)} />
             {label}
           </label>

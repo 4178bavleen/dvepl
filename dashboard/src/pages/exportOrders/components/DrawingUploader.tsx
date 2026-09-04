@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { UploadCloud, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,9 @@ interface Props {
   availableOrders: ExportOrder[];
   onSuccess: () => void;
   revisionDrawing?: EngineeringDrawing | null;
+  directOrderId?: string | null;
+  openDirectUpload?: boolean;
+  onCloseDirectUpload?: () => void;
 }
 
 export default function DrawingUploader({
@@ -40,6 +43,9 @@ export default function DrawingUploader({
   availableOrders,
   onSuccess,
   revisionDrawing = null,
+  directOrderId = null,
+  openDirectUpload = false,
+  onCloseDirectUpload,
 }: Props) {
   const { canWorkOnOrder } = useSalesOrderAccess();
 
@@ -139,7 +145,7 @@ export default function DrawingUploader({
       setDrawingType(revisionDrawing.drawingType || "SLD");
       setChanges("");
     } else {
-      setSalesOrderId(selectedOrderIds[0] ?? "");
+      setSalesOrderId(directOrderId ?? selectedOrderIds[0] ?? "");
       setTitle(file.name.replace(/\.[^/.]+$/, ""));
       setDrawingType("SLD");
       setChanges("");
@@ -155,6 +161,14 @@ export default function DrawingUploader({
     setPendingFile(file);
     setDialogOpen(true);
   };
+
+  useEffect(() => {
+    if (openDirectUpload && directOrderId) {
+      setSalesOrderId(directOrderId);
+      fileRef.current?.click();
+      onCloseDirectUpload?.();
+    }
+  }, [openDirectUpload, directOrderId, onCloseDirectUpload]);
 
   const handleDrop = (event: React.DragEvent) => {
     event.preventDefault();

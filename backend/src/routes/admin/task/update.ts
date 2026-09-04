@@ -6,7 +6,7 @@ import {
 } from "fastify";
 import { adminLogs } from "../../../services/logger/contextLogger";
 import { taskSchema } from "../../../schemas/admin/task/task.schema";
-import { canManageTask } from "./access";
+import { canManageTask, isAdminUser } from "./access";
 
 import NotificationService from "../../../services/notification/notification.service";
 
@@ -58,10 +58,11 @@ async function adminTaskUpdateRoutes(
         if (!hasAccess) {
           return reply.status(403).send({
             success: false,
-            message: "Access denied: you are not assigned to this task.",
+            message: "Access denied: Only assigned team members or administrators can edit or complete this task.",
           });
         }
 
+        const isManager = isAdminUser(request.admin);
         const {
           title,
           description,
@@ -70,6 +71,13 @@ async function adminTaskUpdateRoutes(
           status,
           assignedUserIds,
         } = validationResult.data;
+
+        if (!isManager && assignedUserIds !== undefined) {
+          return reply.status(403).send({
+            success: false,
+            message: "Access denied: Only administrators can modify task assignments.",
+          });
+        }
 
         await fastify.prisma.$transaction(async (tx) => {
           await tx.task.update({

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { ExportOrder } from "@/types/exportOrders";
 import { useSalesOrderAccess } from "@/utils/salesOrderAccess";
-import { FileText, Columns3 } from "lucide-react";
+import { FileText, Columns3, Upload, Plus, CheckCircle2, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -19,6 +19,7 @@ interface Props {
   selectedOrderIds: string[];
   onSelectOrder: (id: string, checked: boolean) => void;
   onSelectAll: (checked: boolean) => void;
+  onUploadDrawing?: (orderId: string) => void;
 }
 
 type ColumnKey =
@@ -28,7 +29,8 @@ type ColumnKey =
   | "status"
   | "amount"
   | "delivery"
-  | "access";
+  | "access"
+  | "actions";
 
 interface ColumnDef {
   key: ColumnKey;
@@ -44,6 +46,7 @@ const COLUMNS: ColumnDef[] = [
   { key: "amount", label: "Amount", defaultVisible: true },
   { key: "delivery", label: "Delivery Target", defaultVisible: true },
   { key: "access", label: "Access", defaultVisible: true },
+  { key: "actions", label: "Actions", defaultVisible: true },
 ];
 
 const STORAGE_KEY = "engineering-drawings.orderColumns";
@@ -91,6 +94,7 @@ export default function OrdersTable({
   selectedOrderIds,
   onSelectOrder,
   onSelectAll,
+  onUploadDrawing,
 }: Props) {
   const { canWorkOnOrder, isAdmin } = useSalesOrderAccess();
   const [visibility, setVisibility] = useState<Record<ColumnKey, boolean>>(
@@ -215,6 +219,9 @@ export default function OrdersTable({
               {visibility.access && (
                 <th className="px-4 py-3 text-left">Access</th>
               )}
+              {visibility.actions && (
+                <th className="px-4 py-3 text-right">Actions</th>
+              )}
             </tr>
           </thead>
 
@@ -326,6 +333,45 @@ export default function OrdersTable({
                           <span className="inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground border">
                             View only
                           </span>
+                        )}
+                      </td>
+                    )}
+                    {visibility.actions && (
+                      <td
+                        className="px-4 py-3 text-right"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {canWork ? (
+                          hasDrawing ? (
+                            <div className="flex items-center justify-end gap-1.5">
+                              <span className="inline-flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md font-medium">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                Uploaded
+                              </span>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                                onClick={() => onUploadDrawing?.(row.id)}
+                                title="Upload another drawing or revision for this order"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                Add More
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-xs gap-1.5 hover:bg-primary hover:text-primary-foreground"
+                              onClick={() => onUploadDrawing?.(row.id)}
+                            >
+                              <Upload className="w-3 h-3" />
+                              Upload Drawing
+                            </Button>
+                          )
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
                         )}
                       </td>
                     )}

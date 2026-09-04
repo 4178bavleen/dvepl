@@ -38,12 +38,11 @@ export async function checkAndSendTaskReminders(prisma: PrismaClient) {
         continue;
       }
 
-      // Find all assigned users with emails
-      const assignedUsers = task.assignments
-        .map((a: any) => a.employee?.user)
-        .filter((u: any) => u && u.email);
+      for (const assignment of (task.assignments as any[])) {
+        const user = assignment.employee?.user;
+        const companyId = assignment.employee?.companyId;
+        if (!user || !user.email) continue;
 
-      for (const user of assignedUsers) {
         // Query to check if we have already sent a reminder for this task to this recipient
         const existingLogs = await prisma.notificationLog.findMany({
           where: {
@@ -88,7 +87,7 @@ export async function checkAndSendTaskReminders(prisma: PrismaClient) {
               eventCode: "TASK_REMINDER",
               relatedModule: "TASK",
               relatedRecordId: task.id,
-            });
+            }, companyId);
             console.log(`[Scheduler] Sent task reminder for "${task.title}" to ${user.email}`);
           } catch (sendError) {
             console.error(`[Scheduler] Failed to send task reminder for "${task.title}" to ${user.email}:`, sendError);

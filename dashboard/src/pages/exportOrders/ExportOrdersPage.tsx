@@ -2,16 +2,13 @@ import { useState, useCallback, useEffect, useMemo } from "react";
 import { useExportOrdersStore } from "@/store/exportOrders.store";
 import { useERPStore } from "@/store/erpStore";
 import { canPerformPageAction } from "@/utils/pagePermissions";
-
-import { Card, CardContent } from "@/components/ui/card";
+import { Search, RefreshCw, Layers, SlidersHorizontal, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import FilterPanel from "./components/FilterPanel";
-import ExportToolbar from "./components/ExportToolbar";
 import OrdersTable from "./components/OrdersTable";
-import PdfPreview from "./components/PdfPreview";
-import SelectedOrdersCard from "./components/SelectedOrdersCard";
 import DrawingUploader from "./components/DrawingUploader";
 import DrawingLibrary from "./components/DrawingLibrary";
-import PdfOptions from "./components/PdfOptions";
 
 export interface Filters {
   soNo: string;
@@ -38,15 +35,6 @@ const DEFAULT_FILTERS: Filters = {
   assignedEngineer: "",
   startDate: "",
   endDate: "",
-};
-
-const DEFAULT_PDF_OPTS: PdfOpts = {
-  companyHeader: true,
-  companyFooter: true,
-  pageNumbers: true,
-  includeDrawings: true,
-  landscapeMode: false,
-  alternateRows: true,
 };
 
 export default function ExportOrdersPage() {
@@ -77,19 +65,18 @@ export default function ExportOrdersPage() {
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [activeFilters, setActiveFilters] = useState<Partial<Filters>>({});
   const [filterOpen, setFilterOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  // ── Selection state ──────────────────────────────────────────────────────
+  // ── Selection & Direct Upload state ──────────────────────────────────────
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [selectedDrawingIds, setSelectedDrawingIds] = useState<string[]>([]);
-
-  // ── PDF Options ──────────────────────────────────────────────────────────
-  const [pdfOptions, setPdfOptions] = useState<PdfOpts>(DEFAULT_PDF_OPTS);
+  const [directUploadOrderId, setDirectUploadOrderId] = useState<string | null>(null);
+  const [openDirectUpload, setOpenDirectUpload] = useState(false);
 
   // ── Fetch data ───────────────────────────────────────────────────────────
-
   useEffect(() => {
     void fetchOrders({
-      search: activeFilters.soNo || activeFilters.customer || undefined,
+      search: searchQuery || activeFilters.soNo || activeFilters.customer || undefined,
       status:
         activeFilters.status && activeFilters.status !== "all"
           ? activeFilters.status
@@ -98,7 +85,7 @@ export default function ExportOrdersPage() {
       startDate: activeFilters.startDate || undefined,
       endDate: activeFilters.endDate || undefined,
     });
-  }, [activeFilters, fetchOrders]);
+  }, [searchQuery, activeFilters, fetchOrders]);
 
   useEffect(() => {
     void fetchAvailableOrders();
@@ -111,13 +98,19 @@ export default function ExportOrdersPage() {
   }, [allOrderIds, allOrderIdsKey, fetchDrawings]);
 
   // ── Computed ─────────────────────────────────────────────────────────────
-
   const selectedOrders = orders.filter((o) => selectedOrderIds.includes(o.id));
-  const drawings = allDrawings.filter(
-    (d) =>
-      d.project?.salesOrderId &&
-      selectedOrderIds.includes(d.project.salesOrderId),
-  );
+
+  // Drawings to display: if orders are selected, show only drawings for selected orders, else show all drawings
+  const displayedDrawings = useMemo(() => {
+    if (selectedOrderIds.length > 0) {
+      return allDrawings.filter(
+        (d) =>
+          d.project?.salesOrderId &&
+          selectedOrderIds.includes(d.project.salesOrderId),
+      );
+    }
+    return allDrawings;
+  }, [allDrawings, selectedOrderIds]);
 
   const hasActiveFilters = Boolean(
     activeFilters.soNo ||
@@ -129,7 +122,6 @@ export default function ExportOrdersPage() {
   );
 
   // ── Handlers ─────────────────────────────────────────────────────────────
-
   const handleSearch = useCallback(() => {
     setActiveFilters({ ...filters });
     setSelectedOrderIds([]);
@@ -139,6 +131,7 @@ export default function ExportOrdersPage() {
   const handleReset = useCallback(() => {
     setFilters(DEFAULT_FILTERS);
     setActiveFilters({});
+    setSearchQuery("");
     setSelectedOrderIds([]);
     setSelectedDrawingIds([]);
   }, []);
@@ -148,33 +141,27 @@ export default function ExportOrdersPage() {
       setSelectedOrderIds((prev) =>
         checked ? [...prev, id] : prev.filter((x) => x !== id),
       );
-
-      // Only clear drawings belonging to THIS order when deselecting
-      if (!checked) {
-        const drawingsToRemove = allDrawings
-          .filter((d) => d.project?.salesOrderId === id)
-          .map((d) => d.id);
-        setSelectedDrawingIds((prev) =>
-          prev.filter((did) => !drawingsToRemove.includes(did)),
-        );
-      }
     },
-    [allDrawings],
+    [],
   );
 
   const handleSelectAll = useCallback(
     (checked: boolean) => {
       setSelectedOrderIds(checked ? orders.map((o) => o.id) : []);
-      if (!checked) setSelectedDrawingIds([]);
     },
     [orders],
   );
 
   const handleDrawingCreated = useCallback(() => {
+    void fetchOrders();
     void fetchDrawings(allOrderIds);
-  }, [allOrderIds, fetchDrawings]);
+  }, [allOrderIds, fetchOrders, fetchDrawings]);
 
-  // Pass all available orders so DrawingLibrary can resolve orderForDrawing
+  const handleDirectUploadClick = (orderId: string) => {
+    setDirectUploadOrderId(orderId);
+    setOpenDirectUpload(true);
+  };
+
   const allKnownOrders = useMemo(() => {
     const merged = [...orders];
     availableOrders.forEach((ao) => {
@@ -184,21 +171,73 @@ export default function ExportOrdersPage() {
   }, [orders, availableOrders]);
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      {/* Toolbar */}
-      <ExportToolbar
-        selectedOrderIds={selectedOrderIds}
-        selectedDrawingIds={selectedDrawingIds}
-        orders={orders}
-        selectedOrders={selectedOrders}
-        drawings={drawings}
-        pdfOptions={pdfOptions}
-        onReset={handleReset}
-        onOpenFilters={() => setFilterOpen(true)}
-        hasActiveFilters={hasActiveFilters}
-      />
+    <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
+            <Layers className="w-6 h-6 text-primary" />
+            Engineering Drawings
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Manage, upload, and track technical drawings for assigned sales orders
+          </p>
+        </div>
 
-      {/* Filters (right drawer) */}
+        {/* Top Actions */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              void fetchOrders();
+              if (allOrderIds.length > 0) void fetchDrawings(allOrderIds);
+            }}
+            className="gap-1.5 h-9"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Refresh
+          </Button>
+
+          <Button
+            variant={hasActiveFilters ? "default" : "outline"}
+            size="sm"
+            onClick={() => setFilterOpen(true)}
+            className="gap-1.5 h-9"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            Filters
+            {hasActiveFilters && (
+              <span className="w-2 h-2 rounded-full bg-white ml-0.5" />
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {/* Search and Quick Filters Bar */}
+      <div className="flex flex-col sm:flex-row items-center gap-3">
+        <div className="relative flex-1 w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by SO number or customer name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 h-10 w-full"
+          />
+        </div>
+        {searchQuery && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSearchQuery("")}
+            className="h-10 text-xs text-muted-foreground"
+          >
+            Clear Search
+          </Button>
+        )}
+      </div>
+
+      {/* Filter Drawer */}
       <FilterPanel
         filters={filters}
         setFilters={setFilters}
@@ -207,74 +246,40 @@ export default function ExportOrdersPage() {
         setOpen={setFilterOpen}
       />
 
-      {/* Main grid: orders + uploader on left, PDF tools on right */}
-      <div className="grid grid-cols-12 gap-6 items-start">
-        {/* Left column */}
-        <div className="col-span-12 lg:col-span-8 flex flex-col gap-6">
-          <Card>
-            <CardContent className="p-5">
-              <OrdersTable
-                orders={orders}
-                isLoading={ordersLoading}
-                selectedOrderIds={selectedOrderIds}
-                onSelectOrder={handleSelectOrder}
-                onSelectAll={handleSelectAll}
-              />
-            </CardContent>
-          </Card>
-
-          <SelectedOrdersCard
-            selectedOrders={selectedOrders}
-            drawings={drawings}
-            selectedDrawingIds={selectedDrawingIds}
-          />
-
-          {canCreate && (
-            <Card>
-              <CardContent className="p-5">
-                <DrawingUploader
-                  selectedOrderIds={selectedOrderIds}
-                  selectedOrders={selectedOrders}
-                  availableOrders={availableOrders}
-                  onSuccess={handleDrawingCreated}
-                />
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        {/* Right column: sticky PDF tools */}
-        <div className="col-span-12 lg:col-span-4 flex flex-col gap-6 lg:sticky lg:top-6">
-          <Card>
-            <CardContent className="p-5">
-              <PdfPreview
-                selectedOrders={selectedOrders}
-                pdfOptions={pdfOptions}
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-5">
-              <PdfOptions options={pdfOptions} setOptions={setPdfOptions} />
-            </CardContent>
-          </Card>
-        </div>
+      {/* Section 1: Assigned Orders */}
+      <div className="flex flex-col gap-3">
+        <OrdersTable
+          orders={orders}
+          isLoading={ordersLoading}
+          selectedOrderIds={selectedOrderIds}
+          onSelectOrder={handleSelectOrder}
+          onSelectAll={handleSelectAll}
+          onUploadDrawing={handleDirectUploadClick}
+        />
       </div>
 
-      {/* Drawing library — full width */}
-      <Card>
-        <CardContent className="p-5">
-          <DrawingLibrary
-            drawings={allDrawings}
-            selectedDrawingIds={selectedDrawingIds}
-            setSelectedDrawingIds={setSelectedDrawingIds}
-            onStatusChanged={handleDrawingCreated}
-            canEdit={canEdit}
-            orders={allKnownOrders}
-          />
-        </CardContent>
-      </Card>
+      {/* Section 2: Upload Area */}
+      {canCreate && (
+        <DrawingUploader
+          selectedOrderIds={selectedOrderIds}
+          selectedOrders={selectedOrders}
+          availableOrders={availableOrders}
+          onSuccess={handleDrawingCreated}
+          directOrderId={directUploadOrderId}
+          openDirectUpload={openDirectUpload}
+          onCloseDirectUpload={() => setOpenDirectUpload(false)}
+        />
+      )}
+
+      {/* Section 3: Drawing Library */}
+      <DrawingLibrary
+        drawings={displayedDrawings}
+        selectedDrawingIds={selectedDrawingIds}
+        setSelectedDrawingIds={setSelectedDrawingIds}
+        onStatusChanged={handleDrawingCreated}
+        canEdit={canEdit}
+        orders={allKnownOrders}
+      />
     </div>
   );
 }

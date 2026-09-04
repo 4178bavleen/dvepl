@@ -437,6 +437,7 @@ export const API_ENDPOINTS = {
     nextDrawingNo: '/export-orders/next-drawing-no',
     createDrawing: '/export-orders/create-drawing',
     updateDrawing: (id: string) => `/export-orders/drawing/update/${id}`,
+    deleteDrawing: (id: string) => `/export-orders/drawing/delete/${id}`,
     sendDrawing: '/export-orders/drawing/send',
     createDrawingRevision: (drawingId: string) =>
       `/export-orders/drawing/${drawingId}/revision`,

@@ -5,7 +5,7 @@ import {
   FastifyRequest,
 } from "fastify";
 import { adminLogs } from "../../../services/logger/contextLogger";
-import { canManageTask } from "./access";
+import { canManageTask, isAdminUser } from "./access";
 
 async function adminTaskDeleteRoutes(
   fastify: FastifyInstance,
@@ -35,11 +35,11 @@ async function adminTaskDeleteRoutes(
           });
         }
 
-        const hasAccess = await canManageTask(fastify, id, request);
-        if (!hasAccess) {
+        const isManager = isAdminUser(request.admin);
+        if (!isManager) {
           return reply.status(403).send({
             success: false,
-            message: "Access denied: you are not assigned to this task.",
+            message: "Access denied: Only administrators have permission to delete tasks.",
           });
         }
 

@@ -389,7 +389,25 @@ export default async function assignSalesOrderRoute(
 
         const emailResults = await Promise.allSettled(
           users.map(async (user) => {
+            const userTasks = createdTasks.filter((t) => t.assignedUserIds.includes(user.id));
             if (!user.email) {
+              for (const ut of userTasks) {
+                try {
+                  await fastify.prisma.notificationLog.create({
+                    data: {
+                      eventCode: "TASK_ASSIGNED",
+                      channel: "EMAIL",
+                      recipient: user.name || user.id,
+                      subject: `[${salesOrder.dveplCode}] ${ut.stageName}`,
+                      message: `No email address registered for user.`,
+                      status: "FAILED",
+                      error: "Recipient email is missing.",
+                      relatedModule: "TASK",
+                      relatedRecordId: ut.taskId,
+                    },
+                  });
+                } catch {}
+              }
               throw new Error(
                 `User ${user.name || user.id} does not have an email address.`,
               );
@@ -419,19 +437,60 @@ export default async function assignSalesOrderRoute(
                 ? userStageNames.join(", ")
                 : "Order Responsibility";
 
-            await NotificationService.sendSalesOrderAssignmentNotification(
-              {
-                to: user.email,
-                userName: user.name || "Team Member",
-                dveplCode: salesOrder.dveplCode,
-                partyName: salesOrder.partyName,
-                stageName: stageLabel,
-                remarks: userRemarks || undefined,
-                dueDate: formattedDueDate || undefined,
-                orderId: salesOrder.id,
-              },
-              salesOrder.companyId,
-            );
+            try {
+              await NotificationService.sendSalesOrderAssignmentNotification(
+                {
+                  to: user.email,
+                  userName: user.name || "Team Member",
+                  dveplCode: salesOrder.dveplCode,
+                  partyName: salesOrder.partyName,
+                  stageName: stageLabel,
+                  remarks: userRemarks || undefined,
+                  dueDate: formattedDueDate || undefined,
+                  orderId: salesOrder.id,
+                },
+                salesOrder.companyId,
+              );
+
+              // Log success for each task
+              for (const ut of userTasks) {
+                try {
+                  await fastify.prisma.notificationLog.create({
+                    data: {
+                      eventCode: "TASK_ASSIGNED",
+                      channel: "EMAIL",
+                      recipient: user.email,
+                      subject: `Job Responsibility Assigned: [${salesOrder.dveplCode}] ${ut.stageName}`,
+                      message: `Assignment email sent to ${user.email} for order ${salesOrder.dveplCode} (${ut.stageName}).`,
+                      status: "SENT",
+                      relatedModule: "TASK",
+                      relatedRecordId: ut.taskId,
+                      sentAt: new Date(),
+                    },
+                  });
+                } catch {}
+              }
+            } catch (sendErr: any) {
+              // Log failure for each task
+              for (const ut of userTasks) {
+                try {
+                  await fastify.prisma.notificationLog.create({
+                    data: {
+                      eventCode: "TASK_ASSIGNED",
+                      channel: "EMAIL",
+                      recipient: user.email,
+                      subject: `Job Responsibility Assigned: [${salesOrder.dveplCode}] ${ut.stageName}`,
+                      message: `Failed to send email to ${user.email}.`,
+                      status: "FAILED",
+                      error: sendErr?.message || String(sendErr),
+                      relatedModule: "TASK",
+                      relatedRecordId: ut.taskId,
+                    },
+                  });
+                } catch {}
+              }
+              throw sendErr;
+            }
           }),
         );
 

@@ -71,7 +71,9 @@ async function adminTaskReadByIdRoutes(
             });
           }
 
-          const isAssigned = task.assignments.some(a => a.employeeId === employee.id);
+          const isAssigned = task.assignments.some(
+            a => a.employeeId === employee.id || a.employee?.user?.id === userId
+          );
           if (!isAssigned) {
             return reply.status(403).send({
               success: false,
@@ -80,13 +82,38 @@ async function adminTaskReadByIdRoutes(
           }
         }
 
+        // Fetch Notification Logs for this task
+        const notifLogs = await fastify.prisma.notificationLog.findMany({
+          where: {
+            OR: [
+              { relatedRecordId: id },
+              { relatedModule: "TASK", relatedRecordId: id },
+            ],
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+        });
+
+        const latestLog = notifLogs[0] || null;
+        const hasSent = notifLogs.some((l) => l.status === "SENT");
+        const hasFailed = notifLogs.some((l) => l.status === "FAILED");
+
         const formattedTask = {
           ...task,
           dueDate: task.dueDate.toISOString().split("T")[0],
           assignedUsers: task.assignments.map((a) => ({
             id: a.employee.user?.id || a.employee.id,
             name: a.employee.user?.name || `${a.employee.firstName} ${a.employee.lastName}`,
+            email: a.employee.user?.email || null,
           })),
+          mailDelivery: {
+            status: hasSent ? "SENT" : hasFailed ? "FAILED" : "NOT_SENT",
+            sentAt: latestLog ? (latestLog.sentAt || latestLog.createdAt) : null,
+            recipient: latestLog?.recipient || null,
+            error: latestLog?.error || null,
+            logs: notifLogs,
+          },
         };
 
         return reply.status(200).send({
