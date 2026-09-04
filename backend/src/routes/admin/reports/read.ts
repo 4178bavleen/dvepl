@@ -22,11 +22,15 @@ async function adminReportReadRouteGroup(fastify: FastifyInstance, options: Fast
             toDate: { type: "string" }
           }
         }
-      }
+      },
+      preHandler: [
+        fastify.verifyToken,
+        fastify.authorizePermissions(["report.view"]),
+      ],
     },
-    async (request: FastifyRequest<{ Querystring: ReportsQuery }>, reply: FastifyReply) => {
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { type = "customer", fromDate, toDate } = request.query;
+        const { type = "customer", fromDate, toDate } = request.query as ReportsQuery;
 
         // Fetch all orders matching basic active constraints
         const where: any = {

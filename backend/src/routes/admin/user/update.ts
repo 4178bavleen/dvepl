@@ -45,6 +45,7 @@ async function updateUserRoute(
     ) => {
       try {
         const companyId = (request.admin as any)?.companyId;
+        const loggedInUserId = (request.admin as any)?.id;
 
         if (!companyId) {
           return reply.status(401).send({
@@ -55,6 +56,14 @@ async function updateUserRoute(
 
         const { id } = request.params as { id: string };
         const { name, email, phone, isActive, role, designation, pageAccess, fieldPermissions, actionPermissions, password, teamId, hasOverride } = request.body as any;
+
+        // Prevent self-role-escalation
+        if (id === loggedInUserId && ((request.body as any).roleIds || role)) {
+          return reply.status(403).send({
+            success: false,
+            message: "You cannot modify your own roles.",
+          });
+        }
 
         if (actionPermissions !== undefined && !isValidActionPermissions(actionPermissions)) {
           return reply.status(400).send({
@@ -139,6 +148,21 @@ async function updateUserRoute(
           });
 
           if (roleIds && roleIds.length > 0) {
+            // Validate all roleIds belong to the same company
+            const validRoles = await fastify.prisma.role.findMany({
+              where: {
+                id: { in: roleIds },
+                companyId,
+                deletedAt: null,
+              },
+            });
+            if (validRoles.length !== roleIds.length) {
+              return reply.status(400).send({
+                success: false,
+                message: "One or more selected roles are invalid.",
+              });
+            }
+
             await tx.userRole.deleteMany({
               where: {
                 userId: id,

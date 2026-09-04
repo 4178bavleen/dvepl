@@ -18,11 +18,14 @@ async function createEmployeeRoutes(
 
     {
       schema: {
-        preHandler: [fastify.verifyToken],
         tags: ["Employee"],
         summary: "Create Employee",
         description: "Create a new employee",
       },
+      preHandler: [
+        fastify.verifyToken,
+        fastify.authorizePermissions(["employee.create"]),
+      ],
     },
 
     async (request: FastifyRequest, reply: FastifyReply) => {

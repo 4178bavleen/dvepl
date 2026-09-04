@@ -20,6 +20,7 @@ async function readUsersRoute(
       },
       preHandler: [
         fastify.verifyToken,
+        fastify.authorizePermissions(["user.view"]),
       ],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {

@@ -19,6 +19,10 @@ async function adminCompanyReadRoutes(
         summary: "Get All Companies",
         description: "Fetch all active companies",
       },
+      preHandler: [
+        fastify.verifyToken,
+        fastify.authorizePermissions(["company.view"]),
+      ],
     },
 
     async (request: FastifyRequest, reply: FastifyReply) => {

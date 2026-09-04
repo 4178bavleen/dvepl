@@ -33,12 +33,16 @@ async function adminPaymentUpdateRoutes(fastify: FastifyInstance, options: Fasti
             remarks: { type: "string" }
           }
         }
-      }
+      },
+      preHandler: [
+        fastify.verifyToken,
+        fastify.authorizePermissions(["payment.update"]),
+      ],
     },
-    async (request: FastifyRequest<{ Params: Params; Body: Body }>, reply: FastifyReply) => {
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { id } = request.params;
-        const { amount, paymentMethod, referenceNo, paymentDate, remarks } = request.body;
+        const { id } = request.params as Params;
+        const { amount, paymentMethod, referenceNo, paymentDate, remarks } = request.body as Body;
 
         const existing = await fastify.prisma.payment.findUnique({
           where: { id },

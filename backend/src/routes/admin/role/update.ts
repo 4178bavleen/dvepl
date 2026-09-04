@@ -72,10 +72,10 @@ async function updateRoleRoute(
           });
         }
 
-        if (role.isSystem && name !== undefined && name !== role.name) {
-          return reply.status(400).send({
+        if (role.isSystem) {
+          return reply.status(403).send({
             success: false,
-            message: "System roles name cannot be updated.",
+            message: "System roles cannot be modified.",
           });
         }
 
@@ -125,6 +125,94 @@ async function updateRoleRoute(
         }
 
         //--------------------------------
+        // Ceiling Enforcement (Bug #13)
+        // Users cannot grant permissions they don't possess.
+        //--------------------------------
+
+        const requesterId = (request.admin as any)?.id;
+        if (requesterId && (pageAccess !== undefined || actionPermissions !== undefined)) {
+          const requester = await fastify.prisma.user.findUnique({
+            where: { id: requesterId },
+            include: {
+              userRoles: {
+                include: { role: true },
+              },
+              accessProfile: true,
+            },
+          });
+
+          const rUp = requester?.accessProfile;
+          const rHasOverride = rUp?.hasOverride ?? false;
+          const rAllRoles = requester?.userRoles.map((ur) => ur.role) || [];
+
+          const mergedRolePageAccess = [
+            ...new Set(rAllRoles.flatMap((r) => (r.pageAccess as string[] || []))),
+          ];
+
+          const requesterPageAccess = rHasOverride
+            ? (rUp?.pageAccess as string[] || [])
+            : (mergedRolePageAccess.length > 0
+                ? mergedRolePageAccess
+                : (rUp?.pageAccess as string[] || []));
+
+          const requesterPageAccessSet = new Set(requesterPageAccess);
+
+          if (pageAccess !== undefined) {
+            const newPageAccess = (pageAccess as string[]) || [];
+            const deniedPages = newPageAccess.filter((p) => !requesterPageAccessSet.has(p));
+            if (deniedPages.length > 0) {
+              return reply.status(403).send({
+                success: false,
+                message: `You cannot grant page access you do not have: ${deniedPages.join(", ")}`,
+              });
+            }
+          }
+
+          if (actionPermissions !== undefined) {
+            const newActionPermissions = actionPermissions as Record<string, any>;
+            const allowedActionPermissions =
+              rHasOverride
+                ? (rUp?.actionPermissions || {})
+                : (Object.keys(
+                    rAllRoles.reduce<Record<string, any>>((acc, r) => {
+                      const ap = (r.actionPermissions as Record<string, any>) || {};
+                      for (const [m, acts] of Object.entries(ap)) {
+                        if (!acc[m]) acc[m] = { ...acts };
+                        else for (const a of ["create", "edit", "delete", "export"]) {
+                          if ((acts as any)[a] === true) acc[m][a] = true;
+                        }
+                      }
+                      return acc;
+                    }, {})
+                  ).length > 0
+                    ? rAllRoles.reduce<Record<string, any>>((acc, r) => {
+                        const ap = (r.actionPermissions as Record<string, any>) || {};
+                        for (const [m, acts] of Object.entries(ap)) {
+                          if (!acc[m]) acc[m] = { ...acts };
+                          else for (const a of ["create", "edit", "delete", "export"]) {
+                            if ((acts as any)[a] === true) acc[m][a] = true;
+                          }
+                        }
+                        return acc;
+                      }, {})
+                    : (rUp?.actionPermissions || {}));
+
+            for (const [module, actions] of Object.entries(newActionPermissions || {})) {
+              const granted = (actions as any) || {};
+              const own = (allowedActionPermissions as any)[module] || {};
+              for (const action of ["create", "edit", "delete", "export"]) {
+                if (granted[action] === true && own[action] !== true) {
+                  return reply.status(403).send({
+                    success: false,
+                    message: `You cannot grant "${action}" on "${module}" because you do not have it.`,
+                  });
+                }
+              }
+            }
+          }
+        }
+
+        //--------------------------------
         // Transaction
         //--------------------------------
 
@@ -155,6 +243,90 @@ async function updateRoleRoute(
                 permissionId,
               })),
             });
+          }
+
+          //--------------------------------
+          // Access Profile Propagation (Bug #11)
+          // When a role's permissions change, existing users who do NOT have a
+          // custom override (hasOverride=false) should inherit the updated role
+          // permissions (snapshot drift fix).
+          //--------------------------------
+
+          const roleNeedsPropagation =
+            pageAccess !== undefined ||
+            fieldPermissions !== undefined ||
+            actionPermissions !== undefined;
+
+          if (roleNeedsPropagation) {
+            const affectedUsers = await tx.user.findMany({
+              where: {
+                deletedAt: null,
+                userRoles: {
+                  some: { roleId: id },
+                },
+                accessProfile: {
+                  isNot: null,
+                },
+              },
+              include: {
+                accessProfile: true,
+                userRoles: {
+                  include: { role: true },
+                },
+              },
+            });
+
+            for (const u of affectedUsers) {
+              if (u.accessProfile?.hasOverride) {
+                continue;
+              }
+
+              // Merge this role's (updated) permissions across all of the user's roles
+              const latestRoles = u.userRoles.map((ur) => ur.role);
+
+              const mergedPageAccess = [
+                ...new Set(
+                  latestRoles.flatMap((r) => (r.pageAccess as string[] || [])),
+                ),
+              ];
+
+              const mergedActionPermissions: Record<string, any> = {};
+              for (const r of latestRoles) {
+                const ap = (r.actionPermissions as Record<string, any>) || {};
+                for (const [m, acts] of Object.entries(ap)) {
+                  if (!mergedActionPermissions[m]) {
+                    mergedActionPermissions[m] = { ...acts };
+                  } else {
+                    for (const a of ["create", "edit", "delete", "export"]) {
+                      if ((acts as any)[a] === true) mergedActionPermissions[m][a] = true;
+                    }
+                  }
+                }
+              }
+
+              const mergedFieldPermissions: Record<string, any> = {};
+              for (const r of latestRoles) {
+                const fp = (r.fieldPermissions as Record<string, any>) || {};
+                for (const [field, config] of Object.entries(fp)) {
+                  if (!mergedFieldPermissions[field]) {
+                    mergedFieldPermissions[field] = { ...config };
+                  } else if ((config as any)?.view === true) {
+                    mergedFieldPermissions[field].view = true;
+                  }
+                }
+              }
+
+              await tx.userAccessProfile.update({
+                where: { userId: u.id },
+                data: {
+                  pageAccess: mergedPageAccess.length > 0 ? mergedPageAccess : [],
+                  actionPermissions: Object.keys(mergedActionPermissions).length > 0
+                    ? mergedActionPermissions
+                    : {},
+                  fieldPermissions: mergedFieldPermissions,
+                },
+              });
+            }
           }
         });
 

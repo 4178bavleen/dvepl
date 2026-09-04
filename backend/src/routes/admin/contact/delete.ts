@@ -21,7 +21,7 @@ async function deleteContactRoute(
       },
       preHandler: [
         fastify.verifyToken,
-        fastify.authorizePermissions(["customer.update"]),
+        fastify.authorizePermissions(["contact.delete"]),
       ],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {

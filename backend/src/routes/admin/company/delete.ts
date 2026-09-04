@@ -19,6 +19,10 @@ async function adminCompanyDeleteRoutes(
         summary: "Delete Company",
         description: "Soft delete company",
       },
+      preHandler: [
+        fastify.verifyToken,
+        fastify.authorizePermissions(["company.delete"]),
+      ],
     },
 
     async (request: FastifyRequest, reply: FastifyReply) => {

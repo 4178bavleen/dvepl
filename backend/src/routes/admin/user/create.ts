@@ -126,6 +126,7 @@ async function createUserRoute(
             id: {
               in: activeRoleIds,
             },
+            companyId,
             deletedAt: null,
           },
         });
@@ -140,8 +141,13 @@ async function createUserRoute(
         // ======================================================
         // Hash Password
         // ======================================================
-        const passwordToHash = password || "Dvepl@2026";
-        const passwordHash = await hashPassword(passwordToHash);
+        if (!password) {
+          return reply.status(400).send({
+            success: false,
+            message: "Password is required.",
+          });
+        }
+        const passwordHash = await hashPassword(password);
 
         // ======================================================
         // Create User + Assign Roles (Transaction)

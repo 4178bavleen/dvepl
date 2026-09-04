@@ -21,6 +21,7 @@ async function readAuditLogRoutes(
       },
       preHandler: [
         fastify.verifyToken,
+        fastify.authorizePermissions(["auditLog.view"]),
       ],
     },
     async (request: FastifyRequest, reply: FastifyReply) => {

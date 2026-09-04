@@ -24,11 +24,15 @@ async function adminPaymentReadRoutes(fastify: FastifyInstance, options: Fastify
             limit: { type: "string" }
           }
         }
-      }
+      },
+      preHandler: [
+        fastify.verifyToken,
+        fastify.authorizePermissions(["payment.view"]),
+      ],
     },
-    async (request: FastifyRequest<{ Querystring: Query }>, reply: FastifyReply) => {
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { salesOrderId, page = "1", limit = "100" } = request.query;
+        const { salesOrderId, page = "1", limit = "100" } = request.query as Query;
 
         const where: any = { deletedAt: null };
         if (salesOrderId) {

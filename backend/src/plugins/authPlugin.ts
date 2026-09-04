@@ -62,6 +62,16 @@ const getModuleForRequest = (url: string): string | null => {
     ["/section/", "sections"], ["/division/", "divisions"], ["/sub-division/", "sub_divisions"],
     ["/reference-code/", "reference_codes"], ["/user/", "users"], ["/role/", "roles"],
     ["/settings/", "settings"], ["/recycle-bin/", "recycle_bin"], ["/custom-fields/", "custom_fields"],
+    ["/notification/", "settings"], ["/payment/", "finance"], ["/reports/", "reports"],
+    ["/vendor-product/", "vendors"], ["/inventory-tracking/", "inventory"],
+    ["/goods-receipt/", "inventory"], ["/purchase-order/", "inventory"],
+    ["/quotetender/", "orders"], ["/dynamic/", "settings"], ["/upload/", "settings"],
+    ["/export-orders/", "export_orders"], ["/workflow/", "settings"],
+    ["/employee-contact/", "employees"], ["/employee-emergency-contact/", "employees"],
+    ["/employee-education/", "employees"], ["/employee-experience/", "employees"],
+    ["/reference-code-counter/", "reference_codes"],
+    ["/tender-request-activity/", "tender_requests"], ["/tender-activity/", "tenders"],
+    ["/tender-file/", "tenders"], ["/tender-remark/", "tenders"],
   ];
   return routeModules.find(([path]) => url.includes(path))?.[1] ?? null;
 };
@@ -71,14 +81,46 @@ const getModuleForRequest = (url: string): string | null => {
 // page-access setting; the permission code itself is never authorized.
 const getModuleForPermission = (permissions: string[]): string | null => {
   const prefixToModule: Record<string, string> = {
+    dashboard: "dashboard",
     company: "companies",
     branch: "branches",
+    department: "departments",
+    team: "teams",
+    designation: "designations",
+    costCenter: "cost_centers",
     employee: "employees",
+    attendance: "attendance",
+    leave: "leaves",
+    holiday: "holidays",
+    shift: "shift_management",
+    salary: "payroll",
+    employeeDocument: "documents",
+    task: "tasks",
     customer: "customers",
+    contact: "contacts",
+    communication: "communication",
+    salesOrder: "orders",
+    order: "orders",
+    vendor: "vendors",
+    inventory: "inventory",
+    exportOrder: "export_orders",
+    payment: "finance",
     tenderRequest: "tender_requests",
     tender: "tenders",
+    technicalClarification: "technical_clarifications",
+    governmentDepartment: "government_departments",
+    section: "sections",
+    division: "divisions",
+    subDivision: "sub_divisions",
+    referenceCode: "reference_codes",
     user: "users",
     role: "roles",
+    approvalRequest: "approval_requests",
+    report: "reports",
+    auditLog: "audit_logs",
+    customField: "custom_fields",
+    recycleBin: "recycle_bin",
+    settings: "settings",
   };
 
   for (const permission of permissions) {
@@ -326,25 +368,63 @@ async function authPlugin(fastify: FastifyInstance) {
         }
 
         const up = dbUser.accessProfile;
-        const mainRole = dbUser.userRoles[0]?.role;
         const hasOverride = up?.hasOverride ?? false;
+
+        // Merge pageAccess from ALL roles (union) instead of only the first role
+        const allRoles = dbUser.userRoles.map((ur) => ur.role);
+
+        const mergedRolePageAccess = [...new Set(
+          allRoles.flatMap((role) => (role.pageAccess as string[] || []))
+        )];
+
+        const mergedRoleActionPermissions: Record<string, any> = {};
+        for (const role of allRoles) {
+          const ap = role.actionPermissions as Record<string, any> || {};
+          for (const [module, actions] of Object.entries(ap)) {
+            if (!mergedRoleActionPermissions[module]) {
+              mergedRoleActionPermissions[module] = { ...actions };
+            } else {
+              // Union: if ANY role grants an action, it's granted
+              for (const action of ["create", "edit", "delete", "export"]) {
+                if ((actions as any)[action] === true) {
+                  mergedRoleActionPermissions[module][action] = true;
+                }
+              }
+            }
+          }
+        }
+
+        const mergedRoleFieldPermissions: Record<string, any> = {};
+        for (const role of allRoles) {
+          const fp = (role.fieldPermissions as Record<string, any>) || {};
+          for (const [field, config] of Object.entries(fp)) {
+            if (!mergedRoleFieldPermissions[field]) {
+              mergedRoleFieldPermissions[field] = { ...config };
+            } else {
+              // Union: if ANY role grants view, it's granted
+              if ((config as any)?.view === true) {
+                mergedRoleFieldPermissions[field].view = true;
+              }
+            }
+          }
+        }
 
         const resolvedPageAccess = hasOverride
           ? (up?.pageAccess as string[] || [])
-          : (mainRole?.pageAccess && (mainRole.pageAccess as any[]).length > 0
-              ? (mainRole.pageAccess as string[])
+          : (mergedRolePageAccess.length > 0
+              ? mergedRolePageAccess
               : (up?.pageAccess as string[] || []));
 
         const resolvedActionPermissions = hasOverride
           ? (up?.actionPermissions || { create: true, edit: true, delete: false, export: true })
-          : (mainRole?.actionPermissions && Object.keys(mainRole.actionPermissions).length > 0
-              ? mainRole.actionPermissions
+          : (Object.keys(mergedRoleActionPermissions).length > 0
+              ? mergedRoleActionPermissions
               : (up?.actionPermissions || { create: true, edit: true, delete: false, export: true }));
 
         const resolvedFieldPermissions = hasOverride
           ? (up?.fieldPermissions || {})
-          : (mainRole?.fieldPermissions && Object.keys((mainRole.fieldPermissions as any) || {}).length > 0
-              ? mainRole.fieldPermissions
+          : (Object.keys(mergedRoleFieldPermissions).length > 0
+              ? mergedRoleFieldPermissions
               : (up?.fieldPermissions || {}));
 
         const tokenUser = {
@@ -387,7 +467,7 @@ async function authPlugin(fastify: FastifyInstance) {
         const moduleKey = getModuleForRequest(request.url) ?? getModuleForPermission(allowedPermissions);
 
         const roles: string[] = (request.admin as any)?.roles ?? [];
-        const isAdmin = roles.some((r: string) => r.toLowerCase().includes("admin"));
+        const isAdmin = roles.some((r: string) => r === "Admin");
         if (isAdmin) return;
 
         // Page/action access profiles are the single source of authorization.

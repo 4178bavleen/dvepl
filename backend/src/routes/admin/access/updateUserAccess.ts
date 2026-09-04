@@ -9,6 +9,62 @@ interface Body {
     permissionIds: string[];
 }
 
+// Mirrors getModuleForPermission in authPlugin.ts so flat permission codes
+// translate to the authoritative pageAccess/actionPermissions modules.
+const PREFIX_TO_MODULE: Record<string, string> = {
+    dashboard: "dashboard",
+    company: "companies",
+    branch: "branches",
+    department: "departments",
+    team: "teams",
+    designation: "designations",
+    costCenter: "cost_centers",
+    employee: "employees",
+    attendance: "attendance",
+    leave: "leaves",
+    holiday: "holidays",
+    shift: "shift_management",
+    salary: "payroll",
+    employeeDocument: "documents",
+    task: "tasks",
+    customer: "customers",
+    contact: "contacts",
+    communication: "communication",
+    salesOrder: "orders",
+    order: "orders",
+    vendor: "vendors",
+    inventory: "inventory",
+    exportOrder: "export_orders",
+    payment: "finance",
+    tenderRequest: "tender_requests",
+    tender: "tenders",
+    technicalClarification: "technical_clarifications",
+    governmentDepartment: "government_departments",
+    section: "sections",
+    division: "divisions",
+    subDivision: "sub_divisions",
+    referenceCode: "reference_codes",
+    user: "users",
+    role: "roles",
+    approvalRequest: "approval_requests",
+    report: "reports",
+    auditLog: "audit_logs",
+    customField: "custom_fields",
+    recycleBin: "recycle_bin",
+    settings: "settings",
+};
+
+const ALL_ACTIONS = ["create", "edit", "delete", "export"] as const;
+type Action = (typeof ALL_ACTIONS)[number];
+
+const actionFromCode = (code: string): Action | "view" | null => {
+    if (code.includes(".create")) return "create";
+    if (code.includes(".update") || code.includes(".edit")) return "edit";
+    if (code.includes(".delete") || code.includes(".remove")) return "delete";
+    if (code.includes(".view") || code.includes(".read")) return "view";
+    return null;
+};
+
 async function updateUserAccessRoute(
     fastify: FastifyInstance,
     options: FastifyPluginOptions
@@ -52,91 +108,82 @@ async function updateUserAccessRoute(
                         message: "User not found.",
                     });
                 }
-                console.log("permissionIds:", permissionIds);
 
-          await fastify.prisma.$transaction(async (tx) => {
-            // 1. Fetch user roles to find which permissions are granted by roles
-            const userRoles = await tx.userRole.findMany({
-              where: { userId: id },
-              include: {
-                role: {
-                  include: {
-                    rolePermissions: true,
-                  },
-                },
-              },
-            });
+                await fastify.prisma.$transaction(async (tx) => {
+                    // 1. Validate the requested permission ids exist.
+                    const allPermissions = await tx.permission.findMany({
+                        where: {
+                            id: { in: permissionIds || [] },
+                        },
+                        select: { id: true, code: true },
+                    });
+                    if (allPermissions.length !== (permissionIds || []).length) {
+                        const err: any = new Error("One or more permissions are invalid.");
+                        err.status = 400;
+                        throw err;
+                    }
 
-            const rolePermissionIds = new Set(
-              userRoles.flatMap((ur) =>
-                ur.role.rolePermissions.map((rp) => rp.permissionId)
-              )
-            );
+                    // 2. Build the authoritative JSON policy from the requested set:
+                    //    - pageAccess: unique modules referenced by any permission
+                    //    - actionPermissions: module -> { create, edit, delete, export }
+                    const pageAccess = [
+                        ...new Set(
+                            allPermissions
+                                .map((p) => PREFIX_TO_MODULE[p.code.split(".")[0]])
+                                .filter((m): m is string => Boolean(m)),
+                        ),
+                    ];
 
-            // 2. Fetch all permissions to validate inputs
-            const allPermissions = await tx.permission.findMany({
-              select: { id: true },
-            });
-            const validPermissionIds = new Set(allPermissions.map((p) => p.id));
+                    const actionPermissions: Record<string, Record<Action, boolean>> = {};
+                    for (const perm of allPermissions) {
+                        const module = PREFIX_TO_MODULE[perm.code.split(".")[0]];
+                        if (!module) continue;
+                        if (!actionPermissions[module]) {
+                            actionPermissions[module] = {
+                                create: false,
+                                edit: false,
+                                delete: false,
+                                export: false,
+                            };
+                        }
+                        const action = actionFromCode(perm.code);
+                        if (action && action !== "view") {
+                            actionPermissions[module][action] = true;
+                        }
+                    }
 
-            const desiredIds = new Set(permissionIds || []);
-
-            // 3. Clear existing custom overrides
-            await tx.userPermission.deleteMany({
-              where: {
-                userId: id,
-              },
-            });
-
-            // 4. Calculate delta overrides (ALLOW / DENY)
-            const overridesToCreate: {
-              userId: string;
-              permissionId: string;
-              allowed: boolean;
-            }[] = [];
-
-            // We look at the union of desired permission IDs and role permission IDs
-            const unionOfPermissions = new Set([...desiredIds, ...rolePermissionIds]);
-
-            for (const permissionId of unionOfPermissions) {
-              // Ignore any permission ID that does not exist in the database
-              if (!validPermissionIds.has(permissionId)) {
-                continue;
-              }
-
-              const isDesired = desiredIds.has(permissionId);
-              const hasRole = rolePermissionIds.has(permissionId);
-
-              if (isDesired && !hasRole) {
-                // Not in role, but desired -> ALLOW override
-                overridesToCreate.push({
-                  userId: id,
-                  permissionId,
-                  allowed: true,
+                    // 3. Persist as a custom override (hasOverride: true) so the new
+                    //    policy takes effect through the authoritative resolution path.
+                    await tx.userAccessProfile.upsert({
+                        where: { userId: id },
+                        create: {
+                            userId: id,
+                            designation: "Team Member",
+                            hasOverride: true,
+                            pageAccess,
+                            actionPermissions,
+                            fieldPermissions: {},
+                        },
+                        update: {
+                            hasOverride: true,
+                            pageAccess,
+                            actionPermissions,
+                            fieldPermissions: {},
+                        },
+                    });
                 });
-              } else if (!isDesired && hasRole) {
-                // In role, but not desired -> DENY override
-                overridesToCreate.push({
-                  userId: id,
-                  permissionId,
-                  allowed: false,
-                });
-              }
-            }
-
-            if (overridesToCreate.length > 0) {
-              await tx.userPermission.createMany({
-                data: overridesToCreate,
-                skipDuplicates: true,
-              });
-            }
-          });
 
                 return reply.send({
                     success: true,
                     message: "Permissions updated successfully.",
                 });
             } catch (error: any) {
+                if (error?.status === 400) {
+                    return reply.status(400).send({
+                        success: false,
+                        message: error.message,
+                    });
+                }
                 return reply.status(500).send({
                     success: false,
                     message: error.message,
