@@ -22,7 +22,7 @@ async function resetUserAccessRoute(
       schema: {
         tags: ["Access"],
         summary: "Reset User Access Overrides",
-        description: "Deletes all custom permission overrides for a user, resetting their access to role defaults.",
+        description: "Clears a user's custom override so they inherit their role defaults.",
       },
     },
     async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
@@ -53,17 +53,16 @@ async function resetUserAccessRoute(
           });
         }
 
-        await fastify.prisma.userPermission.deleteMany({
-          where: {
-            userId: id,
-          },
+        await fastify.prisma.userAccessProfile.update({
+          where: { userId: id },
+          data: { hasOverride: false },
         });
 
-        adminLogs.info("User access overrides reset", { userId: id });
+        adminLogs.info("User access override reset", { userId: id });
 
         return reply.send({
           success: true,
-          message: "User permission overrides reset successfully.",
+          message: "User permission override reset successfully.",
         });
       } catch (error: any) {
         adminLogs.error("Failed to reset user access", { error });

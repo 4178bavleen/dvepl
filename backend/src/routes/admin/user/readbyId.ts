@@ -102,11 +102,9 @@ async function readUserByIdRoute(
                             name: userRole.role.name,
                         })),
 
-                        permissions: [
-                            "user.create",
-                            "user.view",
-                            "lead.assign",
-                        ],
+                        permissions: user.userRoles.flatMap((userRole: any) =>
+                            (userRole.role.rolePermissions || []).map((rp: any) => rp.permission?.code).filter(Boolean)
+                        ),
                     },
                 });
 
@@ -116,7 +114,14 @@ async function readUserByIdRoute(
                     error,
                 });
 
-           
+                return reply.status(500).send({
+                    success: false,
+                    message: "Server error.",
+                    details:
+                        process.env.NODE_ENV === "development"
+                            ? error.message
+                            : undefined,
+                });
 
             }
         }

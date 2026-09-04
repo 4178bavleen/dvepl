@@ -11,8 +11,12 @@ import { adminLogs } from "../../../services/logger/contextLogger";
 import { loginSchema } from "../../../schemas/admin/auth/auth.schema";
 import { getExpiryTime } from "../../../utils/getExpirytime";
 
-const jwtSecret = process.env.JWT_SECRET || "SecretKey";
-const jwtExpiration = process.env.JWT_EXPIRATION || "1h";
+const jwtSecret = process.env.JWT_SECRET;
+const jwtExpiration = process.env.JWT_EXPIRATION || "30d";
+
+if (!jwtSecret) {
+  throw new Error("JWT_SECRET environment variable is not set");
+}
 
 async function adminLoginRoutes(
   fastify: FastifyInstance,

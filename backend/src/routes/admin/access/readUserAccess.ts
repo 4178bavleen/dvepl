@@ -39,35 +39,11 @@ async function readUserAccessRoute(
             companyId,
             deletedAt: null,
           },
-
           include: {
             userRoles: {
-              include: {
-                role: {
-                  include: {
-                    rolePermissions: {
-                      include: {
-                        permission: {
-                          include: {
-                            group: true,
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
+              include: { role: true },
             },
-
-            userPermissions: {
-              include: {
-                permission: {
-                  include: {
-                    group: true,
-                  },
-                },
-              },
-            },
+            accessProfile: true,
           },
         });
 
@@ -78,98 +54,27 @@ async function readUserAccessRoute(
           });
         }
 
-        //-------------------------------------------------------
-        // Group Permissions & Apply Overrides
-        //-------------------------------------------------------
+        const up = user.accessProfile;
+        const mainRole = user.userRoles[0]?.role;
+        const hasOverride = up?.hasOverride ?? false;
 
-        const allPermissions = await fastify.prisma.permission.findMany({
-          include: {
-            group: true,
-          },
-          orderBy: {
-            code: "asc",
-          },
-        });
+        const pageAccess = hasOverride
+          ? (up?.pageAccess || [])
+          : (mainRole?.pageAccess && (mainRole.pageAccess as any[]).length > 0
+              ? mainRole.pageAccess
+              : (up?.pageAccess || []));
 
-        // Set up lookup structures for role permissions and overrides
-        const rolePermissionIds = new Set<string>();
-        for (const userRole of user.userRoles) {
-          for (const rp of userRole.role.rolePermissions) {
-            rolePermissionIds.add(rp.permissionId);
-          }
-        }
+        const actionPermissions = hasOverride
+          ? (up?.actionPermissions || { create: true, edit: true, delete: false, export: true })
+          : (mainRole?.actionPermissions && Object.keys(mainRole.actionPermissions).length > 0
+              ? mainRole.actionPermissions
+              : (up?.actionPermissions || { create: true, edit: true, delete: false, export: true }));
 
-        const overrideAllowedMap = new Map<string, boolean>();
-        for (const up of user.userPermissions) {
-          overrideAllowedMap.set(up.permissionId, up.allowed);
-        }
-
-        const permissionGroupsMap = new Map<
-          string,
-          {
-            groupId: string;
-            groupName: string;
-            permissions: any[];
-          }
-        >();
-
-        for (const permission of allPermissions) {
-          const groupId = permission.group?.id ?? "ungrouped";
-          const groupName = permission.group?.name ?? "Other";
-
-          if (!permissionGroupsMap.has(groupId)) {
-            permissionGroupsMap.set(groupId, {
-              groupId,
-              groupName,
-              permissions: [],
-            });
-          }
-
-          const group = permissionGroupsMap.get(groupId)!;
-
-          const isAssignedByRole = rolePermissionIds.has(permission.id);
-          const override = overrideAllowedMap.get(permission.id);
-
-          // If override is defined, it dictates the status. Otherwise, fall back to role default.
-          const enabled = override !== undefined ? override : isAssignedByRole;
-
-          // Determine source label for UI
-          let source = "none";
-          if (override !== undefined) {
-            source = "override";
-          } else if (isAssignedByRole) {
-            source = "role";
-          }
-
-          group.permissions.push({
-            id: permission.id,
-            code: permission.code,
-            description: permission.description,
-            enabled,
-            editable: true,
-            source,
-          });
-        }
-
-        // ======================================================
-        // Sort Groups and Permissions
-        // ======================================================
-        const permissionGroups = Array.from(permissionGroupsMap.values())
-          .map((group) => ({
-            ...group,
-            permissions: group.permissions.sort((a, b) =>
-              a.code.localeCompare(b.code),
-            ),
-          }))
-          .sort((a, b) => {
-            if (a.groupId === "ungrouped") return 1;
-            if (b.groupId === "ungrouped") return -1;
-            return a.groupName.localeCompare(b.groupName);
-          });
-
-        // ======================================================
-        // Response
-        // ======================================================
+        const fieldPermissions = hasOverride
+          ? (up?.fieldPermissions || {})
+          : (mainRole?.fieldPermissions && Object.keys((mainRole.fieldPermissions as any) || {}).length > 0
+              ? mainRole.fieldPermissions
+              : (up?.fieldPermissions || {}));
 
         return reply.send({
           success: true,
@@ -180,14 +85,15 @@ async function readUserAccessRoute(
               email: user.email,
               phone: user.phone,
               isActive: user.isActive,
-
               roles: user.userRoles.map((ur) => ({
                 id: ur.role.id,
                 name: ur.role.name,
               })),
             },
-
-            permissionGroups,
+            pageAccess,
+            actionPermissions,
+            fieldPermissions,
+            hasOverride,
           },
         });
       } catch (error: any) {

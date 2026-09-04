@@ -66,13 +66,13 @@ const Header: React.FC<HeaderProps> = ({
 
   React.useEffect(() => {
     if (currentUser?.email) {
-      fetchNotifications(currentUser.email as string);
+      fetchNotifications(currentUser.email as string, currentUser.roles as string[]);
     } else {
       fetchNotifications();
     }
     const interval = setInterval(() => {
       if (currentUser?.email) {
-        fetchNotifications(currentUser.email as string);
+        fetchNotifications(currentUser.email as string, currentUser.roles as string[]);
       } else {
         fetchNotifications();
       }

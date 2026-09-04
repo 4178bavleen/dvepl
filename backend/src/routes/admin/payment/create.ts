@@ -30,12 +30,16 @@ async function adminPaymentCreateRoutes(fastify: FastifyInstance, options: Fasti
             remarks: { type: "string" }
           }
         }
-      }
+      },
+      preHandler: [
+        fastify.verifyToken,
+        fastify.authorizePermissions(["payment.create"]),
+      ],
     },
-    async (request: FastifyRequest<{ Body: Body }>, reply: FastifyReply) => {
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         const user = (request as any).user;
-        const { salesOrderId, amount, paymentMethod, referenceNo, paymentDate, remarks } = request.body;
+        const { salesOrderId, amount, paymentMethod, referenceNo, paymentDate, remarks } = request.body as Body;
 
         // Validate order exists
         const order = await fastify.prisma.salesOrder.findUnique({

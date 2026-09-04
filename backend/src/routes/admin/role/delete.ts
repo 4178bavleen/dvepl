@@ -83,13 +83,19 @@ async function deleteRoleRoute(
         // Soft Delete
         //--------------------------------
 
-        await fastify.prisma.role.update({
-          where: {
-            id,
-          },
-          data: {
-            deletedAt: new Date(),
-          },
+        await fastify.prisma.$transaction(async (tx) => {
+          await tx.rolePermission.deleteMany({
+            where: { roleId: id },
+          });
+
+          await tx.role.update({
+            where: {
+              id,
+            },
+            data: {
+              deletedAt: new Date(),
+            },
+          });
         });
 
         return reply.status(200).send({

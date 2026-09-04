@@ -19,14 +19,18 @@ async function adminVendorProductDeleteRoutes(
         summary: "Detach Product from Vendor",
         description: "Soft-delete a vendor-product association",
       },
+      preHandler: [
+        fastify.verifyToken,
+        fastify.authorizePermissions(["vendor.delete"]),
+      ],
     },
 
     async (
-      request: FastifyRequest<{ Params: { id: string } }>,
+      request: FastifyRequest,
       reply: FastifyReply,
     ) => {
       try {
-        const { id } = request.params;
+        const { id } = request.params as { id: string };
 
         const existing = await fastify.prisma.vendorProduct.findFirst({
           where: { id, deletedAt: null },

@@ -15,11 +15,15 @@ async function adminPaymentDeleteRoutes(fastify: FastifyInstance, options: Fasti
           type: "object",
           properties: { id: { type: "string" } }
         }
-      }
+      },
+      preHandler: [
+        fastify.verifyToken,
+        fastify.authorizePermissions(["payment.delete"]),
+      ],
     },
-    async (request: FastifyRequest<{ Params: Params }>, reply: FastifyReply) => {
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { id } = request.params;
+        const { id } = request.params as Params;
 
         const existing = await fastify.prisma.payment.findUnique({ where: { id } });
 

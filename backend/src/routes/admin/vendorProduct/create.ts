@@ -28,6 +28,10 @@ async function adminVendorProductCreateRoutes(
         description:
           "Bulk-attach one or more materials to a vendor (many-to-many)",
       },
+      preHandler: [
+        fastify.verifyToken,
+        fastify.authorizePermissions(["vendor.create"]),
+      ],
     },
 
     async (request: FastifyRequest, reply: FastifyReply) => {

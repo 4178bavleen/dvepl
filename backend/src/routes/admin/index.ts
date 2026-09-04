@@ -6,6 +6,7 @@ import adminUserRouteGroup from "./user/index";
 import adminDesignationRouteGroup from "./designation/index";
 import adminSettingsRouteGroup from "./settings/index";
 import adminCostCenterRouteGroup from "./costCenter/index";
+import accessRoutes from "./access/index";
 
 import adminEmployeeRouteGroup from "./employee";
 import adminEmployeeContactRouteGroup from "./employeeContact";
@@ -72,8 +73,6 @@ async function adminRoutes(
 ) {
   // Public routes
   fastify.register(adminAuthRouteGroup, { prefix: "/auth" });
-  fastify.register(adminCustomFieldRouteGroup, { prefix: "/custom-fields" });
-  fastify.register(recycleBinRoutes, { prefix: "/recycle-bin" });
 
   fastify.register(async function rolesGroup(instance, opts) {
     //runs automatically before every req
@@ -139,6 +138,208 @@ async function adminRoutes(
         }
       } else if (url.includes("/audit-log/")) {
         requiredPermissions = ["company.view"];
+      } else if (url.includes("/notification/")) {
+        requiredPermissions = ["settings.update"];
+      } else if (url.includes("/payment/")) {
+        if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
+          requiredPermissions = ["finance.create"];
+        } else {
+          requiredPermissions = ["finance.view"];
+        }
+      } else if (url.includes("/reports/")) {
+        requiredPermissions = ["reports.view"];
+      } else if (url.includes("/vendor-product/")) {
+        if (url.includes("/create") || url.includes("/delete")) {
+          requiredPermissions = ["vendor.create"];
+        } else {
+          requiredPermissions = ["vendor.view"];
+        }
+      } else if (url.includes("/inventory-tracking/")) {
+        if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
+          requiredPermissions = ["inventory.create"];
+        } else {
+          requiredPermissions = ["inventory.view"];
+        }
+      } else if (url.includes("/goods-receipt/")) {
+        if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
+          requiredPermissions = ["inventory.create"];
+        } else {
+          requiredPermissions = ["inventory.view"];
+        }
+      } else if (url.includes("/purchase-order/")) {
+        if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
+          requiredPermissions = ["inventory.create"];
+        } else {
+          requiredPermissions = ["inventory.view"];
+        }
+      } else if (url.includes("/user/")) {
+        if (url.includes("/create")) {
+          requiredPermissions = ["user.create"];
+        } else if (url.includes("/update")) {
+          requiredPermissions = ["user.update"];
+        } else if (url.includes("/delete")) {
+          requiredPermissions = ["user.delete"];
+        } else {
+          requiredPermissions = ["user.view"];
+        }
+      } else if (url.includes("/role/")) {
+        if (url.includes("/create")) {
+          requiredPermissions = ["role.create"];
+        } else if (url.includes("/update")) {
+          requiredPermissions = ["role.update"];
+        } else if (url.includes("/delete")) {
+          requiredPermissions = ["role.delete"];
+        } else {
+          requiredPermissions = ["role.view"];
+        }
+      } else if (url.includes("/holiday/")) {
+        if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
+          requiredPermissions = ["holiday.create"];
+        } else {
+          requiredPermissions = ["holiday.view"];
+        }
+      } else if (url.includes("/attendance/")) {
+        if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
+          requiredPermissions = ["attendance.create"];
+        } else {
+          requiredPermissions = ["attendance.view"];
+        }
+      } else if (url.includes("/leave/")) {
+        if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
+          requiredPermissions = ["leave.create"];
+        } else {
+          requiredPermissions = ["leave.view"];
+        }
+      } else if (url.includes("/salary/")) {
+        if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
+          requiredPermissions = ["salary.create"];
+        } else {
+          requiredPermissions = ["salary.view"];
+        }
+      } else if (url.includes("/shift/")) {
+        if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
+          requiredPermissions = ["shift.create"];
+        } else {
+          requiredPermissions = ["shift.view"];
+        }
+      } else if (url.includes("/employee-shift/")) {
+        if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
+          requiredPermissions = ["shift.create"];
+        } else {
+          requiredPermissions = ["shift.view"];
+        }
+      } else if (url.includes("/contact/")) {
+        if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
+          requiredPermissions = ["contact.create"];
+        } else {
+          requiredPermissions = ["contact.view"];
+        }
+      } else if (url.includes("/communication/")) {
+        if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
+          requiredPermissions = ["communication.create"];
+        } else {
+          requiredPermissions = ["communication.view"];
+        }
+      } else if (url.includes("/customer/")) {
+        if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
+          requiredPermissions = ["customer.create"];
+        } else {
+          requiredPermissions = ["customer.view"];
+        }
+      } else if (url.includes("/tender-request/")) {
+        if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
+          requiredPermissions = ["tenderRequest.create"];
+        } else {
+          requiredPermissions = ["tenderRequest.view"];
+        }
+      } else if (url.includes("/tender/")) {
+        if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
+          requiredPermissions = ["tender.create"];
+        } else {
+          requiredPermissions = ["tender.view"];
+        }
+      } else if (url.includes("/reference-code/")) {
+        if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
+          requiredPermissions = ["referenceCode.create"];
+        } else {
+          requiredPermissions = ["referenceCode.view"];
+        }
+      } else if (url.includes("/government-department/")) {
+        if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
+          requiredPermissions = ["governmentDepartment.create"];
+        } else {
+          requiredPermissions = ["governmentDepartment.view"];
+        }
+      } else if (url.includes("/section/")) {
+        if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
+          requiredPermissions = ["section.create"];
+        } else {
+          requiredPermissions = ["section.view"];
+        }
+      } else if (url.includes("/division/")) {
+        if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
+          requiredPermissions = ["division.create"];
+        } else {
+          requiredPermissions = ["division.view"];
+        }
+      } else if (url.includes("/sub-division/")) {
+        if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
+          requiredPermissions = ["subDivision.create"];
+        } else {
+          requiredPermissions = ["subDivision.view"];
+        }
+      } else if (url.includes("/technical-clarification/")) {
+        if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
+          requiredPermissions = ["technicalClarification.create"];
+        } else {
+          requiredPermissions = ["technicalClarification.view"];
+        }
+      } else if (url.includes("/employee-document/")) {
+        if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
+          requiredPermissions = ["employeeDocument.create"];
+        } else {
+          requiredPermissions = ["employeeDocument.view"];
+        }
+      } else if (url.includes("/employee-contact/") || url.includes("/employee-emergency-contact/") || url.includes("/employee-education/") || url.includes("/employee-experience/")) {
+        if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
+          requiredPermissions = ["employee.create"];
+        } else {
+          requiredPermissions = ["employee.view"];
+        }
+      } else if (url.includes("/export-orders/")) {
+        if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
+          requiredPermissions = ["exportOrder.create"];
+        } else {
+          requiredPermissions = ["exportOrder.view"];
+        }
+      } else if (url.includes("/dynamic/")) {
+        requiredPermissions = ["settings.update"];
+      } else if (url.includes("/upload/")) {
+        requiredPermissions = ["settings.update"];
+      } else if (url.includes("/workflow/")) {
+        if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
+          requiredPermissions = ["settings.update"];
+        } else {
+          requiredPermissions = ["settings.view"];
+        }
+      } else if (url.includes("/custom-fields/")) {
+        if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
+          requiredPermissions = ["customField.create"];
+        } else {
+          requiredPermissions = ["customField.view"];
+        }
+      } else if (url.includes("/recycle-bin/")) {
+        if (url.includes("/restore") || url.includes("/delete")) {
+          requiredPermissions = ["recycleBin.update"];
+        } else {
+          requiredPermissions = ["recycleBin.view"];
+        }
+      } else if (url.includes("/inventory/")) {
+        if (url.includes("/create") || url.includes("/update") || url.includes("/delete")) {
+          requiredPermissions = ["inventory.create"];
+        } else {
+          requiredPermissions = ["inventory.view"];
+        }
       }
 
       // If we identified specific required permissions, authorize them
@@ -257,24 +458,24 @@ async function adminRoutes(
     instance.register(adminVendorProductRouteGroup, {
       prefix: "/vendor-product",
     });
-    fastify.register(inventoryTrackingRoutes, {
+    instance.register(inventoryTrackingRoutes, {
       prefix: "/inventory-tracking",
     });
-    fastify.register(goodsReceiptRoutes, {
+    instance.register(goodsReceiptRoutes, {
       prefix: "/goods-receipt",
     });
-    fastify.register(purchaseOrderRoutes, {
+    instance.register(purchaseOrderRoutes, {
       prefix: "/purchase-order",
     });
-    fastify.register(quoteTenderOrderRoutes, {
+    instance.register(quoteTenderOrderRoutes, {
       prefix: "/quotetender",
     });
 
-    fastify.register(dynamicRoutes, { prefix: "/dynamic" });
-    fastify.register(adminUploadRouteGroup, {
+    instance.register(dynamicRoutes, { prefix: "/dynamic" });
+    instance.register(adminUploadRouteGroup, {
       prefix: "/upload",
     });
-    fastify.register(adminExportOrdersRouteGroup, {
+    instance.register(adminExportOrdersRouteGroup, {
       prefix: "/export-orders",
     });
     instance.register(notificationRoutes, {
@@ -283,9 +484,11 @@ async function adminRoutes(
     instance.register(adminAuditLogRouteGroup, {
       prefix: "/audit-log",
     });
+    instance.register(adminCustomFieldRouteGroup, { prefix: "/custom-fields" });
+    instance.register(recycleBinRoutes, { prefix: "/recycle-bin" });
+    instance.register(workflowRoutes, { prefix: "/workflow" });
+    instance.register(accessRoutes, { prefix: "/access" });
   });
-
-  fastify.register(workflowRoutes, { prefix: "/workflow" });
 }
 
 export default adminRoutes;

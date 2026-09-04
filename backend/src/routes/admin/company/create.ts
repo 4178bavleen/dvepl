@@ -22,8 +22,11 @@ async function adminCompanycreateRoutes(
         tags: ["Company"],
         summary: "Create Company",
         description: "Create a new company",
-
       },
+      preHandler: [
+        fastify.verifyToken,
+        fastify.authorizePermissions(["company.create"]),
+      ],
     },
 
     async (request: FastifyRequest, reply: FastifyReply) => {

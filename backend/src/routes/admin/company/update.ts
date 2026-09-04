@@ -22,6 +22,10 @@ async function adminCompanyUpdateRoutes(
         summary: "Update Company",
         description: "Update company details",
       },
+      preHandler: [
+        fastify.verifyToken,
+        fastify.authorizePermissions(["company.update"]),
+      ],
     },
 
     async (request: FastifyRequest, reply: FastifyReply) => {

@@ -21,6 +21,10 @@ async function adminVendorProductReadRoutes(
         description:
           "List products attached to a vendor, or vendors attached to a product",
       },
+      preHandler: [
+        fastify.verifyToken,
+        fastify.authorizePermissions(["vendor.view"]),
+      ],
     },
 
     async (request: FastifyRequest, reply: FastifyReply) => {

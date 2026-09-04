@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { notificationApi } from '@/services/notification';
+import { isAdminUser } from '@/utils/pagePermissions';
 
 export interface NotificationItem {
   id: string;
@@ -13,7 +14,7 @@ export interface NotificationItem {
 interface NotificationStore {
   notifications: NotificationItem[];
   loading: boolean;
-  fetchNotifications: (userEmail?: string) => Promise<void>;
+  fetchNotifications: (userEmail?: string, userRoles?: string[]) => Promise<void>;
   markAllAsRead: () => void;
   markAsRead: (id: string) => void;
   clearAll: () => void;
@@ -24,7 +25,7 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
   notifications: [],
   loading: false,
 
-  fetchNotifications: async (userEmail) => {
+  fetchNotifications: async (userEmail, userRoles) => {
     set({ loading: true });
     try {
       // Fetch all system-wide logs by default so the admin user sees all dispatches
@@ -44,7 +45,7 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
           return log.recipient?.toLowerCase() === userEmail.toLowerCase();
         });
 
-        const isAdmin = userEmail ? userEmail.toLowerCase().includes('admin') : false;
+        const isAdmin = isAdminUser({ roles: userRoles || [] });
 
         const mapped: NotificationItem[] = userLogs.map((log: any) => {
           const createdDate = new Date(log.createdAt);
