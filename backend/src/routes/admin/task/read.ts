@@ -43,7 +43,10 @@ async function adminTaskReadRoutes(
 
           whereClause.assignments = {
             some: {
-              employeeId: employee.id,
+              OR: [
+                { employeeId: employee.id },
+                { employee: { userId } }
+              ]
             },
           };
         }
@@ -81,16 +84,56 @@ async function adminTaskReadRoutes(
         const entityIds = tasks.map(t => t.id);
         const cfValuesMap = await cfService.getValuesForEntities("task", entityIds);
 
+        // Fetch Notification Logs for these tasks
+        const notifLogs = entityIds.length > 0
+          ? await fastify.prisma.notificationLog.findMany({
+              where: {
+                OR: [
+                  { relatedRecordId: { in: entityIds } },
+                  { relatedModule: "TASK", relatedRecordId: { in: entityIds } },
+                ],
+              },
+              orderBy: {
+                createdAt: "desc",
+              },
+            })
+          : [];
+
+        const logsByTaskId: Record<string, any[]> = {};
+        for (const log of notifLogs) {
+          if (log.relatedRecordId) {
+            if (!logsByTaskId[log.relatedRecordId]) {
+              logsByTaskId[log.relatedRecordId] = [];
+            }
+            logsByTaskId[log.relatedRecordId].push(log);
+          }
+        }
+
         // Format assignments to match tasksPage UI interface: { id, name }
-        const formattedTasks = tasks.map((t) => ({
-          ...t,
-          dueDate: t.dueDate.toISOString().split("T")[0],
-          assignedUsers: t.assignments.map((a) => ({
-            id: a.employee.user?.id || a.employee.id,
-            name: a.employee.user?.name || `${a.employee.firstName} ${a.employee.lastName}`,
-          })),
-          customFields: cfValuesMap[t.id] || {}
-        }));
+        const formattedTasks = tasks.map((t) => {
+          const taskLogs = logsByTaskId[t.id] || [];
+          const latestLog = taskLogs[0] || null;
+          const hasSent = taskLogs.some((l) => l.status === "SENT");
+          const hasFailed = taskLogs.some((l) => l.status === "FAILED");
+
+          return {
+            ...t,
+            dueDate: t.dueDate.toISOString().split("T")[0],
+            assignedUsers: t.assignments.map((a) => ({
+              id: a.employee.user?.id || a.employee.id,
+              name: a.employee.user?.name || `${a.employee.firstName} ${a.employee.lastName}`,
+              email: a.employee.user?.email || null,
+            })),
+            mailDelivery: {
+              status: hasSent ? "SENT" : hasFailed ? "FAILED" : "NOT_SENT",
+              sentAt: latestLog ? (latestLog.sentAt || latestLog.createdAt) : null,
+              recipient: latestLog?.recipient || null,
+              error: latestLog?.error || null,
+              logsCount: taskLogs.length,
+            },
+            customFields: cfValuesMap[t.id] || {}
+          };
+        });
 
         return reply.status(200).send({
           success: true,

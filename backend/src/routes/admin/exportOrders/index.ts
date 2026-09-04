@@ -236,7 +236,17 @@ async function adminExportOrdersRouteGroup(
           where.status = status.toUpperCase();
         }
 
-        if (assignedEngineer) {
+        const userId = request.admin?.id;
+        const isAdmin = isAdminUser(request.admin);
+
+        // If not admin, restrict to orders assigned to this user
+        if (!isAdmin && userId) {
+          where.assignments = {
+            some: {
+              userId,
+            },
+          };
+        } else if (assignedEngineer) {
           where.assignments = {
             some: {
               user: {
@@ -2478,6 +2488,83 @@ Drawing Link: ${drawingLink}`,
       }
     },
   );
+
+  fastify.delete(
+    "/drawing/delete/:id",
+    {
+      schema: {
+        tags: ["Export Orders"],
+        summary: "Delete an engineering drawing",
+      },
+      preHandler: preHandlers,
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { id } = request.params as any;
+        const companyId = request.admin?.companyId;
+
+        if (!companyId) {
+          return reply.status(401).send({
+            success: false,
+            message: "Unauthorized. Missing company info.",
+          });
+        }
+
+        const drawing = await fastify.prisma.engineeringDrawing.findFirst({
+          where: {
+            id,
+            project: {
+              companyId,
+              deletedAt: null,
+            },
+            deletedAt: null,
+          },
+          include: {
+            project: {
+              select: {
+                salesOrderId: true,
+              },
+            },
+          },
+        });
+
+        if (!drawing) {
+          return reply.status(404).send({
+            success: false,
+            message: "Drawing not found.",
+          });
+        }
+
+        const salesOrderId = drawing.project?.salesOrderId;
+        if (!salesOrderId || !(await canManageDrawingOrder(salesOrderId, request))) {
+          return reply.status(403).send({
+            success: false,
+            message: "You can only delete drawings for sales orders assigned to you.",
+          });
+        }
+
+        await fastify.prisma.engineeringDrawing.update({
+          where: { id },
+          data: {
+            deletedAt: new Date(),
+          },
+        });
+
+        return reply.send({
+          success: true,
+          message: "Drawing deleted successfully.",
+        });
+      } catch (error: any) {
+        adminLogs.error("Failed to delete drawing", { error });
+        return reply.status(500).send({
+          success: false,
+          message: "Server error deleting drawing.",
+          error: error.message,
+        });
+      }
+    },
+  );
 }
 
 export default adminExportOrdersRouteGroup;
+

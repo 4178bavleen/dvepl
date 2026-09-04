@@ -350,6 +350,9 @@ export const exportOrdersApi = {
     apiClient.put(API_ENDPOINTS.exportOrders.updateDrawing(id), { status, rejectionReason })
       .then((res) => drawingResponseSchema.parse(res.data)),
 
+  deleteDrawing: (id: string) =>
+    apiClient.delete(API_ENDPOINTS.exportOrders.deleteDrawing(id)).then((res) => res.data),
+
   // Send a drawing to a customer via Email/WhatsApp
   sendDrawing: (data: {
     drawingId: string;

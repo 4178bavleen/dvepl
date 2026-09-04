@@ -9,6 +9,8 @@ import {
   History,
   Send,
   Upload,
+  Trash2,
+  Loader2
 } from "lucide-react";
 import React, { useState } from "react";
 import { useSalesOrderAccess } from "@/utils/salesOrderAccess";
@@ -37,6 +39,7 @@ import RevisionUploadModal from "./RevisionUploadModal";
 import SendDrawingModal from "./SendDrawingModal";
 import RevisionHistoryModal from "./RevisionHistoryModal";
 import RejectDrawingModal from "./RejectDrawingModal";
+import { ConfirmDialog } from "@/components/shared/confirmDialog";
 
 interface Props {
   drawings: EngineeringDrawing[];
@@ -64,6 +67,8 @@ export default function DrawingLibrary({
   const [revisionUploadDrawing, setRevisionUploadDrawing] = useState<EngineeringDrawing | null>(null);
   const [sendModalDrawing, setSendModalDrawing] = useState<EngineeringDrawing | null>(null);
   const [rejectDrawing, setRejectDrawing] = useState<EngineeringDrawing | null>(null);
+  const [deleteTargetDrawing, setDeleteTargetDrawing] = useState<EngineeringDrawing | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const { canWorkOnOrder } = useSalesOrderAccess();
 
@@ -113,6 +118,25 @@ export default function DrawingLibrary({
   const handleRejectClick = (drawing: EngineeringDrawing) => {
     setOpenActionsMenu(null);
     setRejectDrawing(drawing);
+  };
+
+  const handleDeleteDrawing = async () => {
+    if (!deleteTargetDrawing) return;
+    setIsDeleting(true);
+    try {
+      const { exportOrdersApi } = await import("@/services/modules");
+      await exportOrdersApi.deleteDrawing(deleteTargetDrawing.id);
+      const toast = (await import("react-hot-toast")).default;
+      toast.success("Drawing deleted successfully.");
+      setDeleteTargetDrawing(null);
+      setSelectedDrawingIds(selectedDrawingIds.filter((id) => id !== deleteTargetDrawing.id));
+      onStatusChanged?.();
+    } catch (err: any) {
+      const toast = (await import("react-hot-toast")).default;
+      toast.error(err?.response?.data?.message ?? "Failed to delete drawing.");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   // ── File open ──────────────────────────────────────────────────────────────
@@ -228,6 +252,19 @@ export default function DrawingLibrary({
               >
                 <Send className="w-3.5 h-3.5 text-primary" />
                 Send to Customer
+              </button>
+            )}
+            {workable && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setOpenActionsMenu(null);
+                  setDeleteTargetDrawing(drawing);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-red-50 text-red-600 transition-colors font-semibold text-left border-t"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                Delete Drawing
               </button>
             )}
             {!workable && (
@@ -504,6 +541,18 @@ export default function DrawingLibrary({
                 <Send className="w-3.5 h-3.5" />
               </button>
             )}
+            {workable && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeleteTargetDrawing(d);
+                }}
+                title="Delete Drawing"
+                className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-600 transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </td>
       </tr>
@@ -677,6 +726,20 @@ export default function DrawingLibrary({
           open={true}
           onClose={() => setRejectDrawing(null)}
           onRejected={onStatusChanged ?? (() => {})}
+        />
+      )}
+      {deleteTargetDrawing && (
+        <ConfirmDialog
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) setDeleteTargetDrawing(null);
+          }}
+          title="Delete Engineering Drawing"
+          description={`Are you sure you want to delete drawing ${deleteTargetDrawing.drawingNo} (${deleteTargetDrawing.title})?`}
+          confirmText="Delete"
+          variant="danger"
+          loading={isDeleting}
+          onConfirm={handleDeleteDrawing}
         />
       )}
     </div>
