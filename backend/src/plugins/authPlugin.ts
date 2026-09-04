@@ -386,6 +386,10 @@ async function authPlugin(fastify: FastifyInstance) {
         const uiAccessProfile = (request.admin as any)?.uiAccessProfile;
         const moduleKey = getModuleForRequest(request.url) ?? getModuleForPermission(allowedPermissions);
 
+        const roles: string[] = (request.admin as any)?.roles ?? [];
+        const isAdmin = roles.some((r: string) => r.toLowerCase().includes("admin"));
+        if (isAdmin) return;
+
         // Page/action access profiles are the single source of authorization.
         // Role permissions and per-user database overrides are deliberately not
         // consulted here.
